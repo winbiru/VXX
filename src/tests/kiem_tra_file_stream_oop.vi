@@ -1,4 +1,4 @@
-nhập gói/nhập xuất/chính;
+nhập gói.nhập xuất.chính.*;
 
 hàm chính() {
     đường = ".tmp_oop_file_stream.txt";

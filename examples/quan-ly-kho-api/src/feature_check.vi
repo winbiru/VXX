@@ -1,6 +1,6 @@
-nhập gói/chuẩn/chính;
-nhập diagnostics/language_features;
-nhập app/bootstrap;
+nhập gói.chuẩn.chính.*;
+nhập diagnostics.language_features.*;
+nhập app.bootstrap.*;
 
 hàm chính() {
     chạy kiểm tra tính năng();

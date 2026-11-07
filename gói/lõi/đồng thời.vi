@@ -2,8 +2,9 @@
 // Public API chọn thao tác và diễn giải snapshot ở V++; VM chỉ quản lý
 // worker thread/task registry. 0.2 chỉ truyền kết quả scalar.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 // Các hàm quản lý task/worker dùng chung registry VM; Luồng Công Việc giữ worker ID.
 hàm riêng tư đồng thời yêu cầu số nguyên(giá trị, tên hàm, nhãn) {

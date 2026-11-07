@@ -1,0 +1,35 @@
+// Hồi quy VM và AOT cho ++/--, tràn i32 và đường lỗi có bắt ngoại lệ.
+hàm tiến_lùi(value) {
+    biến result = value;
+    result++;
+    result--;
+    trả về result;
+}
+
+hàm chính() {
+    biến max = 2147483647;
+    max++;
+    in max;
+    max--;
+    in max;
+
+    biến min = -2147483648;
+    min--;
+    in min;
+    min++;
+    in min;
+
+    biến real = 1.5;
+    real++;
+    in real;
+    real--;
+    in real;
+    in tiến_lùi(42);
+
+    thử {
+        ném "aot-catch";
+    } bắt lỗi (error) {
+        in "caught:" + error;
+    };
+    in "after-catch";
+}

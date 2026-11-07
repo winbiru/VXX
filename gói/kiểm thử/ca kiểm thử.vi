@@ -1,5 +1,5 @@
 // Một ca kiểm thử có thể chạy lại, mỗi lần vẫn có setup/cleanup riêng.
-nhập gói/kiểm thử/vòng đời;
+nhập gói.kiểm thử.vòng đời.chạy ca kiểm thử;
 
 lớp công khai Ca Kiểm Thử {
     hàm công khai khởi tạo(thân, thiết lập = rỗng, dọn dẹp = rỗng) {

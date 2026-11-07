@@ -1,0 +1,39 @@
+// Kiểm tra đường đọc chuỗi JSON: ký tự điều khiển, Unicode và escape.
+nhập gói.dữ liệu.json.json.*;
+
+hàm chính() {
+    // Toàn bộ U+0000..U+001F đều bị từ chối khi xuất hiện trực tiếp.
+    bị từ chối = 0;
+    lặp(i = 0; i < 32; i++) {
+        ký tự = chuỗi từ byte máy ảo([i]);
+        thử {
+            json phân tích("\"" + ký tự + "\"");
+        } bắt lỗi (lỗi) {
+            bị từ chối += 1;
+        };
+    };
+    in bị từ chối == 32;
+
+    in json phân tích("\" \"") == " ";
+    in json phân tích("\"Việt Nam 🚀\"") == "Việt Nam 🚀";
+    in json phân tích("\"á\" ") == "á";
+    in json phân tích("\"\\u0000\\u001f\\n\\r\\t\\b\\f\"") ==
+        chuỗi từ byte máy ảo([0, 31, 10, 13, 9, 8, 12]);
+    in json phân tích("\"\\uD83D\\uDE80\"") == "🚀";
+    in json phân tích("true") == đúng;
+    in json phân tích("false") == sai;
+    in json phân tích("null") == rỗng;
+    in json phân tích("[-17,-16,0,4095,4096]")[4] == 4096;
+
+    mẫu lỗi = ["\"\\uD83D\"", "\"\\uDE80\"", "\"\\uD83D\\u0041\"",
+                   "\"\\x00\"", "\"chưa đóng", "{\"k\":1,}", "[1,]", "1 2"];
+    bị từ chối = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(mẫu lỗi); i++) {
+        thử {
+            json phân tích(mẫu lỗi[i]);
+        } bắt lỗi (lỗi) {
+            bị từ chối += 1;
+        };
+    };
+    in bị từ chối == máy ảo lấy độ dài(mẫu lỗi);
+};

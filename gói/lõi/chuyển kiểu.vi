@@ -44,7 +44,7 @@ hàm riêng tư chuyển kiểu bỏ khoảng trắng đầu(văn bản) {
     i = 0;
     n = máy ảo lấy độ dài(văn bản);
     đang bỏ = đúng;
-    lặp(vòng = 0; i < n && đang bỏ; vòng++) {
+    khi (i < n && đang bỏ) {
         nếu (chuyển kiểu là khoảng trắng đầu(văn bản[i])) {
             i = i + 1;
         } hoặc {
@@ -70,7 +70,7 @@ hàm riêng tư chuyển kiểu phân tích số nguyên(văn bản) {
 
     kết quả = 0;
     có chữ số = sai;
-    lặp(vòng = 0; i < n; vòng++) {
+    khi (i < n) {
         chữ số = chuyển kiểu chữ số(văn bản[i]);
         nếu (chữ số < 0) { chuyển kiểu lỗi số nguyên(); };
         có chữ số = đúng;
@@ -172,7 +172,7 @@ hàm riêng tư chuyển kiểu phân tích số thực(văn bản) {
     giá trị = 0.0;
     có chữ số = sai;
     đang đọc = đúng;
-    lặp(vòng = 0; i < n && đang đọc; vòng++) {
+    khi (i < n && đang đọc) {
         chữ số = chuyển kiểu chữ số(văn bản[i]);
         nếu (chữ số < 0) {
             đang đọc = sai;
@@ -188,7 +188,7 @@ hàm riêng tư chuyển kiểu phân tích số thực(văn bản) {
             i = i + 1;
             hệ số = 0.1;
             đang đọc = đúng;
-            lặp(vòng = 0; i < n && đang đọc; vòng++) {
+            khi (i < n && đang đọc) {
                 chữ số = chuyển kiểu chữ số(văn bản[i]);
                 nếu (chữ số < 0) {
                     đang đọc = sai;
@@ -216,7 +216,7 @@ hàm riêng tư chuyển kiểu phân tích số thực(văn bản) {
                 };
             };
             đang đọc = đúng;
-            lặp(vòng = 0; i < n && đang đọc; vòng++) {
+            khi (i < n && đang đọc) {
                 chữ số = chuyển kiểu chữ số(văn bản[i]);
                 nếu (chữ số < 0) {
                     đang đọc = sai;

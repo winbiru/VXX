@@ -1,5 +1,5 @@
-nhập gói / lượng tử / nền;
-nhập gói / bộ sưu tập / danh sách;
+nhập gói . lượng tử . nền.lượng tử yêu cầu nguyên;
+nhập gói . bộ sưu tập . danh sách.thêm;
 // Mạch lưu chỉ dẫn, không lưu bản sao trạng thái vật lý của từng qubit.
 lớp công khai Mạch Lượng Tử {
     hàm công khai khởi tạo(số qubit, số bit = rỗng) {

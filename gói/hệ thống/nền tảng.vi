@@ -1,7 +1,7 @@
 // Module: hệ thống.nền tảng
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/thời gian/đơn điệu;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Nền Tảng {
@@ -27,7 +27,7 @@ lớp công khai Nền Tảng {
         // EINTR là 4 trên các ABI POSIX được hỗ trợ; máy trả errno nguyên tử
         // cùng syscall, không cần đọc trạng thái errno qua một FFI riêng.
         mã ngắt = 4;
-        lặp (vòng = 0; còn lại > 0; vòng++) {
+        khi (còn lại > 0) {
             đợt = còn lại;
             nếu (đợt > 999) { đợt = 999; };
             hạn đợt = thời gian đơn điệu mili giây() + đợt;

@@ -1,1 +1,1 @@
-nhập gói/bộ sưu tập/ngăn xếp; nhập gói/bộ sưu tập/kiểu danh sách; hàm chính() { a = Ngăn Xếp(); b = Ngăn Xếp(); a.đẩy(42); in a.rút(); in b.trống(); ds = Danh Sách([2]); ds.thêm(3); in ds.xóa(0); in ds.tại(0); };
+nhập gói.bộ sưu tập.ngăn xếp.*; nhập gói.bộ sưu tập.kiểu danh sách.*; hàm chính() { a = Ngăn Xếp(); b = Ngăn Xếp(); a.đẩy(42); in a.rút(); in b.trống(); ds = Danh Sách([2]); ds.thêm(3); in ds.xóa(0); in ds.tại(0); };

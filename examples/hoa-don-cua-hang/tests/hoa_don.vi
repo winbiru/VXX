@@ -1,4 +1,4 @@
-nhập ../src/hoa_don;
+nhập ..src.hoa_don.*;
 
 hàm chính() {
     hóaĐơn = HóaĐơn(120000, 15000, 10000);

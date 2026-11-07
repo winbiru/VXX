@@ -1,5 +1,5 @@
 // Kiểm chứng đường dẫn Windows bằng V++ trên mọi hệ điều hành.
-nhập gói/nhập xuất/đường dẫn;
+nhập gói.nhập xuất.đường dẫn.*;
 
 hàm chính() {
     b = "\\";

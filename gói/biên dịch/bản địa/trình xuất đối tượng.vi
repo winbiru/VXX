@@ -1,0 +1,253 @@
+// Shared native object publication; imported by both compiler and tests.
+// Temporary files are published atomically only after validation succeeds.
+
+// Mỗi định dạng object dùng bộ đọc archive tương ứng với đích biên dịch.
+// Trên macOS, VPP_NATIVE_TARGET có thể yêu cầu COFF ngay cả khi host là Mach-O.
+hàm đọc đối tượng kho theo đích(kho lưu trữ, tiền tố, windows) {
+    nếu (windows == 1) { trả về coff kho lưu trữ điểm vào(kho lưu trữ, tiền tố); };
+    trả về thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, tiền tố);
+};
+
+// Xuất object có thể liên kết; lời gọi runtime được giải quyết khi liên kết.
+// Ghi tệp tạm rồi đổi tên để giữ nguyên đầu ra cũ nếu thất bại.
+hàm ghi tệp đối tượng(kho lưu trữ, tiền tố, kết xuất, nguồn đầu vào, windows) {
+    nếu (thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    biến chiều dài = đọc đối tượng kho theo đích(kho lưu trữ, tiền tố, windows);
+    nếu (chiều dài <= 0) { trả về thực thi liên kết báo lỗi("V++ linker: invalid standalone object\n"); };
+    nếu (byte dài(kho lưu trữ) != tiền tố + chiều dài + 4) { trả về thực thi liên kết báo lỗi("V++ linker: truncated standalone object archive\n"); };
+    biến tạm = byte mới();
+    nếu (tạm <= 0) { trả về -1; };
+    biến mã trạng thái = -1;
+    biến mã tệp mở = -1;
+    biến đã tạo = 0;
+    nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, 0) == 0) {
+        mã tệp mở = thực thi liên kết tạm mở(tạm);
+        nếu (mã tệp mở >= 0) { đã tạo = 1; };
+    };
+    nếu (mã tệp mở >= 0) {
+        nếu (thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, tiền tố, chiều dài) == chiều dài) {
+            mã trạng thái = 0;
+        };
+        nếu (máy đóng(mã tệp mở) != 0) { mã trạng thái = -1; };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (thực thi liên kết công bố(tạm, kết xuất) != 0) { mã trạng thái = -1; };
+    };
+    nếu (đã tạo == 1) {
+        // On successful rename the temporary pathname no longer exists.
+        máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm)));
+    };
+    byte hủy(tạm);
+    trả về mã trạng thái;
+};
+
+// Merge packed Windows COFF modules and publish atomically. Runtime-only
+// objects share the same writer as multi-module application objects.
+hàm ghi coff hợp nhất(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    biến hợp nhất = byte mới();
+    biến đóng gói = byte mới();
+    biến trạng thái = 0;
+    nếu (hợp nhất <= 0) { trạng thái = -1; };
+    nếu (đóng gói <= 0) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        biến dài hợp nhất = coff hợp nhất mô đun(kho lưu trữ, hợp nhất);
+        nếu (dài hợp nhất <= 0) {
+            thực thi liên kết báo lỗi("V++ COFF: failed to merge source modules\n");
+            trạng thái = -1;
+        } hoặc {
+            nếu (byte đẩy số nguyên ba mươi hai bit(đóng gói, dài hợp nhất) != 0) { trạng thái = -1; };
+            nếu (trạng thái == 0) {
+                nếu (byte nối(đóng gói, hợp nhất) != 0) { trạng thái = -1; };
+            };
+        };
+    };
+    nếu (trạng thái == 0) {
+        nếu (ghi tệp đối tượng(đóng gói, 0, kết xuất, nguồn đầu vào, 1) != 0) {
+            thực thi liên kết báo lỗi("V++ COFF: failed to publish merged object\n");
+            trạng thái = -1;
+        };
+    };
+    nếu (hợp nhất > 0) { byte hủy(hợp nhất); };
+    nếu (đóng gói > 0) { byte hủy(đóng gói); };
+    trả về trạng thái;
+};
+
+// Merge canonical ARM64 Mach-O objects using V++ alone. Keep the existing
+// Apple ld -r path as the default until the native merge gate is verified.
+hàm bật hợp nhất macho bản địa() {
+    biến tùy chọn = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_MACHO_REL_LINK");
+    nếu (tùy chọn <= 0) { trả về 0; };
+    biến một = "1";
+    biến bật = byte bằng(tùy chọn, một);
+    byte hủy(một);
+    byte hủy(tùy chọn);
+    trả về bật;
+};
+
+// Optional freestanding Mach-O executable generation without Apple ld.
+hàm bật macho executable bản địa() {
+    biến tùy chọn = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_MACHO_EXE_LINK");
+    nếu (tùy chọn <= 0) { trả về 0; };
+    biến một = "1";
+    biến bật = byte bằng(tùy chọn, một);
+    byte hủy(một);
+    byte hủy(tùy chọn);
+    trả về bật;
+};
+
+// Apple requires a code signature on native arm64 binaries. Codesign adds
+// LC_CODE_SIGNATURE after the V++ linker finishes the Mach-O image.
+hàm macho executable ký tệp(tạm) {
+    thực thi liên kết các đối số đặt lại();
+    nếu (thực thi liên kết các đối số hằng văn bản("/usr/bin/codesign") < 0) { trả về -1; };
+    nếu (thực thi liên kết các đối số hằng văn bản("--force") < 0) { trả về -1; };
+    nếu (thực thi liên kết các đối số hằng văn bản("--sign") < 0) { trả về -1; };
+    nếu (thực thi liên kết các đối số hằng văn bản("-") < 0) { trả về -1; };
+    // A temporary path gets a unique suffix; an implicit codesign identifier
+    // would make two otherwise identical executables differ byte-for-byte.
+    nếu (thực thi liên kết các đối số hằng văn bản("--identifier") < 0) { trả về -1; };
+    nếu (thực thi liên kết các đối số hằng văn bản("org.vpp.native") < 0) { trả về -1; };
+    nếu (thực thi liên kết các đối số đẩy(tạm) < 0) { trả về -1; };
+    biến argc = máy đọc số nguyên ba mươi hai bit(3800);
+    máy ghi số nguyên ba mươi hai bit(134222848 + argc * 8, 0);
+    máy ghi số nguyên ba mươi hai bit(134222848 + argc * 8 + 4, 0);
+    trả về thực thi liên kết khởi chạy đợi();
+};
+
+hàm ghi macho executable(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    nếu (thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    biến hợp nhất = byte mới();
+    biến exe = byte mới();
+    biến tạm = byte mới();
+    biến trạng thái = -1;
+    biến đã tạo = 0;
+    biến fd = -1;
+    nếu (hợp nhất <= 0 || exe <= 0 || tạm <= 0) { trả về -1; };
+    nếu (macho hợp nhất mô đun(kho lưu trữ, hợp nhất) > 0) {
+        biến runtime đường = thực thi bộ nhớ đệm giá trị môi trường("VPP_MACOS_RUNTIME_OBJECT");
+        biến tạo = -1;
+        nếu (runtime đường > 0 && byte dài(runtime đường) > 0) {
+            biến runtime = byte mới();
+            nếu (runtime > 0 && elf bản địa đọc tệp(runtime đường, runtime) == 0) {
+                tạo = macho rt tạo(hợp nhất, runtime, exe);
+            };
+            nếu (runtime > 0) { byte hủy(runtime); };
+        } hoặc { tạo = macho tạo executable(hợp nhất, exe); };
+        nếu (runtime đường > 0) { byte hủy(runtime đường); };
+        nếu (tạo > 0) {
+            nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, -1) == 0) {
+                fd = thực thi liên kết tạm mở(tạm);
+                nếu (fd >= 0) { đã tạo = 1; };
+            };
+            nếu (fd >= 0) {
+                biến ptr = thực thi các byte ô nhớ(exe);
+                nếu (ptr >= 0 && thực thi ghi tất cả(fd, thực thi nội dung đệm(ptr), byte dài(exe)) == byte dài(exe)) {
+                    nếu (máy đặt quyền tệp mở(fd, 448) == 0) { trạng thái = 0; };
+                };
+                nếu (máy đóng(fd) != 0) { trạng thái = -1; };
+            };
+            nếu (trạng thái == 0 && macho executable ký tệp(tạm) != 0) { trạng thái = -1; };
+            nếu (trạng thái == 0 && thực thi liên kết executable sẵn sàng(tạm) != 0) { trạng thái = -1; };
+            nếu (trạng thái == 0 && thực thi liên kết công bố(tạm, kết xuất) != 0) { trạng thái = -1; };
+        } hoặc {
+            thực thi liên kết báo lỗi("V++ Mach-O: invalid executable input, symbol or relocation\n");
+        };
+    } hoặc {
+        thực thi liên kết báo lỗi("V++ Mach-O: failed to merge source objects\n");
+    };
+    nếu (đã tạo == 1) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm))); };
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ Mach-O: cannot link freestanding executable or sign it\n"); };
+    byte hủy(hợp nhất);
+    byte hủy(exe);
+    byte hủy(tạm);
+    trả về trạng thái;
+};
+
+hàm ghi macho hợp nhất(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    biến hợp nhất = byte mới();
+    biến đóng gói = byte mới();
+    biến trạng thái = 0;
+    nếu (hợp nhất <= 0 || đóng gói <= 0) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        biến dài hợp nhất = macho hợp nhất mô đun(kho lưu trữ, hợp nhất);
+        nếu (dài hợp nhất <= 0) {
+            thực thi liên kết báo lỗi("V++ Mach-O: invalid relocatable object archive\n");
+            trạng thái = -1;
+        } hoặc {
+            nếu (byte đẩy số nguyên ba mươi hai bit(đóng gói, dài hợp nhất) != 0) { trạng thái = -1; };
+            nếu (trạng thái == 0 && byte nối(đóng gói, hợp nhất) != 0) { trạng thái = -1; };
+        };
+    };
+    nếu (trạng thái == 0) {
+        nếu (ghi tệp đối tượng(đóng gói, 0, kết xuất, nguồn đầu vào, 0) != 0) { trạng thái = -1; };
+    };
+    nếu (hợp nhất > 0) { byte hủy(hợp nhất); };
+    nếu (đóng gói > 0) { byte hủy(đóng gói); };
+    trả về trạng thái;
+};
+
+// Link canonical Windows COFF source units into a CRT-free PE32+ executable.
+// A temporary file is renamed only after every byte has been written.
+hàm ghi pe executable(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    nếu (thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    biến đối tượng = byte mới();
+    biến exe = byte mới();
+    biến tạm = byte mới();
+    biến trạng thái = -1;
+    biến đã tạo = 0;
+    biến fd = -1;
+    nếu (đối tượng <= 0 || exe <= 0 || tạm <= 0) { trả về -1; };
+    biến đầu tiên = coff kho lưu trữ điểm vào(kho lưu trữ, 0);
+    nếu (đầu tiên <= 0) { thực thi liên kết báo lỗi("V++ PE: invalid first COFF object\n"); };
+    nếu (đầu tiên > 0) {
+        nếu (đầu tiên + 4 == byte dài(kho lưu trữ)) {
+            biến phần = byte cắt(kho lưu trữ, 4, đầu tiên);
+            nếu (phần > 0) { byte nối(đối tượng, phần); byte hủy(phần); };
+        } hoặc {
+            coff hợp nhất mô đun(kho lưu trữ, đối tượng);
+        };
+    };
+    nếu (byte dài(đối tượng) > 0) {
+        biến gói = byte mới();
+        nếu (gói > 0) {
+            byte đẩy số nguyên ba mươi hai bit(gói, byte dài(đối tượng));
+            byte nối(gói, đối tượng);
+            nếu (coff kho lưu trữ điểm vào(gói, 0) == byte dài(đối tượng)) {
+                biến runtime đường = thực thi bộ nhớ đệm giá trị môi trường("VPP_WINDOWS_RUNTIME_OBJECT");
+                biến tạo = -1;
+                nếu (runtime đường > 0 && byte dài(runtime đường) > 0) {
+                    biến runtime = byte mới();
+                    nếu (runtime > 0 && elf bản địa đọc tệp(runtime đường, runtime) == 0) {
+                        tạo = pe rt tạo(đối tượng, runtime, exe);
+                    };
+                    nếu (runtime > 0) { byte hủy(runtime); };
+                } hoặc { tạo = pe tạo executable(đối tượng, exe); };
+                nếu (runtime đường > 0) { byte hủy(runtime đường); };
+                nếu (tạo > 0) {
+                    nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, -1) == 0) {
+                        fd = thực thi liên kết tạm mở(tạm);
+                        nếu (fd >= 0) { đã tạo = 1; };
+                    };
+                    nếu (fd >= 0) {
+                        biến ptr = thực thi các byte ô nhớ(exe);
+                        nếu (ptr >= 0) {
+                            nếu (thực thi ghi tất cả(fd, thực thi nội dung đệm(ptr), byte dài(exe)) == byte dài(exe)) { trạng thái = 0; };
+                        };
+                        nếu (máy đóng(fd) != 0) { trạng thái = -1; };
+                    };
+                    nếu (trạng thái == 0 && thực thi liên kết công bố(tạm, kết xuất) != 0) { trạng thái = -1; };
+                };
+            } hoặc {
+                thực thi liên kết báo lỗi("V++ PE: invalid merged COFF object\n");
+            };
+            byte hủy(gói);
+        };
+    };
+    nếu (đã tạo == 1) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm))); };
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ PE: unsupported COFF symbol, relocation or archive\n"); };
+    byte hủy(đối tượng);
+    byte hủy(exe);
+    byte hủy(tạm);
+    trả về trạng thái;
+};
+

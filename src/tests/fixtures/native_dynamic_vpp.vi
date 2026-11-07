@@ -1,0 +1,28 @@
+hàm tạo bộ đếm AOT(n) {
+    trả về hàm(bước = 1) { n += bước; trả về n; };
+};
+hàm lỗi AOT() { ném ["ngoại lệ", 42]; };
+hàm cộng AOT(a, b = 2) { trả về a + b; };
+lớp Bộ Đếm AOT {
+    hàm công khai khởi tạo(n) { mình.n = n; };
+    hàm công khai tăng() { mình.n = mình.n + 1; trả về mình.n; };
+};
+hàm chính() {
+    in cộng AOT(40);
+    in cộng AOT(40, 3);
+    in -2147483648 - 1;
+    in 1.25 + 2.5;
+    n = 1.75; n++; in n;
+    in "Tiếng Việt 🐱"[11];
+    ds = [1, 2]; thêm(ds, 3); ds[1] = 9; in ds;
+    m = {"a": ds}; in m["a"][1];
+    f = tạo bộ đếm AOT(40); in f(); in f(2);
+    b = Bộ Đếm AOT(8); in b.tăng();
+    lặp(i = 0; i < 3; i++) { in i; };
+    chọn(2) { ca 1: { in "sai"; } ca 2: { in "đúng"; } mặc định: { in "sai"; } };
+    thử { lỗi AOT(); } bắt lỗi(e) { in e; };
+    // Force collection while both a captured cell and an instance are live.
+    lặp(i = 0; i < 16000; i++) { rác = [i]; thêm(rác, rác); };
+    in f(); in b.tăng(); in ds;
+    in "VPP DYNAMIC AOT OK";
+};

@@ -1,0 +1,356 @@
+// Microsoft AMD64 COFF object for the V++ i32 frontend. This writer owns the
+// .text section, REL32 external calls, symbols and COFF string table.
+
+// Validate an archived object before extracting or publishing it. The Mach-O
+// and ELF archive reader intentionally rejects COFF headers, so COFF needs
+// its own bounded reader. All offsets are relative to the 20-byte COFF header.
+hàm coff kho lưu trữ điểm vào(kho, độ lệch) {
+    biến tổng = byte dài(kho);
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch > tổng - 4) { trả về -1; };
+    biến dài = byte đọc số nguyên ba mươi hai bit(kho, độ lệch);
+    nếu (dài < 83) { trả về -1; };
+    nếu (dài > tổng - độ lệch - 4) { trả về -1; };
+    biến gốc = độ lệch + 4;
+    nếu (byte lấy(kho, gốc) != 100) { trả về -1; };
+    nếu (byte lấy(kho, gốc + 1) != 134) { trả về -1; };
+    nếu (byte lấy(kho, gốc + 2) != 1) { trả về -1; };
+    nếu (byte lấy(kho, gốc + 3) != 0) { trả về -1; };
+    nếu (byte lấy(kho, gốc + 16) != 0) { trả về -1; };
+    nếu (byte lấy(kho, gốc + 17) != 0) { trả về -1; };
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 40) != 60) { trả về -1; };
+    biến kích thước mã = byte đọc số nguyên ba mươi hai bit(kho, gốc + 36);
+    nếu (kích thước mã <= 0) { trả về -1; };
+    nếu (kích thước mã > dài - 60) { trả về -1; };
+    biến độ lệch tái định vị = 60 + kích thước mã;
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 44) != độ lệch tái định vị) { trả về -1; };
+    biến số tái định vị = byte lấy(kho, gốc + 52) + byte lấy(kho, gốc + 53) * 256;
+    nếu (số tái định vị > (dài - độ lệch tái định vị) / 10) { trả về -1; };
+    biến độ lệch ký hiệu = độ lệch tái định vị + số tái định vị * 10;
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 8) != độ lệch ký hiệu) { trả về -1; };
+    biến số ký hiệu = byte đọc số nguyên ba mươi hai bit(kho, gốc + 12);
+    nếu (số ký hiệu < 0) { trả về -1; };
+    nếu (số ký hiệu > (dài - độ lệch ký hiệu - 4) / 18) { trả về -1; };
+    biến đầu chuỗi = độ lệch ký hiệu + số ký hiệu * 18;
+    biến chiều dài chuỗi = byte đọc số nguyên ba mươi hai bit(kho, gốc + đầu chuỗi);
+    nếu (chiều dài chuỗi < 4) { trả về -1; };
+    nếu (chiều dài chuỗi != dài - đầu chuỗi) { trả về -1; };
+    trả về dài;
+};
+
+// Mach-O registry names have a leading underscore; AMD64 COFF does not.
+hàm coff thêm ký hiệu(các ký hiệu, các chuỗi, tên định danh, đã định nghĩa, vị trí) {
+    nếu (tên định danh <= 0) { trả về -1; };
+    biến n = byte dài(tên định danh) - 1;
+    biến trạng thái = 0;
+    nếu (n <= 0) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        nếu (n <= 8) {
+            lặp (i = 0; i < 8; i++) {
+                biến ch = 0;
+                nếu (i < n) { ch = byte lấy(tên định danh, i + 1); };
+                nếu (byte thêm(các ký hiệu, ch) != 0) { trạng thái = -1; thoát; };
+            };
+        } hoặc {
+            nếu (đối tượng i32(các ký hiệu, 0) != 0) { trạng thái = -1; };
+            nếu (trạng thái == 0) { trạng thái = đối tượng i32(các ký hiệu, byte dài(các chuỗi) + 4); };
+            lặp (i = 1; i <= n; i++) {
+                nếu (trạng thái != 0) { thoát; };
+                nếu (byte thêm(các chuỗi, byte lấy(tên định danh, i)) != 0) { trạng thái = -1; };
+            };
+            nếu (trạng thái == 0) { trạng thái = byte thêm(các chuỗi, 0); };
+        };
+    };
+    nếu (trạng thái == 0) { trạng thái = đối tượng i32(các ký hiệu, vị trí); };
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, đã định nghĩa); }; // section 1 or undefined 0
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, 0); };
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, 32); }; // function type 0x20
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, 0); };
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, 2); }; // external
+    nếu (trạng thái == 0) { trạng thái = byte thêm(các ký hiệu, 0); }; // aux count
+    byte hủy(tên định danh);
+    trả về trạng thái;
+};
+
+hàm coff thêm tái định vị(các mục tái định vị, vị trí, ký hiệu) {
+    nếu (đối tượng i32(các mục tái định vị, vị trí) != 0) { trả về -1; };
+    nếu (đối tượng i32(các mục tái định vị, ký hiệu) != 0) { trả về -1; };
+    nếu (byte thêm(các mục tái định vị, 4) != 0) { trả về -1; }; // IMAGE_REL_AMD64_REL32
+    trả về byte thêm(các mục tái định vị, 0);
+};
+
+hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, lời gọi lõi) {
+    nếu (mã máy == đối tượng) { trả về -1; };
+    nếu (đầu tiên < 0) { trả về -1; };
+    nếu (cuối cùng <= đầu tiên) { trả về -1; };
+    biến n = byte dài(mã máy);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 1700000) { trả về -1; };
+    nếu (byte dài(các điểm bắt đầu) != (cuối cùng - đầu tiên) * 4) { trả về -1; };
+    nếu (byte làm rỗng(đối tượng) != 0) { trả về -1; };
+    biến các ký hiệu = byte mới();
+    biến các chuỗi = byte mới();
+    biến các mục tái định vị = byte mới();
+    biến trạng thái = 0;
+    nếu (các ký hiệu <= 0) { trạng thái = -1; };
+    nếu (các chuỗi <= 0) { trạng thái = -1; };
+    nếu (các mục tái định vị <= 0) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        lặp (id = đầu tiên; id < cuối cùng; id++) {
+            biến vị trí hàm = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (id - đầu tiên) * 4);
+            nếu (vị trí hàm < 0) { trạng thái = -1; thoát; };
+            nếu (vị trí hàm >= n) { trạng thái = -1; thoát; };
+            nếu (coff thêm ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu hàm(sổ đăng ký, id, điểm vào mã định danh), 1, vị trí hàm) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    biến số hàm = 0;
+    nếu (trạng thái == 0) {
+        biến độ lệch = 0;
+        khi (độ lệch < byte dài(sổ đăng ký)) {
+            nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { trạng thái = -1; thoát; };
+            biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+            nếu (kích cỡ <= 0) { trạng thái = -1; thoát; };
+            nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { trạng thái = -1; thoát; };
+            nếu (có tham chiếu hàm(các phần nhập, số hàm) == 1) {
+                nếu (số hàm >= đầu tiên) { nếu (số hàm < cuối cùng) { trạng thái = -1; thoát; }; };
+                nếu (coff thêm ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu hàm(sổ đăng ký, số hàm, điểm vào mã định danh), 0, 0) != 0) { trạng thái = -1; thoát; };
+            };
+            độ lệch = độ lệch + 8 + kích cỡ;
+            số hàm = số hàm + 1;
+        };
+    };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < byte dài(các phần nhập); i = i + 8) {
+            nếu (i + 8 > byte dài(các phần nhập)) { trạng thái = -1; thoát; };
+            biến đích kiểm tra = byte đọc số nguyên ba mươi hai bit(các phần nhập, i + 4);
+            nếu (đích kiểm tra < 0) { trạng thái = -1; thoát; };
+            nếu (đích kiểm tra >= số hàm) { trạng thái = -1; thoát; };
+        };
+    };
+    nếu (trạng thái == 0) {
+        lặp (id = 0; id < 82; id++) {
+            nếu (có tham chiếu hàm(lời gọi lõi, id) == 1) {
+                nếu (coff thêm ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(id), 0, 0) != 0) { trạng thái = -1; thoát; };
+            };
+        };
+    };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < byte dài(các phần nhập); i = i + 8) {
+            biến vị trí lời gọi nhập = byte đọc số nguyên ba mươi hai bit(các phần nhập, i);
+            biến đích tái định vị = byte đọc số nguyên ba mươi hai bit(các phần nhập, i + 4);
+            nếu (vị trí lời gọi nhập < 0) { trạng thái = -1; thoát; };
+            nếu (vị trí lời gọi nhập + 4 > n) { trạng thái = -1; thoát; };
+            nếu (coff thêm tái định vị(các mục tái định vị, vị trí lời gọi nhập, chỉ mục ký hiệu nhập(các phần nhập, đầu tiên, cuối cùng, đích tái định vị)) != 0) { trạng thái = -1; thoát; };
+        };
+        lặp (i = 0; i < byte dài(lời gọi lõi); i = i + 8) {
+            biến vị trí lời gọi lõi = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, i);
+            biến id = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, i + 4);
+            nếu (vị trí lời gọi lõi < 0) { trạng thái = -1; thoát; };
+            nếu (vị trí lời gọi lõi + 4 > n) { trạng thái = -1; thoát; };
+            nếu (id < 0) { trạng thái = -1; thoát; };
+            nếu (id >= 82) { trạng thái = -1; thoát; };
+            nếu (coff thêm tái định vị(các mục tái định vị, vị trí lời gọi lõi, chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, số hàm, id)) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    nếu (trạng thái == 0) {
+        biến số tái định vị = byte dài(các mục tái định vị) / 10;
+        biến số ký hiệu = byte dài(các ký hiệu) / 18;
+        nếu (số tái định vị * 10 != byte dài(các mục tái định vị)) { trạng thái = -1; };
+        nếu (số ký hiệu * 18 != byte dài(các ký hiệu)) { trạng thái = -1; };
+        nếu (số tái định vị > 65535) { trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            biến đoạn tái định vị = 60 + n;
+            biến đoạn ký hiệu = đoạn tái định vị + byte dài(các mục tái định vị);
+            // The machine and section count are each 16-bit; write separately.
+            byte thêm(đối tượng, 100); byte thêm(đối tượng, 134); // IMAGE_FILE_MACHINE_AMD64
+            byte thêm(đối tượng, 1); byte thêm(đối tượng, 0); // number of sections
+            đối tượng i32(đối tượng, 0); // deterministic timestamp
+            đối tượng i32(đối tượng, đoạn ký hiệu);
+            đối tượng i32(đối tượng, số ký hiệu);
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // no optional header
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // characteristics
+            đối tượng tên định danh(đối tượng, ".text", 8);
+            đối tượng i32(đối tượng, 0); // physical/virtual size
+            đối tượng i32(đối tượng, 0); // virtual address
+            đối tượng i32(đối tượng, n);
+            đối tượng i32(đối tượng, 60);
+            đối tượng i32(đối tượng, đoạn tái định vị);
+            đối tượng i32(đối tượng, 0); // line numbers
+            byte thêm(đối tượng, số tái định vị % 256);
+            byte thêm(đối tượng, số tái định vị / 256);
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // line number count
+            đối tượng i32(đối tượng, 1615855648); // .text: code, execute, read, align 16
+            nếu (byte dài(đối tượng) != 60) { trạng thái = -1; };
+            nếu (trạng thái == 0) { trạng thái = byte nối(đối tượng, mã máy); };
+            nếu (trạng thái == 0) { trạng thái = byte nối(đối tượng, các mục tái định vị); };
+            nếu (trạng thái == 0) { trạng thái = byte nối(đối tượng, các ký hiệu); };
+            nếu (trạng thái == 0) { trạng thái = đối tượng i32(đối tượng, 4 + byte dài(các chuỗi)); };
+            nếu (trạng thái == 0) { trạng thái = byte nối(đối tượng, các chuỗi); };
+        };
+    };
+    nếu (các ký hiệu > 0) { byte hủy(các ký hiệu); };
+    nếu (các chuỗi > 0) { byte hủy(các chuỗi); };
+    nếu (các mục tái định vị > 0) { byte hủy(các mục tái định vị); };
+    nếu (trạng thái != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    trả về byte dài(đối tượng);
+};
+
+// The self-hosted compiler emits one .text section per source unit. Merge
+// those restricted COFF records into another valid AMD64 COFF ET_REL analogue
+// without using an external partial linker. All symbol and relocation indices
+// are rebased, and every module starts at a 16-byte boundary.
+hàm coff nối vùng(đích, nguồn, bắt đầu, kích thước) {
+    nếu (kích thước < 0) { trả về -1; };
+    nếu (bắt đầu < 0) { trả về -1; };
+    nếu (kích thước > byte dài(nguồn) - bắt đầu) { trả về -1; };
+    nếu (kích thước == 0) { trả về 0; };
+    biến phần = byte cắt(nguồn, bắt đầu, kích thước);
+    nếu (phần <= 0) { trả về -1; };
+    biến trạng thái = byte nối(đích, phần);
+    byte hủy(phần);
+    trả về trạng thái;
+};
+
+hàm coff xuất hợp nhất(đối tượng, mã máy, các mục tái định vị, các ký hiệu, các chuỗi) {
+    biến n = byte dài(mã máy);
+    biến r = byte dài(các mục tái định vị);
+    biến s = byte dài(các ký hiệu);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 1700000) { trả về -1; };
+    nếu (r < 0) { trả về -1; };
+    nếu (s <= 0) { trả về -1; };
+    nếu (r % 10 != 0) { trả về -1; };
+    nếu (s % 18 != 0) { trả về -1; };
+    nếu (r / 10 > 65535) { trả về -1; };
+    nếu (byte làm rỗng(đối tượng) != 0) { trả về -1; };
+    biến vị trí ký hiệu = 60 + n + r;
+    byte thêm(đối tượng, 100); byte thêm(đối tượng, 134);
+    byte thêm(đối tượng, 1); byte thêm(đối tượng, 0);
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, vị trí ký hiệu);
+    đối tượng i32(đối tượng, s / 18);
+    byte thêm(đối tượng, 0); byte thêm(đối tượng, 0);
+    byte thêm(đối tượng, 0); byte thêm(đối tượng, 0);
+    đối tượng tên định danh(đối tượng, ".text", 8);
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, n);
+    đối tượng i32(đối tượng, 60);
+    đối tượng i32(đối tượng, 60 + n);
+    đối tượng i32(đối tượng, 0);
+    byte thêm(đối tượng, (r / 10) % 256);
+    byte thêm(đối tượng, (r / 10) / 256);
+    byte thêm(đối tượng, 0); byte thêm(đối tượng, 0);
+    đối tượng i32(đối tượng, 1615855648);
+    nếu (byte dài(đối tượng) != 60) { trả về -1; };
+    nếu (byte nối(đối tượng, mã máy) != 0) { trả về -1; };
+    nếu (byte nối(đối tượng, các mục tái định vị) != 0) { trả về -1; };
+    nếu (byte nối(đối tượng, các ký hiệu) != 0) { trả về -1; };
+    nếu (đối tượng i32(đối tượng, 4 + byte dài(các chuỗi)) != 0) { trả về -1; };
+    nếu (byte nối(đối tượng, các chuỗi) != 0) { trả về -1; };
+    trả về byte dài(đối tượng);
+};
+
+// Read a packed COFF archive (length + bytes for each source object). The
+// existing caller already removed implicit runtime objects from the archive.
+hàm coff hợp nhất mô đun(kho, đối tượng) {
+    nếu (kho == đối tượng) { trả về -1; };
+    biến mã máy = byte mới();
+    biến tái định vị = byte mới();
+    biến bảng ký hiệu = byte mới();
+    biến chuỗi = byte mới();
+    biến trạng thái = 0;
+    nếu (mã máy <= 0) { trạng thái = -1; };
+    nếu (tái định vị <= 0) { trạng thái = -1; };
+    nếu (bảng ký hiệu <= 0) { trạng thái = -1; };
+    nếu (chuỗi <= 0) { trạng thái = -1; };
+    biến vị trí = 0;
+    biến số mô đun = 0;
+    khi (trạng thái == 0) {
+        nếu (vị trí >= byte dài(kho)) { thoát; };
+        nếu (số mô đun >= 128) { trạng thái = -1; thoát; };
+        biến n = coff kho lưu trữ điểm vào(kho, vị trí);
+        nếu (n <= 0) { trạng thái = -1; thoát; };
+        biến gốc = vị trí + 4;
+        biến kích thước mã = byte đọc số nguyên ba mươi hai bit(kho, gốc + 36);
+        biến độ dời tái định vị = byte đọc số nguyên ba mươi hai bit(kho, gốc + 44);
+        biến số tái định vị = byte lấy(kho, gốc + 52) + byte lấy(kho, gốc + 53) * 256;
+        biến độ dời ký hiệu = byte đọc số nguyên ba mươi hai bit(kho, gốc + 8);
+        biến số ký hiệu = byte đọc số nguyên ba mươi hai bit(kho, gốc + 12);
+        biến bắt đầu chuỗi = gốc + độ dời ký hiệu + số ký hiệu * 18;
+        biến kích thước chuỗi = byte đọc số nguyên ba mươi hai bit(kho, bắt đầu chuỗi);
+        biến cơ sở ký hiệu = byte dài(bảng ký hiệu) / 18;
+        biến cơ sở chuỗi = byte dài(chuỗi);
+        khi (byte dài(mã máy) % 16 != 0) {
+            nếu (byte thêm(mã máy, 144) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        biến cơ sở mã = byte dài(mã máy);
+        nếu (kích thước mã > 1700000 - cơ sở mã) { trạng thái = -1; thoát; };
+        nếu (coff nối vùng(mã máy, kho, gốc + 60, kích thước mã) != 0) { trạng thái = -1; thoát; };
+
+        lặp (i = 0; i < số ký hiệu; i++) {
+            biến mục ký hiệu = gốc + độ dời ký hiệu + i * 18;
+            biến tên dài = byte đọc số nguyên ba mươi hai bit(kho, mục ký hiệu);
+            nếu (tên dài == 0) {
+                biến tên tại = byte đọc số nguyên ba mươi hai bit(kho, mục ký hiệu + 4);
+                nếu (tên tại < 4) { trạng thái = -1; thoát; };
+                nếu (tên tại >= kích thước chuỗi) { trạng thái = -1; thoát; };
+                nếu (đối tượng i32(bảng ký hiệu, 0) != 0) { trạng thái = -1; thoát; };
+                nếu (đối tượng i32(bảng ký hiệu, tên tại + cơ sở chuỗi) != 0) { trạng thái = -1; thoát; };
+            } hoặc {
+                nếu (coff nối vùng(bảng ký hiệu, kho, mục ký hiệu, 8) != 0) { trạng thái = -1; thoát; };
+            };
+            biến giá trị = byte đọc số nguyên ba mươi hai bit(kho, mục ký hiệu + 8);
+            biến đoạn = byte lấy(kho, mục ký hiệu + 12);
+            nếu (byte lấy(kho, mục ký hiệu + 13) != 0) { trạng thái = -1; thoát; };
+            nếu (đoạn > 1) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục ký hiệu + 14) != 32) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục ký hiệu + 15) != 0) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục ký hiệu + 16) != 2) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục ký hiệu + 17) != 0) { trạng thái = -1; thoát; };
+            nếu (đoạn == 1) {
+                nếu (giá trị < 0) { trạng thái = -1; thoát; };
+                nếu (giá trị >= kích thước mã) { trạng thái = -1; thoát; };
+                giá trị = giá trị + cơ sở mã;
+            } hoặc nếu (giá trị != 0) { trạng thái = -1; thoát; };
+            nếu (đối tượng i32(bảng ký hiệu, giá trị) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, đoạn) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, 0) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, 32) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, 0) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, 2) != 0) { trạng thái = -1; thoát; };
+            nếu (byte thêm(bảng ký hiệu, 0) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        lặp (i = 0; i < số tái định vị; i++) {
+            biến mục tái định vị = gốc + độ dời tái định vị + i * 10;
+            biến tại = byte đọc số nguyên ba mươi hai bit(kho, mục tái định vị);
+            biến tham chiếu = byte đọc số nguyên ba mươi hai bit(kho, mục tái định vị + 4);
+            nếu (tại < 0) { trạng thái = -1; thoát; };
+            nếu (tại > kích thước mã - 4) { trạng thái = -1; thoát; };
+            nếu (tham chiếu < 0) { trạng thái = -1; thoát; };
+            nếu (tham chiếu >= số ký hiệu) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục tái định vị + 8) != 4) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, mục tái định vị + 9) != 0) { trạng thái = -1; thoát; };
+            nếu (coff thêm tái định vị(tái định vị, cơ sở mã + tại, cơ sở ký hiệu + tham chiếu) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        nếu (coff nối vùng(chuỗi, kho, bắt đầu chuỗi + 4, kích thước chuỗi - 4) != 0) { trạng thái = -1; thoát; };
+        vị trí = vị trí + n + 4;
+        số mô đun = số mô đun + 1;
+    };
+    nếu (trạng thái == 0) {
+        nếu (số mô đun < 2) { trạng thái = -1; };
+        nếu (vị trí != byte dài(kho)) { trạng thái = -1; };
+    };
+    nếu (trạng thái == 0) {
+        nếu (coff xuất hợp nhất(đối tượng, mã máy, tái định vị, bảng ký hiệu, chuỗi) <= 0) { trạng thái = -1; };
+    };
+    nếu (mã máy > 0) { byte hủy(mã máy); };
+    nếu (tái định vị > 0) { byte hủy(tái định vị); };
+    nếu (bảng ký hiệu > 0) { byte hủy(bảng ký hiệu); };
+    nếu (chuỗi > 0) { byte hủy(chuỗi); };
+    nếu (trạng thái != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    trả về byte dài(đối tượng);
+};

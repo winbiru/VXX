@@ -1,0 +1,69 @@
+// Kiểm tra phạm vi và tuổi thọ của biến được bắt giữ qua executable tự chủ.
+hàm tạo cặp() {
+    biến số = 0;
+    trả về [hàm() { số += 1; trả về số; }, hàm() { trả về số; }];
+};
+
+hàm bắt lỗi riêng() {
+    biến các hàm = [rỗng, rỗng];
+    thử { ném "một"; } bắt lỗi(e) { các hàm[0] = hàm() { trả về e; }; };
+    thử { ném "hai"; } bắt lỗi(e) { các hàm[1] = hàm() { trả về e; }; };
+    trả về các hàm;
+};
+
+lớp công khai Bộ Đếm Closure {
+    hàm công khai khởi tạo(số) { mình.số = số; };
+    hàm công khai lấy() {
+        trả về hàm() { mình.số = mình.số + 1; trả về mình.số; };
+    };
+};
+
+hàm chính() {
+    biến tự do = hàm(x = 7) { trả về x + 1; };
+    in tự do();
+    in tự do(9);
+    biến ngay = hàm(x) { trả về x + 2; }(40);
+    in ngay;
+
+    biến cặp = tạo cặp();
+    in cặp[0]();
+    in cặp[1]();
+    in cặp[0]();
+    in cặp[1]();
+
+    biến x = 10;
+    biến tham số = hàm(x) { trả về x + 1; };
+    biến cục bộ = hàm() { biến x = 30; trả về x; };
+    in tham số(20);
+    in cục bộ();
+    in x;
+
+    biến đệ quy = hàm(n) {
+        nếu (n <= 1) { trả về 1; };
+        trả về n * đệ quy(n - 1);
+    };
+    in đệ quy(5);
+
+    biến các hàm = [rỗng, rỗng, rỗng];
+    lặp(i = 0; i < 3; i++) {
+        các hàm[i] = hàm() {
+            biến tổng = 0;
+            lặp(j = 0; j < 5; j++) {
+                nếu (j == 1) { bỏ qua; };
+                nếu (j == 3) { thoát; };
+                tổng += j;
+            };
+            trả về tổng + i;
+        };
+    };
+    in các hàm[0]();
+    in các hàm[2]();
+
+    biến lỗi = bắt lỗi riêng();
+    in lỗi[0]();
+    in lỗi[1]();
+    biến bộ đếm = Bộ Đếm Closure(40);
+    biến tăng = bộ đếm.lấy();
+    in tăng();
+    in tăng();
+};

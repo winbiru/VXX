@@ -1,0 +1,10 @@
+nhập assembler.*;
+
+hàm chính() {
+    nếu (đối số đếm() != 3) {
+        biến msg = "Usage: vpp-as <Linux-x86-64.s> <output.o>\n"; byte in(msg); byte hủy(msg); trả về 2;
+    };
+    biến source = đối số lấy(1); biến destination = đối số lấy(2);
+    biến result = as_assemble(source, destination);
+    byte hủy(source); byte hủy(destination); trả về result;
+};

@@ -1,5 +1,6 @@
 nhập cây tài liệu xml;
 nhập bộ sưu tập;
+nhập gói.dữ liệu.xml.xml.xml tạo;
 
 hàm chính() {
     root = cây tài liệu phần tử("gốc");

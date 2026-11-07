@@ -1,5 +1,5 @@
-// Standalone Linux x86-64 System V lowering for the validated i32 IR.
-// Internal V++ calls and C runtime calls share the SysV register/stack ABI.
+// AMD64 i32 lowering: SysV on Linux, Microsoft x64 on Windows.
+// Internal V++ calls and runtime calls share the selected ABI.
 // CALL fixups point to the rel32 field (immediately after opcode E8).
 hàm sinh mã x86 byte(đầu ra, giá trị đang xét) { trả về byte thêm(đầu ra, giá trị đang xét); };
 
@@ -35,7 +35,14 @@ hàm sinh mã x86 bộ nhớ(đầu ra, thanh ghi, ô nhớ, nạp) {
 hàm sinh mã x86 nạp(đầu ra, thanh ghi, ô nhớ) { trả về sinh mã x86 bộ nhớ(đầu ra, thanh ghi, ô nhớ, 1); };
 hàm sinh mã x86 lưu(đầu ra, thanh ghi, ô nhớ) { trả về sinh mã x86 bộ nhớ(đầu ra, thanh ghi, ô nhớ, 0); };
 
-hàm sinh mã x86 đối số thanh ghi(chỉ mục) {
+hàm sinh mã x86 đối số thanh ghi(chỉ mục, windows) {
+    nếu (windows == 1) {
+        nếu (chỉ mục == 0) { trả về 1; }; // ecx
+        nếu (chỉ mục == 1) { trả về 2; }; // edx
+        nếu (chỉ mục == 2) { trả về 8; }; // r8d
+        nếu (chỉ mục == 3) { trả về 9; }; // r9d
+        trả về -1;
+    };
     nếu (chỉ mục == 0) { trả về 7; };
     nếu (chỉ mục == 1) { trả về 6; };
     nếu (chỉ mục == 2) { trả về 2; };
@@ -46,9 +53,11 @@ hàm sinh mã x86 đối số thanh ghi(chỉ mục) {
 };
 
 // Incoming stack args start at [rbp+16]. The caller reserves 8 bytes each.
-hàm sinh mã x86 nạp tham số(đầu ra, chỉ mục) {
-    nếu (chỉ mục < 6) {
-        biến thanh ghi = sinh mã x86 đối số thanh ghi(chỉ mục);
+hàm sinh mã x86 nạp tham số(đầu ra, chỉ mục, windows) {
+    biến số thanh ghi = 6;
+    nếu (windows == 1) { số thanh ghi = 4; };
+    nếu (chỉ mục < số thanh ghi) {
+        biến thanh ghi = sinh mã x86 đối số thanh ghi(chỉ mục, windows);
         nếu (thanh ghi >= 8) { nếu (sinh mã x86 byte(đầu ra, 68) != 0) { trả về -1; }; };
         nếu (sinh mã x86 byte(đầu ra, 137) != 0) { trả về -1; };
         biến bảng mã = thanh ghi;
@@ -57,7 +66,9 @@ hàm sinh mã x86 nạp tham số(đầu ra, chỉ mục) {
     };
     nếu (sinh mã x86 byte(đầu ra, 139) != 0) { trả về -1; };
     nếu (sinh mã x86 byte(đầu ra, 133) != 0) { trả về -1; };
-    trả về sinh mã x86 hằng tức thời(đầu ra, 16 + 8 * (chỉ mục - 6));
+    biến độ lệch = 16 + 8 * (chỉ mục - số thanh ghi);
+    nếu (windows == 1) { độ lệch = độ lệch + 32; }; // 32-byte shadow space
+    trả về sinh mã x86 hằng tức thời(đầu ra, độ lệch);
 };
 
 hàm sinh mã x86 lời triệu hồi(đầu ra, các lời gọi, đích đến) {
@@ -81,7 +92,7 @@ hàm sinh mã x86 vá các nhánh(biểu diễn trung gian, mã máy, các độ
     trả về 0;
 };
 
-hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lời gọi) {
+hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lời gọi, windows) {
     nếu (biểu diễn trung gian == mã máy) { trả về -1; };
     nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
     biến khung = sinh mã khung(biểu diễn trung gian);
@@ -131,6 +142,26 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
                 nếu (mã phép toán == 6) {
                     mã trạng thái = sinh mã x86 byte(mã máy, 15);
                     nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 175); };
+                };
+                nếu (mã phép toán == 30) {
+                    mã trạng thái = sinh mã x86 byte(mã máy, 33);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 200); };
+                };
+                nếu (mã phép toán == 31) {
+                    mã trạng thái = sinh mã x86 byte(mã máy, 9);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 200); };
+                };
+                nếu (mã phép toán == 32) {
+                    mã trạng thái = sinh mã x86 byte(mã máy, 49);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 200); };
+                };
+                nếu (mã phép toán == 33) {
+                    mã trạng thái = sinh mã x86 byte(mã máy, 211);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 224); };
+                };
+                nếu (mã phép toán == 34) {
+                    mã trạng thái = sinh mã x86 byte(mã máy, 211);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 248); };
                 };
                 nếu (mã phép toán == 26) {
                     // Signed 64-bit IDIV keeps INT32_MIN / -1 defined as
@@ -186,10 +217,12 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
             };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, các ô nhớ + độ sâu hiện tại - 1); };
         }
-        hoặc nếu (mã phép toán == 8) {
+        hoặc nếu (mã phép toán == 8 || mã phép toán == 35) {
             mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại - 1);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 247); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 216); };
+            biến phép một ngôi = 216;
+            nếu (mã phép toán == 35) { phép một ngôi = 208; };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, phép một ngôi); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, các ô nhớ + độ sâu hiện tại - 1); };
         }
         hoặc nếu (mã phép toán == 25) {
@@ -212,46 +245,59 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
             độ sâu hiện tại = 0;
         }
         hoặc nếu (mã phép toán == 18) {
-            mã trạng thái = sinh mã x86 nạp tham số(mã máy, đối số);
+            mã trạng thái = sinh mã x86 nạp tham số(mã máy, đối số, windows);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, độ lệch); };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 19) { đang chờ = đối số; }
         hoặc nếu (mã phép toán == 22) {
             nếu (các lời gọi <= 0) { mã trạng thái = -1; };
+            nếu (windows == 1) { nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, 32, 1); }; };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lời triệu hồi(mã máy, các lời gọi, -1); };
+            nếu (windows == 1) { nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, 32, 0); }; };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, độ lệch); };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 23) {
             nếu (các lời gọi <= 0) { mã trạng thái = -1; };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 nạp(mã máy, 7, các ô nhớ + độ sâu hiện tại - 1); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 190); }; // mov esi,imm32
+            biến đầu = 7;
+            biến sau = 190;
+            nếu (windows == 1) { đầu = 1; sau = 186; }; // ecx, edx
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 nạp(mã máy, đầu, các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, sau); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, đối số); };
+            nếu (windows == 1) { nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, 32, 1); }; };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lời triệu hồi(mã máy, các lời gọi, -4); };
+            nếu (windows == 1) { nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, 32, 0); }; };
         }
         hoặc nếu (mã phép toán == 24) { độ sâu hiện tại = độ sâu hiện tại - 1; }
         hoặc nếu (mã phép toán == 17) {
             nếu (các lời gọi <= 0) { mã trạng thái = -1; };
-            biến phần bổ sung = đang chờ - 6;
+            biến số thanh ghi = 6;
+            nếu (windows == 1) { số thanh ghi = 4; };
+            biến phần bổ sung = đang chờ - số thanh ghi;
             nếu (phần bổ sung < 0) { phần bổ sung = 0; };
             biến đối số gửi đi = 0;
-            // Round outgoing stack arguments to a 16-byte boundary.
-            lặp (k = 0; k < phần bổ sung; k = k + 2) { đối số gửi đi = đối số gửi đi + 16; };
+            // Outgoing stack remains 16-byte aligned at the call site.
+            nếu (windows == 1) { đối số gửi đi = 32; };
+            lặp (k = 0; k < phần bổ sung; k++) { đối số gửi đi = đối số gửi đi + 8; };
+            nếu (đối số gửi đi % 16 != 0) { đối số gửi đi = đối số gửi đi + 8; };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, đối số gửi đi, 1); };
-            lặp (j = 6; j < đang chờ; j++) {
+            lặp (j = số thanh ghi; j < đang chờ; j++) {
                 nếu (mã trạng thái != 0) { thoát; };
                 mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại - đang chờ + j);
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 137); };
-                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); };
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); }; // mov [rsp+disp32],eax: ModR/M
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 36); };
-                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, (j - 6) * 8); };
+                biến độ lệch ngăn xếp = (j - số thanh ghi) * 8;
+                nếu (windows == 1) { độ lệch ngăn xếp = độ lệch ngăn xếp + 32; };
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, độ lệch ngăn xếp); };
             };
-            biến số thanh ghi = đang chờ;
-            nếu (số thanh ghi > 6) { số thanh ghi = 6; };
-            lặp (j = 0; j < số thanh ghi; j++) {
+            biến số nạp thanh ghi = đang chờ;
+            nếu (số nạp thanh ghi > số thanh ghi) { số nạp thanh ghi = số thanh ghi; };
+            lặp (j = 0; j < số nạp thanh ghi; j++) {
                 nếu (mã trạng thái != 0) { thoát; };
-                mã trạng thái = sinh mã x86 nạp(mã máy, sinh mã x86 đối số thanh ghi(j), các ô nhớ + độ sâu hiện tại - đang chờ + j);
+                mã trạng thái = sinh mã x86 nạp(mã máy, sinh mã x86 đối số thanh ghi(j, windows), các ô nhớ + độ sâu hiện tại - đang chờ + j);
             };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lời triệu hồi(mã máy, các lời gọi, đối số); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 khung(mã máy, đối số gửi đi, 0); };
@@ -259,13 +305,13 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, các ô nhớ + độ sâu hiện tại - 1); };
             đang chờ = -1;
         }
-        hoặc nếu (mã phép toán == 9) {
+        hoặc nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {
             độ sâu hiện tại = độ sâu hiện tại - 1;
             mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 133); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 192); }; // test eax,eax
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 15); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); }; // je rel32
+            nếu (mã trạng thái == 0) { biến jump = 132; nếu (mã phép toán == 29) { jump = 133; }; mã trạng thái = sinh mã x86 byte(mã máy, jump); }; // je rel32
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(fixups, byte dài(mã máy)); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(fixups, đối số); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, 0); };

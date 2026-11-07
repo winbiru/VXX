@@ -12,7 +12,7 @@ hàm chính() {
     nếu (thực thi môi trường thực thi tệp dữ liệu đường tệp(3) != -1) { trả về 5; };
     biến assembly = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
     nếu (assembly <= 0) { trả về 6; };
-    biến assembly_name = "vpp_aot_primitives_aarch64.S";
+    biến assembly_name = "macos/vpp_aot_primitives_aarch64.S";
     nếu (byte tìm(assembly, assembly_name) < 0) { trả về 7; };
     byte hủy(assembly_name);
     file = tệp mở đọc(assembly);

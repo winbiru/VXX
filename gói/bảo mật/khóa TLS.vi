@@ -1,0 +1,68 @@
+// Binary HKDF-SHA256 and TLS 1.3 key derivation in V++ (RFC 5869/8446).
+// This module does not authenticate a peer or enable a TLS connection.
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+nhập gói.bảo mật.mật mã.mật mã xor byte;
+nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
+
+lớp công khai Khóa TLS VPP {
+    hàm công khai khởi tạo() { mình.băm = Bộ Mật Mã(); };
+    hàm công khai bytes(data, maximum) {
+        nếu (loại của(data) != "danh sách" || độ dài(data) > maximum) {
+            ném "TLS: cần danh sách byte trong giới hạn";
+        };
+        lặp(i = 0; i < độ dài(data); i++) {
+            nếu (loại của(data[i]) != "số nguyên" || data[i] < 0 || data[i] > 255) {
+                ném "TLS: byte không hợp lệ";
+            };
+        };
+        trả về data;
+    };
+    hàm công khai nối(a, b) {
+        result = [];
+        lặp(i = 0; i < độ dài(a); i++) { thêm(result, a[i]); };
+        lặp(i = 0; i < độ dài(b); i++) { thêm(result, b[i]); };
+        trả về result;
+    };
+    hàm công khai hmac(key, data) {
+        mình.bytes(key, 1048576); mình.bytes(data, 1048576);
+        nếu (độ dài(key) > 64) { key = mình.băm.mật mã sha256 các byte(key); };
+        inner = []; outer = [];
+        lặp(i = 0; i < 64; i++) {
+            b = 0; nếu (i < độ dài(key)) { b = key[i]; };
+            thêm(inner, mình.băm.mật mã xor byte(b, 54));
+            thêm(outer, mình.băm.mật mã xor byte(b, 92));
+        };
+        digest = mình.băm.mật mã sha256 các byte(mình.nối(inner, data));
+        trả về mình.băm.mật mã sha256 các byte(mình.nối(outer, digest));
+    };
+    hàm công khai trích(salt, ikm) { trả về mình.hmac(salt, ikm); };
+    hàm công khai mở rộng(prk, info, count) {
+        mình.bytes(prk, 1048576); mình.bytes(info, 65535);
+        nếu (độ dài(prk) < 32 || loại của(count) != "số nguyên" || count < 0 || count > 8160) {
+            ném "TLS: HKDF độ dài không hợp lệ";
+        };
+        previous = []; result = []; block = 1;
+        khi (độ dài(result) < count) {
+            input = mình.nối(previous, info); thêm(input, block);
+            previous = mình.hmac(prk, input);
+            lặp(i = 0; i < 32 && độ dài(result) < count; i++) { thêm(result, previous[i]); };
+            block = block + 1;
+        };
+        trả về result;
+    };
+    hàm công khai nhãn(secret, label, context, count) {
+        nếu (loại của(label) != "chuỗi" || loại của(count) != "số nguyên" || count < 0 || count > 8160) {
+            ném "TLS: HKDF label không hợp lệ";
+        };
+        mình.bytes(context, 255);
+        encoded = chuỗi thành byte máy ảo("tls13 " + label);
+        nếu (độ dài(encoded) < 7 || độ dài(encoded) > 255) { ném "TLS: HKDF label quá dài hoặc trống"; };
+        info = [(count - count % 256) / 256, count % 256, độ dài(encoded)];
+        info = mình.nối(info, encoded); thêm(info, độ dài(context));
+        trả về mình.mở rộng(secret, mình.nối(info, context), count);
+    };
+    hàm công khai dẫn xuất(secret, label, transcript) {
+        mình.bytes(transcript, 1048576);
+        trả về mình.nhãn(secret, label, mình.băm.mật mã sha256 các byte(transcript), 32);
+    };
+};

@@ -89,10 +89,12 @@ namespace vietvm::compiler {
     // Định nghĩa `operatorPrecedenceMap` cho kiểu hiện tại; toán tử chuyển các toán hạng đầu vào thành kết quả theo quy tắc của kiểu.
     const std::unordered_map<std::string,int>& operatorPrecedenceMap() noexcept {
         static const std::unordered_map<std::string,int> ops = {
-            {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
-            {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6},
-            {"++",7},{"--",7},
-            {"+=",0},{"-=",0},{"*=",0},{"/=",0},{"%=",0}
+            {"=",0},{"||",1},{"&&",2},{"|",3},{"^",4},{"&",5},
+            {"==",6},{"!=",6},{"<",7},{">",7},{"<=",7},{">=",7},
+            {"<<",8},{">>",8},{"+",9},{"-",9},{"*",10},{"/",10},{"%",10},
+            {"!",11},{"~",11},{"++",12},{"--",12},
+            {"+=",0},{"-=",0},{"*=",0},{"/=",0},{"%=",0},
+            {"&=",0},{"|=",0},{"^=",0},{"<<=",0},{">>=",0}
         };
         return ops;
     }
@@ -155,7 +157,7 @@ namespace vietvm::compiler {
         }
 
         static const std::unordered_set<std::string> keywords = {
-            "nếu", "hoặc", "lặp", "khởi tạo", "điều kiện",
+            "nếu", "hoặc", "lặp", "khi", "khởi tạo", "điều kiện",
             "cập nhật", "kiểm tra sau", "chuyển", "trường hợp", "mặc định",
             "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
             "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",
@@ -270,12 +272,20 @@ namespace vietvm::compiler {
                 continue;
             }
 
-            // two-char operators
+            // Ưu tiên toán tử ba ký tự trước toán tử hai ký tự.
+            if (i + 2 < n && (src.compare(i, 3, "<<=") == 0 ||
+                              src.compare(i, 3, ">>=") == 0)) {
+                pushToken(i, i + 3);
+                i += 3;
+                continue;
+            }
+            // Toán tử hai ký tự
             if (i + 1 < n) {
                 std::string two = src.substr(i, 2);
                 if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
                     two == "&&" || two == "||" || two == "++" || two == "--" ||
-                    two == "+=" || two == "-=" || two == "*=" || two == "/=" || two == "%=") {
+                    two == "+=" || two == "-=" || two == "*=" || two == "/=" || two == "%=" ||
+                    two == "<<" || two == ">>" || two == "&=" || two == "|=" || two == "^=") {
                     pushToken(i, i + 2);
                     i += 2;
                     continue;
@@ -287,7 +297,8 @@ namespace vietvm::compiler {
             if (c == '+' || c == '-' || c == '*' || c == '/' ||
                 c == '(' || c == ')' || c == '{' || c == '}' ||
                 c == '[' || c == ']' || c == ';' || c == ',' ||
-                c == '<' || c == '>' || c == '=' || c == '!' || c == ':'
+                c == '<' || c == '>' || c == '=' || c == '!' || c == ':' ||
+                c == '%' || c == '&' || c == '|' || c == '^' || c == '~'
             ) {
                 pushToken(i, i + 1);
                 ++i;
@@ -303,7 +314,8 @@ namespace vietvm::compiler {
                 if (cj == '"' || cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
                     cj == '(' || cj == ')' || cj == '{' || cj == '}' ||
                     cj == '[' || cj == ']' || cj == ';' || cj == ',' ||
-                    cj == '<' || cj == '>' || cj == '=' || cj == '!' || cj == ':') break;
+                    cj == '<' || cj == '>' || cj == '=' || cj == '!' || cj == ':' ||
+                    cj == '%' || cj == '&' || cj == '|' || cj == '^' || cj == '~') break;
                 ++j;
             }
 

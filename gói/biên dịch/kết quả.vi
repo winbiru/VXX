@@ -1,7 +1,7 @@
 // Biên dịch nhúng: V++ kiểm tra hợp đồng và dựng snapshot.
 // Boundary bootstrap bien_dich_phan_tich_vm hiện gọi compiler C++.
-nhập gói/biên dịch/cây cú pháp;
-nhập gói/biên dịch/mã lệnh;
+nhập gói.biên dịch.cây cú pháp.biên dịch cây từ thô;
+nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
 
 // Snapshot chỉ phụ thuộc tham số; không cần tạo đối tượng trung gian.
 hàm công khai biên dịch snapshot lỗi(lỗi) {

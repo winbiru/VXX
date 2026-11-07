@@ -39,16 +39,98 @@ if (NOT status EQUAL 0 OR NOT output MATCHES "native-selfhost-host-link-ok")
     message(FATAL_ERROR "V++ self-host execution failed: ${status} ${errors} ${output}")
 endif()
 
-file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
-    "hàm bad(a) { trả về a / 2; };\n")
-set(unwanted "${VPP_OUTPUT_DIR}/unsupported.o")
-file(REMOVE "${unwanted}")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-        "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj-selfhost
-        bad "${VPP_OUTPUT_DIR}/unsupported.vi" "${unwanted}"
-    WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+# Exercise the AST -> V++ Machine IR -> native object path directly. Stage 1's
+# separate executable compiler already tests division, so verify this path too.
+set(arithmetic "${VPP_OUTPUT_DIR}/arithmetic.vi")
+file(WRITE "${arithmetic}"
+    "hàm arith(a, b) { trả về a / b + a % b; };\n"
+    "hàm compound(a, b) { biến x = a; x /= b; x %= 52; trả về x; };\n")
+set(arithmetic_objects)
+foreach(func IN ITEMS arith compound)
+    set(obj "${VPP_OUTPUT_DIR}/${func}.o")
+    file(REMOVE "${obj}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
+            "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj-selfhost
+            "${func}" "${arithmetic}" "${obj}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status ERROR_VARIABLE errors)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${obj}")
+        message(FATAL_ERROR "V++ native self-host arithmetic failed (${func}): ${errors}")
+    endif()
+    list(APPEND arithmetic_objects "${obj}")
+endforeach()
+set(driver "${VPP_OUTPUT_DIR}/arithmetic_smoke.c")
+file(WRITE "${driver}" [=[
+#include <stdint.h>
+extern int32_t arith(int32_t, int32_t);
+extern int32_t compound(int32_t, int32_t);
+int main(void) {
+    if (arith(-159, -3) != 53) return 1;
+    if (arith(-159, 52) != -6) return 2;
+    if (arith(10, -3) != -2) return 3;
+    if (arith(INT32_MIN, -1) != INT32_MIN) return 4;
+    if (arith(52, 0) != -2) return 5;
+    if (compound(-159, -3) != 1) return 6;
+    if (compound(INT32_MIN, -1) != -24) return 7;
+    return 0;
+}
+]=])
+set(arithmetic_exe "${VPP_OUTPUT_DIR}/arithmetic_smoke")
+execute_process(COMMAND "${VPP_CC}" "${driver}" ${arithmetic_objects} -o "${arithmetic_exe}"
     RESULT_VARIABLE status ERROR_VARIABLE errors)
-if (status EQUAL 0 OR EXISTS "${unwanted}" OR NOT errors MATCHES "chưa hỗ trợ")
-    message(FATAL_ERROR "V++ native self-host must reject unsupported division: ${status} ${errors}")
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host arithmetic host-link failed: ${errors}")
+endif()
+execute_process(COMMAND "${arithmetic_exe}" RESULT_VARIABLE status
+    ERROR_VARIABLE errors)
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host arithmetic wrong result: ${status} ${errors}")
+endif()
+
+# Logical operators are now supported by the self-host compiler.  Verify their
+# 0/1 semantics instead of expecting the old unsupported-operation diagnostic.
+set(logical "${VPP_OUTPUT_DIR}/logical.vi")
+file(WRITE "${logical}"
+    "hàm logical_and(a, b) { trả về a && b; };\n"
+    "hàm logical_or(a, b) { trả về a || b; };\n")
+set(logical_objects)
+foreach(func IN ITEMS logical_and logical_or)
+    set(obj "${VPP_OUTPUT_DIR}/${func}.o")
+    file(REMOVE "${obj}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
+            "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj-selfhost
+            "${func}" "${logical}" "${obj}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status ERROR_VARIABLE errors)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${obj}")
+        message(FATAL_ERROR "V++ native self-host logical failed (${func}): ${errors}")
+    endif()
+    list(APPEND logical_objects "${obj}")
+endforeach()
+set(logical_driver "${VPP_OUTPUT_DIR}/logical_smoke.c")
+file(WRITE "${logical_driver}" [=[
+#include <stdint.h>
+extern int32_t logical_and(int32_t, int32_t);
+extern int32_t logical_or(int32_t, int32_t);
+int main(void) {
+    if (logical_and(0, 42) != 0) return 1;
+    if (logical_and(-3, 42) != 1) return 2;
+    if (logical_and(42, 0) != 0) return 3;
+    if (logical_or(0, 0) != 0) return 4;
+    if (logical_or(-3, 0) != 1) return 5;
+    if (logical_or(0, 42) != 1) return 6;
+    return 0;
+}
+]=])
+set(logical_exe "${VPP_OUTPUT_DIR}/logical_smoke")
+execute_process(COMMAND "${VPP_CC}" "${logical_driver}" ${logical_objects} -o "${logical_exe}"
+    RESULT_VARIABLE status ERROR_VARIABLE errors)
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host logical host-link failed: ${errors}")
+endif()
+execute_process(COMMAND "${logical_exe}" RESULT_VARIABLE status ERROR_VARIABLE errors)
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host logical wrong result: ${status} ${errors}")
 endif()

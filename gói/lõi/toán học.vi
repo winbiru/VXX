@@ -1,8 +1,9 @@
 // Thư viện vi.math — điểm sở hữu duy nhất cho API toán học của V++.
 // Các primitive collection/thống kê vẫn dùng lại từ vi.base.
-nhập gói/lõi/thống kê;
-công khai nhập gói/bộ sưu tập/danh sách;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.thống kê.*;
+công khai nhập gói.bộ sưu tập.danh sách.*;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 // Số học cơ bản.
 hàm công khai cộng(a, b) {
@@ -44,7 +45,7 @@ hàm công khai lũy thừa(cơ sở, số mũ) {
 
     kết quả = 1;
     còn lại = số mũ;
-    lặp (i = 0; còn lại > 0; i = i + 1) {
+    khi (còn lại > 0) {
         nếu (còn lại < 1) {
             ném "lũy thừa: số mũ phải là số nguyên không âm";
         };
@@ -61,7 +62,7 @@ hàm công khai giải thừa(n) {
 
     kết quả = 1;
     còn lại = n;
-    lặp (i = 0; còn lại > 0; i = i + 1) {
+    khi (còn lại > 0) {
         nếu (còn lại < 1) {
             ném "giai thừa: đối số phải là số nguyên không âm";
         };

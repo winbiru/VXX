@@ -1,0 +1,149 @@
+// Native ARM64 MH_EXECUTE for freestanding V++ source units. The canonical
+// object archive merger validates Mach-O layout and resolves symbol indices.
+// The executable writer rejects all imports until a dyld binder is available.
+
+hàm macho exe u64(đích, thấp, cao) {
+    nếu (đối tượng i32(đích, thấp) != 0) { trả về -1; };
+    trả về đối tượng i32(đích, cao);
+};
+
+hàm macho exe segment(đích, tên, địa chỉ, độ lớn, vị trí, kích thước, quyền tối đa, quyền, số phần) {
+    nếu (đối tượng i32(đích, 25) != 0 || đối tượng i32(đích, 72 + số phần * 80) != 0) { byte hủy(tên); trả về -1; };
+    nếu (đối tượng tên định danh(đích, tên, 16) != 0) { trả về -1; };
+    biến cao = 1;
+    nếu (địa chỉ == 0 && độ lớn == 0) { cao = 0; };
+    nếu (macho exe u64(đích, địa chỉ, cao) != 0) { trả về -1; };
+    biến cao dài = 0;
+    nếu (địa chỉ == 0 && độ lớn == 0) { cao dài = 1; };
+    nếu (macho exe u64(đích, độ lớn, cao dài) != 0) { trả về -1; };
+    nếu (đối tượng u64(đích, vị trí) != 0 || đối tượng u64(đích, kích thước) != 0) { trả về -1; };
+    nếu (đối tượng i32(đích, quyền tối đa) != 0 || đối tượng i32(đích, quyền) != 0) { trả về -1; };
+    nếu (đối tượng i32(đích, số phần) != 0 || đối tượng i32(đích, 0) != 0) { trả về -1; };
+    trả về 0;
+};
+
+hàm macho exe vá nhánh(mã, nguồn, đích) {
+    nếu (nguồn < 0 || nguồn > byte dài(mã) - 4 || đích < 0 || đích >= byte dài(mã)) { trả về -1; };
+    biến d = đích - nguồn;
+    nếu (d < -134217728 || d >= 134217728) { trả về -1; };
+    nếu (d - máy chia số nguyên ba mươi hai bit(d, 4) * 4 != 0) { trả về -1; };
+    biến lệnh = byte đọc số nguyên ba mươi hai bit(mã, nguồn);
+    // BRANCH26 is the only relocation supported; accept a zero-addend BL.
+    nếu (lệnh != -1811939328) { trả về -1; };
+    biến nhánh = máy chia số nguyên ba mươi hai bit(d, 4);
+    nếu (nhánh < 0) { nhánh = nhánh + 67108864; };
+    trả về byte ghi số nguyên ba mươi hai bit(mã, nguồn, -1811939328 + nhánh);
+};
+
+hàm macho tạo executable(đối tượng, kết quả) {
+    nếu (đối tượng == kết quả || byte làm rỗng(kết quả) != 0) { trả về -1; };
+    biến dài = byte dài(đối tượng);
+    nếu (dài < 241) { trả về -1; };
+    nếu (byte đọc số nguyên ba mươi hai bit(đối tượng, 0) != -17958193 || byte đọc số nguyên ba mươi hai bit(đối tượng, 4) != 16777228) { trả về -1; };
+    nếu (byte đọc số nguyên ba mươi hai bit(đối tượng, 12) != 1 || byte đọc số nguyên ba mươi hai bit(đối tượng, 20) != 200) { trả về -1; };
+    biến n = byte đọc số nguyên ba mươi hai bit(đối tượng, 144);
+    biến rel = byte đọc số nguyên ba mươi hai bit(đối tượng, 160);
+    biến nrel = byte đọc số nguyên ba mươi hai bit(đối tượng, 164);
+    biến sym = byte đọc số nguyên ba mươi hai bit(đối tượng, 192);
+    biến nsym = byte đọc số nguyên ba mươi hai bit(đối tượng, 196);
+    biến str = byte đọc số nguyên ba mươi hai bit(đối tượng, 200);
+    biến nstr = byte đọc số nguyên ba mươi hai bit(đối tượng, 204);
+    nếu (n <= 0 || n > dài - 232 || nrel < 0 || nsym < 1 || nstr < 2) { trả về -1; };
+    nếu (rel < 0 || sym < 232 + n || sym > dài || str < sym || str > dài || nstr != dài - str) { trả về -1; };
+    nếu (nrel > 0 && (rel < 232 + n || nrel > máy chia số nguyên ba mươi hai bit(dài - rel, 8))) { trả về -1; };
+    nếu (nsym > máy chia số nguyên ba mươi hai bit(dài - sym, 16)) { trả về -1; };
+    nếu (str != sym + nsym * 16) { trả về -1; };
+    biến mã = byte cắt(đối tượng, 232, n);
+    nếu (mã <= 0) { trả về -1; };
+    biến trạng thái = 0;
+    biến main = -1;
+    biến tên main = "_main";
+    // Tên ký hiệu Mach-O kết thúc bằng NUL; chuỗi ký tự V++ thì không.
+    nếu (byte thêm(tên main, 0) != 0) { byte hủy(mã); byte hủy(tên main); trả về -1; };
+    lặp (i = 0; i < nsym; i++) {
+        biến tại = sym + i * 16;
+        biến tên = byte đọc số nguyên ba mươi hai bit(đối tượng, tại);
+        biến loại = byte lấy(đối tượng, tại + 4);
+        biến phần = byte lấy(đối tượng, tại + 5);
+        biến giá trị ký hiệu = byte đọc số nguyên ba mươi hai bit(đối tượng, tại + 8);
+        nếu (tên <= 0 || tên >= nstr || loại != 15 || phần != 1) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(đối tượng, tại + 12) != 0 || giá trị ký hiệu < 0 || giá trị ký hiệu >= n) { trạng thái = -1; thoát; };
+        nếu (macho tên bằng(đối tượng, str + tên, tên main, 0) == 1) {
+            nếu (main >= 0) { trạng thái = -1; thoát; };
+            main = giá trị ký hiệu;
+        };
+    };
+    byte hủy(tên main);
+    nếu (main < 0) { trạng thái = -1; thực thi liên kết báo lỗi("V++ Mach-O: missing _main symbol\n"); };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < nrel; i++) {
+            biến nguồn = byte đọc số nguyên ba mươi hai bit(đối tượng, rel + i * 8);
+            biến kiểu = byte đọc số nguyên ba mươi hai bit(đối tượng, rel + i * 8 + 4);
+            biến chỉ mục = kiểu - 754974720;
+            nếu (chỉ mục < 0 || chỉ mục >= nsym) { trạng thái = -1; thoát; };
+            biến đích = byte đọc số nguyên ba mươi hai bit(đối tượng, sym + chỉ mục * 16 + 8);
+            nếu (macho exe vá nhánh(mã, nguồn, đích) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    // Trang arm64 là 16 KiB. Chừa 1 KiB cho lệnh và căn __TEXT lên biên trang.
+    biến trang = 16384;
+    biến độ dài text = 1024 + n;
+    nếu (độ dài text < 1024 || độ dài text > 1900000) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        biến dư = độ dài text - máy chia số nguyên ba mươi hai bit(độ dài text, trang) * trang;
+        nếu (dư != 0) { độ dài text = độ dài text + trang - dư; };
+        nếu (độ dài text > 2000000) { trạng thái = -1; };
+    };
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ Mach-O: symbol or branch relocation failure\n"); };
+    nếu (trạng thái == 0) {
+        // mach_header_64, MH_EXECUTE, 10 lệnh nạp, sizeofcmds=584.
+        nếu (đối tượng i32(kết quả, -17958193) != 0 || đối tượng i32(kết quả, 16777228) != 0 || đối tượng i32(kết quả, 0) != 0 || đối tượng i32(kết quả, 2) != 0 || đối tượng i32(kết quả, 10) != 0 || đối tượng i32(kết quả, 584) != 0 || đối tượng i32(kết quả, 2097285) != 0 || đối tượng i32(kết quả, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && macho exe segment(kết quả, "__PAGEZERO", 0, 0, 0, 0, 0, 0, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && macho exe segment(kết quả, "__TEXT", 0, độ dài text, 0, độ dài text, 7, 5, 1) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng tên định danh(kết quả, "__text", 16) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng tên định danh(kết quả, "__TEXT", 16) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && macho exe u64(kết quả, 1024, 1) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng u64(kết quả, n) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            lặp (i = 0; i < 8; i++) {
+                biến giá trị mô tả text = 0;
+                nếu (i == 0) { giá trị mô tả text = 1024; };
+                nếu (i == 1) { giá trị mô tả text = 2; };
+                nếu (i == 4) { giá trị mô tả text = -2147482624; };
+                nếu (đối tượng i32(kết quả, giá trị mô tả text) != 0) { trạng thái = -1; thoát; };
+            };
+        };
+        nếu (trạng thái == 0 && macho exe segment(kết quả, "__LINKEDIT", độ dài text, 16384, độ dài text, 512, 1, 1, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, -2147483614) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 48) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0) { lặp (i = 0; i < 10; i++) { nếu (đối tượng i32(kết quả, 0) != 0) { trạng thái = -1; thoát; }; }; };
+        nếu (trạng thái == 0) {
+            nếu (đối tượng i32(kết quả, 2) != 0 || đối tượng i32(kết quả, 24) != 0 || đối tượng i32(kết quả, độ dài text) != 0 || đối tượng i32(kết quả, 1) != 0 || đối tượng i32(kết quả, độ dài text + 16) != 0 || đối tượng i32(kết quả, 8) != 0) { trạng thái = -1; };
+        };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, 11) != 0 || đối tượng i32(kết quả, 80) != 0)) { trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            lặp (i = 0; i < 18; i++) {
+                biến giá trị bảng động = 0;
+                nếu (i == 3 || i == 4) { giá trị bảng động = 1; };
+                nếu (đối tượng i32(kết quả, giá trị bảng động) != 0) { trạng thái = -1; thoát; };
+            };
+        };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, 14) != 0 || đối tượng i32(kết quả, 32) != 0 || đối tượng i32(kết quả, 12) != 0 || đối tượng tên định danh(kết quả, "/usr/lib/dyld", 20) != 0)) { trạng thái = -1; };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, 50) != 0 || đối tượng i32(kết quả, 24) != 0 || đối tượng i32(kết quả, 1) != 0 || đối tượng i32(kết quả, 720896) != 0 || đối tượng i32(kết quả, 720896) != 0 || đối tượng i32(kết quả, 0) != 0)) { trạng thái = -1; };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, -2147483608) != 0 || đối tượng i32(kết quả, 24) != 0 || đối tượng u64(kết quả, 1024 + main) != 0 || đối tượng u64(kết quả, 0) != 0)) { trạng thái = -1; };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, 12) != 0 || đối tượng i32(kết quả, 56) != 0 || đối tượng i32(kết quả, 24) != 0 || đối tượng i32(kết quả, 2) != 0 || đối tượng i32(kết quả, 88866816) != 0 || đối tượng i32(kết quả, 65536) != 0 || đối tượng tên định danh(kết quả, "/usr/lib/libSystem.B.dylib", 32) != 0)) { trạng thái = -1; };
+        nếu (byte dài(kết quả) != 616) { trạng thái = -1; thực thi liên kết báo lỗi("V++ Mach-O: unexpected Mach-O header length\n"); };
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, 1024) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte nối(kết quả, mã) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, độ dài text) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && (đối tượng i32(kết quả, 1) != 0 || đối tượng i32(kết quả, 271) != 0 || macho exe u64(kết quả, 1024 + main, 1) != 0)) { trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            nếu (byte thêm(kết quả, 0) != 0 || byte nối(kết quả, "_main") != 0 || byte thêm(kết quả, 0) != 0 || byte thêm(kết quả, 0) != 0) { trạng thái = -1; };
+        };
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, độ dài text + 512) != 0) { trạng thái = -1; };
+        nếu (byte dài(kết quả) != độ dài text + 512) { trạng thái = -1; thực thi liên kết báo lỗi("V++ Mach-O: unexpected image length\n"); };
+    };
+    byte hủy(mã);
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ Mach-O: serialization failed\n"); byte làm rỗng(kết quả); trả về -1; };
+    trả về byte dài(kết quả);
+};

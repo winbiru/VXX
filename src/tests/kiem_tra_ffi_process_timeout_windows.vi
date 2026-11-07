@@ -1,5 +1,5 @@
 // Timeout hủy cây tiến trình qua JobObject chỉ thuộc backend FFI Win32.
-nhập gói/hệ thống/tiến trình;
+nhập gói.hệ thống.tiến trình.*;
 
 hàm chính() {
     // `ping` là tên lệnh hệ điều hành Windows, không phải định danh V++.

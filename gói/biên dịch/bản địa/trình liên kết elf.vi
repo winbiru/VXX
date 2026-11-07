@@ -1,0 +1,888 @@
+// Freestanding Linux x86-64 ELF64 ET_REL -> ET_EXEC linker, written in V++.
+// All file access goes through existing máy_* OS/ASM boundary primitives.
+// Object metadata: 67200000 + index*40; section metadata: 67210000 + index*32.
+// Symbol address cache: 67240000 + index*4; global hash table at 67290000.
+// Linker scratch is used synchronously instead of the external linker argv.
+// This memory belongs to the
+// reserved native linker scratch region and is not allocated as byte handles.
+// Only ELF64 little-endian x86-64, RELA, static SHF_ALLOC sections and
+// R_X86_64_64/PC32/PLT32 are supported. Unsupported inputs fail closed.
+
+hàm elf bản địa đọc i32(tệp, vị trí) {
+    nếu (vị trí < 0) { trả về -1; };
+    nếu (vị trí > thực thi các byte chiều dài(tệp) - 4) { trả về -1; };
+    trả về thực thi các byte nạp i32(tệp, vị trí);
+};
+
+hàm elf bản địa đọc u16(tệp, vị trí) {
+    nếu (vị trí < 0) { trả về -1; };
+    nếu (vị trí > thực thi các byte chiều dài(tệp) - 2) { trả về -1; };
+    trả về thực thi các byte lấy(tệp, vị trí) + 256 * thực thi các byte lấy(tệp, vị trí + 1);
+};
+
+hàm elf bản địa căn chỉnh(giá trị, độ căn) {
+    nếu (giá trị < 0) { trả về -1; };
+    nếu (độ căn < 1) { trả về -1; };
+    nếu (độ căn > 4096) { trả về -1; };
+    biến dư = giá trị - máy chia số nguyên ba mươi hai bit(giá trị, độ căn) * độ căn;
+    nếu (dư == 0) { trả về giá trị; };
+    trả về giá trị + độ căn - dư;
+};
+
+hàm elf bản địa trường đối tượng(chỉ mục, trường) {
+    trả về máy đọc số nguyên ba mươi hai bit(67200000 + chỉ mục * 40 + trường);
+};
+
+hàm elf bản địa trường đoạn(chỉ mục, trường) {
+    trả về máy đọc số nguyên ba mươi hai bit(67210000 + chỉ mục * 32 + trường);
+};
+
+hàm elf bản địa tìm đoạn(chỉ mục đối tượng, chỉ mục đoạn) {
+    lặp (i = 0; i < máy đọc số nguyên ba mươi hai bit(67199996); i++) {
+        nếu (elf bản địa trường đoạn(i, 0) == chỉ mục đối tượng) {
+            nếu (elf bản địa trường đoạn(i, 4) == chỉ mục đoạn) { trả về i; };
+        };
+    };
+    trả về -1;
+};
+
+// Validate ELF header, section table, single symbol table and its string table.
+// Every 64-bit offset/size must fit the native arena's signed i32 address space.
+hàm elf bản địa thêm đối tượng(tệp, bắt đầu, kích cỡ) {
+    biến số = máy đọc số nguyên ba mươi hai bit(67199992);
+    nếu (số >= 32) { trả về -1; };
+    nếu (kích cỡ < 64) { trả về -1; };
+    nếu (bắt đầu < 0) { trả về -1; };
+    nếu (kích cỡ > thực thi các byte chiều dài(tệp) - bắt đầu) { trả về -1; };
+    nếu (elf bản địa đọc i32(tệp, bắt đầu) != 1179403647) { trả về -1; };
+    nếu (thực thi các byte lấy(tệp, bắt đầu + 4) != 2) { trả về -1; };
+    nếu (thực thi các byte lấy(tệp, bắt đầu + 5) != 1) { trả về -1; };
+    nếu (thực thi các byte lấy(tệp, bắt đầu + 6) != 1) { trả về -1; };
+    biến abi = thực thi các byte lấy(tệp, bắt đầu + 8);
+    nếu (abi != 0) { nếu (abi != 3) { trả về -1; }; };
+    lặp (j = 9; j < 16; j++) {
+        nếu (thực thi các byte lấy(tệp, bắt đầu + j) != 0) { trả về -1; };
+    };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 16) != 1) { trả về -1; };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 18) != 62) { trả về -1; };
+    nếu (elf bản địa đọc i32(tệp, bắt đầu + 20) != 1) { trả về -1; };
+    // ET_REL has no entry point and no program header table. Check both
+    // halves of the 64-bit fields; the VM addresses only signed-i32 ranges.
+    lặp (j = 24; j < 40; j = j + 4) {
+        nếu (elf bản địa đọc i32(tệp, bắt đầu + j) != 0) { trả về -1; };
+    };
+    nếu (elf bản địa đọc i32(tệp, bắt đầu + 44) != 0) { trả về -1; };
+    nếu (elf bản địa đọc i32(tệp, bắt đầu + 48) != 0) { trả về -1; };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 52) != 64) { trả về -1; };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 54) != 0) { trả về -1; };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 56) != 0) { trả về -1; };
+    biến bảng = elf bản địa đọc i32(tệp, bắt đầu + 40);
+    nếu (bảng < 64) { trả về -1; };
+    nếu (elf bản địa đọc u16(tệp, bắt đầu + 58) != 64) { trả về -1; };
+    biến tổng = elf bản địa đọc u16(tệp, bắt đầu + 60);
+    nếu (tổng < 2) { trả về -1; };
+    nếu (tổng > 128) { trả về -1; };
+    biến tên đoạn = elf bản địa đọc u16(tệp, bắt đầu + 62);
+    nếu (tên đoạn >= tổng) { trả về -1; };
+    nếu (bảng > kích cỡ - tổng * 64) { trả về -1; };
+    // The ELF SHT_NULL header must not smuggle section metadata.
+    lặp (j = 0; j < 64; j = j + 4) {
+        nếu (elf bản địa đọc i32(tệp, bắt đầu + bảng + j) != 0) { trả về -1; };
+    };
+    // SHN_UNDEF (0) means that section names were deliberately omitted.
+    // Otherwise e_shstrndx must identify a bounded SHT_STRTAB, not an
+    // arbitrary in-range section such as .text, .symtab or .rela.text.
+    nếu (tên đoạn != 0) {
+        biến phần tên = bắt đầu + bảng + tên đoạn * 64;
+        nếu (elf bản địa đọc i32(tệp, phần tên + 4) != 3) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần tên + 28) != 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần tên + 36) != 0) { trả về -1; };
+        biến tên bắt đầu = elf bản địa đọc i32(tệp, phần tên + 24);
+        biến tên dài = elf bản địa đọc i32(tệp, phần tên + 32);
+        nếu (tên bắt đầu < 0) { trả về -1; };
+        nếu (tên dài < 1) { trả về -1; };
+        nếu (tên bắt đầu > kích cỡ - tên dài) { trả về -1; };
+        nếu (thực thi các byte lấy(tệp, bắt đầu + tên bắt đầu) != 0) { trả về -1; };
+        nếu (thực thi các byte lấy(tệp, bắt đầu + tên bắt đầu + tên dài - 1) != 0) { trả về -1; };
+        lặp (k = 1; k < tổng; k++) {
+            biến chỉ mục tên = elf bản địa đọc i32(tệp, bắt đầu + bảng + k * 64);
+            nếu (chỉ mục tên < 0) { trả về -1; };
+            nếu (chỉ mục tên >= tên dài) { trả về -1; };
+        };
+    };
+    biến độ lệch ký hiệu = -1;
+    biến các chuỗi = -1;
+    biến số ký hiệu = 0;
+    lặp (i = 1; i < tổng; i++) {
+        biến phần đầu = bắt đầu + bảng + i * 64;
+        biến loại = elf bản địa đọc i32(tệp, phần đầu + 4);
+        nếu (loại == 9) { trả về -1; }; // SHT_REL is unsupported: use RELA
+        nếu (loại == 3) {
+            nếu (elf bản địa đọc i32(tệp, phần đầu + 40) != 0) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, phần đầu + 44) != 0) { trả về -1; };
+        };
+        nếu (loại == 4) {
+            nếu (elf bản địa đọc i32(tệp, phần đầu + 60) != 0) { trả về -1; };
+        };
+        biến độ lệch = elf bản địa đọc i32(tệp, phần đầu + 24);
+        biến kích cỡ đoạn = elf bản địa đọc i32(tệp, phần đầu + 32);
+        biến căn = elf bản địa đọc i32(tệp, phần đầu + 48);
+        // ET_REL section addresses are not assigned until final layout.
+        // Reject nonzero low/high halves for both source and host objects.
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 16) != 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 20) != 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 28) != 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 36) != 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 52) != 0) { trả về -1; };
+        nếu (độ lệch < 0) { trả về -1; };
+        nếu (kích cỡ đoạn < 0) { trả về -1; };
+        nếu (loại != 8) { nếu (độ lệch > kích cỡ - kích cỡ đoạn) { trả về -1; }; };
+        nếu (căn == 0) { căn = 1; };
+        nếu (căn < 1) { trả về -1; };
+        nếu (căn > 4096) { trả về -1; };
+        biến kiểm căn = căn;
+        khi (kiểm căn > 1) {
+            nếu (kiểm căn - máy chia số nguyên ba mươi hai bit(kiểm căn, 2) * 2 != 0) { trả về -1; };
+            kiểm căn = máy chia số nguyên ba mươi hai bit(kiểm căn, 2);
+        };
+        nếu (loại == 2) {
+            nếu (độ lệch ký hiệu >= 0) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, phần đầu + 56) != 24) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, phần đầu + 60) != 0) { trả về -1; };
+            nếu (kích cỡ đoạn - máy chia số nguyên ba mươi hai bit(kích cỡ đoạn, 24) * 24 != 0) { trả về -1; };
+            độ lệch ký hiệu = độ lệch;
+            số ký hiệu = máy chia số nguyên ba mươi hai bit(kích cỡ đoạn, 24);
+            biến chuỗi chỉ mục = elf bản địa đọc i32(tệp, phần đầu + 40);
+            nếu (chuỗi chỉ mục < 1) { trả về -1; };
+            nếu (chuỗi chỉ mục >= tổng) { trả về -1; };
+            biến phần chuỗi = bắt đầu + bảng + chuỗi chỉ mục * 64;
+            nếu (elf bản địa đọc i32(tệp, phần chuỗi + 4) != 3) { trả về -1; };
+            các chuỗi = elf bản địa đọc i32(tệp, phần chuỗi + 24);
+            biến chuỗi kích cỡ = elf bản địa đọc i32(tệp, phần chuỗi + 32);
+            nếu (các chuỗi < 0) { trả về -1; };
+            nếu (chuỗi kích cỡ <= 0) { trả về -1; };
+            nếu (các chuỗi > kích cỡ - chuỗi kích cỡ) { trả về -1; };
+            máy ghi số nguyên ba mươi hai bit(67200000 + số * 40 + 32, chuỗi kích cỡ);
+        };
+        biến các cờ = elf bản địa đọc i32(tệp, phần đầu + 8);
+        nếu (các cờ < 0) { trả về -1; };
+        nếu (elf bản địa đọc i32(tệp, phần đầu + 12) != 0) { trả về -1; };
+        nếu (máy chia số nguyên ba mươi hai bit(các cờ, 2) - máy chia số nguyên ba mươi hai bit(các cờ, 4) * 2 == 1) {
+            // Accept only ordinary allocated bytes, zero-filled storage and
+            // the host's fini-array pointers. TLS/compressed sections fail.
+            nếu (các cờ >= 64) { trả về -1; };
+            nếu (loại != 1) { nếu (loại != 8) { nếu (loại != 15) { trả về -1; }; }; };
+            biến đoạn số = máy đọc số nguyên ba mươi hai bit(67199996);
+            nếu (đoạn số >= 256) { trả về -1; };
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32, số);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 4, i);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 8, loại);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 12, các cờ);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 16, bắt đầu + độ lệch);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 20, kích cỡ đoạn);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 24, 0);
+            máy ghi số nguyên ba mươi hai bit(67210000 + đoạn số * 32 + 28, căn);
+            máy ghi số nguyên ba mươi hai bit(67199996, đoạn số + 1);
+        };
+    };
+    nếu (độ lệch ký hiệu < 0) { trả về -1; };
+    nếu (các chuỗi < 0) { trả về -1; };
+    biến cache = máy đọc số nguyên ba mươi hai bit(67199988);
+    nếu (số ký hiệu < 1) { trả về -1; };
+    nếu (số ký hiệu > 10000 - cache) { trả về -1; };
+    biến ô nhớ = 67200000 + số * 40;
+    máy ghi số nguyên ba mươi hai bit(ô nhớ, tệp);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 4, bắt đầu);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 8, kích cỡ);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 12, bảng);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 16, tổng);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 20, bắt đầu + độ lệch ký hiệu);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 24, số ký hiệu);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 28, bắt đầu + các chuỗi);
+    máy ghi số nguyên ba mươi hai bit(ô nhớ + 36, cache);
+    lặp (j = cache; j < cache + số ký hiệu; j++) { máy ghi số nguyên ba mươi hai bit(67240000 + j * 4, 0); };
+    máy ghi số nguyên ba mươi hai bit(67199988, cache + số ký hiệu);
+    máy ghi số nguyên ba mươi hai bit(67199992, số + 1);
+    trả về số;
+};
+
+// Compare bounded NUL-terminated ELF names without allocating strings.
+hàm elf bản địa tên bằng(đối tượng trái, tên trái, đối tượng phải, tên phải) {
+    biến tập trái = elf bản địa trường đối tượng(đối tượng trái, 0);
+    biến tập phải = elf bản địa trường đối tượng(đối tượng phải, 0);
+    biến đầu trái = elf bản địa trường đối tượng(đối tượng trái, 28);
+    biến đầu phải = elf bản địa trường đối tượng(đối tượng phải, 28);
+    biến dài trái = elf bản địa trường đối tượng(đối tượng trái, 32);
+    biến dài phải = elf bản địa trường đối tượng(đối tượng phải, 32);
+    nếu (tên trái < 0) { trả về -1; };
+    nếu (tên phải < 0) { trả về -1; };
+    nếu (tên trái >= dài trái) { trả về -1; };
+    nếu (tên phải >= dài phải) { trả về -1; };
+    lặp (i = 0; i < 512; i++) {
+        nếu (i >= dài trái - tên trái) { trả về -1; };
+        nếu (i >= dài phải - tên phải) { trả về -1; };
+        biến trái = thực thi các byte lấy(tập trái, đầu trái + tên trái + i);
+        biến phải = thực thi các byte lấy(tập phải, đầu phải + tên phải + i);
+        nếu (trái != phải) { trả về 0; };
+        nếu (trái == 0) { trả về 1; };
+    };
+    trả về -1;
+};
+
+// Layout: headers [R] at 0x400000, .text [RX] on next page,
+// .rodata [R] on next page, .data/.fini_array [RW] on final page.
+// The virtual address of each byte is 0x400000 + its output file offset.
+hàm elf bản địa bố trí() {
+    biến nơi = 4096;
+    lặp (loại nhóm = 0; loại nhóm < 3; loại nhóm++) {
+        nếu (loại nhóm == 1) { nơi = elf bản địa căn chỉnh(nơi, 4096); máy ghi số nguyên ba mươi hai bit(67199976, nơi); };
+        nếu (loại nhóm == 2) { nơi = elf bản địa căn chỉnh(nơi, 4096); máy ghi số nguyên ba mươi hai bit(67199972, nơi); };
+        lặp (i = 0; i < máy đọc số nguyên ba mươi hai bit(67199996); i++) {
+            biến cờ = elf bản địa trường đoạn(i, 12);
+            biến chạy = máy chia số nguyên ba mươi hai bit(cờ, 4) - máy chia số nguyên ba mươi hai bit(cờ, 8) * 2;
+            biến ghi = cờ - máy chia số nguyên ba mươi hai bit(cờ, 2) * 2;
+            biến nhóm = 1;
+            nếu (chạy == 1) { nhóm = 0; };
+            nếu (ghi == 1) { nhóm = 2; };
+            nếu (chạy == 1) { nếu (ghi == 1) { trả về -1; }; };
+            nếu (nhóm == loại nhóm) {
+                nơi = elf bản địa căn chỉnh(nơi, elf bản địa trường đoạn(i, 28));
+                nếu (nơi < 0) { trả về -1; };
+                biến kích cỡ = elf bản địa trường đoạn(i, 20);
+                nếu (kích cỡ > 2097152 - nơi) { trả về -1; };
+                máy ghi số nguyên ba mươi hai bit(67210000 + i * 32 + 24, nơi);
+                nơi = nơi + kích cỡ;
+            };
+        };
+        nếu (loại nhóm == 0) { máy ghi số nguyên ba mươi hai bit(67199980, nơi); };
+        nếu (loại nhóm == 1) { máy ghi số nguyên ba mươi hai bit(67199968, nơi); };
+    };
+    nếu (nơi > 2097152) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(67199984, nơi);
+    trả về nơi;
+};
+
+hàm elf bản địa ký hiệu độ lệch(đối tượng, ký hiệu) {
+    nếu (ký hiệu < 0) { trả về -1; };
+    nếu (ký hiệu >= elf bản địa trường đối tượng(đối tượng, 24)) { trả về -1; };
+    trả về elf bản địa trường đối tượng(đối tượng, 20) + ký hiệu * 24;
+};
+
+// Bounded global-name lookup: 2048 open-addressed (object+1, symbol) slots.
+// Hash arithmetic stays positive and within i32, including under emulation.
+hàm elf bản địa ô ký hiệu(đối tượng, tên) {
+    nếu (tên <= 0) { trả về -1; };
+    biến dài = elf bản địa trường đối tượng(đối tượng, 32);
+    nếu (tên >= dài) { trả về -1; };
+    biến tệp = elf bản địa trường đối tượng(đối tượng, 0);
+    biến đầu = elf bản địa trường đối tượng(đối tượng, 28);
+    biến băm = 0;
+    biến kết thúc = 0;
+    lặp (i = 0; i < 512; i++) {
+        nếu (i >= dài - tên) { trả về -1; };
+        biến chữ = thực thi các byte lấy(tệp, đầu + tên + i);
+        nếu (chữ == 0) { kết thúc = 1; thoát; };
+        băm = băm * 33 + chữ;
+        băm = băm - máy chia số nguyên ba mươi hai bit(băm, 65521) * 65521;
+    };
+    nếu (kết thúc != 1) { trả về -1; };
+    biến ô = băm - máy chia số nguyên ba mươi hai bit(băm, 2048) * 2048;
+    lặp (lần = 0; lần < 2048; lần++) {
+        biến địa chỉ = 67290000 + ô * 8;
+        biến khác = máy đọc số nguyên ba mươi hai bit(địa chỉ) - 1;
+        nếu (khác < 0) { trả về địa chỉ; };
+        biến ký hiệu khác = máy đọc số nguyên ba mươi hai bit(địa chỉ + 4);
+        biến tệp khác = elf bản địa trường đối tượng(khác, 0);
+        biến tên khác = elf bản địa đọc i32(tệp khác, elf bản địa ký hiệu độ lệch(khác, ký hiệu khác));
+        nếu (elf bản địa tên bằng(đối tượng, tên, khác, tên khác) == 1) { trả về địa chỉ; };
+        ô = ô + 1;
+        nếu (ô == 2048) { ô = 0; };
+    };
+    trả về -1;
+};
+
+// Build once, so duplicate strong definitions fail even when never referenced.
+// A strong definition wins over weak; the first of equal weak definitions wins.
+hàm elf bản địa đăng ký ký hiệu() {
+    lặp (i = 0; i < 2048; i++) { máy ghi số nguyên ba mươi hai bit(67290000 + i * 8, 0); };
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến tệp = elf bản địa trường đối tượng(j, 0);
+        lặp (k = 1; k < elf bản địa trường đối tượng(j, 24); k++) {
+            biến vị trí = elf bản địa ký hiệu độ lệch(j, k);
+            biến ràng buộc = máy chia số nguyên ba mươi hai bit(thực thi các byte lấy(tệp, vị trí + 4), 16);
+            nếu (ràng buộc == 0) { bỏ qua; };
+            nếu (ràng buộc > 2) { trả về -1; };
+            biến tên = elf bản địa đọc i32(tệp, vị trí);
+            biến ô = elf bản địa ô ký hiệu(j, tên);
+            nếu (ô < 0) { trả về -1; };
+            nếu (elf bản địa đọc u16(tệp, vị trí + 6) == 0) { bỏ qua; };
+            biến cũ = máy đọc số nguyên ba mươi hai bit(ô) - 1;
+            nếu (cũ >= 0) {
+                biến vị trí cũ = elf bản địa ký hiệu độ lệch(cũ, máy đọc số nguyên ba mươi hai bit(ô + 4));
+                biến cũ ràng buộc = máy chia số nguyên ba mươi hai bit(thực thi các byte lấy(elf bản địa trường đối tượng(cũ, 0), vị trí cũ + 4), 16);
+                nếu (ràng buộc == 1) { nếu (cũ ràng buộc == 1) { trả về -1; }; };
+                nếu (ràng buộc == 2) { bỏ qua; };
+            };
+            máy ghi số nguyên ba mươi hai bit(ô, j + 1);
+            máy ghi số nguyên ba mươi hai bit(ô + 4, k);
+        };
+    };
+    trả về 0;
+};
+
+hàm elf bản địa địa chỉ đã định nghĩa(đối tượng, ký hiệu) {
+    biến tệp = elf bản địa trường đối tượng(đối tượng, 0);
+    biến vị trí = elf bản địa ký hiệu độ lệch(đối tượng, ký hiệu);
+    nếu (vị trí < 0) { trả về -1; };
+    biến đoạn = elf bản địa đọc u16(tệp, vị trí + 6);
+    biến giá trị = elf bản địa đọc i32(tệp, vị trí + 8);
+    nếu (elf bản địa đọc i32(tệp, vị trí + 12) != 0) { trả về -1; };
+    nếu (giá trị < 0) { trả về -1; };
+    nếu (đoạn == 65521) { trả về giá trị; }; // SHN_ABS
+    biến phần = elf bản địa tìm đoạn(đối tượng, đoạn);
+    nếu (phần < 0) { trả về -1; };
+    nếu (giá trị > elf bản địa trường đoạn(phần, 20)) { trả về -1; };
+    trả về 4194304 + elf bản địa trường đoạn(phần, 24) + giá trị;
+};
+
+hàm elf bản địa giải ký hiệu(đối tượng, ký hiệu) {
+    biến vị trí = elf bản địa ký hiệu độ lệch(đối tượng, ký hiệu);
+    nếu (vị trí < 0) { trả về -1; };
+    biến cache = elf bản địa trường đối tượng(đối tượng, 36) + ký hiệu;
+    biến sẵn = máy đọc số nguyên ba mươi hai bit(67240000 + cache * 4);
+    nếu (sẵn != 0) { trả về sẵn; };
+    biến tệp = elf bản địa trường đối tượng(đối tượng, 0);
+    biến ràng buộc = máy chia số nguyên ba mươi hai bit(thực thi các byte lấy(tệp, vị trí + 4), 16);
+    biến địa chỉ = -1;
+    nếu (ràng buộc == 0) {
+        nếu (ký hiệu == 0) { trả về 0; };
+        địa chỉ = elf bản địa địa chỉ đã định nghĩa(đối tượng, ký hiệu);
+    } hoặc {
+        biến ô = elf bản địa ô ký hiệu(đối tượng, elf bản địa đọc i32(tệp, vị trí));
+        nếu (ô < 0) { trả về -1; };
+        biến khác = máy đọc số nguyên ba mươi hai bit(ô) - 1;
+        nếu (khác < 0) {
+            nếu (ràng buộc == 2) { trả về 0; };
+            trả về -1;
+        };
+        địa chỉ = elf bản địa địa chỉ đã định nghĩa(khác, máy đọc số nguyên ba mươi hai bit(ô + 4));
+    };
+    nếu (địa chỉ < 0) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(67240000 + cache * 4, địa chỉ);
+    trả về địa chỉ;
+};
+
+hàm elf bản địa điểm vào() {
+    biến số điểm vào = 0;
+    biến địa chỉ điểm vào = -1;
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến tệp = elf bản địa trường đối tượng(j, 0);
+        lặp (k = 1; k < elf bản địa trường đối tượng(j, 24); k++) {
+            biến mục = elf bản địa ký hiệu độ lệch(j, k);
+            nếu (elf bản địa đọc u16(tệp, mục + 6) == 0) { bỏ qua; };
+            biến tên = elf bản địa đọc i32(tệp, mục);
+            nếu (tên < 0) { trả về -1; };
+            nếu (tên > elf bản địa trường đối tượng(j, 32) - 7) { bỏ qua; };
+            biến vị trí = elf bản địa trường đối tượng(j, 28) + tên;
+            nếu (thực thi các byte lấy(tệp, vị trí) != 95) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 1) != 115) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 2) != 116) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 3) != 97) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 4) != 114) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 5) != 116) { bỏ qua; };
+            nếu (thực thi các byte lấy(tệp, vị trí + 6) != 0) { bỏ qua; };
+            biến địa chỉ = elf bản địa giải ký hiệu(j, k);
+            nếu (địa chỉ <= 0) { trả về -1; };
+            địa chỉ điểm vào = địa chỉ;
+            số điểm vào = số điểm vào + 1;
+        };
+    };
+    nếu (số điểm vào != 1) { trả về -1; };
+    trả về địa chỉ điểm vào;
+};
+
+hàm elf bản địa tái định vị(đầu ra) {
+    biến đầu ra ô nhớ = thực thi các byte ô nhớ(đầu ra);
+    nếu (đầu ra ô nhớ < 0) { trả về -1; };
+    biến đầu ra nền = thực thi nội dung đệm(đầu ra ô nhớ);
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến tệp = elf bản địa trường đối tượng(j, 0);
+        biến phần đầu = elf bản địa trường đối tượng(j, 4);
+        biến độ lệch bảng = elf bản địa trường đối tượng(j, 12);
+        lặp (k = 1; k < elf bản địa trường đối tượng(j, 16); k++) {
+            biến phần = phần đầu + độ lệch bảng + k * 64;
+            nếu (elf bản địa đọc i32(tệp, phần + 4) != 4) { bỏ qua; };
+            nếu (elf bản địa đọc i32(tệp, phần + 56) != 24) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, phần + 60) != 0) { trả về -1; };
+            biến vị trí = elf bản địa đọc i32(tệp, phần + 24);
+            biến chiều dài = elf bản địa đọc i32(tệp, phần + 32);
+            biến mục tiêu = elf bản địa đọc i32(tệp, phần + 44);
+            nếu (mục tiêu <= 0) { trả về -1; };
+            nếu (mục tiêu >= elf bản địa trường đối tượng(j, 16)) { trả về -1; };
+            biến đoạn = elf bản địa tìm đoạn(j, mục tiêu);
+            nếu (đoạn < 0) { trả về -1; };
+            biến bảng ký hiệu = elf bản địa đọc i32(tệp, phần + 40);
+            nếu (bảng ký hiệu < 1) { trả về -1; };
+            nếu (bảng ký hiệu >= elf bản địa trường đối tượng(j, 16)) { trả về -1; };
+            biến đầu ký hiệu = phần đầu + độ lệch bảng + bảng ký hiệu * 64;
+            nếu (elf bản địa đọc i32(tệp, đầu ký hiệu + 4) != 2) { trả về -1; };
+            nếu (phần đầu + elf bản địa đọc i32(tệp, đầu ký hiệu + 24) != elf bản địa trường đối tượng(j, 20)) { trả về -1; };
+            nếu (chiều dài < 0) { trả về -1; };
+            nếu (chiều dài - máy chia số nguyên ba mươi hai bit(chiều dài, 24) * 24 != 0) { trả về -1; };
+            nếu (vị trí < 0) { trả về -1; };
+            nếu (vị trí > elf bản địa trường đối tượng(j, 8) - chiều dài) { trả về -1; };
+            lặp (m = 0; m < chiều dài; m = m + 24) {
+                biến r = phần đầu + vị trí + m;
+                nếu (elf bản địa đọc i32(tệp, r + 4) != 0) { trả về -1; };
+                biến dời = elf bản địa đọc i32(tệp, r);
+                biến loại = elf bản địa đọc i32(tệp, r + 8);
+                biến chỉ số ký hiệu = elf bản địa đọc i32(tệp, r + 12);
+                biến bù = elf bản địa đọc i32(tệp, r + 16);
+                biến bù cao = elf bản địa đọc i32(tệp, r + 20);
+                nếu (bù < 0) { nếu (bù cao != -1) { trả về -1; }; }
+                hoặc { nếu (bù cao != 0) { trả về -1; }; };
+                biến rộng = 4;
+                nếu (loại == 1) { rộng = 8; }
+                hoặc nếu (loại != 2) { nếu (loại != 4) { trả về -1; }; };
+                nếu (dời < 0) { trả về -1; };
+                nếu (dời > elf bản địa trường đoạn(đoạn, 20) - rộng) { trả về -1; };
+                biến đích = elf bản địa trường đoạn(đoạn, 24) + dời;
+                nếu (đích > máy đọc số nguyên ba mươi hai bit(67199984) - rộng) { trả về -1; };
+                biến ký hiệu địa chỉ = elf bản địa giải ký hiệu(j, chỉ số ký hiệu);
+                nếu (ký hiệu địa chỉ < 0) { trả về -1; };
+                biến nền = ký hiệu địa chỉ;
+                nếu (loại != 1) { nền = nền - (4194304 + đích); };
+                // Check before adding, so i32 wrap cannot hide a bad addend.
+                nếu (nền > 0) { nếu (bù > 2147483647 - nền) { trả về -1; }; };
+                nếu (nền < 0) { nếu (bù < (-2147483647 - 1) - nền) { trả về -1; }; };
+                biến giá trị = nền + bù;
+                nếu (loại == 1) { nếu (giá trị < 0) { trả về -1; }; };
+                máy ghi số nguyên ba mươi hai bit(đầu ra nền + đích, giá trị);
+                nếu (loại == 1) { máy ghi số nguyên ba mươi hai bit(đầu ra nền + đích + 4, 0); };
+            };
+        };
+    };
+    trả về 0;
+};
+
+// Program headers and ELF header use low addresses; upper u32 words stay zero.
+hàm elf bản địa phân đoạn(đầu ra, chỉ mục, loại, cờ, đầu, dài, căn) {
+    biến nơi = 64 + chỉ mục * 56;
+    thực thi các byte lưu i32(đầu ra, nơi, loại);
+    thực thi các byte lưu i32(đầu ra, nơi + 4, cờ);
+    thực thi các byte lưu i32(đầu ra, nơi + 8, đầu);
+    nếu (loại == 1) {
+        thực thi các byte lưu i32(đầu ra, nơi + 16, 4194304 + đầu);
+        thực thi các byte lưu i32(đầu ra, nơi + 24, 4194304 + đầu);
+    };
+    thực thi các byte lưu i32(đầu ra, nơi + 32, dài);
+    thực thi các byte lưu i32(đầu ra, nơi + 40, dài);
+    thực thi các byte lưu i32(đầu ra, nơi + 48, căn);
+    trả về 0;
+};
+
+hàm elf bản địa xuất(đầu ra, điểm vào) {
+    biến dài = máy đọc số nguyên ba mươi hai bit(67199984);
+    nếu (dài < 4096) { trả về -1; };
+    nếu (thực thi các byte dự trữ(đầu ra, dài) != 0) { trả về -1; };
+    biến ô = thực thi các byte ô nhớ(đầu ra);
+    nếu (ô < 0) { trả về -1; };
+    biến nền = thực thi nội dung đệm(ô);
+    lặp (i = 0; i <= dài; i++) { máy ghi byte(nền + i, 0); };
+    máy ghi số nguyên ba mươi hai bit(32 + ô * 32, dài);
+    thực thi các byte lưu i32(đầu ra, 0, 1179403647);
+    thực thi các byte lưu i32(đầu ra, 4, 65794); // ELFCLASS64, LSB, EV_CURRENT
+    thực thi các byte lưu i32(đầu ra, 16, 4063234); // ET_EXEC, EM_X86_64
+    thực thi các byte lưu i32(đầu ra, 20, 1);
+    thực thi các byte lưu i32(đầu ra, 24, điểm vào);
+    thực thi các byte lưu i32(đầu ra, 32, 64);
+    thực thi các byte lưu i32(đầu ra, 52, 3670080); // e_ehsize=64, e_phentsize=56
+    thực thi các byte lưu i32(đầu ra, 56, 5); // 5 phdrs, no section table
+    elf bản địa phân đoạn(đầu ra, 0, 1, 4, 0, 344, 4096);
+    elf bản địa phân đoạn(đầu ra, 1, 1, 5, 4096, máy đọc số nguyên ba mươi hai bit(67199980) - 4096, 4096);
+    biến chỉ đọc = máy đọc số nguyên ba mươi hai bit(67199976);
+    biến dữ liệu = máy đọc số nguyên ba mươi hai bit(67199972);
+    elf bản địa phân đoạn(đầu ra, 2, 1, 4, chỉ đọc, máy đọc số nguyên ba mươi hai bit(67199968) - chỉ đọc, 4096);
+    elf bản địa phân đoạn(đầu ra, 3, 1, 6, dữ liệu, dài - dữ liệu, 4096);
+    elf bản địa phân đoạn(đầu ra, 4, 1685382481, 6, 0, 0, 16); // PT_GNU_STACK RW
+    lặp (i = 0; i < máy đọc số nguyên ba mươi hai bit(67199996); i++) {
+        nếu (elf bản địa trường đoạn(i, 8) == 8) { bỏ qua; }; // NOBITS stays zero
+        biến tệp = elf bản địa trường đối tượng(elf bản địa trường đoạn(i, 0), 0);
+        biến nguồn = elf bản địa trường đoạn(i, 16);
+        biến đích = elf bản địa trường đoạn(i, 24);
+        biến dài đoạn = elf bản địa trường đoạn(i, 20);
+        lặp (j = 0; j < dài đoạn; j++) {
+            máy ghi byte(nền + đích + j, thực thi các byte lấy(tệp, nguồn + j));
+        };
+    };
+    trả về elf bản địa tái định vị(đầu ra);
+};
+
+hàm elf bản địa đọc tệp(đường tệp, nội dung) {
+    biến tệp = thực thi tệp dữ liệu mở đọc(đường tệp);
+    nếu (tệp <= 0) { trả về -1; };
+    biến đạt = -1;
+    // Read until EOF; a 2 MiB arena needs up to 512 full 4 KiB reads,
+    // followed by one EOF probe. A fixed 257-iteration loop rejected valid
+    // archives just above 1 MiB before reaching the linker.
+    khi (đúng) {
+        biến số = thực thi tệp dữ liệu đọc khối(tệp, nội dung);
+        nếu (số < 0) {
+            // A full arena cannot accept another block. Probe one byte to
+            // distinguish an exact 2 MiB input from an oversized input.
+            nếu (thực thi các byte chiều dài(nội dung) == 2097152) {
+                nếu (thực thi tệp dữ liệu đọc byte(tệp) == -1) { đạt = 0; };
+            };
+            thoát;
+        };
+        nếu (số == 0) { đạt = 0; thoát; };
+    };
+    nếu (thực thi tệp dữ liệu đóng(tệp) != 0) { đạt = -1; };
+    trả về đạt;
+};
+
+// mkstemp creates mode 0600. Grant owner read/write/execute on the open
+// descriptor before close, validation and atomic rename (no chmod process).
+hàm elf bản địa cấp quyền(mã tệp mở) {
+    trả về máy đặt quyền tệp mở(mã tệp mở, 448); // 0700
+};
+
+hàm elf bản địa công bố theo chế độ(đầu ra, kết xuất, chạy) {
+    biến tạm = thực thi các byte mới();
+    nếu (tạm <= 0) { trả về -1; };
+    biến đạt = thực thi liên kết tạm thời đường tệp(kết xuất, tạm, -1);
+    biến tệp = -1;
+    biến đã tạo = 0;
+    nếu (đạt == 0) {
+        tệp = thực thi liên kết tạm mở(tạm);
+        nếu (tệp < 0) { đạt = -1; } hoặc { đã tạo = 1; };
+    };
+    nếu (đạt == 0) {
+        biến dài = thực thi các byte chiều dài(đầu ra);
+        nếu (thực thi ghi tất cả(tệp, thực thi nội dung đệm(thực thi các byte ô nhớ(đầu ra)), dài) != dài) { đạt = -1; };
+    };
+    nếu (đạt == 0) { nếu (chạy == 1) { đạt = elf bản địa cấp quyền(tệp); }; };
+    nếu (tệp >= 0) { nếu (máy đóng(tệp) != 0) { đạt = -1; }; };
+    nếu (đạt == 0) {
+        nếu (chạy == 1) { đạt = thực thi liên kết executable sẵn sàng(tạm); }
+        hoặc {
+            nếu (máy thông tin tệp(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm)), 3584) != 0) { đạt = -1; }
+            hoặc { nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { đạt = -1; }; };
+        };
+    };
+    nếu (đạt == 0) { đạt = thực thi liên kết công bố(tạm, kết xuất); };
+    nếu (đã tạo == 1) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm))); };
+    thực thi các byte giải phóng(tạm);
+    trả về đạt;
+};
+
+hàm elf bản địa công bố(đầu ra, kết xuất) {
+    trả về elf bản địa công bố theo chế độ(đầu ra, kết xuất, 1);
+};
+
+hàm thực thi liên kết elf bản địa(kho lưu trữ, kết xuất) {
+    máy ghi số nguyên ba mươi hai bit(67199992, 0);
+    máy ghi số nguyên ba mươi hai bit(67199996, 0);
+    máy ghi số nguyên ba mươi hai bit(67199988, 0);
+    biến dài = thực thi các byte chiều dài(kho lưu trữ);
+    biến nơi = 0;
+    khi (nơi < dài) {
+        nếu (nơi > dài - 4) { trả về thực thi liên kết báo lỗi("V++ native ELF: truncated archive\n"); };
+        biến kích cỡ = elf bản địa đọc i32(kho lưu trữ, nơi);
+        nếu (elf bản địa thêm đối tượng(kho lưu trữ, nơi + 4, kích cỡ) < 0) {
+            trả về thực thi liên kết báo lỗi("V++ native ELF: invalid source object\n");
+        };
+        nơi = nơi + 4 + kích cỡ;
+    };
+    nếu (nơi != dài) { trả về -1; };
+    nếu (máy đọc số nguyên ba mươi hai bit(67199992) < 1) { trả về -1; };
+    biến đường host = thực thi môi trường thực thi tệp dữ liệu đường tệp(2);
+    nếu (đường host <= 0) { trả về thực thi liên kết báo lỗi("V++ native ELF: missing preassembled syscall host\n"); };
+    biến host = thực thi các byte mới();
+    biến đạt = -1;
+    nếu (host > 0) { đạt = elf bản địa đọc tệp(đường host, host); };
+    thực thi các byte giải phóng(đường host);
+    nếu (đạt == 0) {
+        nếu (elf bản địa thêm đối tượng(host, 0, thực thi các byte chiều dài(host)) < 0) {
+            đạt = thực thi liên kết báo lỗi("V++ native ELF: invalid host object\n");
+        };
+    };
+    nếu (đạt == 0) { nếu (elf bản địa bố trí() < 0) { đạt = thực thi liên kết báo lỗi("V++ native ELF: section layout failed\n"); }; };
+    nếu (đạt == 0) { nếu (elf bản địa đăng ký ký hiệu() != 0) { đạt = thực thi liên kết báo lỗi("V++ native ELF: invalid or duplicate global symbol\n"); }; };
+    biến điểm vào = -1;
+    nếu (đạt == 0) {
+        điểm vào = elf bản địa điểm vào();
+        nếu (điểm vào < 4198400) { đạt = -1; };
+        nếu (điểm vào >= 4194304 + máy đọc số nguyên ba mươi hai bit(67199980)) { đạt = -1; };
+    };
+    biến đầu ra = thực thi các byte mới();
+    nếu (đầu ra <= 0) { đạt = -1; };
+    nếu (đạt == 0) {
+        nếu (elf bản địa xuất(đầu ra, điểm vào) != 0) { đạt = thực thi liên kết báo lỗi("V++ native ELF: unsupported or overflowing relocation / unresolved symbol\n"); };
+    };
+    nếu (đạt == 0) {
+        nếu (elf bản địa công bố(đầu ra, kết xuất) != 0) { đạt = thực thi liên kết báo lỗi("V++ native ELF: executable publication failed\n"); };
+    };
+    nếu (đầu ra > 0) { thực thi các byte giải phóng(đầu ra); };
+    nếu (host > 0) { thực thi các byte giải phóng(host); };
+    trả về đạt;
+};
+
+// Partial linking for V++ compiler objects: ELF64 ET_REL with one .text,
+// global function symbols and PLT32 RELA calls. Undefined globals survive.
+// The global-slot -> output-symbol map occupies 67310000..67318192.
+hàm elf bản địa đối tượng đệm(đầu ra, dài) {
+    biến cũ = thực thi các byte chiều dài(đầu ra);
+    nếu (cũ < 0) { trả về -1; };
+    nếu (dài < cũ) { trả về -1; };
+    nếu (thực thi các byte dự trữ(đầu ra, dài - cũ) != 0) { trả về -1; };
+    biến ô = thực thi các byte ô nhớ(đầu ra);
+    biến nền = thực thi nội dung đệm(ô);
+    lặp (i = cũ; i <= dài; i++) { máy ghi byte(nền + i, 0); };
+    trả về máy ghi số nguyên ba mươi hai bit(32 + ô * 32, dài);
+};
+
+hàm elf bản địa đối tượng nối đoạn(đầu ra, tệp, đầu, dài) {
+    nếu (đầu < 0) { trả về -1; };
+    nếu (dài < 0) { trả về -1; };
+    nếu (đầu > thực thi các byte chiều dài(tệp) - dài) { trả về -1; };
+    biến cũ = thực thi các byte chiều dài(đầu ra);
+    nếu (cũ < 0) { trả về -1; };
+    nếu (thực thi các byte dự trữ(đầu ra, dài) != 0) { trả về -1; };
+    biến ô = thực thi các byte ô nhớ(đầu ra);
+    biến đích = thực thi nội dung đệm(ô) + cũ;
+    biến nguồn = thực thi nội dung đệm(thực thi các byte ô nhớ(tệp)) + đầu;
+    lặp (i = 0; i < dài; i++) { máy ghi byte(đích + i, máy đọc byte(nguồn + i)); };
+    máy ghi byte(đích + dài, 0);
+    trả về máy ghi số nguyên ba mươi hai bit(32 + ô * 32, cũ + dài);
+};
+
+hàm elf bản địa đối tượng u64(đầu ra, thấp) {
+    nếu (thực thi các byte đẩy i32(đầu ra, thấp) != 0) { trả về -1; };
+    trả về thực thi các byte đẩy i32(đầu ra, 0);
+};
+
+hàm elf bản địa đối tượng bố trí(mã) {
+    nếu (máy đọc số nguyên ba mươi hai bit(67199996) != máy đọc số nguyên ba mươi hai bit(67199992)) { trả về -1; };
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến phần = elf bản địa tìm đoạn(j, 1);
+        nếu (phần < 0) { trả về -1; };
+        nếu (elf bản địa trường đoạn(phần, 8) != 1) { trả về -1; };
+        nếu (elf bản địa trường đoạn(phần, 12) != 6) { trả về -1; };
+        biến đầu = elf bản địa căn chỉnh(thực thi các byte chiều dài(mã), 16);
+        nếu (đầu < 0) { trả về -1; };
+        nếu (elf bản địa đối tượng đệm(mã, đầu) != 0) { trả về -1; };
+        máy ghi số nguyên ba mươi hai bit(67210000 + phần * 32 + 24, đầu);
+        nếu (elf bản địa đối tượng nối đoạn(mã, elf bản địa trường đối tượng(j, 0), elf bản địa trường đoạn(phần, 16), elf bản địa trường đoạn(phần, 20)) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm elf bản địa đối tượng thêm ký hiệu(các ký hiệu, các chuỗi, đối tượng, ký hiệu) {
+    biến tệp = elf bản địa trường đối tượng(đối tượng, 0);
+    biến mục = elf bản địa ký hiệu độ lệch(đối tượng, ký hiệu);
+    nếu (mục < 0) { trả về -1; };
+    biến tên = elf bản địa đọc i32(tệp, mục);
+    nếu (tên <= 0) { trả về -1; };
+    nếu (tên >= elf bản địa trường đối tượng(đối tượng, 32)) { trả về -1; };
+    biến đầu tên = elf bản địa trường đối tượng(đối tượng, 28) + tên;
+    biến dài = 0;
+    khi (dài < 512) {
+        nếu (dài >= elf bản địa trường đối tượng(đối tượng, 32) - tên) { trả về -1; };
+        nếu (thực thi các byte lấy(tệp, đầu tên + dài) == 0) { thoát; };
+        dài = dài + 1;
+    };
+    nếu (dài < 1) { trả về -1; };
+    nếu (dài == 512) { trả về -1; };
+    biến tên mới = thực thi các byte chiều dài(các chuỗi);
+    nếu (elf bản địa đối tượng nối đoạn(các chuỗi, tệp, đầu tên, dài + 1) != 0) { trả về -1; };
+    biến giá trị = elf bản địa đọc i32(tệp, mục + 8);
+    biến đoạn = elf bản địa đọc u16(tệp, mục + 6);
+    biến thông tin = 18;
+    nếu (đoạn == 1) {
+        biến phần = elf bản địa tìm đoạn(đối tượng, 1);
+        nếu (phần < 0) { trả về -1; };
+        giá trị = giá trị + elf bản địa trường đoạn(phần, 24);
+        thông tin = 65554; // st_info=GLOBAL FUNC, st_shndx=1
+    } hoặc { nếu (đoạn != 0) { trả về -1; }; };
+    nếu (thực thi các byte đẩy i32(các ký hiệu, tên mới) != 0) { trả về -1; };
+    nếu (thực thi các byte đẩy i32(các ký hiệu, thông tin) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(các ký hiệu, giá trị) != 0) { trả về -1; };
+    trả về elf bản địa đối tượng u64(các ký hiệu, 0);
+};
+
+hàm elf bản địa đối tượng ký hiệu(các ký hiệu, các chuỗi) {
+    nếu (elf bản địa đăng ký ký hiệu() != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng đệm(các ký hiệu, 24) != 0) { trả về -1; };
+    nếu (thực thi các byte thêm cuối(các chuỗi, 0) != 0) { trả về -1; };
+    lặp (i = 0; i < 2048; i++) { máy ghi số nguyên ba mươi hai bit(67310000 + i * 4, 0); };
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến tệp = elf bản địa trường đối tượng(j, 0);
+        lặp (k = 1; k < elf bản địa trường đối tượng(j, 24); k++) {
+            biến mục = elf bản địa ký hiệu độ lệch(j, k);
+            biến ô = elf bản địa ô ký hiệu(j, elf bản địa đọc i32(tệp, mục));
+            nếu (ô < 0) { trả về -1; };
+            // Definitions were registered first, so an undefined reference
+            // encountered early can immediately choose a later definition.
+            biến khác = máy đọc số nguyên ba mươi hai bit(ô) - 1;
+            nếu (khác < 0) {
+                máy ghi số nguyên ba mươi hai bit(ô, j + 1);
+                máy ghi số nguyên ba mươi hai bit(ô + 4, k);
+                khác = j;
+            };
+            biến chỉ mục ô = máy chia số nguyên ba mươi hai bit(ô - 67290000, 8);
+            biến ánh xạ = 67310000 + chỉ mục ô * 4;
+            biến chỉ mục = máy đọc số nguyên ba mươi hai bit(ánh xạ);
+            nếu (chỉ mục == 0) {
+                chỉ mục = máy chia số nguyên ba mươi hai bit(thực thi các byte chiều dài(các ký hiệu), 24);
+                nếu (elf bản địa đối tượng thêm ký hiệu(các ký hiệu, các chuỗi, khác, máy đọc số nguyên ba mươi hai bit(ô + 4)) != 0) { trả về -1; };
+                máy ghi số nguyên ba mươi hai bit(ánh xạ, chỉ mục);
+            };
+            máy ghi số nguyên ba mươi hai bit(67240000 + (elf bản địa trường đối tượng(j, 36) + k) * 4, chỉ mục);
+        };
+    };
+    trả về 0;
+};
+
+hàm elf bản địa đối tượng tái định vị(các mục) {
+    lặp (j = 0; j < máy đọc số nguyên ba mươi hai bit(67199992); j++) {
+        biến tệp = elf bản địa trường đối tượng(j, 0);
+        biến đầu = elf bản địa trường đối tượng(j, 4);
+        biến phần = elf bản địa tìm đoạn(j, 1);
+        biến nền = elf bản địa trường đoạn(phần, 24);
+        biến bảng = đầu + elf bản địa trường đối tượng(j, 12);
+        // Inputs have the exact compiler layout, validated by thực thi elf
+        // các dịch vụ: .rela.text is section 2, and every addend is -4.
+        biến đoạn = bảng + 128;
+        biến nơi = đầu + elf bản địa đọc i32(tệp, đoạn + 24);
+        biến dài = elf bản địa đọc i32(tệp, đoạn + 32);
+        lặp (i = 0; i < dài; i = i + 24) {
+            biến chỉ số ký hiệu = elf bản địa đọc i32(tệp, nơi + i + 12);
+            biến ánh xạ = máy đọc số nguyên ba mươi hai bit(67240000 + (elf bản địa trường đối tượng(j, 36) + chỉ số ký hiệu) * 4);
+            nếu (ánh xạ <= 0) { trả về -1; };
+            biến dời = nền + elf bản địa đọc i32(tệp, nơi + i);
+            nếu (elf bản địa đối tượng u64(các mục, dời) != 0) { trả về -1; };
+            nếu (thực thi các byte đẩy i32(các mục, 4) != 0) { trả về -1; };
+            nếu (thực thi các byte đẩy i32(các mục, ánh xạ) != 0) { trả về -1; };
+            nếu (thực thi các byte đẩy i32(các mục, -4) != 0) { trả về -1; };
+            nếu (thực thi các byte đẩy i32(các mục, -1) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+hàm elf bản địa đối tượng phần đầu(đầu ra, tên, loại, cờ, dời, dài, liên kết, tin, căn, mục) {
+    nếu (thực thi các byte đẩy i32(đầu ra, tên) != 0) { trả về -1; };
+    nếu (thực thi các byte đẩy i32(đầu ra, loại) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(đầu ra, cờ) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(đầu ra, 0) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(đầu ra, dời) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(đầu ra, dài) != 0) { trả về -1; };
+    nếu (thực thi các byte đẩy i32(đầu ra, liên kết) != 0) { trả về -1; };
+    nếu (thực thi các byte đẩy i32(đầu ra, tin) != 0) { trả về -1; };
+    nếu (elf bản địa đối tượng u64(đầu ra, căn) != 0) { trả về -1; };
+    trả về elf bản địa đối tượng u64(đầu ra, mục);
+};
+
+hàm elf bản địa đối tượng xuất(đầu ra, mã, các ký hiệu, các chuỗi, các mục) {
+    biến tên = thực thi các byte mới();
+    nếu (tên <= 0) { trả về -1; };
+    biến đạt = thực thi các byte thêm cuối(tên, 0);
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".text"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".rela.text"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".symtab"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".strtab"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".shstrtab"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tên, ".note.GNU-stack"); };
+    nếu (đạt == 0) { đạt = thực thi các byte thêm cuối(tên, 0); };
+    biến mã dài = thực thi các byte chiều dài(mã);
+    biến r = elf bản địa căn chỉnh(64 + mã dài, 8);
+    biến s = r + thực thi các byte chiều dài(các mục);
+    biến t = s + thực thi các byte chiều dài(các ký hiệu);
+    biến n = t + thực thi các byte chiều dài(các chuỗi);
+    biến cuối tên = n + thực thi các byte chiều dài(tên);
+    biến bảng = elf bản địa căn chỉnh(cuối tên, 8);
+    nếu (bảng < 0) { đạt = -1; };
+    nếu (bảng > 2097152 - 448) { đạt = -1; };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng đệm(đầu ra, 64); };
+    nếu (đạt == 0) {
+        thực thi các byte lưu i32(đầu ra, 0, 1179403647);
+        thực thi các byte lưu i32(đầu ra, 4, 65794);
+        thực thi các byte lưu i32(đầu ra, 16, 4063233); // ET_REL, x86-64
+        thực thi các byte lưu i32(đầu ra, 20, 1);
+        thực thi các byte lưu i32(đầu ra, 40, bảng);
+        thực thi các byte lưu i32(đầu ra, 52, 64);
+        thực thi các byte lưu i32(đầu ra, 56, 4194304); // e_shentsize=64
+        thực thi các byte lưu i32(đầu ra, 60, 327687); // e_shnum=7, e_shstrndx=5
+        đạt = thực thi các byte nối(đầu ra, mã);
+    };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng đệm(đầu ra, r); };
+    nếu (đạt == 0) { đạt = thực thi các byte nối(đầu ra, các mục); };
+    nếu (đạt == 0) { đạt = thực thi các byte nối(đầu ra, các ký hiệu); };
+    nếu (đạt == 0) { đạt = thực thi các byte nối(đầu ra, các chuỗi); };
+    nếu (đạt == 0) { đạt = thực thi các byte nối(đầu ra, tên); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng đệm(đầu ra, bảng + 64); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 1, 1, 6, 64, mã dài, 0, 0, 16, 0); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 7, 4, 0, r, thực thi các byte chiều dài(các mục), 3, 1, 8, 24); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 18, 2, 0, s, thực thi các byte chiều dài(các ký hiệu), 4, 1, 8, 24); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 26, 3, 0, t, thực thi các byte chiều dài(các chuỗi), 0, 0, 1, 0); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 34, 3, 0, n, thực thi các byte chiều dài(tên), 0, 0, 1, 0); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng phần đầu(đầu ra, 44, 1, 0, cuối tên, 0, 0, 0, 1, 0); };
+    thực thi các byte giải phóng(tên);
+    nếu (đạt == 0) { nếu (thực thi các byte chiều dài(đầu ra) != bảng + 448) { đạt = -1; }; };
+    trả về đạt;
+};
+
+hàm thực thi liên kết elf đối tượng bản địa(kho lưu trữ, kết xuất, chế độ) {
+    máy ghi số nguyên ba mươi hai bit(67199992, 0);
+    máy ghi số nguyên ba mươi hai bit(67199996, 0);
+    máy ghi số nguyên ba mươi hai bit(67199988, 0);
+    biến dài = thực thi các byte chiều dài(kho lưu trữ);
+    biến nơi = 0;
+    nếu (chế độ == 1) {
+        biến đầu tiên = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, 0);
+        nếu (đầu tiên <= 0) { trả về -1; };
+        nơi = đầu tiên + 4;
+    };
+    khi (nơi < dài) {
+        nếu (nơi > dài - 4) { trả về -1; };
+        biến kích cỡ = elf bản địa đọc i32(kho lưu trữ, nơi);
+        nếu (kích cỡ < 448) { trả về -1; };
+        nếu (kích cỡ > dài - nơi - 4) { trả về -1; };
+        nếu (thực thi elf các dịch vụ(kho lưu trữ, nơi + 4, kích cỡ) != 0) {
+            trả về thực thi liên kết báo lỗi("V++ native ELF merge: unsupported compiler object\n");
+        };
+        nếu (elf bản địa thêm đối tượng(kho lưu trữ, nơi + 4, kích cỡ) < 0) { trả về -1; };
+        nơi = nơi + 4 + kích cỡ;
+    };
+    nếu (nơi != dài) { trả về -1; };
+    nếu (máy đọc số nguyên ba mươi hai bit(67199992) < 1) { trả về -1; };
+    biến mã = thực thi các byte mới();
+    biến các ký hiệu = thực thi các byte mới();
+    biến các chuỗi = thực thi các byte mới();
+    biến các mục = thực thi các byte mới();
+    biến đầu ra = thực thi các byte mới();
+    biến đạt = 0;
+    nếu (mã <= 0) { đạt = -1; };
+    nếu (các ký hiệu <= 0) { đạt = -1; };
+    nếu (các chuỗi <= 0) { đạt = -1; };
+    nếu (các mục <= 0) { đạt = -1; };
+    nếu (đầu ra <= 0) { đạt = -1; };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng bố trí(mã); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng ký hiệu(các ký hiệu, các chuỗi); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng tái định vị(các mục); };
+    nếu (đạt == 0) { đạt = elf bản địa đối tượng xuất(đầu ra, mã, các ký hiệu, các chuỗi, các mục); };
+    nếu (đạt == 0) { đạt = elf bản địa công bố theo chế độ(đầu ra, kết xuất, 0); };
+    nếu (mã > 0) { thực thi các byte giải phóng(mã); };
+    nếu (các ký hiệu > 0) { thực thi các byte giải phóng(các ký hiệu); };
+    nếu (các chuỗi > 0) { thực thi các byte giải phóng(các chuỗi); };
+    nếu (các mục > 0) { thực thi các byte giải phóng(các mục); };
+    nếu (đầu ra > 0) { thực thi các byte giải phóng(đầu ra); };
+    nếu (đạt != 0) { trả về thực thi liên kết báo lỗi("V++ native ELF merge: partial link failed\n"); };
+    trả về 0;
+};

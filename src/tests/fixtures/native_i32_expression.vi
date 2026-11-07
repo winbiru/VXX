@@ -1,0 +1,36 @@
+// Cùng biểu thức đi qua đường i32 và đường động khi tham số đổi kiểu.
+hàm tính(a, b) { trả về (a + 17) * 31 + (b * 7 + 3) - (a + 5) * 11; };
+hàm ghép(a, b) { trả về (a + 1) + (b + 2); };
+hàm so sánh(a, b) { trả về (a + 3) * 2 >= b - 1; };
+hàm biến chưa gán() { trả về (biến thiếu + 1) * 2; };
+hàm lỗi biểu thức() { ném "lỗi trong biểu thức"; };
+hàm bộ đếm(n) {
+    trả về hàm() { n += 1; trả về (n + 1) * 2; };
+};
+hàm chính() {
+    in tính(17, 19);
+    in tính(-8, 13);
+    in tính(2147483647, 2);
+    in tính(-2147483648, 2);
+    in tính(1.25, 2.5);
+    in tính(3, 4);
+    in ghép("a", "b");
+    in ghép(3, 4);
+    in so sánh(2, 12);
+    in so sánh(-7, 4);
+    in biến chưa gán();
+    f = bộ đếm(8); in f(); in f();
+    // Lời gọi có tác dụng phụ là ranh giới của biểu thức.
+    in (f() + 1) * (f() + 2);
+    // Không gộp qua lời gọi có thể ném lỗi.
+    thử { in (2 + 3) * lỗi biểu thức(); } bắt lỗi(e) { in e; };
+    in (9 + 3) * 2 / 4;
+    // Các cạnh lùi, bỏ qua và nhánh điều kiện vẫn chạy đúng vùng mã.
+    tổng = 0;
+    lặp(i = 0; i < 8; i++) {
+        nếu ((i + 1) * 2 < 7) { bỏ qua; };
+        tổng += (i + 2) * 3;
+    };
+    in tổng;
+    in "Biểu thức i32 AOT đúng";
+};

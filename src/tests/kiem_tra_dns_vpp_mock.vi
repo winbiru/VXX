@@ -1,0 +1,45 @@
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.thời gian.đơn điệu.*;
+hàm chính() {
+    mode = thành số nguyên(đọc biến môi trường("VPP_DNS_MOCK_MODE", "0"));
+    port = thành số nguyên(đọc biến môi trường("VPP_DNS_VI_PORT", "53"));
+    bộ = Bộ Phân Giải DNS();
+    nếu (mode >= 10 && mode != 20 && mode != 21) {
+        rejected = sai; start = thời gian đơn điệu mili giây();
+        thử { bộ.phân giải tên miền hỏi máy chủ đầy đủ("example.com", "127.0.0.1", port, 1, 250); }
+        bắt lỗi(e) {
+            nếu (loại của(e) == "từ điển") {
+                rejected = lấy từ điển(e, "loại", "") == "dns_giao_thức";
+            } hoặc { rejected = mode >= 30; };
+        };
+        khẳng định bằng(rejected, đúng, "malformed DNS accepted");
+        khẳng định bằng(thời gian đơn điệu mili giây() - start < 1500, đúng, "DNS deadline reset");
+    } hoặc nếu (mode == 3) {
+        addresses = phân giải tên miền phân giải("example.com");
+        khẳng định bằng(độ dài(addresses), 1);
+        khẳng định bằng(addresses[0], "203.0.113.47");
+    } hoặc nếu (mode == 2 || mode == 4 || mode == 20 || mode == 21) {
+        servers = ["127.0.0.2", "127.0.0.1"];
+        nếu (mode == 2) { servers = ["127.0.0.1", "127.0.0.2"]; };
+        nếu (mode == 20 || mode == 21) { servers = ["127.0.0.1", "127.0.0.1"]; };
+        result = bộ.phân giải tên miền hỏi dự phòng đầy đủ("example.com", servers, port, 1, 250);
+        nếu (mode == 2) {
+            khẳng định bằng(result["status"], "NXDOMAIN");
+            khẳng định bằng(độ dài(result["addresses"]), 0);
+        } hoặc {
+            khẳng định bằng(result["addresses"][0], "203.0.113.47");
+            khẳng định bằng(result["ttl"], 25);
+        };
+    } hoặc {
+        a = bộ.phân giải tên miền hỏi máy chủ đầy đủ("example.com", "127.0.0.1", port, 1, 1000);
+        aaaa = bộ.phân giải tên miền hỏi máy chủ đầy đủ("example.com", "127.0.0.1", port, 28, 1000);
+        khẳng định bằng(a["addresses"][0], "203.0.113.47");
+        khẳng định bằng(aaaa["addresses"][0], "2001:0db8:0000:0000:0000:0000:0000:0001");
+        khẳng định bằng(a["ttl"], 25); khẳng định bằng(aaaa["ttl"], 25);
+    };
+    in "VPP DNS MOCK OK";
+};

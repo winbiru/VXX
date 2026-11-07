@@ -1,9 +1,9 @@
 // Đối chiếu C++ compiler và pipeline tự lưu trữ V++ cho map/list.
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/chính;
-nhập gói/lõi/kịch bản;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.lõi.kịch bản.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.bảng mã.*;
 
 hàm cùng mã trung gian(nguồn) {
     c = biên dịch mã trung gian(nguồn);

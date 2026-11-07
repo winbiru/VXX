@@ -3,11 +3,17 @@
 // Regex chỉ dùng engine primitive; cursor, delimiter policy và tokenization
 // đều được điều phối ở lớp V++.
 
-nhập gói/lõi/biểu thức chính quy;
-nhập gói/lõi/giao diện tài nguyên;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy khớp;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy tìm;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy thay;
+nhập gói.lõi.giao diện tài nguyên.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 
 // Các thuật toán và trợ giúp nằm trong lớp nội bộ, không được xuất qua import.
@@ -61,7 +67,7 @@ lớp riêng tư Máy Quét Nội Bộ {
 
     hàm riêng tư bộ quét biểu thức chính quy dấu nhận diện(văn bản) {
         dấu nhận diện = "__VPP_SCAN_REGEX_MARKER__";
-        lặp(vòng = 0; biểu thức chính quy tìm(văn bản, dấu nhận diện) != ""; vòng++) {
+        khi (biểu thức chính quy tìm(văn bản, dấu nhận diện) != "") {
             dấu nhận diện = dấu nhận diện + "_";
         };
         trả về dấu nhận diện;
@@ -162,7 +168,7 @@ lớp riêng tư Máy Quét Nội Bộ {
         // Không dùng điều kiện `i < n && cắt...`: runtime hiện chưa khóa
         // short-circuit cho mọi backend, nên truy cập chuỗi phải được bảo vệ riêng.
         đang bỏ phân cách = đúng;
-        lặp(k = 0; đang bỏ phân cách; k++) {
+        khi (đang bỏ phân cách) {
             nếu (vị trí >= n) {
                 đang bỏ phân cách = sai;
             } hoặc {
@@ -183,7 +189,7 @@ lớp riêng tư Máy Quét Nội Bộ {
 
         bắt đầu = vị trí;
         đang đọc = đúng;
-        lặp(k = 0; đang đọc; k++) {
+        khi (đang đọc) {
             nếu (vị trí >= n) {
                 đang đọc = sai;
             } hoặc {
@@ -341,7 +347,7 @@ lớp riêng tư Máy Quét Nội Bộ {
         số chữ số = 0;
         đã chấm = sai;
         hết định trị = sai;
-        lặp(k = 0; !hết định trị; k++) {
+        khi (!hết định trị) {
             nếu (i >= n) {
                 hết định trị = đúng;
             } hoặc {
@@ -519,7 +525,7 @@ lớp riêng tư Máy Quét Nội Bộ {
         n = máy ảo lấy độ dài(văn bản);
         bắt đầu = 0;
         vị trí = 0;
-        lặp(vòng = 0; vị trí < n; vòng++) {
+        khi (vị trí < n) {
             khớp = mình.bộ quét biểu thức chính quy tại(văn bản, vị trí, mẫu phân cách);
             nếu (lấy từ điển(khớp, "có", 0) == 1) {
                 bước = lấy từ điển(khớp, "độ dài", 0);
@@ -648,4 +654,5 @@ hàm công khai tách từ tố biểu thức chính quy(văn bản, mẫu phân
     bộ nội bộ = Máy Quét Nội Bộ();
     trả về bộ nội bộ.tách từ tố biểu thức chính quy(văn bản, mẫu phân cách, giữ phân cách);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;

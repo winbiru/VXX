@@ -63,8 +63,9 @@ hàm test_bad_ir() {
     byte đẩy số nguyên ba mươi hai bit(ir, 25); byte đẩy số nguyên ba mươi hai bit(ir, 1);
     byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
     nếu (sinh mã phát(ir, code) != -1) { trả về 23; };
-    // DIV and MOD need two operands and a zero immediate in the IR wire format.
-    lặp (op = 26; op <= 27; op++) {
+    // Các phép nhị phân cần hai toán hạng và trường hằng bằng 0.
+    lặp (op = 26; op <= 34; op++) {
+        nếu (op == 28 || op == 29) { bỏ qua; };
         byte làm rỗng(ir);
         byte đẩy số nguyên ba mươi hai bit(ir, op); byte đẩy số nguyên ba mươi hai bit(ir, 0);
         byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
@@ -83,6 +84,16 @@ hàm test_bad_ir() {
         nếu (sinh mã phát(ir, code) != -1) { trả về 33; };
         nếu (byte dài(code) != 0) { trả về 34; };
     };
+    // Đảo bit cần một toán hạng; từ chối hằng không dùng khác 0.
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 35); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 35; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 7);
+    byte đẩy số nguyên ba mươi hai bit(ir, 35); byte đẩy số nguyên ba mươi hai bit(ir, 1);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 36; };
     nếu (byte hủy(ir) != 0) { trả về 18; };
     nếu (byte hủy(code) != 0) { trả về 18; };
     trả về 0;

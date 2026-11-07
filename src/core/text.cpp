@@ -53,6 +53,19 @@ std::size_t utf8UnitLengthOrRawByte(const std::string &value, std::size_t offset
     return length;
 }
 
+bool isUtf8UnitBoundary(const std::string &value, std::size_t offset) {
+    if (offset == 0 || offset >= value.size()) return offset <= value.size();
+    // Một biên chỉ có thể nằm trong tối đa ba byte phía sau byte dẫn đầu.
+    // Byte continuation đứng riêng không che biên vì utf8SequenceLength trả 0.
+    for (std::size_t back = 1; back <= 3 && back <= offset; ++back) {
+        const std::size_t start = offset - back;
+        const std::size_t length =
+            utf8SequenceLength(static_cast<unsigned char>(value[start]));
+        if (length > back && validUtf8Unit(value, start, length)) return false;
+    }
+    return true;
+}
+
 } // namespace
 
 // Loại bỏ khoảng trắng ở đầu và cuối chuỗi; hàm tìm biên trái/phải đầu tiên không phải whitespace rồi trả lát cắt tương ứng.
@@ -130,6 +143,54 @@ std::string utf8CodePointSlice(const std::string &value,
 
     if (byteStart == value.size()) return "";
     return value.substr(byteStart, byteEnd - byteStart);
+}
+
+std::string utf8ReplaceExact(const std::string &value,
+                             const std::string &pattern,
+                             const std::string &replacement) {
+    if (pattern.empty()) {
+        if (value.empty()) return replacement;
+        std::string result;
+        const std::size_t units = utf8CodePointCount(value);
+        if (!replacement.empty() &&
+            units + 1 <= (result.max_size() - value.size()) / replacement.size()) {
+            result.reserve(value.size() + (units + 1) * replacement.size());
+        }
+        result.append(replacement);
+        for (std::size_t offset = 0; offset < value.size();) {
+            const std::size_t width = utf8UnitLengthOrRawByte(value, offset);
+            result.append(value, offset, width);
+            result.append(replacement);
+            offset += width;
+        }
+        return result;
+    }
+
+    std::string result;
+    result.reserve(value.size());
+    std::size_t copied = 0;
+    std::size_t offset = 0;
+    bool changed = false;
+    while (offset < value.size()) {
+        const bool sizeFits = pattern.size() <= value.size() - offset;
+        const std::size_t end = sizeFits ? offset + pattern.size() : value.size();
+        const bool match =
+            sizeFits &&
+            value.compare(offset, pattern.size(), pattern) == 0 &&
+            isUtf8UnitBoundary(value, end);
+        if (match) {
+            result.append(value, copied, offset - copied);
+            result.append(replacement);
+            offset = end;
+            copied = end;
+            changed = true;
+            continue;
+        }
+        offset += utf8UnitLengthOrRawByte(value, offset);
+    }
+    if (!changed) return value;
+    result.append(value, copied, value.size() - copied);
+    return result;
 }
 
 } // namespace vietvm::core

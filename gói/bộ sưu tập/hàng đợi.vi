@@ -1,4 +1,4 @@
-nhập gói/bộ sưu tập/bộ đệm danh sách;
+nhập gói.bộ sưu tập.bộ đệm danh sách.*;
 
 // FIFO: đầu đọc độc lập cho từng instance; nén sau khi dùng nửa bộ đệm.
 lớp công khai Hàng Đợi kế thừa Bộ Đệm Danh Sách {

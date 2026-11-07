@@ -1,6 +1,7 @@
 // Bảng kiểu của đồ thị: định danh khai báo tách khỏi tên nhìn thấy qua import.
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.sổ đăng ký.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Các hàm phụ trợ không giữ trạng thái; Bộ Đăng Ký Kiểu sở hữu sổ và đồ thị.
 hàm riêng tư biên dịch kiểu tìm(bảng, tên) {
@@ -76,7 +77,8 @@ lớp công khai Bộ Đăng Ký Kiểu {
                 bề mặt = lấy từ điển(phụ, "kiểu xuất", []);
                 lặp(k = 0; k < máy ảo lấy độ dài(bề mặt); k++) {
                     tên = bề mặt[k]["tên"];
-                    nếu (e["bí danh"] != "") { tên = e["bí danh"] + "." + tên; };
+                    nếu (!biên dịch sổ nhận nhập(e, tên)) { bỏ qua; };
+                    tên = biên dịch sổ tên nhập(e, tên);
                     biên dịch sổ thêm tên(thấy, tên, bề mặt[k]["id"], tên mô đun);
                     nếu (e["tái xuất"]) {
                         biên dịch sổ thêm tên(xuất, tên, bề mặt[k]["id"], tên mô đun);
@@ -88,6 +90,17 @@ lớp công khai Bộ Đăng Ký Kiểu {
             mục["kiểu xuất"] = xuất;
         };
         sổ["kiểu"] = các kiểu;
+        // A selected name can be either a function or a public type.
+        lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
+            e = cạnh[i];
+            tên chọn = lấy từ điển(e, "tên nhập", "");
+            nếu (tên chọn == "" || tên chọn == "*") { bỏ qua; };
+            phụ = biên dịch sổ tìm mô đun(mô đun, e["đích"]);
+            nếu (biên dịch kiểu tìm(phụ["xuất"], tên chọn) < 0 &&
+                biên dịch kiểu tìm(phụ["kiểu xuất"], tên chọn) < 0) {
+                ném "biên dịch nhập: không có tên công khai '" + tên chọn + "' trong '" + e["đích"] + "'";
+            };
+        };
     };
 
     hàm riêng tư chuẩn hóa() {

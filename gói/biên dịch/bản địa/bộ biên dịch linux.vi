@@ -1,0 +1,20 @@
+// Entrypoint bootstrap ELF x86-64: chỉ nạp backend đang chạy.
+// Giữ bộ biên dịch.vi đa nền tảng cho Mach-O và COFF; mỗi đơn vị object
+// ELF được đóng gói trong bộ đệm giới hạn 2 MiB ở runtime i32 hiện tại.
+nhập phân tích từ vựng.*;
+nhập từ tố.*;
+nhập phân tích cú pháp.*;
+nhập chương trình.*;
+nhập sinh mã.*;
+nhập mã máy x86 64.*;
+nhập sinh mã chương trình.*;
+nhập đối tượng.*;
+nhập đối tượng mô đun.*;
+nhập định dạng elf 64.*;
+nhập nạp mô đun.*;
+nhập biên dịch mô đun.*;
+nhập bộ nhớ đệm.*;
+nhập assembler.*;
+nhập trình xuất đối tượng.*;
+nhập nền tảng linux.*;
+nhập trình điều khiển.*;

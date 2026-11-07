@@ -2,7 +2,8 @@
 // Mục đích: chuẩn hóa định dạng log theo mức thông tin/cảnh báo/lỗi.
 // Giữ lớp NhậtKý và các hàm cấp mô-đun tương thích.
 
-nhập gói/nhập xuất/tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.tệp.ghi nối tệp;
 
 lớp công khai Nhật ký {
     // Ghi chú hàm: công khai ghi thông tin.

@@ -1095,7 +1095,7 @@ StackValue executeSocketMachinePrimitive(Opcode opcode,
         if (::closesocket(static_cast<SOCKET>(socket.descriptor)) != 0)
             throw socketError("closesocket lỗi=" + std::to_string(WSAGetLastError()));
 #else
-        // Uses vpp_file_primitives.S on supported Unix ABIs, with no libc close.
+        // Uses common/posix/vpp_file_primitives.S on supported Unix ABIs, with no libc close.
         const auto closed = file_machine::close(static_cast<int>(socket.descriptor));
         // Linux closes the descriptor even when close reports EINTR.
         // Never retry close: the descriptor number may already be reused.

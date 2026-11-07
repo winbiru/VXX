@@ -1,6 +1,6 @@
 nhập json;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.*;
 
 hàm chính() {
     dữ liệu = json phân tích("{\"tên\":\"V++\",\"số\":3}");

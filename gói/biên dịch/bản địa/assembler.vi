@@ -1,0 +1,723 @@
+// Source assembler for the Linux x86-64 self-host boundary. AT&T operands,
+// fixed rel32 branches and disp32 memory operands make layout deterministic.
+// This deliberately bounded dialect rejects unsupported syntax before publish.
+// State words: error, section buffers 1..5, symbols 6, names 7, fixups 8,
+// current section 9, line 10. Symbol records: name, section, value, global,
+// source line, ELF index. Fixups: section, offset, symbol, addend, type, line.
+hàm as_get(s, i) { trả về byte đọc số nguyên ba mươi hai bit(s, i * 4); };
+hàm as_set(s, i, v) { trả về byte ghi số nguyên ba mươi hai bit(s, i * 4, v); };
+hàm as_eq(a, b) { biến r = byte bằng(a, b); byte hủy(b); trả về r; };
+hàm as_error(s) { as_set(s, 0, 1); trả về -1; };
+hàm as_mod(a, b) { trả về a - máy chia số nguyên ba mươi hai bit(a, b) * b; };
+hàm as_space(c) { nếu (c == 32 || c == 9 || c == 13) { trả về 1; }; trả về 0; };
+hàm as_trim(t, a, b) {
+    khi (a < b && as_space(byte lấy(t, a)) == 1) { a = a + 1; };
+    khi (b > a && as_space(byte lấy(t, b - 1)) == 1) { b = b - 1; };
+    trả về byte cắt(t, a, b - a);
+};
+hàm as_unquote(t) {
+    biến n = 0;
+    biến v = 0;
+
+    n = byte dài(t);
+    nếu (n >= 2 && byte lấy(t, 0) == 34 && byte lấy(t, n - 1) == 34) {
+        v = byte cắt(t, 1, n - 2); byte hủy(t); trả về v;
+    };
+    trả về t;
+};
+hàm as_number(s, t) {
+    biến p = 0;
+    biến end = byte dài(t);
+    biến value = 0;
+    biến sign = 1;
+    biến term = 0;
+    biến base = 10;
+    biến digits = 0;
+    biến c = 0;
+    biến d = 0;
+    khi (p < end && as_space(byte lấy(t, p)) == 1) { p = p + 1; };
+    khi (end > p && as_space(byte lấy(t, end - 1)) == 1) { end = end - 1; };
+    nếu (byte lấy(t, p) == 36) { p = p + 1; };
+    nếu (byte lấy(t, p) == 40 && byte lấy(t, end - 1) == 41) { p = p + 1; end = end - 1; };
+    khi (p < end) {
+        khi (p < end && as_space(byte lấy(t, p)) == 1) { p = p + 1; };
+        sign = 1; nếu (byte lấy(t, p) == 45) { sign = -1; p = p + 1; }
+        hoặc nếu (byte lấy(t, p) == 43) { p = p + 1; };
+        khi (p < end && as_space(byte lấy(t, p)) == 1) { p = p + 1; };
+        term = 0; base = 10; digits = 0;
+        nếu (byte lấy(t, p) == 39 && p + 2 < end && byte lấy(t, p + 2) == 39) {
+            term = byte lấy(t, p + 1); digits = 1; p = p + 3;
+        } hoặc {
+            nếu (byte lấy(t, p) == 48 && byte lấy(t, p + 1) == 120) { base = 16; p = p + 2; };
+            khi (p < end) {
+                c = byte lấy(t, p); d = c - 48;
+                nếu (c >= 97 && c <= 102) { d = c - 87; };
+                nếu (c >= 65 && c <= 70) { d = c - 55; };
+                nếu (d < 0 || d >= base) { thoát; };
+                nếu (base == 16 && digits >= 8) { as_error(s); trả về 0; };
+                nếu (base == 10 && (digits >= 10 || term < 0 || term > 214748364 || term == 214748364 && (d > 8 || d == 8 && sign == 1))) { as_error(s); trả về 0; };
+                term = term * base + d; digits = digits + 1; p = p + 1;
+            };
+        };
+        nếu (digits == 0) { as_error(s); trả về 0; };
+        value = value + sign * term;
+        khi (p < end && as_space(byte lấy(t, p)) == 1) { p = p + 1; };
+        nếu (p < end && byte lấy(t, p) != 43 && byte lấy(t, p) != 45) { as_error(s); trả về 0; };
+        nếu (p == end) { trả về value; };
+    };
+    as_error(s); trả về 0;
+};
+
+hàm as_name_equal(names, offset, t) {
+    biến j = 0;
+
+    lặp (j = 0; j < byte dài(t); j++) { nếu (byte lấy(names, offset + j) != byte lấy(t, j)) { trả về 0; }; };
+    nếu (byte lấy(names, offset + byte dài(t)) != 0) { trả về 0; }; trả về 1;
+};
+hàm as_symbol(s, t, numeric) {
+    biến syms = 0;
+    biến names = 0;
+    biến i = 0;
+    biến id = 0;
+
+    syms = as_get(s, 6); names = as_get(s, 7);
+    nếu (byte dài(t) == 0) { trả về as_error(s); };
+    lặp (j = 0; j < byte dài(t); j++) {
+        biến ch = byte lấy(t, j);
+        nếu (ch != 32 && ch != 46 && ch != 95 && ch < 128 && (ch < 48 || ch > 57) && (ch < 65 || ch > 90) && (ch < 97 || ch > 122)) { trả về as_error(s); };
+    };
+    nếu (numeric == 0) {
+        lặp (i = 0; i < byte dài(syms); i = i + 24) {
+            nếu (as_name_equal(names, byte đọc số nguyên ba mươi hai bit(syms, i), t) == 1) { trả về máy chia số nguyên ba mươi hai bit(i, 24); };
+        };
+    };
+    nếu (byte dài(syms) >= 24000 || byte dài(t) > 131071 - byte dài(names)) { trả về as_error(s); };
+    id = máy chia số nguyên ba mươi hai bit(byte dài(syms), 24);
+    byte đẩy số nguyên ba mươi hai bit(syms, byte dài(names));
+    nếu (byte nối(names, t) != 0 || byte thêm(names, 0) != 0) { trả về as_error(s); };
+    byte đẩy số nguyên ba mươi hai bit(syms, 0); byte đẩy số nguyên ba mươi hai bit(syms, 0);
+    byte đẩy số nguyên ba mươi hai bit(syms, 0); byte đẩy số nguyên ba mươi hai bit(syms, as_get(s, 10));
+    byte đẩy số nguyên ba mươi hai bit(syms, 0); trả về id;
+};
+hàm as_fix(s, target, addend, kind) {
+    biến f = 0;
+    biến sec = 0;
+    biến buf = 0;
+    biến id = 0;
+
+    f = as_get(s, 8); sec = as_get(s, 9); buf = as_get(s, sec);
+    id = as_symbol(s, target, 0);
+    nếu (id < 0 || byte dài(f) >= 144000) { trả về as_error(s); };
+    byte đẩy số nguyên ba mươi hai bit(f, sec); byte đẩy số nguyên ba mươi hai bit(f, byte dài(buf));
+    byte đẩy số nguyên ba mươi hai bit(f, id); byte đẩy số nguyên ba mươi hai bit(f, addend);
+    byte đẩy số nguyên ba mươi hai bit(f, kind); byte đẩy số nguyên ba mươi hai bit(f, as_get(s, 10));
+    byte đẩy số nguyên ba mươi hai bit(buf, 0);
+    nếu (kind == 1) { byte đẩy số nguyên ba mươi hai bit(buf, 0); };
+    trả về 0;
+};
+hàm as_emit(s, b) {
+    nếu (b < 0 || b > 255 || byte dài(as_get(s, as_get(s, 9))) >= 131072) { trả về as_error(s); };
+    nếu (byte thêm(as_get(s, as_get(s, 9)), b) != 0) { trả về as_error(s); }; trả về 0;
+};
+hàm as_int(s, v, width) {
+    biến b = 0;
+    biến i = 0;
+    biến low = 0;
+
+    nếu (width == 1 && (v < -128 || v > 255) || width == 2 && (v < -32768 || v > 65535)) { trả về as_error(s); };
+    b = as_get(s, as_get(s, 9));
+    nếu (width == 4) { nếu (byte đẩy số nguyên ba mươi hai bit(b, v) != 0) { trả về as_error(s); }; trả về 0; };
+    lặp (i = 0; i < width; i++) {
+        low = as_mod(v, 256); nếu (low < 0) { low = low + 256; };
+        as_emit(s, low); v = máy chia số nguyên ba mươi hai bit(v - low, 256);
+    }; trả về 0;
+};
+// Register code includes width in the upper byte (8/16/32/64/128).
+hàm as_register(t) {
+    biến names = 0;
+    biến start = 0;
+    biến index = 0;
+    biến answer = 0;
+    biến i = 0;
+    biến n = 0;
+    biến width = 0;
+    biến end = 0;
+    biến last = 0;
+    biến c = 0;
+
+    names = "%rax %rcx %rdx %rbx %rsp %rbp %rsi %rdi %eax %ecx %edx %ebx %esp %ebp %esi %edi %ax %cx %dx %bx %sp %bp %si %di %al %cl %dl %bl %spl %bpl %sil %dil";
+    start = 0; index = 0; answer = -1;
+    lặp (i = 0; i <= byte dài(names); i++) {
+        nếu (i == byte dài(names) || byte lấy(names, i) == 32) {
+            n = byte cắt(names, start, i - start);
+            nếu (byte bằng(n, t) == 1) { width = 64; nếu (index >= 8) { width = 32; }; nếu (index >= 16) { width = 16; }; nếu (index >= 24) { width = 8; }; answer = width * 256 + as_mod(index, 8); };
+            byte hủy(n); start = i + 1; index = index + 1;
+        };
+    }; byte hủy(names);
+    nếu (answer >= 0) { trả về answer; };
+    nếu (byte dài(t) >= 3 && byte lấy(t, 0) == 37 && byte lấy(t, 1) == 114) {
+        end = byte dài(t); width = 64; last = byte lấy(t, end - 1);
+        nếu (last == 100) { width = 32; end = end - 1; }; nếu (last == 119) { width = 16; end = end - 1; }; nếu (last == 98) { width = 8; end = end - 1; };
+        n = 0; lặp (i = 2; i < end; i++) { c = byte lấy(t, i) - 48; nếu (c < 0 || c > 9) { trả về -1; }; n = n * 10 + c; };
+        nếu (n >= 8 && n <= 15) { trả về width * 256 + n; };
+    };
+    nếu (byte dài(t) == 5 && byte lấy(t, 1) == 120 && byte lấy(t, 2) == 109 && byte lấy(t, 3) == 109) {
+        n = byte lấy(t, 4) - 48; nếu (n >= 0 && n <= 7) { trả về 128 * 256 + n; };
+    }; trả về -1;
+};
+// Operand fields: kind (1=reg,2=immediate,3=memory), reg, width, base,
+// index, scale log2, displacement, symbol handle (owned by the caller).
+hàm as_operand(s, t, o) {
+    biến i = 0;
+    biến reg = 0;
+    biến p = 0;
+    biến disp = 0;
+    biến c = 0;
+    biến end = 0;
+    biến a = 0;
+    biến start = 0;
+    biến field = 0;
+    biến part = 0;
+    biến r = 0;
+    biến scale = 0;
+    biến log = 0;
+
+    lặp (i = 0; i < 8; i++) { as_set(o, i, 0); };
+    as_set(o, 3, -1); as_set(o, 4, -1);
+    nếu (byte dài(t) == 0) { trả về as_error(s); };
+    nếu (byte lấy(t, 0) == 37) {
+        reg = as_register(t); nếu (reg < 0) { trả về as_error(s); };
+        as_set(o, 0, 1); as_set(o, 1, as_mod(reg, 256)); as_set(o, 2, máy chia số nguyên ba mươi hai bit(reg, 256)); trả về 0;
+    };
+    nếu (byte lấy(t, 0) == 36) { as_set(o, 0, 2); as_set(o, 6, as_number(s, t)); trả về 0; };
+    as_set(o, 0, 3);
+    p = -1; lặp (i = 0; i < byte dài(t) - 1; i++) { nếu (byte lấy(t, i) == 40 && byte lấy(t, i + 1) == 37) { p = i; thoát; }; };
+    nếu (p < 0 || byte lấy(t, byte dài(t) - 1) != 41) { trả về as_error(s); };
+    disp = as_trim(t, 0, p);
+    nếu (byte dài(disp) > 0) {
+        c = byte lấy(disp, 0);
+        nếu (c == 40 || c == 45 || c >= 48 && c <= 57) { as_set(o, 6, as_number(s, disp)); }
+        hoặc {
+            end = byte dài(disp); lặp (i = 1; i < end; i++) { nếu (byte lấy(disp, i) == 43) { end = i; thoát; }; };
+            as_set(o, 7, byte cắt(disp, 0, end));
+            nếu (end < byte dài(disp)) { a = byte cắt(disp, end + 1, byte dài(disp) - end - 1); as_set(o, 6, as_number(s, a)); byte hủy(a); };
+        };
+    }; byte hủy(disp);
+    start = p + 1; field = 0;
+    lặp (i = p + 1; i < byte dài(t); i++) {
+        nếu (byte lấy(t, i) == 41 && i != byte dài(t) - 1) { trả về as_error(s); };
+        nếu (byte lấy(t, i) == 44 || byte lấy(t, i) == 41) {
+            part = as_trim(t, start, i);
+            nếu (field < 2) {
+                r = -1;
+                nếu (as_eq(part, "%rip") == 1 && field == 0) { r = -2; }
+                hoặc nếu (byte dài(part) > 0) { reg = as_register(part); nếu (reg < 0 || máy chia số nguyên ba mươi hai bit(reg, 256) != 64) { as_error(s); }; r = as_mod(reg, 256); };
+                as_set(o, 3 + field, r);
+            } hoặc {
+                scale = as_number(s, part); log = -1;
+                nếu (scale == 1) { log = 0; }; nếu (scale == 2) { log = 1; }; nếu (scale == 4) { log = 2; }; nếu (scale == 8) { log = 3; };
+                nếu (log < 0) { as_error(s); }; as_set(o, 5, log);
+            }; byte hủy(part); start = i + 1; field = field + 1;
+        };
+    };
+    nếu (field > 3 || as_get(o, 3) == -1 || as_get(o, 4) == 4 || as_get(o, 3) == -2 && as_get(o, 4) != -1) { trả về as_error(s); };
+    trả về 0;
+};
+hàm as_prefix(s, width, reg, o, force) {
+    biến rex = 0;
+    biến base = 0;
+    biến index = 0;
+
+    nếu (width == 16) { as_emit(s, 102); };
+    rex = 64; nếu (width == 64) { rex = rex + 8; };
+    nếu (reg >= 8) { rex = rex + 4; };
+    base = as_get(o, 3); index = as_get(o, 4);
+    nếu (as_get(o, 0) == 1) { base = as_get(o, 1); };
+    nếu (base >= 8) { rex = rex + 1; }; nếu (index >= 8) { rex = rex + 2; };
+    nếu (width == 8 && (base >= 4 || reg >= 4)) { force = 1; };
+    nếu (as_get(o, 0) == 1 && as_get(o, 2) == 8 && as_get(o, 1) >= 4) { force = 1; };
+    nếu (rex != 64 || force == 1) { as_emit(s, rex); }; trả về 0;
+};
+hàm as_modrm(s, reg, o, tail) {
+    biến r = 0;
+    biến base = 0;
+    biến index = 0;
+    biến rm = 0;
+    biến ix = 0;
+
+    r = as_mod(reg, 8);
+    nếu (as_get(o, 0) == 1) { trả về as_emit(s, 192 + r * 8 + as_mod(as_get(o, 1), 8)); };
+    nếu (as_get(o, 0) != 3) { trả về as_error(s); };
+    base = as_get(o, 3); index = as_get(o, 4);
+    nếu (base == -2) {
+        as_emit(s, r * 8 + 5);
+        nếu (as_get(o, 7) > 0) { trả về as_fix(s, as_get(o, 7), as_get(o, 6) - 4 - tail, 2); };
+        trả về as_int(s, as_get(o, 6), 4);
+    };
+    nếu (as_get(o, 7) > 0) { trả về as_error(s); };
+    rm = as_mod(base, 8);
+    nếu (index >= 0 || rm == 4) {
+        as_emit(s, 128 + r * 8 + 4); ix = 4; nếu (index >= 0) { ix = as_mod(index, 8); };
+        as_emit(s, as_get(o, 5) * 64 + ix * 8 + rm);
+    } hoặc { as_emit(s, 128 + r * 8 + rm); };
+    trả về as_int(s, as_get(o, 6), 4);
+};
+hàm as_rm(s, width, opcode, reg, o, escape, tail) {
+    as_prefix(s, width, reg, o, 0); nếu (escape == 1) { as_emit(s, 15); };
+    as_emit(s, opcode); trả về as_modrm(s, reg, o, tail);
+};
+hàm as_condition(t) {
+    nếu (as_eq(t, "e") == 1 || as_eq(t, "z") == 1) { trả về 4; };
+    nếu (as_eq(t, "ne") == 1 || as_eq(t, "nz") == 1) { trả về 5; };
+    nếu (as_eq(t, "b") == 1) { trả về 2; }; nếu (as_eq(t, "ae") == 1) { trả về 3; };
+    nếu (as_eq(t, "be") == 1) { trả về 6; }; nếu (as_eq(t, "a") == 1) { trả về 7; };
+    nếu (as_eq(t, "s") == 1) { trả về 8; }; nếu (as_eq(t, "ns") == 1) { trả về 9; };
+    nếu (as_eq(t, "p") == 1) { trả về 10; }; nếu (as_eq(t, "l") == 1) { trả về 12; };
+    nếu (as_eq(t, "ge") == 1) { trả về 13; }; nếu (as_eq(t, "le") == 1) { trả về 14; };
+    nếu (as_eq(t, "g") == 1) { trả về 15; }; trả về -1;
+};
+
+hàm as_supported(mnemonic) {
+    biến dialect = "|pushq|popq|movb|movw|movl|movq|movzbl|movzwl|movslq|leal|leaq|addl|addq|orl|andl|andq|subl|subq|xorl|xorq|cmpb|cmpl|cmpq|testb|testw|testl|testq|incl|incq|decl|decq|negl|divl|divq|idivl|imull|imulq|rolw|rorl|shrl|shlq|bswapl|bswapq|xchgl|seta|setb|setnz|movsd|addsd|subsd|mulsd|divsd|ucomisd|cvtsi2sdl|cvttsd2sil|";
+    biến key = "|"; byte nối(key, mnemonic); byte thêm(key, 124);
+    biến found = byte tìm(dialect, key); byte hủy(key); byte hủy(dialect);
+    nếu (found < 0) { trả về 0; }; trả về 1;
+};
+
+hàm as_instruction(s, mnemonic, args) {
+    biến target = 0;
+    biến cc = 0;
+    biến cond = 0;
+    biến result = 0;
+    biến count = 0;
+    biến start = 0;
+    biến depth = 0;
+    biến quoted = 0;
+    biến i = 0;
+    biến c = 0;
+    biến t = 0;
+    biến a = 0;
+    biến b = 0;
+    biến d = 0;
+    biến width = 0;
+    biến n = 0;
+    biến suffix = 0;
+    biến op = 0;
+    biến handled = 0;
+    biến reg = 0;
+    biến code = 0;
+    biến size = 0;
+    biến escape = 0;
+    biến w = 0;
+    biến arithmetic = 0;
+    biến unary = 0;
+    biến shift = 0;
+    biến r = 0;
+    biến rex = 0;
+    biến sse = 0;
+    biến prefix = 0;
+    biến reverse = 0;
+    biến o = 0;
+
+    nếu (as_eq(mnemonic, "ret") == 1 || as_eq(mnemonic, "leave") == 1 || as_eq(mnemonic, "syscall") == 1 || as_eq(mnemonic, "ud2") == 1 || as_eq(mnemonic, "cltd") == 1) {
+        nếu (byte dài(args) != 0) { trả về as_error(s); };
+    };
+    nếu (as_eq(mnemonic, "ret") == 1) { trả về as_emit(s, 195); };
+    nếu (as_eq(mnemonic, "leave") == 1) { trả về as_emit(s, 201); };
+    nếu (as_eq(mnemonic, "syscall") == 1) { as_emit(s, 15); trả về as_emit(s, 5); };
+    nếu (as_eq(mnemonic, "ud2") == 1) { as_emit(s, 15); trả về as_emit(s, 11); };
+    nếu (as_eq(mnemonic, "cltd") == 1) { trả về as_emit(s, 153); };
+    nếu (as_eq(mnemonic, "rep") == 1) { nếu (as_eq(args, "stosb") != 1) { trả về as_error(s); }; as_emit(s, 243); trả về as_emit(s, 170); };
+    nếu (as_eq(mnemonic, "call") == 1 || byte lấy(mnemonic, 0) == 106) {
+        target = as_unquote(as_trim(args, 0, byte dài(args)));
+        nếu (as_eq(mnemonic, "call") == 1) { as_emit(s, 232); }
+        hoặc nếu (as_eq(mnemonic, "jmp") == 1) { as_emit(s, 233); }
+        hoặc { cc = byte cắt(mnemonic, 1, byte dài(mnemonic) - 1); cond = as_condition(cc); byte hủy(cc); nếu (cond < 0) { byte hủy(target); trả về as_error(s); }; as_emit(s, 15); as_emit(s, 128 + cond); };
+        result = as_fix(s, target, -4, 2); byte hủy(target); trả về result;
+    };
+    nếu (as_supported(mnemonic) != 1) { trả về as_error(s); };
+    count = 0; start = 0; depth = 0; quoted = 0;
+    lặp (i = 0; i <= byte dài(args); i++) {
+        c = byte lấy(args, i);
+        nếu (c == 34) { quoted = 1 - quoted; };
+        nếu (quoted == 0) { nếu (c == 40) { depth = depth + 1; }; nếu (c == 41) { depth = depth - 1; }; };
+        nếu (i == byte dài(args) || c == 44 && depth == 0 && quoted == 0) {
+            nếu (count >= 3) { trả về as_error(s); };
+            t = as_trim(args, start, i); as_operand(s, t, as_get(s, 20 + count)); byte hủy(t); count = count + 1; start = i + 1;
+        };
+    };
+    nếu (as_get(s, 0) != 0) { trả về -1; };
+    a = as_get(s, 20); b = as_get(s, 21); d = as_get(s, 22);
+    width = 32; n = byte dài(mnemonic); suffix = byte lấy(mnemonic, n - 1);
+    nếu (suffix == 113) { width = 64; }; nếu (suffix == 119) { width = 16; }; nếu (suffix == 98) { width = 8; };
+    op = byte cắt(mnemonic, 0, n - 1); handled = 0;
+    nếu (suffix == 113 || suffix == 108 || suffix == 119 || suffix == 98) {
+        nếu (as_eq(mnemonic, "movzbl") != 1 && as_eq(mnemonic, "movzwl") != 1 && as_eq(mnemonic, "movslq") != 1 && as_eq(mnemonic, "cvtsi2sdl") != 1 && as_eq(mnemonic, "cvttsd2sil") != 1 && as_eq(mnemonic, "setb") != 1) {
+            lặp (i = 0; i < count; i++) { nếu (as_get(as_get(s, 20 + i), 0) == 1 && as_get(as_get(s, 20 + i), 2) != width) { as_error(s); }; };
+        };
+    };
+    nếu (as_eq(op, "push") == 1 || as_eq(op, "pop") == 1) {
+        nếu (count != 1 || as_get(a, 0) != 1 || width != 64) { as_error(s); }
+        hoặc { reg = as_get(a, 1); nếu (reg >= 8) { as_emit(s, 65); }; code = 80; nếu (as_eq(op, "pop") == 1) { code = 88; }; as_emit(s, code + as_mod(reg, 8)); }; handled = 1;
+    };
+    nếu (as_eq(op, "mov") == 1) {
+        nếu (count != 2) { as_error(s); }
+        hoặc nếu (as_get(a, 0) == 2) {
+            code = 199; size = 4;
+            nếu (width == 8) { code = 198; size = 1; }; nếu (width == 16) { size = 2; };
+            as_rm(s, width, code, 0, b, 0, size); as_int(s, as_get(a, 6), size);
+        } hoặc nếu (as_get(a, 0) == 1) {
+            code = 137; nếu (width == 8) { code = 136; };
+            as_rm(s, width, code, as_get(a, 1), b, 0, 0);
+        } hoặc nếu (as_get(b, 0) == 1) {
+            code = 139; nếu (width == 8) { code = 138; };
+            as_rm(s, width, code, as_get(b, 1), a, 0, 0);
+        } hoặc { as_error(s); }; handled = 1;
+    };
+    nếu (as_eq(op, "lea") == 1) { nếu (count != 2 || as_get(a, 0) != 3 || as_get(b, 0) != 1) { as_error(s); } hoặc { as_rm(s, width, 141, as_get(b, 1), a, 0, 0); }; handled = 1; };
+    nếu (as_eq(mnemonic, "movzbl") == 1 || as_eq(mnemonic, "movzwl") == 1 || as_eq(mnemonic, "movslq") == 1) {
+        code = 182; escape = 1; w = 32;
+        nếu (as_eq(mnemonic, "movzwl") == 1) { code = 183; }; nếu (as_eq(mnemonic, "movslq") == 1) { code = 99; escape = 0; w = 64; };
+        nếu (count != 2 || as_get(b, 0) != 1 || as_get(b, 2) != w) { as_error(s); }
+        hoặc nếu (as_get(a, 0) == 1 && (code == 182 && as_get(a, 2) != 8 || code == 183 && as_get(a, 2) != 16 || code == 99 && as_get(a, 2) != 32)) { as_error(s); }
+        hoặc { as_rm(s, w, code, as_get(b, 1), a, escape, 0); }; handled = 1;
+    };
+    arithmetic = -1;
+    nếu (as_eq(op, "add") == 1) { arithmetic = 0; }; nếu (as_eq(op, "or") == 1) { arithmetic = 1; };
+    nếu (as_eq(op, "and") == 1) { arithmetic = 4; }; nếu (as_eq(op, "sub") == 1) { arithmetic = 5; };
+    nếu (as_eq(op, "xor") == 1) { arithmetic = 6; }; nếu (as_eq(op, "cmp") == 1) { arithmetic = 7; };
+    nếu (arithmetic >= 0) {
+        nếu (count != 2) { as_error(s); }
+        hoặc nếu (as_get(a, 0) == 2) {
+            code = 129; size = 4; nếu (width == 8) { code = 128; size = 1; }; nếu (width == 16) { size = 2; };
+            as_rm(s, width, code, arithmetic, b, 0, size); as_int(s, as_get(a, 6), size);
+        } hoặc nếu (as_get(a, 0) == 1) {
+            code = arithmetic * 8 + 1; nếu (width == 8) { code = code - 1; };
+            as_rm(s, width, code, as_get(a, 1), b, 0, 0);
+        } hoặc nếu (as_get(b, 0) == 1) {
+            code = arithmetic * 8 + 3; nếu (width == 8) { code = code - 1; };
+            as_rm(s, width, code, as_get(b, 1), a, 0, 0);
+        } hoặc { as_error(s); }; handled = 1;
+    };
+    nếu (as_eq(op, "test") == 1) {
+        nếu (count != 2) { as_error(s); }
+        hoặc nếu (as_get(a, 0) == 2) {
+            code = 247; size = 4; nếu (width == 8) { code = 246; size = 1; }; nếu (width == 16) { size = 2; };
+            as_rm(s, width, code, 0, b, 0, size); as_int(s, as_get(a, 6), size);
+        } hoặc nếu (as_get(a, 0) == 1) { code = 133; nếu (width == 8) { code = 132; }; as_rm(s, width, code, as_get(a, 1), b, 0, 0); }
+        hoặc { as_error(s); }; handled = 1;
+    };
+    unary = -1; code = 247;
+    nếu (as_eq(op, "inc") == 1) { unary = 0; code = 255; }; nếu (as_eq(op, "dec") == 1) { unary = 1; code = 255; };
+    nếu (as_eq(op, "neg") == 1) { unary = 3; }; nếu (as_eq(op, "div") == 1) { unary = 6; }; nếu (as_eq(op, "idiv") == 1) { unary = 7; };
+    nếu (unary >= 0) { nếu (count != 1) { as_error(s); } hoặc { as_rm(s, width, code, unary, a, 0, 0); }; handled = 1; };
+    shift = -1;
+    nếu (as_eq(op, "rol") == 1) { shift = 0; }; nếu (as_eq(op, "ror") == 1) { shift = 1; };
+    nếu (as_eq(op, "shl") == 1) { shift = 4; }; nếu (as_eq(op, "shr") == 1) { shift = 5; };
+    nếu (shift >= 0) { nếu (count != 2 || as_get(a, 0) != 2) { as_error(s); } hoặc { as_rm(s, width, 193, shift, b, 0, 1); as_int(s, as_get(a, 6), 1); }; handled = 1; };
+    nếu (as_eq(op, "imul") == 1) {
+        nếu (count != 3 || as_get(a, 0) != 2 || as_get(d, 0) != 1) { as_error(s); }
+        hoặc { as_rm(s, width, 105, as_get(d, 1), b, 0, 4); as_int(s, as_get(a, 6), 4); }; handled = 1;
+    };
+    nếu (as_eq(op, "bswap") == 1) {
+        nếu (count != 1 || as_get(a, 0) != 1) { as_error(s); }
+        hoặc { r = as_get(a, 1); rex = 64; nếu (width == 64) { rex = rex + 8; }; nếu (r >= 8) { rex = rex + 1; }; nếu (rex != 64) { as_emit(s, rex); }; as_emit(s, 15); as_emit(s, 200 + as_mod(r, 8)); }; handled = 1;
+    };
+    nếu (as_eq(op, "xchg") == 1) { nếu (count != 2 || as_get(a, 0) != 1) { as_error(s); } hoặc { as_rm(s, width, 135, as_get(a, 1), b, 0, 0); }; handled = 1; };
+    nếu (n >= 4 && byte lấy(mnemonic, 0) == 115 && byte lấy(mnemonic, 1) == 101 && byte lấy(mnemonic, 2) == 116) {
+        cc = byte cắt(mnemonic, 3, n - 3); cond = as_condition(cc); byte hủy(cc);
+        nếu (cond < 0 || count != 1 || as_get(a, 0) == 1 && as_get(a, 2) != 8) { as_error(s); } hoặc { as_rm(s, 8, 144 + cond, 0, a, 1, 0); }; handled = 1;
+    };
+    sse = -1; prefix = 242; reverse = 0; w = 32;
+    nếu (as_eq(mnemonic, "movsd") == 1) { sse = 16; nếu (as_get(a, 2) == 128) { sse = 17; reverse = 1; }; };
+    nếu (as_eq(mnemonic, "addsd") == 1) { sse = 88; }; nếu (as_eq(mnemonic, "subsd") == 1) { sse = 92; };
+    nếu (as_eq(mnemonic, "mulsd") == 1) { sse = 89; }; nếu (as_eq(mnemonic, "divsd") == 1) { sse = 94; };
+    nếu (as_eq(mnemonic, "ucomisd") == 1) { prefix = 102; sse = 46; };
+    nếu (as_eq(mnemonic, "cvtsi2sdl") == 1) { sse = 42; }; nếu (as_eq(mnemonic, "cvttsd2sil") == 1) { sse = 44; };
+    nếu (sse >= 0) {
+        nếu (count != 2) { as_error(s); }
+        hoặc nếu (reverse == 0 && (as_get(b, 0) != 1 || sse != 44 && as_get(b, 2) != 128 || sse == 44 && as_get(b, 2) != 32)) { as_error(s); }
+        hoặc nếu (reverse == 0 && as_get(a, 0) == 1 && (sse != 42 && as_get(a, 2) != 128 || sse == 42 && as_get(a, 2) != 32)) { as_error(s); }
+        hoặc nếu (reverse == 1 && as_get(b, 0) == 1 && as_get(b, 2) != 128) { as_error(s); }
+        hoặc { as_emit(s, prefix); nếu (reverse == 1) { as_rm(s, w, sse, as_get(a, 1), b, 1, 0); } hoặc { as_rm(s, w, sse, as_get(b, 1), a, 1, 0); }; }; handled = 1;
+    };
+    byte hủy(op);
+    lặp (i = 0; i < 3; i++) { o = as_get(s, 20 + i); nếu (as_get(o, 7) > 0) { byte hủy(as_get(o, 7)); as_set(o, 7, 0); }; };
+    nếu (handled == 0) { trả về as_error(s); }; trả về 0;
+};
+
+hàm as_directive(s, op, args) {
+    biến end = 0;
+    biến i = 0;
+    biến name = 0;
+    biến sec = 0;
+    biến id = 0;
+    biến power = 0;
+    biến step = 0;
+    biến buf = 0;
+    biến fill = 0;
+    biến len = 0;
+    biến c = 0;
+    biến size = 0;
+    biến start = 0;
+    biến t = 0;
+    biến first = 0;
+    biến hi = 0;
+    biến lo = 0;
+    biến part = 0;
+    biến v = 0;
+
+    nếu (as_eq(op, ".text") == 1) { nếu (byte dài(args) != 0) { trả về as_error(s); }; as_set(s, 9, 1); trả về 0; };
+    nếu (as_eq(op, ".data") == 1) { nếu (byte dài(args) != 0) { trả về as_error(s); }; as_set(s, 9, 3); trả về 0; };
+    nếu (as_eq(op, ".section") == 1) {
+        end = byte dài(args); lặp (i = 0; i < end; i++) { nếu (byte lấy(args, i) == 44) { end = i; thoát; }; };
+        name = byte cắt(args, 0, end); sec = -1;
+        nếu (as_eq(name, ".rodata") == 1) { sec = 2; }; nếu (as_eq(name, ".fini_array") == 1) { sec = 4; }; nếu (as_eq(name, ".note.GNU-stack") == 1) { sec = 5; };
+        byte hủy(name); nếu (sec < 0) { trả về as_error(s); };
+        nếu (end < byte dài(args)) {
+            nếu (sec == 2 || sec == 4 && as_eq(args, ".fini_array,\"aw\",@fini_array") != 1 || sec == 5 && as_eq(args, ".note.GNU-stack,\"\",@progbits") != 1) { trả về as_error(s); };
+        };
+        as_set(s, 9, sec); trả về 0;
+    };
+    nếu (as_eq(op, ".type") == 1 || as_eq(op, ".size") == 1) { trả về 0; };
+    nếu (as_eq(op, ".globl") == 1) {
+        name = as_unquote(as_trim(args, 0, byte dài(args))); id = as_symbol(s, name, 0); byte hủy(name);
+        nếu (id < 0) { trả về -1; }; byte ghi số nguyên ba mươi hai bit(as_get(s, 6), id * 24 + 12, 1); trả về 0;
+    };
+    nếu (as_eq(op, ".p2align") == 1) {
+        power = as_number(s, args); nếu (power < 0 || power > 12) { trả về as_error(s); };
+        step = 1; lặp (i = 0; i < power; i++) { step = step * 2; };
+        buf = as_get(s, as_get(s, 9)); fill = 0; nếu (as_get(s, 9) == 1) { fill = 144; };
+        khi (as_mod(byte dài(buf), step) != 0) { as_emit(s, fill); }; trả về 0;
+    };
+    nếu (as_eq(op, ".ascii") == 1 || as_eq(op, ".asciz") == 1) {
+        len = byte dài(args); nếu (len < 2 || byte lấy(args, 0) != 34 || byte lấy(args, len - 1) != 34) { trả về as_error(s); };
+        lặp (i = 1; i < len - 1; i++) { c = byte lấy(args, i); nếu (c == 92 || c == 34) { trả về as_error(s); }; as_emit(s, c); };
+        nếu (as_eq(op, ".asciz") == 1) { as_emit(s, 0); }; trả về 0;
+    };
+    nếu (as_eq(op, ".long") == 1 || as_eq(op, ".quad") == 1) {
+        size = 4; nếu (as_eq(op, ".quad") == 1) { size = 8; }; start = 0;
+        lặp (i = 0; i <= byte dài(args); i++) {
+            nếu (i == byte dài(args) || byte lấy(args, i) == 44) {
+                t = as_trim(args, start, i); first = byte lấy(t, 0);
+                nếu (first >= 48 && first <= 57 || first == 45) {
+                    nếu (size == 8 && byte dài(t) > 10 && byte lấy(t, 0) == 48 && byte lấy(t, 1) == 120) {
+                        nếu (byte dài(t) > 18) { as_error(s); }
+                        hoặc { hi = byte cắt(t, 0, byte dài(t) - 8); lo = "0x"; part = byte cắt(t, byte dài(t) - 8, 8); byte nối(lo, part); as_int(s, as_number(s, lo), 4); as_int(s, as_number(s, hi), 4); byte hủy(hi); byte hủy(lo); byte hủy(part); };
+                    } hoặc { v = as_number(s, t); as_int(s, v, 4); nếu (size == 8) { hi = 0; nếu (v < 0) { hi = -1; }; as_int(s, hi, 4); }; };
+                } hoặc { nếu (size != 8) { as_error(s); } hoặc { as_fix(s, t, 0, 1); }; };
+                byte hủy(t); start = i + 1;
+            };
+        }; trả về 0;
+    };
+    trả về as_error(s);
+};
+
+hàm as_line(s, line) {
+    biến n = 0;
+    biến name = 0;
+    biến numeric = 0;
+    biến id = 0;
+    biến syms = 0;
+    biến end = 0;
+    biến op = 0;
+    biến args = 0;
+    biến result = 0;
+
+    n = byte dài(line); nếu (n == 0) { trả về 0; };
+    nếu (n >= 2 && byte lấy(line, 0) == 47 && byte lấy(line, 1) == 47) { trả về 0; };
+    nếu (byte lấy(line, n - 1) == 58) {
+        name = as_unquote(byte cắt(line, 0, n - 1)); numeric = 0;
+        nếu (byte dài(name) == 1 && byte lấy(name, 0) >= 48 && byte lấy(name, 0) <= 57) { numeric = 1; };
+        id = as_symbol(s, name, numeric); byte hủy(name); nếu (id < 0) { trả về -1; };
+        syms = as_get(s, 6); nếu (byte đọc số nguyên ba mươi hai bit(syms, id * 24 + 4) != 0) { trả về as_error(s); };
+        byte ghi số nguyên ba mươi hai bit(syms, id * 24 + 4, as_get(s, 9)); byte ghi số nguyên ba mươi hai bit(syms, id * 24 + 8, byte dài(as_get(s, as_get(s, 9))));
+        byte ghi số nguyên ba mươi hai bit(syms, id * 24 + 16, as_get(s, 10)); trả về 0;
+    };
+    end = 0; khi (end < n && as_space(byte lấy(line, end)) == 0) { end = end + 1; };
+    op = byte cắt(line, 0, end); args = as_trim(line, end, n); result = 0;
+    nếu (byte lấy(op, 0) == 46) { result = as_directive(s, op, args); }
+    hoặc { nếu (as_get(s, 9) != 1) { as_error(s); } hoặc { result = as_instruction(s, op, args); }; };
+    byte hủy(op); byte hủy(args); trả về result;
+};
+
+hàm as_u64(out, low, high) {
+ byte đẩy số nguyên ba mươi hai bit(out, low); trả về byte đẩy số nguyên ba mươi hai bit(out, high); };
+hàm as_zeros(out, n) {
+    biến i = 0;
+ lặp (i = 0; i < n; i++) { nếu (byte thêm(out, 0) != 0) { trả về -1; }; }; trả về 0; };
+hàm as_sh(out, name, kind, flags, offset, size, link, info, alignment, entry) {
+    byte đẩy số nguyên ba mươi hai bit(out, name); byte đẩy số nguyên ba mươi hai bit(out, kind);
+    as_u64(out, flags, 0); as_u64(out, 0, 0); as_u64(out, offset, 0); as_u64(out, size, 0);
+    byte đẩy số nguyên ba mươi hai bit(out, link); byte đẩy số nguyên ba mươi hai bit(out, info);
+    as_u64(out, alignment, 0); trả về as_u64(out, entry, 0);
+};
+hàm as_numeric_ref(names, offset) {
+    biến c = 0;
+    biến d = 0;
+
+    c = byte lấy(names, offset); d = byte lấy(names, offset + 1);
+    nếu (c >= 48 && c <= 57 && (d == 102 || d == 98) && byte lấy(names, offset + 2) == 0) { trả về 1; }; trả về 0;
+};
+hàm as_symbols(s) {
+    biến syms = 0;
+    biến names = 0;
+    biến out = 0;
+    biến index = 0;
+    biến global = 0;
+    biến i = 0;
+    biến name = 0;
+    biến sec = 0;
+    biến binding = 0;
+
+    syms = as_get(s, 6); names = as_get(s, 7); out = as_get(s, 34);
+    as_zeros(out, 24); index = 1;
+    lặp (global = 0; global <= 1; global++) {
+        nếu (global == 1) { as_set(s, 19, index); };
+        lặp (i = 0; i < byte dài(syms); i = i + 24) {
+            name = byte đọc số nguyên ba mươi hai bit(syms, i); sec = byte đọc số nguyên ba mươi hai bit(syms, i + 4);
+            nếu (as_numeric_ref(names, name) == 1) { bỏ qua; };
+            binding = byte đọc số nguyên ba mươi hai bit(syms, i + 12); nếu (sec == 0) { binding = 1; };
+            nếu (binding != global) { bỏ qua; };
+            byte ghi số nguyên ba mươi hai bit(syms, i + 20, index); index = index + 1;
+            byte đẩy số nguyên ba mươi hai bit(out, name); byte thêm(out, binding * 16); byte thêm(out, 0); byte thêm(out, sec); byte thêm(out, 0);
+            as_u64(out, byte đọc số nguyên ba mươi hai bit(syms, i + 8), 0); as_u64(out, 0, 0);
+        };
+    }; trả về 0;
+};
+hàm as_relocations(s) {
+    biến syms = 0;
+    biến names = 0;
+    biến fixes = 0;
+    biến i = 0;
+    biến sec = 0;
+    biến pos = 0;
+    biến id = 0;
+    biến add = 0;
+    biến kind = 0;
+    biến line = 0;
+    biến name = 0;
+    biến digit = 0;
+    biến direction = 0;
+    biến best = 0;
+    biến j = 0;
+    biến off = 0;
+    biến at = 0;
+    biến target_sec = 0;
+    biến out = 0;
+    biến hi = 0;
+
+    syms = as_get(s, 6); names = as_get(s, 7); fixes = as_get(s, 8);
+    lặp (i = 0; i < byte dài(fixes); i = i + 24) {
+        sec = byte đọc số nguyên ba mươi hai bit(fixes, i); pos = byte đọc số nguyên ba mươi hai bit(fixes, i + 4);
+        id = byte đọc số nguyên ba mươi hai bit(fixes, i + 8); add = byte đọc số nguyên ba mươi hai bit(fixes, i + 12);
+        kind = byte đọc số nguyên ba mươi hai bit(fixes, i + 16); line = byte đọc số nguyên ba mươi hai bit(fixes, i + 20);
+        name = byte đọc số nguyên ba mươi hai bit(syms, id * 24);
+        nếu (as_numeric_ref(names, name) == 1) {
+            digit = byte lấy(names, name); direction = byte lấy(names, name + 1); best = -1;
+            lặp (j = 0; j < byte dài(syms); j = j + 24) {
+                off = byte đọc số nguyên ba mươi hai bit(syms, j); at = byte đọc số nguyên ba mươi hai bit(syms, j + 16);
+                nếu (byte lấy(names, off) != digit || byte lấy(names, off + 1) != 0) { bỏ qua; };
+                nếu (direction == 102 && at > line && (best < 0 || at < byte đọc số nguyên ba mươi hai bit(syms, best + 16))) { best = j; };
+                nếu (direction == 98 && at < line && (best < 0 || at > byte đọc số nguyên ba mươi hai bit(syms, best + 16))) { best = j; };
+            };
+            nếu (best < 0) { as_set(s, 10, line); trả về as_error(s); }; id = máy chia số nguyên ba mươi hai bit(best, 24);
+        };
+        target_sec = byte đọc số nguyên ba mươi hai bit(syms, id * 24 + 4);
+        nếu (kind == 2 && target_sec == sec) {
+            byte ghi số nguyên ba mươi hai bit(as_get(s, sec), pos, byte đọc số nguyên ba mươi hai bit(syms, id * 24 + 8) + add - pos);
+        } hoặc {
+            nếu (sec < 1 || sec > 4) { trả về as_error(s); };
+            out = as_get(s, 29 + sec); as_u64(out, pos, 0);
+            byte đẩy số nguyên ba mươi hai bit(out, kind); byte đẩy số nguyên ba mươi hai bit(out, byte đọc số nguyên ba mươi hai bit(syms, id * 24 + 20));
+            hi = 0; nếu (add < 0) { hi = -1; }; as_u64(out, add, hi);
+        };
+    }; trả về 0;
+};
+hàm as_object(s) {
+    biến out = 0;
+    biến section_names = 0;
+    biến offsets = 0;
+    biến name_offsets = 0;
+    biến names = 0;
+    biến start = 0;
+    biến i = 0;
+    biến t = 0;
+    biến align = 0;
+    biến buf = 0;
+    biến table = 0;
+    biến kind = 0;
+    biến flags = 0;
+    biến link = 0;
+    biến info = 0;
+    biến entry = 0;
+
+    as_symbols(s); nếu (as_relocations(s) != 0) { trả về -1; };
+    out = as_get(s, 36); section_names = as_get(s, 35); offsets = as_get(s, 37); name_offsets = as_get(s, 38);
+    names = ".text|.rodata|.data|.fini_array|.note.GNU-stack|.rela.text|.rela.rodata|.rela.data|.rela.fini_array|.symtab|.strtab|.shstrtab|";
+    byte thêm(section_names, 0); start = 0;
+    lặp (i = 0; i < byte dài(names); i++) { nếu (byte lấy(names, i) == 124) { byte đẩy số nguyên ba mươi hai bit(name_offsets, byte dài(section_names)); t = byte cắt(names, start, i - start); byte nối(section_names, t); byte thêm(section_names, 0); byte hủy(t); start = i + 1; }; }; byte hủy(names);
+    as_zeros(out, 64);
+    lặp (i = 1; i <= 12; i++) {
+        align = 8; nếu (i == 1) { align = 16; }; nếu (i == 5 || i == 11 || i == 12) { align = 1; };
+        khi (as_mod(byte dài(out), align) != 0) { byte thêm(out, 0); }; byte đẩy số nguyên ba mươi hai bit(offsets, byte dài(out));
+        buf = -1; nếu (i <= 5) { buf = as_get(s, i); }; nếu (i >= 6 && i <= 9) { buf = as_get(s, i + 24); }; nếu (i == 10) { buf = as_get(s, 34); }; nếu (i == 11) { buf = as_get(s, 7); }; nếu (i == 12) { buf = section_names; };
+        nếu (byte nối(out, buf) != 0) { trả về as_error(s); }; byte đẩy số nguyên ba mươi hai bit(offsets, byte dài(buf));
+    };
+    khi (as_mod(byte dài(out), 8) != 0) { byte thêm(out, 0); };
+    nếu (byte dài(out) > 2097152 - 832) { trả về as_error(s); };
+    table = byte dài(out); as_zeros(out, 64);
+    lặp (i = 1; i <= 12; i++) {
+        kind = 1; flags = 0; link = 0; info = 0; align = 1; entry = 0;
+        nếu (i == 1) { flags = 6; align = 16; }; nếu (i == 2) { flags = 2; align = 8; }; nếu (i == 3) { flags = 3; align = 8; }; nếu (i == 4) { kind = 15; flags = 3; align = 8; entry = 8; };
+        nếu (i >= 6 && i <= 9) { kind = 4; link = 10; info = i - 5; align = 8; entry = 24; };
+        nếu (i == 10) { kind = 2; link = 11; info = as_get(s, 19); align = 8; entry = 24; }; nếu (i == 11 || i == 12) { kind = 3; };
+        as_sh(out, byte đọc số nguyên ba mươi hai bit(name_offsets, (i - 1) * 4), kind, flags, byte đọc số nguyên ba mươi hai bit(offsets, (i - 1) * 8), byte đọc số nguyên ba mươi hai bit(offsets, (i - 1) * 8 + 4), link, info, align, entry);
+    };
+    byte ghi số nguyên ba mươi hai bit(out, 0, 1179403647); byte ghi số nguyên ba mươi hai bit(out, 4, 65794);
+    byte ghi số nguyên ba mươi hai bit(out, 16, 4063233); byte ghi số nguyên ba mươi hai bit(out, 20, 1);
+    byte ghi số nguyên ba mươi hai bit(out, 40, table); byte ghi số nguyên ba mươi hai bit(out, 52, 64);
+    byte ghi số nguyên ba mươi hai bit(out, 56, 4194304); byte ghi số nguyên ba mươi hai bit(out, 60, 786445);
+    trả về 0;
+};
+
+hàm as_assemble(source, destination) {
+    biến s = 0;
+    biến status = 0;
+    biến i = 0;
+    biến b = 0;
+    biến text = 0;
+    biến start = 0;
+    biến line = 0;
+    biến msg = 0;
+
+    s = byte mới(); nếu (s <= 0) { trả về 1; };
+    as_zeros(s, 160); status = 0;
+    lặp (i = 1; i <= 8; i++) { b = byte mới(); as_set(s, i, b); nếu (b <= 0) { status = 1; }; };
+    lặp (i = 20; i <= 22; i++) { b = byte mới(); as_set(s, i, b); nếu (b <= 0) { status = 1; } hoặc { as_zeros(b, 32); }; };
+    lặp (i = 30; i <= 38; i++) { b = byte mới(); as_set(s, i, b); nếu (b <= 0) { status = 1; }; };
+    text = byte mới(); nếu (text <= 0) { status = 1; };
+    nếu (status == 0) { nếu (elf bản địa đọc tệp(source, text) != 0) { status = 1; }; };
+    as_set(s, 9, 1); as_set(s, 10, 1); byte thêm(as_get(s, 7), 0);
+    nếu (status == 0) {
+        start = 0;
+        lặp (i = 0; i <= byte dài(text); i++) {
+            nếu (i == byte dài(text) || byte lấy(text, i) == 10) {
+                line = as_trim(text, start, i); as_line(s, line);
+                nếu (as_get(s, 0) != 0) { byte in(line); byte hủy(line); status = 1; thoát; };
+                byte hủy(line); as_set(s, 10, as_get(s, 10) + 1); start = i + 1;
+            };
+        };
+    };
+    nếu (status == 0) { nếu (as_object(s) != 0 || as_get(s, 0) != 0) { status = 1; }; };
+    nếu (status == 0) {
+        nếu (thực thi liên kết kiểm tra hợp lệ files(destination, source) != 0) { status = 1; }
+        hoặc nếu (elf bản địa công bố theo chế độ(as_get(s, 36), destination, 0) != 0) { status = 1; };
+    };
+    nếu (status != 0) { msg = "\nV++ assembler: failed at source line\n"; byte in(msg); byte hủy(msg); in as_get(s, 10); };
+    byte hủy(text);
+    lặp (i = 1; i <= 8; i++) { byte hủy(as_get(s, i)); };
+    lặp (i = 20; i <= 22; i++) { byte hủy(as_get(s, i)); };
+    lặp (i = 30; i <= 38; i++) { byte hủy(as_get(s, i)); };
+    byte hủy(s); trả về status;
+};

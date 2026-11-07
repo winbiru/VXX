@@ -1,0 +1,184 @@
+// PE32+ AMD64 executable linker for canonical, one-section V++ COFF.
+// No CRT, imports or base relocations: entry point is `main`. Unsupported
+// external symbols are rejected before publishing the output.
+
+hàm pe cùng tên(kho, ký hiệu, bảng chuỗi, trái, phải) {
+    biến a = ký hiệu + trái * 18;
+    biến b = ký hiệu + phải * 18;
+    biến aa = a;
+    biến bb = b;
+    biến giới hạn a = a + 8;
+    biến giới hạn b = b + 8;
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, a) == 0) {
+        aa = bảng chuỗi + byte đọc số nguyên ba mươi hai bit(kho, a + 4);
+        giới hạn a = byte dài(kho);
+    };
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, b) == 0) {
+        bb = bảng chuỗi + byte đọc số nguyên ba mươi hai bit(kho, b + 4);
+        giới hạn b = byte dài(kho);
+    };
+    lặp (i = 0; i < 4096; i++) {
+        nếu (aa + i >= giới hạn a || bb + i >= giới hạn b) {
+            nếu (aa + i == giới hạn a && bb + i == giới hạn b) { trả về 1; };
+            trả về 0;
+        };
+        biến x = byte lấy(kho, aa + i);
+        biến y = byte lấy(kho, bb + i);
+        nếu (x != y) { trả về 0; };
+        nếu (x == 0) { trả về 1; };
+    };
+    trả về 0;
+};
+
+hàm pe tên main(kho, ký hiệu, bảng chuỗi, mục) {
+    biến tại = ký hiệu + mục * 18;
+    biến tên = tại;
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, tại) == 0) {
+        tên = bảng chuỗi + byte đọc số nguyên ba mươi hai bit(kho, tại + 4);
+    };
+    nếu (byte lấy(kho, tên) != 109) { trả về 0; };
+    nếu (byte lấy(kho, tên + 1) != 97) { trả về 0; };
+    nếu (byte lấy(kho, tên + 2) != 105) { trả về 0; };
+    nếu (byte lấy(kho, tên + 3) != 110) { trả về 0; };
+    nếu (byte lấy(kho, tên + 4) != 0) { trả về 0; };
+    trả về 1;
+};
+
+// Expects one validated COFF record, without the archive length prefix.
+hàm pe tạo executable(coff, kết quả) {
+    nếu (coff == kết quả || byte dài(coff) < 83) { thực thi liên kết báo lỗi("PE bad length/alias\n"); trả về -1; };
+    biến n = byte đọc số nguyên ba mươi hai bit(coff, 36);
+    biến r = byte lấy(coff, 52) + byte lấy(coff, 53) * 256;
+    biến số ký hiệu = byte đọc số nguyên ba mươi hai bit(coff, 12);
+    biến vị trí ký hiệu = byte đọc số nguyên ba mươi hai bit(coff, 8);
+    biến vị trí chuỗi = vị trí ký hiệu + số ký hiệu * 18;
+    nếu (n <= 0 || n > 900000 || r < 0 || số ký hiệu <= 0 || số ký hiệu > 50000) { thực thi liên kết báo lỗi("PE bad counts\n"); trả về -1; };
+    nếu (vị trí ký hiệu != 60 + n + r * 10) { thực thi liên kết báo lỗi("PE bad symptr\n"); trả về -1; };
+    nếu (vị trí chuỗi > byte dài(coff) - 4) { thực thi liên kết báo lỗi("PE bad strptr\n"); trả về -1; };
+    biến dài chuỗi = byte đọc số nguyên ba mươi hai bit(coff, vị trí chuỗi);
+    nếu (dài chuỗi < 4 || dài chuỗi != byte dài(coff) - vị trí chuỗi) { thực thi liên kết báo lỗi("PE bad strlen\n"); trả về -1; };
+    biến địa chỉ = byte mới();
+    biến mã = byte cắt(coff, 60, n);
+    biến trạng thái = 0;
+    biến điểm vào = -1;
+    nếu (địa chỉ <= 0 || mã <= 0) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < số ký hiệu; i++) {
+            biến vị trí ký hiệu kiểm tra = vị trí ký hiệu + i * 18;
+            biến đoạn = byte lấy(coff, vị trí ký hiệu kiểm tra + 12);
+            biến giá trị kiểm tra = byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu kiểm tra + 8);
+            nếu (byte lấy(coff, vị trí ký hiệu kiểm tra + 13) != 0 || byte lấy(coff, vị trí ký hiệu kiểm tra + 14) != 32 || byte lấy(coff, vị trí ký hiệu kiểm tra + 15) != 0 || byte lấy(coff, vị trí ký hiệu kiểm tra + 16) != 2 || byte lấy(coff, vị trí ký hiệu kiểm tra + 17) != 0) { trạng thái = -1; thoát; };
+            nếu (đoạn > 1 || giá trị kiểm tra < 0) { trạng thái = -1; thoát; };
+            nếu (đoạn == 1 && giá trị kiểm tra >= n) { trạng thái = -1; thoát; };
+            nếu (đoạn == 0 && giá trị kiểm tra != 0) { trạng thái = -1; thoát; };
+            nếu (byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu kiểm tra) == 0) {
+                biến tên tại = byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu kiểm tra + 4);
+                nếu (tên tại < 4 || tên tại >= dài chuỗi) { trạng thái = -1; thoát; };
+                biến cuối = vị trí chuỗi + tên tại;
+                khi (cuối < byte dài(coff) && byte lấy(coff, cuối) != 0) { cuối = cuối + 1; };
+                nếu (cuối == byte dài(coff)) { trạng thái = -1; thoát; };
+            };
+            nếu (đoạn == 1) {
+                lặp (j = 0; j < i; j++) {
+                    nếu (byte lấy(coff, vị trí ký hiệu + j * 18 + 12) == 1 && pe cùng tên(coff, vị trí ký hiệu, vị trí chuỗi, i, j) == 1) {
+                        trạng thái = -1; thoát;
+                    };
+                };
+                nếu (trạng thái != 0) { thoát; };
+                nếu (pe tên main(coff, vị trí ký hiệu, vị trí chuỗi, i) == 1) { điểm vào = giá trị kiểm tra; };
+            };
+        };
+    };
+    nếu (điểm vào < 0) { trạng thái = -1; };
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ PE: invalid symbol table or missing main\n"); };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < số ký hiệu; i++) {
+            biến vị trí ký hiệu giải quyết = vị trí ký hiệu + i * 18;
+            biến giá trị giải quyết = byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu giải quyết + 8);
+            nếu (byte lấy(coff, vị trí ký hiệu giải quyết + 12) == 0) {
+                biến đã thấy = 0;
+                lặp (j = 0; j < số ký hiệu; j++) {
+                    nếu (byte lấy(coff, vị trí ký hiệu + j * 18 + 12) == 1 && pe cùng tên(coff, vị trí ký hiệu, vị trí chuỗi, i, j) == 1) {
+                        giá trị giải quyết = byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu + j * 18 + 8);
+                        đã thấy = 1;
+                        thoát;
+                    };
+                };
+                nếu (đã thấy == 0) { trạng thái = -1; thoát; };
+            };
+            nếu (đối tượng i32(địa chỉ, giá trị giải quyết) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    nếu (trạng thái != 0 && điểm vào >= 0) { thực thi liên kết báo lỗi("V++ PE: unresolved external symbol\n"); };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < r; i++) {
+            biến vị trí bản ghi tái định vị = 60 + n + i * 10;
+            biến vị trí = byte đọc số nguyên ba mươi hai bit(coff, vị trí bản ghi tái định vị);
+            biến chỉ mục = byte đọc số nguyên ba mươi hai bit(coff, vị trí bản ghi tái định vị + 4);
+            nếu (vị trí < 0 || vị trí > n - 4 || chỉ mục < 0 || chỉ mục >= số ký hiệu) { trạng thái = -1; thoát; };
+            nếu (byte lấy(coff, vị trí bản ghi tái định vị + 8) != 4 || byte lấy(coff, vị trí bản ghi tái định vị + 9) != 0) { trạng thái = -1; thoát; };
+            biến đích = byte đọc số nguyên ba mươi hai bit(địa chỉ, chỉ mục * 4);
+            biến cộng thêm = byte đọc số nguyên ba mươi hai bit(mã, vị trí);
+            nếu (byte ghi số nguyên ba mươi hai bit(mã, vị trí, đích - vị trí - 4 + cộng thêm) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    nếu (trạng thái == 0) {
+        biến thô = (n + 511) / 512 * 512;
+        biến ảnh = (n + 4095) / 4096 * 4096 + 4096;
+        nếu (byte làm rỗng(kết quả) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 23117) != 0) { trạng thái = -1; }; // MZ
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, 60) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 128) != 0) { trạng thái = -1; }; // e_lfanew
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, 128) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 17744) != 0) { trạng thái = -1; }; // PE\0\0
+        nếu (trạng thái == 0 && byte thêm(kết quả, 100) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 134) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 1) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 0) != 0) { trạng thái = -1; }; // timestamp
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng i32(kết quả, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 240) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 0) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 34) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 0) != 0) { trạng thái = -1; };
+        // PE32+ optional header (240 bytes).
+        nếu (trạng thái == 0 && byte thêm(kết quả, 11) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 2) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 1) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte thêm(kết quả, 0) != 0) { trạng thái = -1; };
+        đối tượng i32(kết quả, thô); đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 0);
+        đối tượng i32(kết quả, 4096 + điểm vào); đối tượng i32(kết quả, 4096);
+        đối tượng i32(kết quả, 1073741824); đối tượng i32(kết quả, 1); // imagebase 0x140000000
+        đối tượng i32(kết quả, 4096); đối tượng i32(kết quả, 512);
+        byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+        byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+        byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+        đối tượng i32(kết quả, 0); đối tượng i32(kết quả, ảnh); đối tượng i32(kết quả, 512);
+        đối tượng i32(kết quả, 0);
+        byte thêm(kết quả, 3); byte thêm(kết quả, 0); // subsystem console
+        byte thêm(kết quả, 0); byte thêm(kết quả, 1); // NX compatible
+        đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+        đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+        đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 16);
+        lặp (i = 0; i < 16; i++) { đối tượng u64(kết quả, 0); };
+        nếu (byte dài(kết quả) != 392) { thực thi liên kết báo lỗi("PE bad optional header length\n"); trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            đối tượng tên định danh(kết quả, ".text", 8);
+            đối tượng i32(kết quả, n); đối tượng i32(kết quả, 4096);
+            đối tượng i32(kết quả, thô); đối tượng i32(kết quả, 512);
+            đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 0);
+            byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+            byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+            đối tượng i32(kết quả, 1610612768);
+            nếu (byte dài(kết quả) != 432) { thực thi liên kết báo lỗi("PE bad section header length\n"); trạng thái = -1; };
+        };
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, 512) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && byte nối(kết quả, mã) != 0) { trạng thái = -1; };
+        nếu (trạng thái == 0 && đối tượng đệm(kết quả, 512 + thô) != 0) { trạng thái = -1; };
+    };
+    nếu (địa chỉ > 0) { byte hủy(địa chỉ); };
+    nếu (mã > 0) { byte hủy(mã); };
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("PE output construction failed\n"); byte làm rỗng(kết quả); trả về -1; };
+    trả về byte dài(kết quả);
+};

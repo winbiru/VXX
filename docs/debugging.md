@@ -22,11 +22,14 @@ thể làm các diagnostic phía sau chỉ là hệ quả.
 ```text
 vpp --dump-ast src/chính.vi
 vpp --dump-ir src/chính.vi
+vpp --dump-ir --compiler=cpp src/chính.vi
 ```
 
 `--dump-ast` giúp kiểm tra parser đã hiểu token/block/call theo cấu trúc nào. `--dump-ir` cho
-thấy IR sau optimizer trước direct bytecode emitter. Hai lệnh không chạy VM, nên phù hợp để
-khoanh vùng lỗi compiler mà không gây side effect của chương trình.
+thấy stack IR của compiler V++ trước codegen nếu native đã bootstrap.
+`--compiler=cpp` dùng Stage 0 để kiểm tra IR sau optimizer của direct emitter;
+hai schema khác nhau. Hai lệnh không thực thi chương trình, nên phù hợp để
+khoanh vùng lỗi compiler mà không gây side effect của mã nguồn.
 
 Khi cần quan sát bytecode đã sinh:
 

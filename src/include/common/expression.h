@@ -8,6 +8,8 @@ struct Instruction;
 
 namespace vietvm::compiler {
 
+    // Legacy postfix API disabled with src/compiler/support/expression.cpp.
+#if 0
     // Chuyển đổi to postfix; hàm biến dữ liệu từ biểu diễn hiện tại sang biểu diễn đích và giữ nguyên ý nghĩa logic.
     std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens);
 
@@ -17,5 +19,6 @@ namespace vietvm::compiler {
     int precedence_op(const std::string& op);
     // Xác định toán tử kết hợp trái hay phải; kết quả được thuật toán shunting-yard dùng khi quyết định pop toán tử khỏi stack.
     char associativity_op(const std::string& op);
+#endif
 
 } // namespace vietvm::Compiler

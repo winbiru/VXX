@@ -1,0 +1,125 @@
+// Trình xem dữ liệu parser/IR Stage 1. Mọi phép duyệt chạy trong V++ native;
+// bản dump này phản ánh mô hình map/stack IR V++ (khác schema Stage 0).
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.nút cú pháp.tạo nút cú pháp;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+hàm riêng tư biên dịch hiển thị thụt lề(độ sâu) {
+    khoảng = "";
+    lặp(i = 0; i < độ sâu; i++) { khoảng += "  "; };
+    trả về khoảng;
+};
+
+// Quote giá trị để mỗi nút luôn ở đúng một dòng, kể cả chuỗi UTF-8.
+hàm riêng tư biên dịch hiển thị trích dẫn(giá trị) {
+    s = thành chuỗi(giá trị);
+    kết quả = "\"";
+    lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
+        c = s[i];
+        nếu (c == "\\") { kết quả += "\\\\"; }
+        hoặc nếu (c == "\"") { kết quả += "\\\""; }
+        hoặc nếu (c == "\n") { kết quả += "\\n"; }
+        hoặc nếu (c == "\r") { kết quả += "\\r"; }
+        hoặc nếu (c == "\t") { kết quả += "\\t"; }
+        hoặc { kết quả += c; };
+    };
+    trả về kết quả + "\"";
+};
+
+hàm riêng tư biên dịch hiển thị nút(nút, độ sâu, dòng) {
+    dữ liệu = nút.dữ liệu();
+    loại = nút.loại();
+    mục = biên dịch hiển thị thụt lề(độ sâu) + loại;
+    tên = lấy từ điển(dữ liệu, "tên", "");
+    nếu (tên != "") { mục += " tên=" + biên dịch hiển thị trích dẫn(tên); };
+    nếu (loại == "nhập") {
+        mục += " đích=" + biên dịch hiển thị trích dẫn(lấy từ điển(dữ liệu, "đích", ""));
+    };
+    nếu (loại == "hàm" || loại == "hàm ẩn danh") {
+        tham số = lấy từ điển(dữ liệu, "tham số", []);
+        mục += " tham số=" + thành chuỗi(máy ảo lấy độ dài(tham số));
+    };
+    nếu (loại == "lặp") {
+        mục += " dạng=" + biên dịch hiển thị trích dẫn(lấy từ điển(dữ liệu, "dạng", ""));
+    };
+    nếu (loại == "hằng" || loại == "tên") {
+        mục += " giá trị=" + biên dịch hiển thị trích dẫn(lấy từ điển(dữ liệu, "giá trị", ""));
+    };
+    máy ảo thêm cuối danh sách(dòng, mục + "\n");
+    con = nút.các con();
+    lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
+        biên dịch hiển thị nút(con[i], độ sâu + 1, dòng);
+    };
+};
+
+hàm công khai biên dịch hiển thị cây cú pháp(mã nguồn) {
+    cây = biên dịch phân tích chương trình thuần(mã nguồn);
+    từ tố = biên dịch từ tố hóa(mã nguồn);
+    câu = cây["câu lệnh"];
+    dòng = ["AST (V++ native) từ tố=" + thành chuỗi(máy ảo lấy độ dài(từ tố)) +
+            " câu lệnh=" + thành chuỗi(máy ảo lấy độ dài(câu)) + "\n"];
+    biên dịch hiển thị nút(tạo nút cú pháp(cây), 0, dòng);
+    trả về biên dịch lắp ráp nối các phần(dòng);
+};
+
+hàm riêng tư biên dịch hiển thị lệnh IR(lệnh, độ sâu, dòng) {
+    lặp(i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+        mục = lệnh[i];
+        tên = lấy từ điển(mục, "mã", "");
+        văn bản = biên dịch hiển thị thụt lề(độ sâu) +
+            thành chuỗi(i) + "  " + tên;
+        giá trị = lấy từ điển(mục, "giá trị", rỗng);
+        nếu (giá trị != rỗng) {
+            loại = loại của(giá trị);
+            nếu (loại == "chuỗi" || loại == "số nguyên" || loại == "số thực") {
+                văn bản += " giá trị=" + biên dịch hiển thị trích dẫn(giá trị);
+            };
+        };
+        ký hiệu = lấy từ điển(mục, "ký hiệu", rỗng);
+        nếu (ký hiệu != rỗng) {
+            văn bản += " ký hiệu=" + thành chuỗi(ký hiệu);
+        };
+        máy ảo thêm cuối danh sách(dòng, văn bản + "\n");
+    };
+};
+
+hàm công khai biên dịch hiển thị biểu diễn trung gian(mã nguồn) {
+    // Dump cấp tệp: giữ thứ tự import dưới dạng metadata IR. Compiler
+    // liên kết đa mô-đun mới chịu trách nhiệm giải và hạ nội dung import.
+    cây = biên dịch phân tích chương trình thuần(mã nguồn);
+    IR = biên dịch hạ IR từ cây thuần(cây, đúng);
+    lệnh = IR["lệnh"];
+    các hàm = IR["hàm"];
+    các lớp = IR["lớp"];
+    thứ tự = IR["thứ tự"];
+    dòng = ["IR (V++ native) lệnh=" + thành chuỗi(máy ảo lấy độ dài(lệnh)) +
+            " hàm=" + thành chuỗi(máy ảo lấy độ dài(các hàm)) +
+            " lớp=" + thành chuỗi(máy ảo lấy độ dài(các lớp)) + "\n"];
+    lặp(i = 0; i < máy ảo lấy độ dài(thứ tự); i++) {
+        mục = thứ tự[i];
+        nếu (mục["loại"] == "nhập") {
+            máy ảo thêm cuối danh sách(dòng, "nhập " +
+                biên dịch hiển thị trích dẫn(mục["đích"]) +
+                " (chưa liên kết)\n");
+        };
+    };
+    biên dịch hiển thị lệnh IR(lệnh, 0, dòng);
+    lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+        mục = các hàm[i];
+        thân = mục["lệnh"];
+        máy ảo thêm cuối danh sách(dòng, "hàm #" + thành chuỗi(i) + " " +
+            biên dịch hiển thị trích dẫn(mục["tên"]) +
+            " tham số=" + thành chuỗi(máy ảo lấy độ dài(mục["tham số"])) + "\n");
+        biên dịch hiển thị lệnh IR(thân, 1, dòng);
+    };
+    lặp(i = 0; i < máy ảo lấy độ dài(các lớp); i++) {
+        máy ảo thêm cuối danh sách(dòng, "lớp #" + thành chuỗi(i) + " " +
+            biên dịch hiển thị trích dẫn(các lớp[i]["tên"]) + "\n");
+    };
+    trả về biên dịch lắp ráp nối các phần(dòng);
+};

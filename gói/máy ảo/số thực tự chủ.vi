@@ -1,0 +1,217 @@
+// Exact integer arithmetic, base 10000. No strtod/snprintf or floating-point
+// operations are used to parse/format IEEE-754. Collection runs at safepoints.
+hàm fs_big(value) { biến v = vm_vector(4); vm_append(v, vm_int(value)); trả về v; };
+hàm fs_big_trim(v) {
+    khi (vm_get(v, 1) > 1 && vm_number(vm_at(v, vm_get(v, 1) - 1)) == 0) { vm_pop(v); };
+    trả về 0;
+};
+hàm fs_big_mul(v, factor, carry) {
+    lặp(i = 0; i < vm_get(v, 1); i++) {
+        biến n = vm_number(vm_at(v, i)) * factor + carry;
+        carry = máy chia số nguyên ba mươi hai bit(n, 10000);
+        vm_put(v, i, vm_int(n - carry * 10000));
+    };
+    khi (carry > 0) {
+        biến next = máy chia số nguyên ba mươi hai bit(carry, 10000);
+        vm_append(v, vm_int(carry - next * 10000)); carry = next;
+    }; trả về 0;
+};
+hàm fs_big_half(v) {
+    biến carry = 0;
+    lặp(i = vm_get(v, 1) - 1; i >= 0; i--) {
+        biến n = carry * 10000 + vm_number(vm_at(v, i));
+        biến half = máy chia số nguyên ba mươi hai bit(n, 2);
+        vm_put(v, i, vm_int(half)); carry = n - half * 2;
+    }; fs_big_trim(v); trả về 0;
+};
+hàm fs_big_cmp(a, b) {
+    nếu (vm_get(a, 1) != vm_get(b, 1)) { nếu (vm_get(a, 1) > vm_get(b, 1)) { trả về 1; }; trả về -1; };
+    lặp(i = vm_get(a, 1) - 1; i >= 0; i--) {
+        biến x = vm_number(vm_at(a, i)); biến y = vm_number(vm_at(b, i));
+        nếu (x > y) { trả về 1; }; nếu (x < y) { trả về -1; };
+    }; trả về 0;
+};
+hàm fs_big_sub(a, b) {
+    biến borrow = 0;
+    lặp(i = 0; i < vm_get(a, 1); i++) {
+        biến n = vm_number(vm_at(a, i)) - borrow;
+        nếu (i < vm_get(b, 1)) { n = n - vm_number(vm_at(b, i)); };
+        borrow = n < 0; nếu (borrow) { n = n + 10000; }; vm_put(a, i, vm_int(n));
+    }; fs_big_trim(a); trả về 0;
+};
+hàm fs_big_zero(v) { trả về vm_get(v, 1) == 1 && vm_number(vm_at(v, 0)) == 0; };
+hàm fs_pow2(bit) { biến n = 1; lặp(i = 0; i < bit; i++) { n = n * 2; }; trả về n; };
+hàm fs_set_bit(value, bit) {
+    biến index = máy chia số nguyên ba mươi hai bit(bit, 8);
+    biến address = value + 8 + index;
+    máy ghi byte(address, máy đọc byte(address) + fs_pow2(bit - index * 8)); trả về 0;
+};
+hàm fs_float_exponent(value, exponent, negative) {
+    máy ghi byte(value + 14, máy đọc byte(value + 14) + (exponent % 16) * 16);
+    máy ghi byte(value + 15, máy chia số nguyên ba mươi hai bit(exponent, 16) + negative * 128); trả về 0;
+};
+// Decimal -> rational P/Q -> binary expansion -> ties-to-even, including
+// subnormals, carry into the exponent, overflow and signed underflow.
+hàm vm_f64_parse(value, raw) {
+    lặp(i = 0; i < 8; i++) { máy ghi byte(value + 8 + i, 0); };
+    biến at = 0; biến negative = 0; biến ch = máy đọc byte(raw);
+    nếu (ch == 45 || ch == 43) { negative = ch == 45; at = 1; };
+    biến p = fs_big(0); biến q = fs_big(1); biến digits = 0; biến fractional = 0;
+    biến point = 0; biến significant = 0;
+    khi (at < 4096) {
+        ch = máy đọc byte(raw + at);
+        nếu (ch == 46 && point == 0) { point = 1; at = at + 1; bỏ qua; };
+        nếu (ch < 48 || ch > 57) { thoát; };
+        nếu (significant > 0 || ch != 48) { significant = significant + 1; };
+        nếu (significant > 768) { vm_error(2); trả về -1; };
+        fs_big_mul(p, 10, ch - 48); digits = digits + 1;
+        nếu (point) { fractional = fractional + 1; }; at = at + 1;
+    };
+    biến exponent = 0;
+    nếu (ch == 101 || ch == 69) {
+        at = at + 1; ch = máy đọc byte(raw + at); biến sign = 1;
+        nếu (ch == 45 || ch == 43) { nếu (ch == 45) { sign = -1; }; at = at + 1; };
+        biến start = at;
+        khi (at < 4096) {
+            ch = máy đọc byte(raw + at); nếu (ch < 48 || ch > 57) { thoát; };
+            nếu (exponent < 10000) { exponent = exponent * 10 + ch - 48; }; at = at + 1;
+        };
+        nếu (at == start) { vm_error(2); trả về -1; }; exponent = exponent * sign;
+    };
+    nếu (digits == 0 || at >= 4096 || ch != 0) { vm_error(2); trả về -1; };
+    exponent = exponent - fractional;
+    biến magnitude = significant + exponent;
+    nếu (fs_big_zero(p) || magnitude < -324) { fs_float_exponent(value, 0, negative); trả về 0; };
+    nếu (magnitude > 310) { fs_float_exponent(value, 2047, negative); trả về 0; };
+    khi (exponent > 0) {
+        biến step = 4; nếu (exponent < step) { step = exponent; };
+        biến factor = 1; lặp(i = 0; i < step; i++) { factor = factor * 10; };
+        fs_big_mul(p, factor, 0); exponent = exponent - step;
+    };
+    khi (exponent < 0) {
+        biến step = 4; nếu (exponent > 0 - step) { step = 0 - exponent; };
+        biến factor = 1; lặp(i = 0; i < step; i++) { factor = factor * 10; };
+        fs_big_mul(q, factor, 0); exponent = exponent + step;
+    };
+    biến e = 0;
+    nếu (fs_big_cmp(p, q) >= 0) {
+        khi (fs_big_cmp(p, q) >= 0) { fs_big_mul(q, 2, 0); e = e + 1; };
+        fs_big_half(q); e = e - 1;
+    } hoặc { khi (fs_big_cmp(p, q) < 0) { fs_big_mul(p, 2, 0); e = e - 1; }; };
+    nếu (e > 1023) { fs_float_exponent(value, 2047, negative); trả về 0; };
+    nếu (e < -1075) { fs_float_exponent(value, 0, negative); trả về 0; };
+    fs_big_sub(p, q);
+    biến biased = 0; biến leading = e + 1074;
+    nếu (e >= -1022) { biased = e + 1023; leading = 52; };
+    fs_float_exponent(value, biased, 0);
+    lặp(bit = 51; bit >= 0; bit--) {
+        nếu (bit == leading) { fs_set_bit(value, bit); }
+        hoặc nếu (bit < leading) {
+            fs_big_mul(p, 2, 0);
+            nếu (fs_big_cmp(p, q) >= 0) { fs_big_sub(p, q); fs_set_bit(value, bit); };
+        };
+    };
+    biến guard = leading == -1;
+    nếu (leading >= 0) {
+        fs_big_mul(p, 2, 0); guard = fs_big_cmp(p, q) >= 0;
+        nếu (guard) { fs_big_sub(p, q); };
+    };
+    nếu (guard && (fs_big_zero(p) == 0 || máy đọc byte(value + 8) % 2 == 1)) {
+        biến carry = 1;
+        lặp(i = 0; i < 8 && carry > 0; i++) {
+            biến n = máy đọc byte(value + 8 + i) + carry;
+            carry = máy chia số nguyên ba mươi hai bit(n, 256); máy ghi byte(value + 8 + i, n % 256);
+        };
+    };
+    máy ghi byte(value + 15, máy đọc byte(value + 15) + negative * 128); trả về 0;
+};
+hàm fs_big_text(v) {
+    biến result = vm_integer_text(vm_number(vm_at(v, vm_get(v, 1) - 1)));
+    lặp(i = vm_get(v, 1) - 2; i >= 0; i--) {
+        biến group = vm_integer_text(vm_number(vm_at(v, i)));
+        lặp(j = vm_get(group, 1); j < 4; j++) { result = vm_concat(result, vm_literal("0")); };
+        result = vm_concat(result, group);
+    }; trả về result;
+};
+hàm fs_copy_text(text, output, negative) {
+    nếu (negative) { text = vm_concat(vm_literal("-"), text); };
+    biến size = vm_get(text, 1); nếu (size > 511) { vm_error(2); trả về -1; };
+    lặp(i = 0; i < size; i++) { máy ghi byte(output + i, máy đọc byte(vm_get(text, 2) + i)); };
+    máy ghi byte(output + size, 0); trả về size;
+};
+// Matches the existing VM convention: integral floats use fixed .1f;
+// fractional floats use ten significant digits, rounded ties-to-even.
+hàm vm_f64_text(value, output) {
+    biến b = value + 8; biến high = máy đọc byte(b + 7); biến negative = high >= 128;
+    biến exponent = (high % 128) * 16 + máy chia số nguyên ba mươi hai bit(máy đọc byte(b + 6), 16);
+    biến top = máy đọc byte(b + 6) % 16;
+    biến mantissa = fs_big(top);
+    lặp(i = 5; i >= 0; i--) { fs_big_mul(mantissa, 256, máy đọc byte(b + i)); };
+    nếu (exponent == 2047) {
+        biến text = vm_literal("nan"); nếu (fs_big_zero(mantissa)) { text = vm_literal("inf"); };
+        trả về fs_copy_text(text, output, negative);
+    };
+    nếu (exponent > 0) {
+        // Reconstruct the implicit bit using the same limb arithmetic.
+        mantissa = fs_big(top + 16);
+        lặp(i = 5; i >= 0; i--) { fs_big_mul(mantissa, 256, máy đọc byte(b + i)); };
+    };
+    nếu (fs_big_zero(mantissa)) { trả về fs_copy_text(vm_literal("0.0"), output, negative); };
+    biến power = exponent - 1075; nếu (exponent == 0) { power = -1074; };
+    biến scale = 0;
+    nếu (power < 0) {
+        scale = 0 - power; biến remaining = scale;
+        khi (remaining > 0) {
+            biến step = 7; nếu (remaining < step) { step = remaining; };
+            biến factor = 1; lặp(i = 0; i < step; i++) { factor = factor * 5; };
+            fs_big_mul(mantissa, factor, 0); remaining = remaining - step;
+        };
+    } hoặc {
+        khi (power > 0) {
+            biến step = 16; nếu (power < step) { step = power; };
+            fs_big_mul(mantissa, fs_pow2(step), 0); power = power - step;
+        };
+    };
+    biến digits = fs_big_text(mantissa); biến n = vm_get(digits, 1); biến p = vm_get(digits, 2);
+    biến integral = n > scale;
+    nếu (integral) { lặp(i = n - scale; i < n; i++) { nếu (máy đọc byte(p + i) != 48) { integral = 0; thoát; }; }; };
+    nếu (integral) {
+        biến text = vm_slice(digits, 0, n - scale); trả về fs_copy_text(vm_concat(text, vm_literal(".0")), output, negative);
+    };
+    biến exp = n - scale - 1; biến kept = n; nếu (kept > 10) { kept = 10; };
+    biến text = vm_slice(digits, 0, kept); biến data = vm_get(text, 2);
+    nếu (n > kept) {
+        biến next = máy đọc byte(p + kept); biến round = next > 53;
+        nếu (next == 53) {
+            round = máy đọc byte(data + kept - 1) % 2 == 1;
+            lặp(i = kept + 1; i < n; i++) { nếu (máy đọc byte(p + i) != 48) { round = 1; thoát; }; };
+        };
+        nếu (round) {
+            biến carry = 1;
+            lặp(i = kept - 1; i >= 0 && carry > 0; i--) {
+                biến digit = máy đọc byte(data + i) + 1;
+                nếu (digit == 58) { digit = 48; } hoặc { carry = 0; }; máy ghi byte(data + i, digit);
+            };
+            nếu (carry) { máy ghi byte(data, 49); exp = exp + 1; };
+        };
+    };
+    khi (kept > 1 && máy đọc byte(data + kept - 1) == 48) { kept = kept - 1; }; vm_set(text, 1, kept);
+    biến result = vm_literal("");
+    nếu (exp < -4 || exp >= 10) {
+        result = vm_slice(text, 0, 1);
+        nếu (kept > 1) { result = vm_concat(vm_concat(result, vm_literal(".")), vm_slice(text, 1, kept - 1)); };
+        biến suffix = vm_literal("e+"); biến abs_exp = exp;
+        nếu (exp < 0) { suffix = vm_literal("e-"); abs_exp = 0 - exp; };
+        result = vm_concat(result, suffix); nếu (abs_exp < 10) { result = vm_concat(result, vm_literal("0")); };
+        result = vm_concat(result, vm_integer_text(abs_exp));
+    } hoặc nếu (exp < 0) {
+        result = vm_literal("0."); lặp(i = 0; i < 0 - exp - 1; i++) { result = vm_concat(result, vm_literal("0")); }; result = vm_concat(result, text);
+    } hoặc {
+        lặp(i = 0; i <= exp || i < kept; i++) {
+            nếu (i == exp + 1) { result = vm_concat(result, vm_literal(".")); };
+            nếu (i < kept) { result = vm_concat(result, vm_slice(text, i, 1)); }
+            hoặc { result = vm_concat(result, vm_literal("0")); };
+        };
+    };
+    trả về fs_copy_text(result, output, negative);
+};

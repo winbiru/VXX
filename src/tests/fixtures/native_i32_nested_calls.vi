@@ -1,0 +1,15 @@
+// Lời gọi i32 lồng nhau: hàm không tham số, nhiều tầng và một nhánh đổi kiểu.
+hàm hằng() { trả về 5; };
+hàm tăng(a) { trả về a + 1; };
+hàm trộn(a, b, c) { trả về a * 3 + b * 2 + c; };
+
+hàm chính() {
+    x = 2;
+    in trộn(tăng(x + 3), tăng(tăng(x)), hằng());
+    in trộn(hằng(), tăng(x), tăng(hằng()));
+    x = 1.5;
+    in trộn(tăng(x + 3), 2, hằng());
+    x = 3;
+    in trộn(tăng(x), hằng(), tăng(hằng()));
+    in trộn(tăng(x), 2, 3) + 1;
+};

@@ -1,6 +1,6 @@
 // Vòng đời mặc định cho các adapter tài nguyên có trạng thái đóng.
 // Lớp con có thể ghi đè đóng() khi cần giải phóng kết nối bên ngoài.
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 lớp công khai Tài Nguyên Có Trạng Thái triển khai Đóng Được {
     hàm công khai khởi tạo() { mình.đã đóng = sai; };

@@ -4,14 +4,18 @@
 // V++ sở hữu cả chuyển đổi IEEE-754 thành thập phân và làm tròn.
 // VM chỉ đọc byte biểu diễn số, không dựng thân thập phân hay chạy formatter.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/ký hiệu vùng;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/định dạng số thực;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.ký hiệu vùng.ký hiệu vùng lấy;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.định dạng số thực.*;
 
 // Thuật toán định dạng không giữ trạng thái được tổ chức thành hàm cấp mô-đun.
 hàm riêng tư định dạng có ký tự(văn bản, ký tự) {
@@ -223,7 +227,7 @@ hàm riêng tư định dạng cơ số dương(giá trị, cơ số, hoa) {
     nếu (giá trị == 0) { trả về "0"; };
     kết quả = "";
     còn lại = giá trị;
-    lặp(vòng = 0; còn lại > 0; vòng++) {
+    khi (còn lại > 0) {
         dư = còn lại % cơ số;
         kết quả = chữ[dư] + kết quả;
         còn lại = làm tròn xuống(còn lại / cơ số);
@@ -434,7 +438,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
     đã tường mình = sai;
     đã ngầm = sai;
 
-    lặp(vòng = 0; con trỏ < n; vòng++) {
+    khi (con trỏ < n) {
         nếu (mẫu[con trỏ] != "%") {
             kết quả = kết quả + mẫu[con trỏ];
             con trỏ = con trỏ + 1;
@@ -443,7 +447,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
 
             bắt đầu số = vị trí hiện tại;
-            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+            khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                 vị trí hiện tại = vị trí hiện tại + 1;
             };
             có chỉ số = sai;
@@ -460,7 +464,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
 
             cờ = "";
             đang cờ = đúng;
-            lặp(k = 0; vị trí hiện tại < n && đang cờ; k++) {
+            khi (vị trí hiện tại < n && đang cờ) {
                 c = mẫu[vị trí hiện tại];
                 nếu (c == "-" || c == "+" || c == "0" || c == " " || c == "," || c == "(") {
                     nếu (định dạng có ký tự(cờ, c)) { ném "FORMAT_DUPLICATE_FLAG"; };
@@ -473,7 +477,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             };
 
             bắt đầu rộng = vị trí hiện tại;
-            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+            khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                 vị trí hiện tại = vị trí hiện tại + 1;
             };
             có rộng = vị trí hiện tại > bắt đầu rộng;
@@ -488,7 +492,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
                 có chính xác = đúng;
                 vị trí hiện tại = vị trí hiện tại + 1;
                 bắt đầu chính xác = vị trí hiện tại;
-                lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+                khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                     vị trí hiện tại = vị trí hiện tại + 1;
                 };
                 nếu (bắt đầu chính xác == vị trí hiện tại) { ném "FORMAT_PRECISION"; };

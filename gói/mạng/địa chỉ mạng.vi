@@ -1,6 +1,6 @@
 // IPv4/IPv6 parser thuần V++ dùng chung cho socket, DNS hosts và DNS config.
 // Không gọi libc hoặc hệ điều hành.
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.*;
 
 lớp công khai Bộ Phân Tích IP {
     hàm công khai khởi tạo() {};

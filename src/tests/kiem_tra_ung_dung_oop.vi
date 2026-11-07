@@ -1,4 +1,4 @@
-nhập gói/ứng dụng/chính;
+nhập gói.ứng dụng.chính.*;
 
 hàm chính() {
     app = Bộ Điều Khiển Ứng Dụng("Thử", "1.0");

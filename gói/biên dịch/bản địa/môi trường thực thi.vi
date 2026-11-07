@@ -1,3 +1,5 @@
+nhập trình liên kết elf.*;
+
 // Native runtime algorithms. Only máy_* operations cross the machine/OS ABI.
 // Arena: counter at 0, input status at 8, 64 byte records at 16 (32 bytes
 // each), 64 file records at 2064 (16 bytes each), scratch at 3104, cache
@@ -24,7 +26,7 @@ hàm thực thi các byte ô nhớ(mã tài nguyên) {
     trả về ô nhớ;
 };
 
-hàm thực thi nội dung đệm(ô nhớ) { trả về 4096 + ô nhớ * 1048592; };
+hàm thực thi nội dung đệm(ô nhớ) { trả về 4096 + ô nhớ * 2097168; };
 
 hàm thực thi các byte dự trữ(mã tài nguyên, phần bổ sung) {
     biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
@@ -32,11 +34,11 @@ hàm thực thi các byte dự trữ(mã tài nguyên, phần bổ sung) {
     nếu (phần bổ sung < 0) { trả về -1; };
     biến bản ghi dữ liệu = 16 + ô nhớ * 32;
     biến chiều dài = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 16);
-    nếu (phần bổ sung > 1048576 - chiều dài) { trả về -1; };
+    nếu (phần bổ sung > 2097152 - chiều dài) { trả về -1; };
     biến dung lượng cần = chiều dài + phần bổ sung + 1;
     biến dung lượng = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 24);
-    lặp (i = 0; dung lượng < dung lượng cần; i++) {
-        nếu (dung lượng > 524288) { dung lượng = 1048577; }
+    khi (dung lượng < dung lượng cần) {
+        nếu (dung lượng > 1048576) { dung lượng = 2097153; }
         hoặc { dung lượng = dung lượng * 2; };
     };
     trả về máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 24, dung lượng);
@@ -193,7 +195,7 @@ hàm thực thi các byte giải phóng(mã tài nguyên) {
 
 hàm thực thi ghi tất cả(mã tệp mở, độ lệch, chiều dài) {
     biến done = 0;
-    lặp (i = 0; done < chiều dài; i++) {
+    khi (done < chiều dài) {
         biến số phần tử = máy ghi(mã tệp mở, độ lệch + done, chiều dài - done);
         nếu (số phần tử < 0) {
             nếu (máy lỗi() == 4) { bỏ qua; };
@@ -274,9 +276,33 @@ hàm thực thi môi trường thực thi ứng viên(gốc, hậu tố) {
     trả về -1;
 };
 
+// A Windows current directory has a drive prefix even when running under
+// Wine.  Do this check before probing /proc: Wine may expose Linux procfs
+// through Z:, but the compiler is still a Windows PE process.
+hàm thực thi máy đích windows() {
+    biến thư mục = thực thi hệ điều hành đường tệp(1);
+    nếu (thư mục <= 0) { trả về 0; };
+    biến windows = 0;
+    nếu (thực thi các byte chiều dài(thư mục) >= 3) {
+        biến ký tự đầu = thực thi các byte lấy(thư mục, 0);
+        biến ký tự thứ hai = thực thi các byte lấy(thư mục, 1);
+        biến dấu ngăn = thực thi các byte lấy(thư mục, 2);
+        nếu (ký tự thứ hai == 58) {
+            nếu (dấu ngăn == 47 || dấu ngăn == 92) {
+                nếu ((ký tự đầu >= 65 && ký tự đầu <= 90) || (ký tự đầu >= 97 && ký tự đầu <= 122)) {
+                    windows = 1;
+                };
+            };
+        };
+    };
+    thực thi các byte giải phóng(thư mục);
+    trả về windows;
+};
+
 // Linux exposes this procfs entry; Darwin does not. Cache the host choice
 // outside the handle table and linker/cache scratch slots.
 hàm thực thi máy đích linux() {
+    nếu (thực thi máy đích windows() == 1) { trả về 0; };
     biến trạng thái nội bộ = máy đọc số nguyên ba mươi hai bit(3832);
     nếu (trạng thái nội bộ == 1) { trả về 1; };
     nếu (trạng thái nội bộ == 2) { trả về 0; };
@@ -300,15 +326,31 @@ hàm thực thi môi trường thực thi tệp dữ liệu đường tệp(lo�
     nếu (loại từ tố == 0) { hậu tố = "gói/biên dịch/bản địa/môi trường thực thi.vi"; }
     hoặc nếu (loại từ tố == 1) {
         nếu (thực thi máy đích linux() == 1) {
-            hậu tố = "scripts/ASM/vpp_aot_primitives_linux_x86_64.S";
+            hậu tố = "scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.S";
         } hoặc {
-            hậu tố = "scripts/ASM/vpp_aot_primitives_aarch64.S";
+            hậu tố = "scripts/ASM/macos/vpp_aot_primitives_aarch64.S";
+        };
+    } hoặc nếu (loại từ tố == 2) {
+        // A preassembled freestanding Linux runtime can be passed directly
+        // to GNU ld. Its ASM macros must already have been expanded with
+        // VPP_LINUX_HOST_NO_CRT and VPP_VM_F64_FREESTANDING enabled.
+        nếu (thực thi máy đích linux() == 1) {
+            hậu tố = "scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o";
         };
     };
     nếu (hậu tố <= 0) { trả về -1; };
     biến thư mục nhà = thực thi hệ điều hành đường tệp(0);
     nếu (thư mục nhà > 0) {
-        nếu (thực thi các byte lấy(thư mục nhà, 0) == 47) {
+        biến đường tuyệt đối = 0;
+        nếu (thực thi các byte lấy(thư mục nhà, 0) == 47) { đường tuyệt đối = 1; };
+        // Windows drive paths (C:\dir and C:/dir) are also absolute.
+        nếu (thực thi các byte chiều dài(thư mục nhà) >= 3) {
+            nếu (thực thi các byte lấy(thư mục nhà, 1) == 58) {
+                biến dấu ngăn ổ đĩa = thực thi các byte lấy(thư mục nhà, 2);
+                nếu (dấu ngăn ổ đĩa == 47 || dấu ngăn ổ đĩa == 92) { đường tuyệt đối = 1; };
+            };
+        };
+        nếu (đường tuyệt đối == 1) {
             biến kết quả trả về = thực thi môi trường thực thi ứng viên(thư mục nhà, hậu tố);
             thực thi các byte giải phóng(thư mục nhà);
             nếu (kết quả trả về > 0) { thực thi các byte giải phóng(hậu tố); trả về kết quả trả về; };
@@ -325,7 +367,8 @@ hàm thực thi môi trường thực thi tệp dữ liệu đường tệp(lo�
         };
         biến cuối cùng dấu gạch chéo = -1;
         lặp (i = 0; i < thực thi các byte chiều dài(thư mục); i++) {
-            nếu (thực thi các byte lấy(thư mục, i) == 47) { cuối cùng dấu gạch chéo = i; };
+            biến dấu ngăn = thực thi các byte lấy(thư mục, i);
+            nếu (dấu ngăn == 47 || dấu ngăn == 92) { cuối cùng dấu gạch chéo = i; };
         };
         nếu (cuối cùng dấu gạch chéo <= 0) {
             nếu (thực thi các byte chiều dài(thư mục) == 1) { thoát; };
@@ -390,13 +433,34 @@ hàm thực thi đối tượng dịch vụ tên định danh(kho lưu trữ, đ
 // also checks string-table references before the host linker sees an object.
 hàm thực thi elf các dịch vụ(kho lưu trữ, điểm bắt đầu, chiều dài) {
     nếu (chiều dài < 448) { trả về -1; };
+    // The compiler's ET_REL object has no executable entry point or program
+    // headers. Validate reserved header fields before reading section data.
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu) != 1179403647) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 4) != 65794) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 8) != 0) { trả về -1; };
+    lặp (j = 9; j < 16; j++) {
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + j) != 0) { trả về -1; };
+    };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 16) != 4063233) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 20) != 1) { trả về -1; };
+    lặp (j = 24; j < 40; j = j + 4) {
+        nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + j) != 0) { trả về -1; };
+    };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 48) != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 52) != 64) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 53) != 0) { trả về -1; };
+    lặp (j = 54; j < 58; j++) {
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + j) != 0) { trả về -1; };
+    };
     biến các phần đầu = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 40);
     nếu (các phần đầu < 64) { trả về -1; };
     nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 44) != 0) { trả về -1; };
-    nếu (các phần đầu > chiều dài - 384) { trả về -1; };
+    // Seven 64-byte section headers: the sixth non-null section is the
+    // non-executable .note.GNU-stack emitted by the current ELF writer.
+    nếu (các phần đầu > chiều dài - 448) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 58) != 64) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 59) != 0) { trả về -1; };
-    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 60) != 6) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 60) != 7) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 61) != 0) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 62) != 5) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 63) != 0) { trả về -1; };
@@ -404,14 +468,49 @@ hàm thực thi elf các dịch vụ(kho lưu trữ, điểm bắt đầu, chi�
     biến mục ký hiệu kích cỡ = -1;
     biến chuỗi độ lệch = -1;
     biến chuỗi kích cỡ = -1;
-    lặp (i = 1; i < 6; i++) {
+    biến mã máy kích cỡ = -1;
+    biến tái định vị độ lệch = -1;
+    biến tái định vị kích cỡ = -1;
+    biến kết thúc mã = -1;
+    biến kết thúc tái định vị = -1;
+    biến kết thúc ký hiệu = -1;
+    biến kết thúc chuỗi = -1;
+    biến độ lệch tên đoạn = -1;
+    biến kết thúc tên đoạn = -1;
+    // The null section header is all zero in the canonical V++ writer.
+    lặp (j = 0; j < 64; j = j + 4) {
+        nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + các phần đầu + j) != 0) { trả về -1; };
+    };
+    lặp (i = 1; i < 7; i++) {
         biến phân đoạn = điểm bắt đầu + các phần đầu + i * 64;
         biến loại từ tố = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 4);
         biến giá trị mong đợi = 3;
         nếu (i == 1) { giá trị mong đợi = 1; };
         nếu (i == 2) { giá trị mong đợi = 4; };
         nếu (i == 3) { giá trị mong đợi = 2; };
+        nếu (i == 6) { giá trị mong đợi = 1; };
         nếu (loại từ tố != giá trị mong đợi) { trả về -1; };
+        // Every ET_REL section emitted by V++ has sh_addr == 0. Check both
+        // halves of the ELF64 field, including non-allocated metadata and
+        // the empty GNU-stack section, before accepting a compiler object.
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 16) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 20) != 0) { trả về -1; };
+        biến cờ mong đợi = 0;
+        biến căn mong đợi = 1;
+        biến mục mong đợi = 0;
+        biến liên kết mong đợi = 0;
+        biến thông tin mong đợi = 0;
+        nếu (i == 1) { cờ mong đợi = 6; căn mong đợi = 16; };
+        nếu (i == 2) { căn mong đợi = 8; mục mong đợi = 24; liên kết mong đợi = 3; thông tin mong đợi = 1; };
+        nếu (i == 3) { căn mong đợi = 8; mục mong đợi = 24; liên kết mong đợi = 4; thông tin mong đợi = 1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 8) != cờ mong đợi) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 12) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 40) != liên kết mong đợi) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 44) != thông tin mong đợi) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 48) != căn mong đợi) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 52) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 56) != mục mong đợi) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 60) != 0) { trả về -1; };
         biến độ lệch = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 24);
         biến kích cỡ = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 32);
         nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 28) != 0) { trả về -1; };
@@ -420,25 +519,96 @@ hàm thực thi elf các dịch vụ(kho lưu trữ, điểm bắt đầu, chi�
         nếu (kích cỡ < 0) { trả về -1; };
         nếu (độ lệch > chiều dài) { trả về -1; };
         nếu (kích cỡ > chiều dài - độ lệch) { trả về -1; };
+        nếu (i == 6) {
+            // GNU-stack is an empty PROGBITS section with no SHF_EXECINSTR.
+            nếu (kích cỡ != 0) { trả về -1; };
+        };
+        nếu (i == 1) {
+            // The V++ object writer emits only executable, read-only .text.
+            // Native linking must not accept a writable or misaligned code
+            // segment, or a malformed 64-bit address hidden in the header.
+            nếu (độ lệch != 64) { trả về -1; };
+            mã máy kích cỡ = kích cỡ;
+            kết thúc mã = độ lệch + kích cỡ;
+        };
+        nếu (i == 2) {
+            tái định vị độ lệch = độ lệch;
+            tái định vị kích cỡ = kích cỡ;
+            kết thúc tái định vị = độ lệch + kích cỡ;
+        };
         nếu (i == 3) {
             mục ký hiệu độ lệch = độ lệch;
             mục ký hiệu kích cỡ = kích cỡ;
-            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 40) != 4) { trả về -1; };
-            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 56) != 24) { trả về -1; };
-            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 60) != 0) { trả về -1; };
+            kết thúc ký hiệu = độ lệch + kích cỡ;
         };
-        nếu (i == 4) { chuỗi độ lệch = độ lệch; chuỗi kích cỡ = kích cỡ; };
+        nếu (i == 4) { chuỗi độ lệch = độ lệch; chuỗi kích cỡ = kích cỡ; kết thúc chuỗi = độ lệch + kích cỡ; };
+        nếu (i == 5) { độ lệch tên đoạn = độ lệch; kết thúc tên đoạn = độ lệch + kích cỡ; };
     };
+    // Canonical ET_REL sections must not overlap one another or the ELF
+    // header/section table. Otherwise malformed input could be interpreted
+    // as executable machine code or bogus symbol/relocation bytes.
+    nếu (tái định vị độ lệch < kết thúc mã) { trả về -1; };
+    nếu (mục ký hiệu độ lệch < kết thúc tái định vị) { trả về -1; };
+    nếu (chuỗi độ lệch < kết thúc ký hiệu) { trả về -1; };
+    nếu (độ lệch tên đoạn < kết thúc chuỗi) { trả về -1; };
+    nếu (các phần đầu < kết thúc tên đoạn) { trả về -1; };
     nếu (mục ký hiệu kích cỡ < 24) { trả về -1; };
+    nếu (mã máy kích cỡ <= 0) { trả về -1; };
+    nếu (tái định vị kích cỡ < 0) { trả về -1; };
+    nếu (tái định vị kích cỡ - máy chia số nguyên ba mươi hai bit(tái định vị kích cỡ, 24) * 24 != 0) { trả về -1; };
     nếu (chuỗi kích cỡ <= 0) { trả về -1; };
     nếu (mục ký hiệu kích cỡ - máy chia số nguyên ba mươi hai bit(mục ký hiệu kích cỡ, 24) * 24 != 0) { trả về -1; };
     nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + chuỗi độ lệch) != 0) { trả về -1; };
+    // The canonical object contains a real .shstrtab at section index five.
+    // Reject malformed section-name offsets or missing string terminators.
+    biến tên dài = kết thúc tên đoạn - độ lệch tên đoạn;
+    nếu (tên dài < 1) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + độ lệch tên đoạn) != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + kết thúc tên đoạn - 1) != 0) { trả về -1; };
+    lặp (i = 1; i < 7; i++) {
+        biến chỉ mục tên = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + các phần đầu + i * 64);
+        nếu (chỉ mục tên < 0) { trả về -1; };
+        nếu (chỉ mục tên >= tên dài) { trả về -1; };
+    };
     biến số phần tử = máy chia số nguyên ba mươi hai bit(mục ký hiệu kích cỡ, 24);
+    // Validate every relocation before releasing the object to a linker.
+    // V++ emits only PLT32 CALL relocations with signed addend -4. A bad
+    // symbol index, width or offset must never reach an external linker.
+    lặp (i = 0; i < tái định vị kích cỡ; i = i + 24) {
+        biến mục = điểm bắt đầu + tái định vị độ lệch + i;
+        biến vị trí = thực thi các byte nạp i32(kho lưu trữ, mục);
+        biến chỉ mục = thực thi các byte nạp i32(kho lưu trữ, mục + 12);
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục + 4) != 0) { trả về -1; };
+        nếu (vị trí < 0) { trả về -1; };
+        nếu (vị trí > mã máy kích cỡ - 4) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục + 8) != 4) { trả về -1; };
+        nếu (chỉ mục <= 0) { trả về -1; };
+        nếu (chỉ mục >= số phần tử) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục + 16) != -4) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục + 20) != -1) { trả về -1; };
+    };
     lặp (i = 1; i < số phần tử; i++) {
         biến mục ký hiệu = điểm bắt đầu + mục ký hiệu độ lệch + i * 24;
         biến tên định danh độ lệch = thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu);
         nếu (tên định danh độ lệch <= 0) { trả về -1; };
         nếu (tên định danh độ lệch >= chuỗi kích cỡ) { trả về -1; };
+        // Every emitted non-null symbol is a global function in .text or
+        // an undefined external. In particular, reject a fake definition
+        // that points outside code before we attempt native relocation.
+        nếu (thực thi các byte lấy(kho lưu trữ, mục ký hiệu + 4) != 18) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, mục ký hiệu + 5) != 0) { trả về -1; };
+        biến phân đoạn ký hiệu = thực thi các byte lấy(kho lưu trữ, mục ký hiệu + 6);
+        nếu (thực thi các byte lấy(kho lưu trữ, mục ký hiệu + 7) != 0) { trả về -1; };
+        nếu (phân đoạn ký hiệu != 0) {
+            nếu (phân đoạn ký hiệu != 1) { trả về -1; };
+        };
+        biến giá trị ký hiệu = thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu + 8);
+        nếu (giá trị ký hiệu < 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu + 12) != 0) { trả về -1; };
+        nếu (phân đoạn ký hiệu == 0) { nếu (giá trị ký hiệu != 0) { trả về -1; }; }
+        hoặc { nếu (giá trị ký hiệu >= mã máy kích cỡ) { trả về -1; }; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu + 16) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu + 20) != 0) { trả về -1; };
         biến khả dụng = chuỗi kích cỡ - tên định danh độ lệch;
         biến terminated = 0;
         lặp (j = 0; j < khả dụng; j++) {
@@ -550,14 +720,14 @@ hàm thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, đ�
 
 // Validates the entire archive, including each Mach-O symbol table. The
 // packed result is (count * 2 + needs_compiler_services), or -1 on error.
-// With <= 1 MiB archives and 232-byte minimum objects, this fits in i32.
+// With <= 2 MiB archives and 232-byte minimum objects, this fits in i32.
 hàm thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ) {
     biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
     nếu (tổng số < 5) { trả về -1; };
     biến độ lệch = 0;
     biến số phần tử = 0;
     biến needs các dịch vụ = 0;
-    lặp (i = 0; độ lệch < tổng số; i++) {
+    khi (độ lệch < tổng số) {
         biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, độ lệch);
         nếu (chiều dài < 0) { trả về -1; };
         biến các dịch vụ = thực thi đối tượng các dịch vụ(kho lưu trữ, độ lệch + 4, chiều dài);
@@ -577,7 +747,8 @@ hàm thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ
 hàm thực thi liên kết kho lưu trữ đơn(đối tượng) {
     biến chiều dài = thực thi các byte chiều dài(đối tượng);
     nếu (chiều dài < 232) { trả về -1; };
-    nếu (chiều dài > 1048572) { trả về -1; };
+    // The archive adds a four-byte length prefix in the same 2 MiB arena.
+    nếu (chiều dài > 2097148) { trả về -1; };
     biến kho lưu trữ = thực thi các byte mới();
     nếu (kho lưu trữ <= 0) { trả về -1; };
     nếu (thực thi các byte đẩy i32(kho lưu trữ, chiều dài) != 0) {
@@ -602,6 +773,19 @@ hàm thực thi liên kết hợp lệ đường tệp(mã tài nguyên, cực �
         nếu (thực thi các byte lấy(mã tài nguyên, i) == 0) { trả về -1; };
     };
     trả về 0;
+};
+
+// Keep linker failures actionable on both bootstrap and freestanding paths.
+// Emit diagnostics through the existing V++ byte arena and OS write boundary.
+hàm thực thi liên kết báo lỗi(văn bản) {
+    nếu (văn bản > 0) {
+        biến ô nhớ = thực thi các byte ô nhớ(văn bản);
+        nếu (ô nhớ >= 0) {
+            máy ghi(2, thực thi nội dung đệm(ô nhớ), thực thi các byte chiều dài(văn bản));
+        };
+        thực thi các byte giải phóng(văn bản);
+    };
+    trả về -1;
 };
 
 // Validate the path bytes before the OS borrows their NUL-terminated data.
@@ -635,18 +819,18 @@ hàm thực thi liên kết giống nhau định danh(đầu tiên, thứ hai) {
 // that aliases the source inode (including hard links). A missing destination
 // is permitted; any other lstat error fails closed.
 hàm thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) {
-    nếu (thực thi liên kết kiểm tra hợp lệ paths(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    nếu (thực thi liên kết kiểm tra hợp lệ paths(kết xuất, nguồn đầu vào) != 0) { trả về thực thi liên kết báo lỗi("V++ linker: invalid paths\n"); };
     biến nguồn đầu vào ô nhớ = thực thi các byte ô nhớ(nguồn đầu vào);
     biến kết xuất ô nhớ = thực thi các byte ô nhớ(kết xuất);
-    nếu (nguồn đầu vào ô nhớ < 0) { trả về -1; };
-    nếu (kết xuất ô nhớ < 0) { trả về -1; };
-    nếu (máy thông tin tệp(thực thi nội dung đệm(nguồn đầu vào ô nhớ), 3376) != 0) { trả về -1; };
-    nếu (thực thi liên kết thông tin tệp thông thường(3376) != 1) { trả về -1; };
+    nếu (nguồn đầu vào ô nhớ < 0) { trả về thực thi liên kết báo lỗi("V++ linker: invalid source handle\n"); };
+    nếu (kết xuất ô nhớ < 0) { trả về thực thi liên kết báo lỗi("V++ linker: invalid output handle\n"); };
+    nếu (máy thông tin tệp(thực thi nội dung đệm(nguồn đầu vào ô nhớ), 3376) != 0) { trả về thực thi liên kết báo lỗi("V++ linker: source stat failed\n"); };
+    nếu (thực thi liên kết thông tin tệp thông thường(3376) != 1) { trả về thực thi liên kết báo lỗi("V++ linker: source is not a regular file\n"); };
     nếu (máy thông tin liên kết(thực thi nội dung đệm(kết xuất ô nhớ), 3584) == 0) {
-        nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { trả về -1; };
-        nếu (thực thi liên kết giống nhau định danh(3376, 3584) == 1) { trả về -1; };
+        nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { trả về thực thi liên kết báo lỗi("V++ linker: output is not a regular file\n"); };
+        nếu (thực thi liên kết giống nhau định danh(3376, 3584) == 1) { trả về thực thi liên kết báo lỗi("V++ linker: source and output are identical\n"); };
     } hoặc {
-        nếu (máy lỗi() != 2) { trả về -1; }; // ENOENT
+        nếu (máy lỗi() != 2) { trả về thực thi liên kết báo lỗi("V++ linker: output lstat failed (not ENOENT)\n"); }; // ENOENT
     };
     trả về 0;
 };
@@ -686,11 +870,11 @@ hàm thực thi liên kết tạm thời đường tệp(kết xuất, đích nh
     } hoặc {
         nếu (thực thi liên kết thêm cuối văn bản(đích nhận, ".vpp-module-") != 0) { trả về -1; };
         biến số chia = 1;
-        lặp (i = 0; máy chia số nguyên ba mươi hai bit(chỉ mục, số chia) >= 10; i++) {
+        khi (máy chia số nguyên ba mươi hai bit(chỉ mục, số chia) >= 10) {
             số chia = số chia * 10;
         };
         biến dịch vụ tài nguyên = chỉ mục;
-        lặp (j = 0; số chia > 0; j++) {
+        khi (số chia > 0) {
             biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
             nếu (thực thi các byte thêm cuối(đích nhận, chữ số đang xét + 48) != 0) { trả về -1; };
             dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;
@@ -730,10 +914,10 @@ hàm thực thi liên kết công bố(tạm thời, kết xuất) {
 };
 
 // V++ builds the full-width argv table in the private linker arena.
-// The machine primitive obtains environ and invokes clang directly;
+// The machine primitive obtains environ and invokes the selected linker;
 // V++ owns the waitpid EINTR retry and successful-exit decision.
 hàm thực thi liên kết khởi chạy đợi() {
-    biến con = máy khởi chạy clang(67113984);
+    biến con = máy khởi chạy clang(134222848);
     nếu (con <= 0) { trả về -1; };
     lặp (lần thử lại = 0; lần thử lại < 1000000; lần thử lại++) {
         biến đã đợi = máy đợi(con, 3360);
@@ -747,13 +931,17 @@ hàm thực thi liên kết khởi chạy đợi() {
     trả về -1;
 };
 
-// The OS boundary creates the temporary descriptor. V++ validates the
-// archive entry and writes all its bytes through the existing EINTR-safe
-// write primitive. Return bytes written or -1 on failure.
-hàm thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, tiền tố) {
+// The caller validates the target-specific archive entry and supplies its
+// length. Check the range again before crossing the raw-pointer boundary.
+// This also permits COFF object publishing on non-Windows bootstrap hosts.
+hàm thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, tiền tố, chiều dài) {
     nếu (mã tệp mở < 0) { trả về -1; };
-    biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, tiền tố);
-    nếu (chiều dài < 0) { trả về -1; };
+    biến tổng = thực thi các byte chiều dài(kho lưu trữ);
+    nếu (tiền tố < 0) { trả về -1; };
+    nếu (chiều dài <= 0) { trả về -1; };
+    nếu (tiền tố > tổng - 4) { trả về -1; };
+    nếu (chiều dài > tổng - tiền tố - 4) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, tiền tố) != chiều dài) { trả về -1; };
     biến ô nhớ = thực thi các byte ô nhớ(kho lưu trữ);
     nếu (ô nhớ < 0) { trả về -1; };
     trả về thực thi ghi tất cả(mã tệp mở, thực thi nội dung đệm(ô nhớ) + tiền tố + 4, chiều dài);
@@ -803,7 +991,7 @@ hàm thực thi bộ nhớ đệm phần đầu kiểm tra(khóa tra cứu, tệ
     biến dữ liệu đầu vào kích cỡ = máy đọc số nguyên ba mươi hai bit(3212);
     nếu (saved khóa tra cứu kích cỡ != khóa tra cứu kích cỡ) { trả về -1; };
     nếu (dữ liệu đầu vào kích cỡ < 0) { trả về -1; };
-    nếu (dữ liệu đầu vào kích cỡ > 1048576) { trả về -1; };
+    nếu (dữ liệu đầu vào kích cỡ > 2097152) { trả về -1; };
     nếu (tệp dữ liệu kích cỡ != 48 + saved khóa tra cứu kích cỡ + dữ liệu đầu vào kích cỡ) { trả về -1; };
     trả về dữ liệu đầu vào kích cỡ;
 };
@@ -877,7 +1065,7 @@ hàm thực thi tệp dữ liệu đóng(mã tài nguyên) {
 
 hàm thực thi đọc lần thử lại(mã tệp mở, độ lệch, chiều dài) {
     biến kết quả trả về = -1;
-    lặp (i = 0; i < 1; i = i) {
+    khi (đúng) {
         kết quả trả về = máy đọc(mã tệp mở, độ lệch, chiều dài);
         nếu (kết quả trả về >= 0) { thoát; };
         nếu (máy lỗi() != 4) { thoát; };
@@ -891,7 +1079,7 @@ hàm thực thi tệp dữ liệu đọc khối(mã tài nguyên, các byte) {
     nếu (tệp dữ liệu < 0) { trả về -1; };
     nếu (ô nhớ < 0) { trả về -1; };
     biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32);
-    biến số phần tử = 1048576 - chiều dài;
+    biến số phần tử = 2097152 - chiều dài;
     nếu (số phần tử > 4096) { số phần tử = 4096; };
     nếu (số phần tử <= 0) { trả về -1; };
     nếu (thực thi các byte dự trữ(các byte, số phần tử) != 0) { trả về -1; };
@@ -964,7 +1152,7 @@ hàm thực thi đọc i32() {
     máy ghi số nguyên ba mươi hai bit(8, 0);
     biến chiều dài = 0;
     biến overflow dòng = 0;
-    lặp (i = 0; i < 1; i = i) {
+    khi (đúng) {
         biến số phần tử = thực thi đọc lần thử lại(0, 3184, 1);
         nếu (số phần tử < 0) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
         nếu (số phần tử == 0) {
@@ -980,7 +1168,7 @@ hàm thực thi đọc i32() {
     };
     nếu (overflow dòng == 1) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
     biến con trỏ hiện tại = 0;
-    lặp (j = 0; con trỏ hiện tại < chiều dài; j++) {
+    khi (con trỏ hiện tại < chiều dài) {
         nếu (thực thi khoảng trắng(máy đọc byte(3104 + con trỏ hiện tại)) != 1) { thoát; };
         con trỏ hiện tại = con trỏ hiện tại + 1;
     };
@@ -993,7 +1181,7 @@ hàm thực thi đọc i32() {
     biến các chữ số = 0;
     biến giá trị đang xét = 0;
     biến đầu ra of khoảng = 0;
-    lặp (k = 0; con trỏ hiện tại < chiều dài; k++) {
+    khi (con trỏ hiện tại < chiều dài) {
         biến chữ số đang xét = máy đọc byte(3104 + con trỏ hiện tại) - 48;
         nếu (chữ số đang xét < 0) { thoát; };
         nếu (chữ số đang xét > 9) { thoát; };
@@ -1018,12 +1206,12 @@ hàm thực thi đọc i32() {
 
 
 // Cache/link state is in the metadata scratch page. OS pointers stay 64 bit:
-// linker argv at 67113984, 4096 pointers; offset table at 67146752;
-// copied NUL-terminated arguments begin at 67163136. The extra 1 MiB region
+// linker argv at 134222848, 4096 pointers; offset table at 134255616;
+// copied NUL-terminated arguments begin at 134272000. The extra 1 MiB region
 // is mapped by the machine primitive and is never issued as a byte handle.
 hàm thực thi liên kết các đối số đặt lại() {
     máy ghi số nguyên ba mươi hai bit(3800, 0);
-    máy ghi số nguyên ba mươi hai bit(3804, 67163136);
+    máy ghi số nguyên ba mươi hai bit(3804, 134272000);
     trả về 0;
 };
 
@@ -1036,10 +1224,10 @@ hàm thực thi liên kết các đối số đẩy(văn bản) {
     biến con trỏ hiện tại = máy đọc số nguyên ba mươi hai bit(3804);
     nếu (chỉ mục < 0) { trả về -1; };
     nếu (chỉ mục >= 4095) { trả về -1; };
-    nếu (con trỏ hiện tại < 67163136) { trả về -1; };
-    nếu (chiều dài >= 68162560 - con trỏ hiện tại) { trả về -1; };
-    nếu (máy gắn địa chỉ(67113984 + chỉ mục * 8, con trỏ hiện tại) != 0) { trả về -1; };
-    máy ghi số nguyên ba mươi hai bit(67146752 + chỉ mục * 4, con trỏ hiện tại);
+    nếu (con trỏ hiện tại < 134272000) { trả về -1; };
+    nếu (chiều dài >= 135271424 - con trỏ hiện tại) { trả về -1; };
+    nếu (máy gắn địa chỉ(134222848 + chỉ mục * 8, con trỏ hiện tại) != 0) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(134255616 + chỉ mục * 4, con trỏ hiện tại);
     lặp (i = 0; i < chiều dài; i++) {
         máy ghi byte(con trỏ hiện tại + i, thực thi các byte lấy(văn bản, i));
     };
@@ -1052,11 +1240,11 @@ hàm thực thi liên kết các đối số đẩy(văn bản) {
 hàm thực thi liên kết các đối số đồng bộ(chỉ mục, văn bản) {
     nếu (chỉ mục < 0) { trả về -1; };
     nếu (chỉ mục >= máy đọc số nguyên ba mươi hai bit(3800)) { trả về -1; };
-    biến con trỏ hiện tại = máy đọc số nguyên ba mươi hai bit(67146752 + chỉ mục * 4);
+    biến con trỏ hiện tại = máy đọc số nguyên ba mươi hai bit(134255616 + chỉ mục * 4);
     biến chiều dài = thực thi các byte chiều dài(văn bản);
     nếu (chiều dài <= 0) { trả về -1; };
     biến điểm kết thúc = máy đọc số nguyên ba mươi hai bit(3804);
-    nếu (con trỏ hiện tại < 67163136) { trả về -1; };
+    nếu (con trỏ hiện tại < 134272000) { trả về -1; };
     nếu (chiều dài >= điểm kết thúc - con trỏ hiện tại) { trả về -1; };
     lặp (i = 0; i < chiều dài; i++) {
         máy ghi byte(con trỏ hiện tại + i, thực thi các byte lấy(văn bản, i));
@@ -1075,7 +1263,7 @@ hàm thực thi liên kết các đối số hằng văn bản(văn bản) {
 hàm thực thi liên kết các đối số xóa liên kết(chỉ mục) {
     nếu (chỉ mục < 0) { trả về -1; };
     nếu (chỉ mục >= máy đọc số nguyên ba mươi hai bit(3800)) { trả về -1; };
-    trả về máy xóa(máy đọc số nguyên ba mươi hai bit(67146752 + chỉ mục * 4));
+    trả về máy xóa(máy đọc số nguyên ba mươi hai bit(134255616 + chỉ mục * 4));
 };
 
 hàm thực thi liên kết macho(đối tượng, kết xuất, nguồn đầu vào) {
@@ -1089,17 +1277,37 @@ hàm thực thi liên kết macho(đối tượng, kết xuất, nguồn đầu 
 // V++ owns every module, path, argv entry, descriptor and cleanup decision.
 // The fixed-size address array holds full-width 64-bit pointers; no i32
 // handle or offset is reinterpreted as a process pointer.
-hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+// mode 0 links an executable with runtime/ASM. Mode 1 merges only source
+// objects, preserving undefined runtime symbols for a later final link.
+// Mode 2 merges all objects including the V++ runtime, without platform ASM.
+hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, chế độ xuất) {
+    nếu (chế độ xuất < 0) { trả về -1; };
+    nếu (chế độ xuất > 2) { trả về -1; };
     nếu (kho lưu trữ == kết xuất) { trả về -1; };
     nếu (kho lưu trữ == nguồn đầu vào) { trả về -1; };
     nếu (kết xuất == nguồn đầu vào) { trả về -1; };
     nếu (thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    nếu (thực thi máy đích linux() == 1) {
+        biến bật native = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_ELF_LINK");
+        biến đã bật elf = 0;
+        nếu (bật native > 0) {
+            biến một = "1";
+            đã bật elf = thực thi các byte bằng nhau(bật native, một);
+            thực thi các byte giải phóng(một);
+            thực thi các byte giải phóng(bật native);
+        };
+        nếu (đã bật elf == 1) {
+            nếu (chế độ xuất == 0) { trả về thực thi liên kết elf bản địa(kho lưu trữ, kết xuất); };
+            trả về thực thi liên kết elf đối tượng bản địa(kho lưu trữ, kết xuất, chế độ xuất);
+        };
+    };
     biến bản tổng hợp = thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ);
-    nếu (bản tổng hợp < 2) { trả về -1; };
+    nếu (bản tổng hợp < 2) { trả về thực thi liên kết báo lỗi("V++ linker: invalid ELF/Mach-O object archive\n"); };
     biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
     biến các mô đun = máy chia số nguyên ba mươi hai bit(bản tổng hợp, 2);
     nếu (các mô đun < 1) { trả về -1; };
     nếu (các mô đun > 4086) { trả về -1; };
+    nếu (chế độ xuất == 1) { nếu (các mô đun < 2) { trả về -1; }; };
     thực thi liên kết các đối số đặt lại();
     biến tạm = thực thi các byte mới();
     nếu (tạm <= 0) { trả về -1; };
@@ -1109,21 +1317,106 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     biến mã tệp mở = -1;
     biến vị trí đang xét = 0;
     biến linux = thực thi máy đích linux();
+    biến linux host object = -1;
+    biến liên kết ld = 0;
+    biến liên kết ld macos = 0;
+    biến macos sdk = -1;
+    biến macos runtime object = -1;
+    nếu (linux == 1) {
+        nếu (chế độ xuất == 0) {
+            linux host object = thực thi môi trường thực thi tệp dữ liệu đường tệp(2);
+            nếu (linux host object > 0) { liên kết ld = 1; };
+        } hoặc {
+            // GNU ld -r can merge V++ relocatable ELF objects directly.
+            // No C compiler driver or host ASM input is needed here.
+            liên kết ld = 1;
+        };
+    };
+    nếu (linux != 1) {
+        // Opt in to Apple ld for both executables and relocatable objects.
+        // Only executable links need the SDK and platform runtime object.
+        biến tùy chọn = thực thi bộ nhớ đệm giá trị môi trường("VPP_MACOS_DIRECT_LD");
+        nếu (tùy chọn > 0) {
+            biến giá trị bật ld = "1";
+            nếu (thực thi các byte bằng nhau(tùy chọn, giá trị bật ld) == 1) {
+                liên kết ld macos = 1;
+            };
+            thực thi các byte giải phóng(giá trị bật ld);
+            thực thi các byte giải phóng(tùy chọn);
+        };
+        nếu (liên kết ld macos == 1 && chế độ xuất == 0) {
+            macos sdk = thực thi bộ nhớ đệm giá trị môi trường("VPP_MACOS_SDKROOT");
+            nếu (macos sdk <= 0) {
+                macos sdk = thực thi bộ nhớ đệm giá trị môi trường("SDKROOT");
+            };
+            nếu (macos sdk <= 0) {
+                trả về thực thi liên kết báo lỗi("V++ macOS ld: set VPP_MACOS_SDKROOT or SDKROOT\n");
+            };
+            macos runtime object = thực thi bộ nhớ đệm giá trị môi trường("VPP_MACOS_RUNTIME_OBJECT");
+            nếu (macos runtime object <= 0) {
+                thực thi các byte giải phóng(macos sdk);
+                trả về thực thi liên kết báo lỗi("V++ macOS ld: set VPP_MACOS_RUNTIME_OBJECT to assembled ARM64 Mach-O .o\n");
+            };
+        };
+    };
     biến đối tượng điểm bắt đầu = 0;
     nếu (linux == 1) {
-        nếu (thực thi liên kết các đối số hằng văn bản("cc") < 0) { mã trạng thái = -2; };
+        nếu (liên kết ld == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("ld") < 0) { mã trạng thái = -2; };
+        } hoặc {
+            nếu (thực thi liên kết các đối số hằng văn bản("cc") < 0) { mã trạng thái = -2; };
+        };
     } hoặc {
-        nếu (thực thi liên kết các đối số hằng văn bản("/usr/bin/clang") < 0) { mã trạng thái = -2; };
+        nếu (liên kết ld macos == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("/usr/bin/ld") < 0) { mã trạng thái = -2; };
+        } hoặc {
+            nếu (thực thi liên kết các đối số hằng văn bản("/usr/bin/clang") < 0) { mã trạng thái = -2; };
+        };
         nếu (mã trạng thái == -1) {
             nếu (thực thi liên kết các đối số hằng văn bản("-arch") < 0) { mã trạng thái = -2; };
         };
         nếu (mã trạng thái == -1) {
             nếu (thực thi liên kết các đối số hằng văn bản("arm64") < 0) { mã trạng thái = -2; };
         };
+        nếu (liên kết ld macos == 1 && chế độ xuất == 0) {
+            nếu (mã trạng thái == -1) {
+                nếu (thực thi liên kết các đối số hằng văn bản("-platform_version") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("macos") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("11.0") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("11.0") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("-syslibroot") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số đẩy(macos sdk) < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("-lSystem") < 0) { mã trạng thái = -2; };
+            };
+        };
     };
-    đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
     nếu (mã trạng thái == -1) {
-        lặp (i = 0; i < các mô đun; i++) {
+        nếu (chế độ xuất != 0) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-r") < 0) { mã trạng thái = -2; };
+        };
+    };
+    // Drop the final executable's static symbol table so temporary STT_FILE
+    // names cannot make self-hosted output nondeterministic. Relocatable
+    // module outputs retain their symbols for subsequent links.
+    nếu (mã trạng thái == -1 && chế độ xuất == 0 && linux == 1) {
+        nếu (liên kết ld == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("--strip-all") < 0) { mã trạng thái = -2; };
+        } hoặc {
+            nếu (thực thi liên kết các đối số hằng văn bản("-Wl,--strip-all") < 0) { mã trạng thái = -2; };
+        };
+    };
+    // Snapshot the first temporary object argument after optional linker
+    // flags; otherwise cleanup unlinks '-r' and leaks the last object.
+    đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
+    nếu (chế độ xuất == 1) {
+        biến runtime chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, 0);
+        nếu (runtime chiều dài <= 0) { mã trạng thái = -2; }
+        hoặc { vị trí đang xét = runtime chiều dài + 4; };
+    };
+    nếu (mã trạng thái == -1) {
+        biến đầu = 0;
+        nếu (chế độ xuất == 1) { đầu = 1; };
+        lặp (i = đầu; i < các mô đun; i++) {
             biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, vị trí đang xét);
             nếu (chiều dài < 0) { mã trạng thái = -2; thoát; };
             nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, i) != 0) { mã trạng thái = -2; thoát; };
@@ -1137,7 +1430,7 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
                 mã trạng thái = -2;
                 thoát;
             };
-            nếu (thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, vị trí đang xét) != chiều dài) {
+            nếu (thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, vị trí đang xét, chiều dài) != chiều dài) {
                 mã trạng thái = -2; thoát;
             };
             nếu (máy đóng(mã tệp mở) != 0) {
@@ -1150,23 +1443,50 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     nếu (mã trạng thái == -1) {
         nếu (vị trí đang xét != tổng số) { mã trạng thái = -2; };
     };
-    nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { mã trạng thái = -2; };
-    };
-    nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { mã trạng thái = -2; };
-    };
-    nếu (mã trạng thái == -1) {
-        biến primitive = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
-        nếu (primitive <= 0) { mã trạng thái = -2; }
-        hoặc {
-            nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
-            thực thi các byte giải phóng(primitive);
+    nếu (chế độ xuất == 0) {
+        // Linux AOT executables boot directly through the ASM _start and use
+        // raw syscalls. Keep the object-only modes relocatable for bootstrap.
+        // These flags remove crt1.o, libc, ld-linux and their implicit ABI.
+        nếu (mã trạng thái == -1) {
+            nếu (linux == 1) {
+                nếu (liên kết ld == 1) {
+                    nếu (thực thi liên kết các đối số hằng văn bản("-static") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-z") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("noexecstack") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("--build-id=none") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-e") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("_start") < 0) { mã trạng thái = -2; };
+                } hoặc {
+                    nếu (thực thi liên kết các đối số hằng văn bản("-nostdlib") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-static") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-no-pie") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-Wl,-z,noexecstack") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-Wl,--build-id=none") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_LINUX_HOST_NO_CRT=1") < 0) { mã trạng thái = -2; };
+                    nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_VM_F64_FREESTANDING=1") < 0) { mã trạng thái = -2; };
+                };
+            };
         };
-    };
-    nếu (mã trạng thái == -1) {
-        nếu (linux == 1) {
-            nếu (thực thi liên kết các đối số hằng văn bản("-lcrypto") < 0) { mã trạng thái = -2; };
+        nếu (mã trạng thái == -1) {
+            nếu (liên kết ld == 0 && liên kết ld macos == 0) {
+                nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { mã trạng thái = -2; };
+                nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { mã trạng thái = -2; };
+            };
+        };
+        nếu (mã trạng thái == -1) {
+            biến primitive = -1;
+            nếu (liên kết ld == 1) {
+                primitive = linux host object;
+                linux host object = -1;
+            } hoặc nếu (liên kết ld macos == 1) {
+                primitive = macos runtime object;
+                macos runtime object = -1;
+            } hoặc { primitive = thực thi môi trường thực thi tệp dữ liệu đường tệp(1); };
+            nếu (primitive <= 0) { mã trạng thái = -2; }
+            hoặc {
+                nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
+                thực thi các byte giải phóng(primitive);
+            };
         };
     };
     nếu (mã trạng thái == -1) {
@@ -1195,12 +1515,23 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     };
     nếu (mã trạng thái == -1) {
         biến số đối số dòng lệnh = máy đọc số nguyên ba mươi hai bit(3800);
-        máy ghi số nguyên ba mươi hai bit(67113984 + số đối số dòng lệnh * 8, 0);
-        máy ghi số nguyên ba mươi hai bit(67113984 + số đối số dòng lệnh * 8 + 4, 0);
+        máy ghi số nguyên ba mươi hai bit(134222848 + số đối số dòng lệnh * 8, 0);
+        máy ghi số nguyên ba mươi hai bit(134222848 + số đối số dòng lệnh * 8 + 4, 0);
         nếu (thực thi liên kết khởi chạy đợi() != 0) { mã trạng thái = -2; };
     };
     nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
+        nếu (chế độ xuất == 0) {
+            nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
+        } hoặc {
+            biến đường tệp ô nhớ = thực thi các byte ô nhớ(tạm);
+            nếu (đường tệp ô nhớ < 0) { mã trạng thái = -2; }
+            hoặc {
+                nếu (máy thông tin tệp(thực thi nội dung đệm(đường tệp ô nhớ), 3584) != 0) { mã trạng thái = -2; }
+                hoặc {
+                    nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { mã trạng thái = -2; };
+                };
+            };
+        };
     };
     nếu (mã trạng thái == -1) {
         nếu (thực thi liên kết công bố(tạm, kết xuất) != 0) { mã trạng thái = -2; };
@@ -1211,9 +1542,20 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     lặp (i = 0; i < đã tạo; i++) {
         thực thi liên kết các đối số xóa liên kết(đối tượng điểm bắt đầu + i);
     };
+    nếu (linux host object > 0) { thực thi các byte giải phóng(linux host object); };
+    nếu (macos sdk > 0) { thực thi các byte giải phóng(macos sdk); };
+    nếu (macos runtime object > 0) { thực thi các byte giải phóng(macos runtime object); };
     thực thi các byte giải phóng(tạm);
     nếu (mã trạng thái == 0) { trả về 0; };
     trả về -1;
+};
+
+hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    trả về thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, 0);
+};
+
+hàm thực thi liên kết đối tượng các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    trả về thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, 1);
 };
 
 // No C file streams or allocation are used by the content-addressed cache.
@@ -1330,7 +1672,7 @@ hàm thực thi bộ nhớ đệm đường tệp(khóa tra cứu) {
 
 hàm thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, độ lệch, chiều dài) {
     biến done = 0;
-    lặp (i = 0; done < chiều dài; i++) {
+    khi (done < chiều dài) {
         biến số phần tử = thực thi đọc lần thử lại(mã tệp mở, độ lệch + done, chiều dài - done);
         nếu (số phần tử <= 0) { trả về -1; };
         done = done + số phần tử;
@@ -1497,7 +1839,7 @@ hàm thực thi bộ nhớ đệm thêm cuối số(văn bản, giá trị đang
         số chia = số chia * 10;
     };
     biến dịch vụ tài nguyên = giá trị đang xét;
-    lặp (i = 0; số chia > 0; i++) {
+    khi (số chia > 0) {
         biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
         nếu (thực thi các byte thêm cuối(văn bản, chữ số đang xét + 48) != 0) { trả về -1; };
         dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;

@@ -16,10 +16,13 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/đối tượng.vi"
     "src/tests/nativecodegenharness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
+    # Modules are concatenated below, so strip their original import clauses.
+    string(REGEX REPLACE "(^|\n)[ \t]*nhập[^\n]*;[ \t]*(\n|$)" "\\1"
+        contents "${contents}")
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/native-codegen-input.vi"
-    "hàm chính() { biến x = -159; x /= -3; x %= 52; x += 51; nếu (!sai) { trả về x; }; trả về 1; };\n")
+    "hàm chính() { biến x = -159; x /= -3; x %= 52; x += 51; x &= 127; x |= 128; x ^= 128; x <<= 1; x >>= 1; x = ~~x; biến p = 1|2&4; x += p-1; nếu (!sai) { trả về x; }; trả về 1; };\n")
 file(REMOVE "${harness}")
 if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
     if (NOT EXISTS "${VPP_STAGE1}")

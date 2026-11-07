@@ -1,4 +1,4 @@
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.*;
 
 hàm cùng bits(a, b) {
     nếu (độ dài(a) != độ dài(b)) { trả về sai; };

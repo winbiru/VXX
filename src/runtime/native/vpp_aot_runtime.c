@@ -3,6 +3,11 @@
 // primitives provide these symbols. Leave the old implementation here for
 // bootstrap/fallback builds, but compile none of it into a V++ runtime binary.
 // This also retires the former hybrid C cache/link services on that path.
+#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+// Stage 0 compiles this file as strict C11. Request POSIX.1-2008 before
+// including libc headers so lstat, mkstemp, fdopen and readlink are declared.
+#define _POSIX_C_SOURCE 200809L
+#endif
 #if !defined(VPP_NATIVE_VPP_RUNTIME)
 #include <inttypes.h>
 #include <errno.h>
@@ -13,11 +18,18 @@
 #include <ctype.h>
 #include <string.h>
 #include <stddef.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#include <wchar.h>
+#else
 #include <fcntl.h>
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
 #include <crt_externs.h>
@@ -89,7 +101,7 @@ int32_t vpp_native_read_status(void) {
 // exposed through the current signed-i32 Machine IR ABI.
 #define VPP_NATIVE_BYTES_SLOTS 64
 #define VPP_NATIVE_FILE_SLOTS 64
-#define VPP_NATIVE_BYTES_MAX (1024u * 1024u)
+#define VPP_NATIVE_BYTES_MAX (2u * 1024u * 1024u)
 #define VPP_NATIVE_PATH_MAX 4096u
 #define VPP_NATIVE_IO_CHUNK 4096u
 
@@ -182,7 +194,7 @@ static vpp_native_file_slot *vpp_native_find_file(int32_t handle) {
 #endif
 
 // Reserve enough space for additional bytes plus a trailing NUL. Do not
-// mutate the buffer on allocation failure or exceed the fixed 1 MiB cap.
+// mutate the buffer on allocation failure or exceed the fixed 2 MiB cap.
 static int vpp_native_bytes_reserve(vpp_native_bytes_slot *slot, size_t additional) {
     if (!slot || additional > VPP_NATIVE_BYTES_MAX - slot->length) return -1;
 #ifdef VPP_NATIVE_VPP_RUNTIME
@@ -383,7 +395,17 @@ static int32_t vpp_native_file_open(int32_t path_handle, const char *mode) {
         if (slot->id != 0) continue;
         // A full handle table must not truncate/create a file.
         if (vpp_native_next_handle == INT32_MAX) return -1;
+#ifdef _WIN32
+        // Windows' narrow CRT uses the active code page, not UTF-8.
+        // Convert explicitly so Vietnamese paths survive the Stage 0 bridge.
+        wchar_t wide_path[VPP_NATIVE_PATH_MAX + 1];
+        int converted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            (const char *)path->data, -1, wide_path, VPP_NATIVE_PATH_MAX + 1);
+        if (converted == 0) return -1;
+        FILE *stream = _wfopen(wide_path, mode[0] == 'r' ? L"rb" : L"wb");
+#else
         FILE *stream = fopen((const char *)path->data, mode);
+#endif
         if (!stream) return -1;
         const int32_t id = vpp_native_allocate_handle();
         slot->id = id;
@@ -469,6 +491,12 @@ int32_t vpp_native_argc(void) {
     if (count >= 0 && last != 0) ++count;
     if (fclose(file) != 0) return -1;
     return count;
+#elif defined(_WIN32)
+    int count = 0;
+    wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (!args) return -1;
+    LocalFree(args);
+    return count;
 #else
     return -1;
 #endif
@@ -523,10 +551,51 @@ int32_t vpp_native_argv(int32_t index) {
         return -1;
     }
     return handle;
+#elif defined(_WIN32)
+    int count = 0;
+    wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (!args) return -1;
+    int32_t handle = -1;
+    if (index >= 0 && index < count) {
+        int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+            args[index], -1, NULL, 0, NULL, NULL);
+        if (length > 0 && (size_t)(length - 1) <= VPP_NATIVE_BYTES_MAX) {
+            handle = vpp_native_bytes_new();
+            vpp_native_bytes_slot *slot = vpp_native_find_bytes(handle);
+            if (!slot || vpp_native_bytes_reserve(slot, (size_t)(length - 1)) != 0 ||
+                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, args[index], -1,
+                    (char *)slot->data, length, NULL, NULL) != length) {
+                if (handle > 0) vpp_native_bytes_free(handle);
+                handle = -1;
+            } else {
+                slot->length = (size_t)(length - 1);
+            }
+        }
+    }
+    LocalFree(args);
+    return handle;
 #else
     (void)index;
     return -1;
 #endif
+}
+
+// Stage 0 uses the owned argv byte handle above. Keep raw OS pointers behind
+// this i32 ABI so the same callers work when Stage 1 switches to ASM.
+int32_t vpp_native_os_argument_length(int32_t index) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t length = vpp_native_bytes_length(handle);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return length;
+}
+
+int32_t vpp_native_os_argument_byte(int32_t index, int32_t offset) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t value = vpp_native_bytes_get(handle, offset);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return value;
 }
 #endif
 
@@ -544,6 +613,12 @@ static void vpp_native_cache_report(void) {
     if (stats && strcmp(stats, "1") == 0)
         fprintf(stderr, "native cache: hits=%lu misses=%lu writes=%lu\n",
                 vpp_cache_hits, vpp_cache_misses, vpp_cache_writes);
+}
+
+// Điểm vào C dùng bởi primitive ASM đăng ký atexit ở Stage 0. Runtime V++
+// tự host cung cấp cùng ABI này từ mã V++, còn bootstrap C chỉ chuyển tiếp.
+void vpp_native_cache_report_entry(void) {
+    vpp_native_cache_report();
 }
 
 static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
@@ -604,6 +679,13 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
     int length = snprintf(path, capacity, "%s/%s.cache", directory, hex);
     return length >= 0 && (size_t)length < capacity ? 0 : -1;
 }
+#endif
+
+#ifdef _WIN32
+// The legacy cache is advisory and disabled on Windows until the same atomic
+// cache implementation is available there. The machine boundary registers
+// this callback through atexit even when cache reads/writes are disabled.
+void vpp_native_cache_report_entry(void) {}
 #endif
 
 // 1 = hit, 0 = miss/disabled/unavailable, -1 = invalid handles. A miss leaves
@@ -736,7 +818,7 @@ static int vpp_native_runtime_file(const char *relative, char *target, size_t ca
     // V++ resolves only the trusted runtime paths. C retains the final OS
     // regular-file check before passing a discovered path to clang.
     int32_t kind = -1;
-    if (strcmp(relative, "scripts/ASM/vpp_aot_primitives_aarch64.S") == 0)
+    if (strcmp(relative, "scripts/ASM/macos/vpp_aot_primitives_aarch64.S") == 0)
         kind = 1;
     else if (strcmp(relative, "src/runtime/native/vpp_aot_runtime.c") == 0)
         kind = 2;
@@ -780,23 +862,66 @@ static int vpp_native_runtime_file(const char *relative, char *target, size_t ca
         }
     }
 #endif
+#elif defined(_WIN32)
+    // Runtime discovery must accept Unicode checkout paths and Windows drive
+    // roots. Find files under VPP_HOME, then the current directory's parents.
+    wchar_t wide_relative[VPP_NATIVE_PATH_MAX + 1];
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, relative, -1,
+            wide_relative, VPP_NATIVE_PATH_MAX + 1)) return -1;
+    wchar_t directory[VPP_NATIVE_PATH_MAX + 1];
+    DWORD size = GetEnvironmentVariableW(L"VPP_HOME", directory,
+                                         VPP_NATIVE_PATH_MAX + 1);
+    if (size > 0 && size <= VPP_NATIVE_PATH_MAX) {
+        wchar_t path[VPP_NATIVE_PATH_MAX + 1];
+        int written = swprintf(path, VPP_NATIVE_PATH_MAX + 1, L"%ls\\%ls",
+                               directory, wide_relative);
+        if (written > 0 && (size_t)written <= VPP_NATIVE_PATH_MAX) {
+            DWORD attrs = GetFileAttributesW(path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                int converted = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                    path, -1, target, (int)capacity, NULL, NULL);
+                return converted > 0 ? 0 : -1;
+            }
+        }
+    }
+    size = GetCurrentDirectoryW(VPP_NATIVE_PATH_MAX + 1, directory);
+    if (size == 0 || size > VPP_NATIVE_PATH_MAX) return -1;
+    for (;;) {
+        wchar_t path[VPP_NATIVE_PATH_MAX + 1];
+        int written = swprintf(path, VPP_NATIVE_PATH_MAX + 1, L"%ls\\%ls",
+                               directory, wide_relative);
+        if (written > 0 && (size_t)written <= VPP_NATIVE_PATH_MAX) {
+            DWORD attrs = GetFileAttributesW(path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                int converted = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                    path, -1, target, (int)capacity, NULL, NULL);
+                return converted > 0 ? 0 : -1;
+            }
+        }
+        wchar_t *slash = wcsrchr(directory, L'\\');
+        if (!slash || slash == directory ||
+            (slash == directory + 2 && directory[1] == L':')) break;
+        *slash = L'\0';
+    }
 #else
     (void)relative; (void)target; (void)capacity;
 #endif
     return -1;
 }
 
+#if defined(__APPLE__) || defined(__linux__)
 static int vpp_native_runtime_source(char *target, size_t capacity) {
     return vpp_native_runtime_file("src/runtime/native/vpp_aot_runtime.c", target, capacity);
 }
+#endif
 
 #ifndef VPP_NATIVE_VPP_RUNTIME
 int32_t vpp_native_runtime_module_path(void) {
     char path[VPP_NATIVE_PATH_MAX + 1];
-    // The C/POSIX runtime supplies every native ABI symbol on both Linux and
-    // bootstrap macOS. Loading runtime.vi here would duplicate the runtime
+    // The C bootstrap and machine object supply every native ABI symbol.
+    // Loading the full V++ runtime here would duplicate the runtime
     // and introduce unresolved máy_* assembly primitive references.
-    const char *module = "gói/biên dịch/native/runtime_c.vi";
+    const char *module = "gói/biên dịch/bản địa/môi trường thực thi c.vi";
     if (vpp_native_runtime_file(module, path, sizeof path) != 0)
         return -1;
     const size_t length = strlen(path);
@@ -1079,7 +1204,7 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
         position += length;
     }
 #ifdef VPP_NATIVE_VPP_RUNTIME
-    if (vpp_native_runtime_file("scripts/ASM/vpp_aot_primitives_aarch64.S",
+    if (vpp_native_runtime_file("scripts/ASM/macos/vpp_aot_primitives_aarch64.S",
                                 primitive_path, sizeof primitive_path) != 0)
         goto cleanup_modules;
     if (needs_services && vpp_native_runtime_source(runtime_path, sizeof runtime_path) != 0)

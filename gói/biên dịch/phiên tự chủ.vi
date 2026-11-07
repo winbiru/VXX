@@ -1,10 +1,10 @@
 // Một nguồn, nhiều truy vấn; mỗi pass chỉ chạy khi cần kết quả của nó.
 // Không gọi compiler snapshot C++; lexer/parser/IR/emitter đều là V++.
-nhập gói/biên dịch/từ vựng;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/phát mã;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.biên dịch.chương trình.Bộ Phân Tích Cú Pháp;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian từ IR thuần;
 
 lớp công khai Bộ Biên Dịch Tự Chủ {
     hàm công khai khởi tạo(mã nguồn) { mình.làm mới(mã nguồn); };

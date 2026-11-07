@@ -1,0 +1,4 @@
+hàm chính() {
+    không_gọi_được = [];
+    không_gọi_được();
+};

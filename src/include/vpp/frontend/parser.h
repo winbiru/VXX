@@ -60,7 +60,7 @@ private:
     void attachInterfaceForm(AstStatement &statement);
     // Nhận diện cấu trúc `nếu`/`hoặc` và gắn dạng điều kiện vào AST; lowering dựa vào metadata này để phát control flow trực tiếp.
     void attachConditionalForm(AstStatement &statement);
-    // Nhận diện header vòng `lặp` và gắn ba biểu thức init/condition/update cùng dạng vòng lặp vào AST.
+    // Nhận diện header vòng `lặp` hoặc `khi` và gắn dạng vòng lặp vào AST.
     void attachLoopForm(AstStatement &statement);
     // Nhận diện cặp `thử`/`bắt lỗi`, lấy biến catch và gắn hai block con vào metadata AST để semantic tạo catch scope.
     void attachTryForm(AstStatement &statement);

@@ -1,7 +1,7 @@
 // No fixed TZ assumption: verify the Win32 CRT adapter and V++ civil clock
 // logic for known epochs independently of the host timezone.
 nhập thời gian;
-nhập gói/thời gian/địa phương;
+nhập gói.thời gian.địa phương.*;
 
 hàm chính() {
     epoch = [0, 0, 0, 0, 0, 0, 0, 0];

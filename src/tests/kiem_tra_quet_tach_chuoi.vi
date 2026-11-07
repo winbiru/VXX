@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     s = bộ quét("  alpha 42 ff 3.5 nope");

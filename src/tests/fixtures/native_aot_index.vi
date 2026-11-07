@@ -1,0 +1,47 @@
+// Cùng một hàm được gọi với kiểu động, chỉ số và độ dài UTF-8 khác nhau.
+hàm bằng(nguồn, chỉ số, mẫu) { trả về nguồn[chỉ số] == mẫu; };
+hàm khác(nguồn, chỉ số, mẫu) { trả về nguồn[chỉ số] != mẫu; };
+hàm ký tự(nguồn, chỉ số) { trả về nguồn[chỉ số] == "🌿"; };
+hàm đầu(nguồn) { trả về nguồn[0] != "á"; };
+hàm cộng phần tử(tổng, nguồn, chỉ số) { tổng = tổng + nguồn[chỉ số]; trả về tổng; };
+hàm lọc cộng(nguồn) {
+    tổng = 0;
+    lặp(i = 0; i < 4; i++) { nếu (nguồn[i] % 2 == 0) { tổng += nguồn[i]; }; };
+    trả về tổng;
+};
+hàm tạo cộng(gốc) {
+    kết quả = [];
+    lặp(i = 0; i < 4; i++) { máy ảo thêm cuối danh sách(kết quả, gốc + i); };
+    trả về kết quả[0] + kết quả[1] + kết quả[2] + kết quả[3];
+};
+hàm tạo lọc tổng(gốc) {
+    kết quả = [];
+    lặp(i = 0; i < 4; i++) { máy ảo thêm cuối danh sách(kết quả, gốc + i); };
+    tổng = 0;
+    lặp(i = 0; i < 4; i++) { nếu (kết quả[i] % 2 == 0) { tổng += kết quả[i]; }; };
+    trả về tổng;
+};
+hàm chính() {
+    in bằng("aáệ🌿z", 0, "a");
+    in bằng("aáệ🌿z", 1, "á");
+    in bằng("aáệ🌿z", 2, "ệ");
+    in ký tự("aáệ🌿z", 3);
+    in khác("aáệ🌿z", 4, "🌿");
+    in khác("á", 0, "áá");
+    in khác("á", 0, 1);
+    in đầu("x");
+    in bằng([1, 2.5, "á"], 1, 2.5);
+    in bằng({"1": "á"}, 1, "á");
+    in bằng({"mã": "á"}, "mã", "á");
+    dài = "";
+    lặp(i = 0; i < 1100; i++) { dài += "á🌿"; };
+    in bằng(dài, 0, "á") && bằng(dài, 63, "🌿") && bằng(dài, 64, "á");
+    in bằng(dài, 2199, "🌿");
+    in bằng("Việt Nam 🌿 Việt Nam 🌿 Việt Nam 🌿 Việt Nam 🌿", 9, "🌿");
+    in cộng phần tử(5000, [7], 0) == 5007;
+    in cộng phần tử(1.5, [2.5], 0) == 4.0;
+    in cộng phần tử("a", {"0": "á"}, 0) == "aá";
+    in lọc cộng([1, 2, 3, 4]) == 6;
+    in tạo cộng(10) == 46;
+    in tạo lọc tổng(10) == 22;
+};

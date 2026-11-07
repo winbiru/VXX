@@ -1,9 +1,9 @@
 // Legacy API-project adapter. It is intentionally excluded from gói/ứng dụng/chính.vi
 // because its routes, users schema, and JSON contracts are project-specific.
 
-nhập gói/mạng/chính;
-nhập gói/dữ liệu/chính;
-nhập gói/nhập xuất/chính;
+nhập gói.mạng.chính.*;
+nhập gói.dữ liệu.chính.*;
+nhập gói.nhập xuất.chính.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Cầu Nối API {

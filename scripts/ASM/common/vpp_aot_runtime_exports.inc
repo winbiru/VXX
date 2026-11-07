@@ -1,0 +1,149 @@
+// Bổ sung ABI giá trị bản địa vào ranh giới nền tảng hiện có.
+#if defined(VPP_NATIVE_DYNAMIC_RUNTIME) && VPP_NATIVE_DYNAMIC_RUNTIME
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_integer), AOT_PUBLIC(vpp_aot_integer)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_string), AOT_PUBLIC(vpp_aot_string)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_floating), AOT_PUBLIC(vpp_aot_floating)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_null), AOT_PUBLIC(vpp_aot_null)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_load), AOT_PUBLIC(vpp_aot_load)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_load_inline), AOT_PUBLIC(vpp_aot_load_inline)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_is_i32), AOT_PUBLIC(vpp_aot_is_i32)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_read_i32), AOT_PUBLIC(vpp_aot_read_i32)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_initialize), AOT_PUBLIC(vpp_aot_initialize)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_assign), AOT_PUBLIC(vpp_aot_assign)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_assign_slot), AOT_PUBLIC(vpp_aot_assign_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_copy_slot), AOT_PUBLIC(vpp_aot_copy_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_update), AOT_PUBLIC(vpp_aot_index_update)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_store_integer), AOT_PUBLIC(vpp_aot_store_integer)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_parameter), AOT_PUBLIC(vpp_aot_parameter)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_increment), AOT_PUBLIC(vpp_aot_increment)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_increment_slot), AOT_PUBLIC(vpp_aot_increment_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_update_integer_slot), AOT_PUBLIC(vpp_aot_update_integer_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_update_numeric_slots), AOT_PUBLIC(vpp_aot_update_numeric_slots)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_slot), AOT_PUBLIC(vpp_aot_compare_integer_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_range), AOT_PUBLIC(vpp_aot_compare_integer_range)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_outside_range), AOT_PUBLIC(vpp_aot_compare_integer_outside_range)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_or_range), AOT_PUBLIC(vpp_aot_compare_integer_or_range)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_set), AOT_PUBLIC(vpp_aot_compare_integer_set)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_integer_or_and), AOT_PUBLIC(vpp_aot_compare_integer_or_and)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_numeric_slots), AOT_PUBLIC(vpp_aot_compare_numeric_slots)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_compare_numeric_slots_and), AOT_PUBLIC(vpp_aot_compare_numeric_slots_and)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_not_slot_and), AOT_PUBLIC(vpp_aot_not_slot_and)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_counted_scalar_loop), AOT_PUBLIC(vpp_aot_counted_scalar_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_counted_scalar_loop_tail), AOT_PUBLIC(vpp_aot_counted_scalar_loop_tail)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_simple_scalar_loop), AOT_PUBLIC(vpp_aot_simple_scalar_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_simple_scalar_loop_tail), AOT_PUBLIC(vpp_aot_simple_scalar_loop_tail)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_numeric_add_loop), AOT_PUBLIC(vpp_aot_numeric_add_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_numeric_add_loop_tail), AOT_PUBLIC(vpp_aot_numeric_add_loop_tail)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_list_append_i32_loop), AOT_PUBLIC(vpp_aot_list_append_i32_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_list_mod_sum_loop), AOT_PUBLIC(vpp_aot_list_mod_sum_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_range_mod_sum_i32_loop), AOT_PUBLIC(vpp_aot_range_mod_sum_i32_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_indirect_i32_fold_loop), AOT_PUBLIC(vpp_aot_indirect_i32_fold_loop)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_binary), AOT_PUBLIC(vpp_aot_binary)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_negate), AOT_PUBLIC(vpp_aot_negate)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_list), AOT_PUBLIC(vpp_aot_list)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_map), AOT_PUBLIC(vpp_aot_map)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index), AOT_PUBLIC(vpp_aot_index)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_slot), AOT_PUBLIC(vpp_aot_index_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_compare_integer), AOT_PUBLIC(vpp_aot_index_compare_integer)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_compare_integer_outside_range), AOT_PUBLIC(vpp_aot_index_compare_integer_outside_range)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_compare_integer_pair), AOT_PUBLIC(vpp_aot_index_compare_integer_pair)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_store_slot), AOT_PUBLIC(vpp_aot_index_store_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_store_integer_op), AOT_PUBLIC(vpp_aot_index_store_integer_op)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_mod_equal), AOT_PUBLIC(vpp_aot_index_mod_equal)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_mod_add_if_equal), AOT_PUBLIC(vpp_aot_index_mod_add_if_equal)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_string_slot), AOT_PUBLIC(vpp_aot_index_string_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_index_equal), AOT_PUBLIC(vpp_aot_index_equal)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_set_index), AOT_PUBLIC(vpp_aot_set_index)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_call), AOT_PUBLIC(vpp_aot_call)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_call_small), AOT_PUBLIC(vpp_aot_call_small)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_call_quad), AOT_PUBLIC(vpp_aot_call_quad)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_method_direct_small), AOT_PUBLIC(vpp_aot_method_direct_small)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_indirect), AOT_PUBLIC(vpp_aot_indirect)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_indirect_slot), AOT_PUBLIC(vpp_aot_indirect_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_callee_id), AOT_PUBLIC(vpp_aot_callee_id)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_callee_slot_id), AOT_PUBLIC(vpp_aot_callee_slot_id)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_method_id), AOT_PUBLIC(vpp_aot_method_id)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_fast_args), AOT_PUBLIC(vpp_aot_fast_args)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_fast_arg), AOT_PUBLIC(vpp_aot_fast_arg)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_ascii_index_arg), AOT_PUBLIC(vpp_aot_ascii_index_arg)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_method_top_id), AOT_PUBLIC(vpp_aot_method_top_id)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_fast_receiver_result), AOT_PUBLIC(vpp_aot_fast_receiver_result)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_fast_result), AOT_PUBLIC(vpp_aot_fast_result)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_fast_result_slot), AOT_PUBLIC(vpp_aot_fast_result_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_closure), AOT_PUBLIC(vpp_aot_closure)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_define_class), AOT_PUBLIC(vpp_aot_define_class)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_define_method), AOT_PUBLIC(vpp_aot_define_method)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_construct), AOT_PUBLIC(vpp_aot_construct)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_property), AOT_PUBLIC(vpp_aot_property)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_method), AOT_PUBLIC(vpp_aot_method)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_print), AOT_PUBLIC(vpp_aot_print)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_return_value), AOT_PUBLIC(vpp_aot_return_value)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_return_slot), AOT_PUBLIC(vpp_aot_return_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_return_integer), AOT_PUBLIC(vpp_aot_return_integer)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_return_negated_slot), AOT_PUBLIC(vpp_aot_return_negated_slot)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_list_append_add), AOT_PUBLIC(vpp_aot_list_append_add)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_intrinsic), AOT_PUBLIC(vpp_aot_intrinsic)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_native_core), AOT_PUBLIC(vpp_aot_native_core)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_foreign), AOT_PUBLIC(vpp_aot_foreign)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_switch_begin), AOT_PUBLIC(vpp_aot_switch_begin)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_switch_end), AOT_PUBLIC(vpp_aot_switch_end)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_throw_value), AOT_PUBLIC(vpp_aot_throw_value)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_try_begin), AOT_PUBLIC(vpp_aot_try_begin)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_try_end), AOT_PUBLIC(vpp_aot_try_end)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_catch_value), AOT_PUBLIC(vpp_aot_catch_value)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_safepoint), AOT_PUBLIC(vpp_aot_safepoint)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_condition), AOT_PUBLIC(vpp_aot_condition)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_case), AOT_PUBLIC(vpp_aot_case)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_default), AOT_PUBLIC(vpp_aot_default)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_failed), AOT_PUBLIC(vpp_aot_failed)
+DYNAMIC_EXPORT AOT_PUBLIC(vpp_native_dynamic_handle_error), AOT_PUBLIC(vpp_aot_handle_error)
+#else
+RT_EXPORT PUBLIC(vpp_native_bytes_new), RT_TARGET(rt_bytes_new), 0
+RT_EXPORT PUBLIC(vpp_native_bytes_length), RT_TARGET(rt_bytes_length), 1
+RT_EXPORT PUBLIC(vpp_native_bytes_get), RT_TARGET(rt_bytes_get), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_append), RT_TARGET(rt_bytes_append), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_concat), RT_TARGET(rt_bytes_concat), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_equal), RT_TARGET(rt_bytes_equal), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_slice), RT_TARGET(rt_bytes_slice), 3
+RT_EXPORT PUBLIC(vpp_native_bytes_find), RT_TARGET(rt_bytes_find), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_clear), RT_TARGET(rt_bytes_clear), 1
+RT_EXPORT PUBLIC(vpp_native_bytes_print), RT_TARGET(rt_bytes_print), 1
+RT_EXPORT PUBLIC(vpp_native_bytes_push_i32), RT_TARGET(rt_bytes_push_i32), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_load_i32), RT_TARGET(rt_bytes_load_i32), 2
+RT_EXPORT PUBLIC(vpp_native_bytes_store_i32), RT_TARGET(rt_bytes_store_i32), 3
+RT_EXPORT PUBLIC(vpp_native_bytes_free), RT_TARGET(rt_bytes_free), 1
+RT_EXPORT PUBLIC(vpp_native_bytes_reserve_extra), RT_TARGET(rt_bytes_reserve), 2
+RT_EXPORT PUBLIC(vpp_native_argv), RT_TARGET(rt_argv), 1
+RT_EXPORT PUBLIC(vpp_native_file_open_read), RT_TARGET(rt_file_open_read), 1
+RT_EXPORT PUBLIC(vpp_native_file_open_write), RT_TARGET(rt_file_open_write), 1
+RT_EXPORT PUBLIC(vpp_native_file_read_block), RT_TARGET(rt_file_read_block), 2
+RT_EXPORT PUBLIC(vpp_native_file_write_block), RT_TARGET(rt_file_write_block), 2
+RT_EXPORT PUBLIC(vpp_native_file_read_byte), RT_TARGET(rt_file_read_byte), 1
+RT_EXPORT PUBLIC(vpp_native_file_write_byte), RT_TARGET(rt_file_write_byte), 2
+RT_EXPORT PUBLIC(vpp_native_file_close), RT_TARGET(rt_file_close), 1
+RT_EXPORT PUBLIC(vpp_native_print_i32), RT_TARGET(rt_print_i32), 1
+RT_EXPORT PUBLIC(vpp_native_read_i32), RT_TARGET(rt_read_i32), 0
+RT_EXPORT PUBLIC(vpp_native_read_status), RT_TARGET(rt_read_status), 0
+RT_EXPORT PUBLIC(vpp_native_runtime_module_path), RT_TARGET(rt_runtime_module_path), 0
+RT_EXPORT PUBLIC(vpp_native_runtime_file_path), RT_TARGET(rt_runtime_file_path), 1
+RT_EXPORT PUBLIC(vpp_native_object_services), RT_TARGET(rt_object_services), 3
+RT_EXPORT PUBLIC(vpp_native_object_archive_entry), RT_TARGET(rt_object_archive_entry), 2
+RT_EXPORT PUBLIC(vpp_native_object_archive_summary), RT_TARGET(rt_object_archive_summary), 1
+RT_EXPORT PUBLIC(vpp_native_link_archive_single), RT_TARGET(rt_link_archive_single), 1
+RT_EXPORT PUBLIC(vpp_native_link_validate_paths), RT_TARGET(rt_link_validate_paths), 2
+RT_EXPORT PUBLIC(vpp_native_link_temporary_path), RT_TARGET(rt_link_temporary_path), 3
+RT_EXPORT PUBLIC(vpp_native_link_temp_open), RT_TARGET(rt_link_temp_open), 1
+RT_EXPORT PUBLIC(vpp_native_link_publish), RT_TARGET(rt_link_publish), 2
+RT_EXPORT PUBLIC(vpp_native_link_spawn_wait), RT_TARGET(rt_link_spawn_wait), 0
+RT_EXPORT PUBLIC(vpp_native_link_validate_files), RT_TARGET(rt_link_validate_files), 2
+RT_EXPORT PUBLIC(vpp_native_link_executable_ready), RT_TARGET(rt_link_executable_ready), 1
+RT_EXPORT PUBLIC(vpp_native_link_write_object), RT_TARGET(rt_link_write_object), 3
+RT_EXPORT PUBLIC(vpp_native_cache_header_write), RT_TARGET(rt_cache_header_write), 2
+RT_EXPORT PUBLIC(vpp_native_cache_header_check), RT_TARGET(rt_cache_header_check), 2
+RT_EXPORT PUBLIC(vpp_native_cache_digest_hex), RT_TARGET(rt_cache_digest_hex), 0
+RT_EXPORT PUBLIC(vpp_native_cache_read), RT_TARGET(rt_cache_read), 2
+RT_EXPORT PUBLIC(vpp_native_cache_write), RT_TARGET(rt_cache_write), 2
+RT_EXPORT PUBLIC(vpp_native_link_macho), RT_TARGET(rt_link_macho), 3
+RT_EXPORT PUBLIC(vpp_native_link_macho_modules), RT_TARGET(rt_link_macho_modules), 3
+RT_EXPORT PUBLIC(vpp_native_cache_report_entry), RT_TARGET(rt_cache_report), 0
+#endif

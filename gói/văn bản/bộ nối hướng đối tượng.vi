@@ -1,5 +1,6 @@
 // Đối tượng nối chuỗi có trạng thái; dùng lại cùng logic với API hàm.
-nhập gói/văn bản/bộ nối chuỗi;
+nhập gói.văn bản.bộ nối chuỗi.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 lớp công khai Bộ Nối Văn Bản {
     hàm công khai khởi tạo(phân cách, tiền tố = "", hậu tố = "", giá trị rỗng = rỗng) {

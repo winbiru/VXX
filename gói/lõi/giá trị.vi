@@ -2,9 +2,11 @@
 // Các helper tương ứng nhóm java.util.Objects nhưng giữ semantics V++:
 // rỗng là null, collection/object mutable dùng equality/hash theo identity.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/toán học;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
 
 hàm công khai bằng giá trị(a, b) {
     trả về a == b;

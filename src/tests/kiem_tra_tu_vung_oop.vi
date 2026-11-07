@@ -1,6 +1,6 @@
 // Cache theo nguồn, tách trạng thái instance và tương thích API lexer cũ.
-nhập gói/biên dịch/từ vựng;
-nhập gói/kiểm thử/khẳng định;
+nhập gói.biên dịch.từ vựng.*;
+nhập gói.kiểm thử.khẳng định.*;
 
 hàm so từ tố từ vựng(a, b) {
     khẳng định bằng(độ dài(a), độ dài(b));

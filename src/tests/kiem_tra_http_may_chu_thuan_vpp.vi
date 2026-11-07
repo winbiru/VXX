@@ -1,6 +1,6 @@
-nhập gói/mạng/http/máy khách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
+nhập gói.mạng.http.máy khách.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.văn bản.chuỗi.*;
 
 hàm chính() {
     request = mạng http phân tích phần đầu yêu cầu(

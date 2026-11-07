@@ -17,7 +17,7 @@ endif()
 execute_process(COMMAND "${executable}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
-if (NOT status EQUAL 0 OR NOT output STREQUAL "1048576\n90\n")
+if (NOT status EQUAL 0 OR NOT output STREQUAL "2097152\n90\n")
     message(FATAL_ERROR "native byte-range execution failed: ${status}\n${errors}\n${output}")
 endif()
 file(READ "${VPP_OUTPUT_DIR}/native-slice-cap.bin" content HEX)
@@ -51,4 +51,4 @@ foreach(name IN ITEMS "byte cắt" "byte tìm" "byte làm rỗng"
         message(FATAL_ERROR "native byte-range symbol ${name} must be reserved: ${status}\n${errors}")
     endif()
 endforeach()
-message(STATUS "V++ native byte slices, search, reset and 1 MiB boundary: PASS")
+message(STATUS "V++ native byte slices, search, reset and 2 MiB boundary: PASS")

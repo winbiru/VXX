@@ -1,10 +1,11 @@
 // Bộ nhớ đệm DNS dương thuần V++; TTL tính theo đồng hồ đơn điệu.
 // Mỗi instance sở hữu bộ nhớ riêng. Không cache NXDOMAIN/NODATA khi chưa
 // phân tích SOA negative TTL theo RFC 2308.
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/toán học;
-nhập gói/thời gian/đơn điệu;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 lớp công khai Bộ Nhớ Đệm DNS {
     hàm công khai khởi tạo(mức trần = 64) {
@@ -26,7 +27,7 @@ lớp công khai Bộ Nhớ Đệm DNS {
     hàm công khai phân giải tên miền đọc(khóa) {
         bây giờ = thời gian đơn điệu mili giây();
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+        khi (i < máy ảo lấy độ dài(mình.mục)) {
             mục = mình.mục[i];
             nếu (mục[1] <= bây giờ) {
                 máy ảo xóa vị trí danh sách(mình.mục, i);
@@ -48,7 +49,7 @@ lớp công khai Bộ Nhớ Đệm DNS {
         nếu (máy ảo lấy độ dài(địa chỉ) == 0 || thời gian tồn tại <= 0) { trả về sai; };
         bây giờ = thời gian đơn điệu mili giây();
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+        khi (i < máy ảo lấy độ dài(mình.mục)) {
             mục = mình.mục[i];
             nếu (mục[1] <= bây giờ || mục[0] == khóa) {
                 máy ảo xóa vị trí danh sách(mình.mục, i);

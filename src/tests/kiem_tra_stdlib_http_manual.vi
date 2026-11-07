@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     // Manual test: phụ thuộc kết nối mạng và TLS hệ thống.
