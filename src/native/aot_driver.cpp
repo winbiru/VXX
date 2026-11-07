@@ -271,15 +271,18 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
             }
         }
     }
-    std::vector<std::string> configure={"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string()};
+    const auto cmakePath = [](const fs::path &path) {
+        return path.generic_u8string();
+    };
+    std::vector<std::string> configure={"cmake","-S",cmakePath(root/"scripts/quality/native_aot_link"),"-B",cmakePath(temporary.path/"build")};
 #if !defined(_WIN32)
     // Unix CI uses single-configuration generators. Visual Studio ignores
     // CMAKE_BUILD_TYPE and warns about it for each nested native link.
     configure.push_back("-DCMAKE_BUILD_TYPE=Release");
 #endif
-    configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+root.u8string(),
-        "-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),
-        "-DVPP_AOT_OUTPUT="+executable.u8string()});
+    configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+cmakePath(root),
+        "-DVPP_AOT_LIB_ROOT="+cmakePath(libraries),"-DVPP_AOT_SOURCE="+cmakePath(source),
+        "-DVPP_AOT_OUTPUT="+cmakePath(executable)});
 #if defined(VPP_AOT_LINK_LEGACY_LIBFFI) && VPP_AOT_LINK_LEGACY_LIBFFI
     configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=ON");
 #else
