@@ -6,7 +6,11 @@ vpp_native_os_spawn_clang:
     mov w10, #0x1400
     movk w10, #0x400, lsl #16
     cmp w0, w10
+    b.eq Lclang_argv_offset_valid
+    movk w10, #0x800, lsl #16
+    cmp w0, w10
     b.ne Lbo_nho_loi
+Lclang_argv_offset_valid:
     add x4, x9, w0, uxtw
     ldr x10, [x4]
     cbz x10, Lbo_nho_loi
@@ -36,4 +40,3 @@ vpp_native_os_waitpid:
     mov w2, #0
     bl waitpid
     TRA_BO_NHO
-

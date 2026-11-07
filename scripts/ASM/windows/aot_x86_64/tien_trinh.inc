@@ -2,13 +2,16 @@
 
 // V++ quản lý một tiến trình con với PID quy ước là 1. _wspawnvp tìm PATH và tạo dòng lệnh Unicode
 // từ argv UTF-16; _cwait nhận mã thoát rồi đổi sang trạng thái đợi POSIX. Bảng argv gồm 4096 con trỏ
-// tại độ lệch 0x04001400.
+// tại độ lệch 0x04001400 hoặc 0x08001400.
 .globl vpp_native_os_spawn_clang
 vpp_native_os_spawn_clang:
     VAO_BO_NHO
     subq $64, %rsp           // Biến cục bộ bổ sung, giữ căn chỉnh Win64
     cmpl $0x04001400, %ecx
+    je .Lclang_argv_offset_valid
+    cmpl $0x08001400, %ecx
     jne Lbo_nho_loi
+.Lclang_argv_offset_valid:
     cmpq $0, vpp_native_spawn_handle(%rip)
     jne Lbo_nho_loi
     leaq (%r11,%rcx), %r10
@@ -168,4 +171,3 @@ vpp_native_os_waitpid:
     movl %ecx, (%rax,%rdx)
     movl $1, %eax
     TRA_BO_NHO
-

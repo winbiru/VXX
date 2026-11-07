@@ -395,23 +395,23 @@ vpp_freestanding_main:
     // vpp_native_memory_bind. PATH points to the probe executable directory.
     COPY_TO_ARENA 45056, .Lspawn_command, .Lspawn_command_end
     COPY_TO_ARENA 49152, .Lspawn_child_arg, .Lspawn_child_arg_end
-    movl $0x04001400, %edi
+    movl $0x08001400, %edi
     movl $45056, %esi
     call vpp_native_memory_bind
     testl %eax, %eax
     jne .Lbad_core
-    movl $0x04001408, %edi
+    movl $0x08001408, %edi
     movl $49152, %esi
     call vpp_native_memory_bind
     testl %eax, %eax
     jne .Lbad_core
-    movl $0x04001410, %edi
+    movl $0x08001410, %edi
     xorl %esi, %esi
     call vpp_native_memory_write_i32
-    movl $0x04001414, %edi
+    movl $0x08001414, %edi
     xorl %esi, %esi
     call vpp_native_memory_write_i32
-    movl $0x04001400, %edi
+    movl $0x08001400, %edi
     call vpp_native_os_spawn_clang
     cmpl $1, %eax
     jl .Lbad_core

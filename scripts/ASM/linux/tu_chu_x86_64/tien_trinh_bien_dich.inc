@@ -1,6 +1,6 @@
 // Tạo và đợi chương trình phục vụ trình biên dịch.
 
-// Bảng argv dùng chung với bộ liên kết V++ nằm tại 0x08001400.
+// Chấp nhận bảng argv ABI cũ và vùng riêng mà bộ liên kết V++ sử dụng.
 .globl vpp_native_os_spawn_clang
 vpp_native_os_spawn_clang:
     pushq %rbp
@@ -16,8 +16,11 @@ vpp_native_os_spawn_clang:
     movl -12(%rbp), %edx
     testq %r11, %r11
     jz Lbo_nho_loi
+    cmpl $0x04001400, %edi
+    je .Lclang_argv_offset_valid
     cmpl $0x08001400, %edi
     jne Lbo_nho_loi
+.Lclang_argv_offset_valid:
     cmpl $(135271424 - 32768), %edi
     ja Lbo_nho_loi
     leaq (%r11,%rdi), %rax

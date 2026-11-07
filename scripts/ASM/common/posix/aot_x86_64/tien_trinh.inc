@@ -1,11 +1,15 @@
 // Tạo, thăm dò, đọc, đợi và đóng tiến trình theo ABI của nền tảng.
 
-// V++ cấp bảng argv gồm 4096 con trỏ tại độ lệch 0x04001400.
+// V++ cấp bảng argv ở độ lệch 0x04001400; linker cũng dùng vùng riêng tại
+// 0x08001400 để không chồng lấn với các bảng tiến trình hiện có.
 .globl PUBLIC(vpp_native_os_spawn_clang)
 PUBLIC(vpp_native_os_spawn_clang):
     VAO_BO_NHO
     cmpl $0x04001400, %edi
+    je .Lclang_argv_offset_valid
+    cmpl $0x08001400, %edi
     jne Lbo_nho_loi
+.Lclang_argv_offset_valid:
     KIEM_TRA_LECH %edi, 32768   // Đúng 4096 con trỏ argv đủ độ rộng
     leaq (%r11,%rdi), %rax
     cmpq $0, (%rax)
@@ -218,4 +222,3 @@ PUBLIC(vpp_native_os_waitpid):
     call Llinux_doi_pid
 #endif
     TRA_BO_NHO
-

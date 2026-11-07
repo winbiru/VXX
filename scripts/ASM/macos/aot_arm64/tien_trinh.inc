@@ -8,7 +8,11 @@ _vpp_native_os_spawn_clang:
     mov w10, #0x1400
     movk w10, #0x800, lsl #16
     cmp w0, w10
+    b.eq Lclang_argv_offset_valid
+    movk w10, #0x400, lsl #16
+    cmp w0, w10
     b.ne Ltao_tien_trinh_loi
+Lclang_argv_offset_valid:
     add x10, x9, w0, uxtw
     ldr x11, [x10]
     cbz x11, Ltao_tien_trinh_loi
@@ -54,4 +58,3 @@ _vpp_native_os_waitpid:
 Ldoi_loi:
     mov w0, #-1
     TRA_BO_NHO
-

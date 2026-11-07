@@ -1,13 +1,16 @@
 // Tạo, thăm dò, đọc, đợi và đóng tiến trình theo ABI của nền tảng.
 
-// fork/exec bảng argv do V++ chuẩn bị tại 0x08001400. Chỉ con tìm PATH; cha nhận PID và V++ đợi bằng
+// fork/exec bảng argv do V++ chuẩn bị tại 0x04001400 hoặc 0x08001400. Chỉ con tìm PATH; cha nhận PID và V++ đợi bằng
 // wait4. exec thất bại thoát 127. Cầu khởi động và errno hiện dùng một luồng.
 .globl vpp_native_os_spawn_clang
 .type vpp_native_os_spawn_clang, @function
 vpp_native_os_spawn_clang:
     VPP_VAO_BO_NHO
+    cmpl $0x04001400, %edi
+    je .Lclang_argv_offset_valid
     cmpl $0x08001400, %edi
     jne .Lbo_nho_khong_hop_le
+.Lclang_argv_offset_valid:
     VPP_KIEM_TRA_LECH %edi, 32768  // 4096 con trỏ argv đủ độ rộng
     leaq (%r11,%rdi), %r8
     movq %r8, -32(%rbp)
@@ -174,4 +177,3 @@ vpp_native_os_waitpid:
 .Lban_than_chuong_trinh: .asciz "/proc/self/exe"
 .Ltao_bang_chu: .ascii "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 .text
-
