@@ -1395,13 +1395,14 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
             nếu (thực thi liên kết các đối số hằng văn bản("-r") < 0) { mã trạng thái = -2; };
         };
     };
-    // GNU ld applies -x while reading input symbols, so place it before the
-    // object arguments. Keep relocatable module outputs' symbol tables intact.
+    // Drop the final executable's static symbol table so temporary STT_FILE
+    // names cannot make self-hosted output nondeterministic. Relocatable
+    // module outputs retain their symbols for subsequent links.
     nếu (mã trạng thái == -1 && chế độ xuất == 0 && linux == 1) {
         nếu (liên kết ld == 1) {
-            nếu (thực thi liên kết các đối số hằng văn bản("-x") < 0) { mã trạng thái = -2; };
+            nếu (thực thi liên kết các đối số hằng văn bản("--strip-all") < 0) { mã trạng thái = -2; };
         } hoặc {
-            nếu (thực thi liên kết các đối số hằng văn bản("-Wl,-x") < 0) { mã trạng thái = -2; };
+            nếu (thực thi liên kết các đối số hằng văn bản("-Wl,--strip-all") < 0) { mã trạng thái = -2; };
         };
     };
     // Snapshot the first temporary object argument after optional linker

@@ -63,6 +63,8 @@ find "$BUILD_DIR" -type f -name '*.gcda' -delete
 # against the uninstrumented Release toolchain in the mandatory build/ARM64
 # jobs. Match the ASan/UBSan exclusions: instrumented Stage 0 makes these
 # fixtures prohibitively slow without providing useful C++ coverage.
+# The bit-operators test also requires the native-cli-compiler fixture, even
+# though its name does not start with vpp-native-.
 # Selective imports also builds the ASM VM and needs both native fixtures.
 # The instrumented HTTP fixture compiles its network modules before listening.
 STAGE="ctest"
@@ -71,7 +73,7 @@ echo '[coverage] Run instrumented CTest suite'
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
   ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
     --output-on-failure --no-tests=error --output-log "$BUILD_DIR/ctest.log" \
-    -E '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
+    -E '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
 report_duration
 
 STAGE="capture"

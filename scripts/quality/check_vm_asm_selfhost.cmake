@@ -14,9 +14,12 @@ endif()
 foreach(stage IN ITEMS 2 3)
     set(next "${VPP_OUTPUT_DIR}/compiler-stage${stage}.vmb")
     message(STATUS "ASM VM compiler Stage ${stage}: starting full self-host build")
+    # Full-language compilation on the standalone ASM VM can take more than
+    # 15 minutes on a shared macOS runner (the old limit was 900 seconds).
+    # This test runs both stages serially and compares their exact images.
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "VPP_HOME=${VPP_ROOT}"
         "${VPP_VM}" "${seed}" build "${source}" -o "${next}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 1800)
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "ASM VM compiler Stage ${stage} failed: ${status}\n${output}\n${errors}")
     endif()

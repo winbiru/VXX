@@ -143,11 +143,12 @@ jobs:
           # Release regression and installed smoke cover native self-hosting,
           # linker and machine-code checks without sanitizer instrumentation.
           # Selective imports needs the excluded native compiler/ASM VM fixtures.
+          # Bit operators also needs the excluded native-cli-compiler fixture.
           # Exercise frontend, runtime and integration with ASan/UBSan here.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
+              --exclude-regex '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm

@@ -1019,7 +1019,7 @@ if (BUILD_TESTS)
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm_selfhost.cmake)
             set_tests_properties(vpp-vm-asm-selfhost PROPERTIES
                 DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler"
-                PROCESSORS 2 TIMEOUT 2100)
+                PROCESSORS 2 TIMEOUT 4200)
 
             add_test(NAME vpp-selective-imports
                 COMMAND ${CMAKE_COMMAND}

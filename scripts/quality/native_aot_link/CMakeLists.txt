@@ -246,6 +246,12 @@ if (WIN32)
 endif()
 set_target_properties(vpp-aot-program PROPERTIES LINKER_LANGUAGE CXX
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Stage 0/1 bootstrap executables otherwise retain STT_FILE entries from
+    # temporary compiler objects. Strip only final ELF executables, not the
+    # relocatable objects used to link them.
+    target_link_options(vpp-aot-program PRIVATE "LINKER:--strip-all")
+endif()
 if (NOT DEFINED VPP_AOT_LIB_ROOT)
     set(VPP_AOT_LIB_ROOT "${VPP_AOT_ROOT}")
 endif()
@@ -321,6 +327,10 @@ else()
         find_library(VPP_AOT_CORE_FOUNDATION CoreFoundation REQUIRED)
         target_link_libraries(vpp-aot-program PRIVATE "${VPP_AOT_SECURITY}" "${VPP_AOT_CORE_FOUNDATION}")
     else()
+        # The stage2/stage3 convergence gate rejects a dynamically linked
+        # libcrypto. Keep Stage 0 OpenSSL symbols inside the executable so
+        # the bootstrap does not acquire a libcrypto.so dependency.
+        set(OPENSSL_USE_STATIC_LIBS TRUE)
         find_package(OpenSSL REQUIRED)
         target_link_libraries(vpp-aot-program PRIVATE OpenSSL::SSL OpenSSL::Crypto)
     endif()
