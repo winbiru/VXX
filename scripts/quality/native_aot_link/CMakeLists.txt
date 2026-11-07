@@ -214,6 +214,8 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
     set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
     file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
         "${VPP_AOT_ROOT}/scripts/ASM/common/posix/aot_x86_64/*.inc")
+    list(APPEND stage0_machine_includes
+        "${VPP_AOT_ROOT}/scripts/ASM/common/posix/vpp_vm_f64_primitives.inc")
     add_custom_command(OUTPUT "${stage0_machine_object}"
         COMMAND "${VPP_AOT_C_COMPILER}" -c
             "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_x86_64.S"

@@ -17,6 +17,7 @@
 #include "../common/posix/aot_x86_64/sha256.inc"
 #include "../common/posix/aot_x86_64/bao_cao.inc"
 #include "../common/posix/aot_x86_64/so_nguyen.inc"
+#include "../common/posix/vpp_vm_f64_primitives.inc"
 #include "../common/posix/aot_x86_64/du_lieu.inc"
 #include "vpp_linux_sha256_x86_64.S"
 #include "vpp_linux_syscalls_x86_64.S"
