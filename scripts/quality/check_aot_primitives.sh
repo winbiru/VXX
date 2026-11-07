@@ -101,6 +101,24 @@ VPP_LINUX_HOST_COMPILER= VPP_LINUX_HOST_ASSEMBLER="$compiler" \
     -c "$repo_root/scripts/ASM/linux/vpp_linux_host_x86_64.s" \
     -o "$work/linux-host-cpp.o"
 cmp "$work/linux-host-flat.o" "$work/linux-host-cpp.o"
+"$linux_stage0_nm" --defined-only "$work/linux-host-flat.o" \
+    > "$work/linux-host-defined"
+for symbol in vpp_native_f64_parse vpp_native_f64_text; do
+    if ! grep -Eq "[[:space:]][TW][[:space:]]${symbol}\$" \
+        "$work/linux-host-defined"; then
+        printf 'FAIL Linux freestanding host missing %s\n' "$symbol" >&2
+        exit 1
+    fi
+done
+"$linux_stage0_nm" --undefined-only "$work/linux-host-flat.o" \
+    > "$work/linux-host-undefined"
+for symbol in vpp_fn_vm_f64_parse vpp_fn_vm_f64_text; do
+    if ! grep -Eq "[[:space:]]${symbol}\$" "$work/linux-host-undefined"; then
+        printf 'FAIL Linux freestanding host missing runtime bridge target %s\n' \
+            "$symbol" >&2
+        exit 1
+    fi
+done
 printf 'PASS Linux: ghép nguồn chức năng khớp CPP từng byte\n'
 
 # Validate that Windows file publication can replace an existing executable

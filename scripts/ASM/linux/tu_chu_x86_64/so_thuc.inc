@@ -135,6 +135,31 @@ Lvm_so_thuc_sai_x86:
     popq %r12
     popq %rbx
     ret
+
+// Decimal conversion is implemented by the V++ runtime; adapt its stack ABI
+// to the SysV register ABI used by the VM native primitives.
+.globl vpp_native_f64_parse
+.type vpp_native_f64_parse, @function
+vpp_native_f64_parse:
+    subq $40, %rsp
+    movl %edi, (%rsp)
+    movl %esi, 4(%rsp)
+    call "vpp_fn_vm_f64_parse"
+    addq $40, %rsp
+    ret
+.size vpp_native_f64_parse, .-vpp_native_f64_parse
+
+.globl vpp_native_f64_text
+.type vpp_native_f64_text, @function
+vpp_native_f64_text:
+    subq $40, %rsp
+    movl %edi, (%rsp)
+    movl %esi, 4(%rsp)
+    call "vpp_fn_vm_f64_text"
+    addq $40, %rsp
+    ret
+.size vpp_native_f64_text, .-vpp_native_f64_text
+
 .section .rodata
 Lvm_so_thuc_dinh_dang:
 .asciz "%.10g"

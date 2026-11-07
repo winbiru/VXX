@@ -5,7 +5,7 @@ foreach(required IN ITEMS VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(ENV{VPP_HOME} "${VPP_ROOT}")
-if (NOT DEFINED VPP_VM)
+if (NOT DEFINED VPP_VM OR NOT EXISTS "${VPP_VM}")
     set(VPP_VM "${VPP_OUTPUT_DIR}/vpp-vm")
     execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${VPP_VM}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)

@@ -1026,9 +1026,11 @@ if (BUILD_TESTS)
                     "-DVPP_STAGE1=${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native"
                     "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
                     "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_VM=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-check/vpp-vm"
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/selective-imports"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_selective_imports.cmake)
             set_tests_properties(vpp-selective-imports PROPERTIES
+                DEPENDS vpp-vm-asm
                 FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 300)
 
         endif()
