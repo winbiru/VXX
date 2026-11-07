@@ -10,6 +10,6 @@ vpp_native_spawn_handle: .quad 0
 vpp_native_argument_buffer: .quad 0
 vpp_native_argument_index: .long -1
 
-#ifndef VPP_WINDOWS_BOUNDARY_TEST
+#if !defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_STAGE0)
 #include "../../common/vpp_vietnamese_runtime_symbols.inc"
 #endif

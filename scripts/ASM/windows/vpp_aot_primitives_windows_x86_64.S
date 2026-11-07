@@ -20,7 +20,10 @@
 #include "aot_x86_64/thong_tin_tep.inc"
 #include "aot_x86_64/moi_truong.inc"
 #include "aot_x86_64/duong_dan.inc"
+#ifndef VPP_WINDOWS_STAGE0
+// Stage 0 owns argv as C byte handles, including UTF-16 -> UTF-8 conversion.
 #include "aot_x86_64/doi_so.inc"
+#endif
 #include "aot_x86_64/so_nguyen.inc"
 #include "aot_x86_64/tien_trinh.inc"
 #include "aot_x86_64/sha256.inc"

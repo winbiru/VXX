@@ -74,6 +74,8 @@ vdk-*.zip
 # V++ workspace/package cache
 .vpp/
 .vpp-native-cache/
+.ci-prefix/
+.ci-smoke/
 
 # Python tooling
 __pycache__/

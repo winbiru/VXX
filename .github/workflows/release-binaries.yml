@@ -29,7 +29,7 @@ jobs:
       - name: Install Linux crypto and FFI dependencies
         if: runner.os == 'Linux'
         # Ubuntu 26.04's static libcrypto.a also needs libjitterentropy.a.
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Install macOS POSIX FFI dependency
         if: runner.os == 'macOS'

@@ -6,7 +6,8 @@ if (vpp_aot_runtime STREQUAL "vpp" OR vpp_aot_runtime STREQUAL "vpp-freestanding
         "${VPP_AOT_CONFIGURATION};${VPP_AOT_LIB_ROOT};${VPP_AOT_LINK_LEGACY_LIBFFI}")
     project(vpp_native_aot_link LANGUAGES NONE)
 elseif (vpp_aot_runtime STREQUAL "" OR vpp_aot_runtime STREQUAL "cpp")
-    project(vpp_native_aot_link LANGUAGES CXX)
+    # The Windows Stage 0 linker compiles the same C bootstrap used on POSIX.
+    project(vpp_native_aot_link LANGUAGES C CXX)
 else()
     message(FATAL_ERROR "VPP_AOT_RUNTIME must be vpp, vpp-freestanding or cpp")
 endif()
@@ -164,6 +165,27 @@ add_custom_command(OUTPUT "${object}"
     VERBATIM)
 set_source_files_properties("${object}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
 set(vpp_aot_bootstrap_objects)
+if (WIN32)
+    add_library(vpp-aot-bootstrap-runtime OBJECT
+        "${VPP_AOT_ROOT}/src/runtime/native/vpp_aot_runtime.c")
+    target_compile_features(vpp-aot-bootstrap-runtime PRIVATE c_std_11)
+    if (MSVC)
+        target_compile_options(vpp-aot-bootstrap-runtime PRIVATE /utf-8)
+    endif()
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.obj")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/windows/aot_x86_64/*.inc"
+        "${VPP_AOT_ROOT}/scripts/ASM/common/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -target x86_64-pc-windows-msvc -c
+            -DVPP_WINDOWS_STAGE0=1 -DVPP_NATIVE_RUNTIME_STACK_ABI=0
+            "${VPP_AOT_ROOT}/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S"
+            -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+endif()
 if (NOT MSVC AND (APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
     find_program(VPP_AOT_C_COMPILER NAMES clang cc REQUIRED)
     set(bootstrap_runtime_object "${CMAKE_CURRENT_BINARY_DIR}/bootstrap-runtime.o")
@@ -219,6 +241,9 @@ endif()
 set_source_files_properties(${vpp_aot_bootstrap_objects}
     PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
 add_executable(vpp-aot-program "${object}" ${vpp_aot_bootstrap_objects})
+if (WIN32)
+    target_sources(vpp-aot-program PRIVATE $<TARGET_OBJECTS:vpp-aot-bootstrap-runtime>)
+endif()
 set_target_properties(vpp-aot-program PROPERTIES LINKER_LANGUAGE CXX
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
 if (NOT DEFINED VPP_AOT_LIB_ROOT)
@@ -280,7 +305,7 @@ endif()
 find_package(Threads REQUIRED)
 target_link_libraries(vpp-aot-program PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 if (WIN32)
-    target_link_libraries(vpp-aot-program PRIVATE ws2_32 bcrypt secur32 crypt32)
+    target_link_libraries(vpp-aot-program PRIVATE ws2_32 bcrypt secur32 crypt32 shell32)
 else()
     # Link the same ABI as the runtime archives selected by the AOT driver.
     # Machine-only executables must not gain a libffi dependency here.

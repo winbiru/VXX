@@ -307,7 +307,8 @@ vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_native_core.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp
-    ${CMAKE_SOURCE_DIR}/src/native/aot_windows_entry.cpp)
+    ${CMAKE_SOURCE_DIR}/src/native/aot_windows_entry.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vpp_aot_runtime.c)
 target_link_libraries(vpp-native-aot PUBLIC vpp-runtime-native)
 if (BUILD_TESTS)
     add_executable(vpp-native-aot-scalar-loop-semantics

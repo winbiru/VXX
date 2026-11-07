@@ -32,7 +32,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Build V++ collector runtime
         run: |

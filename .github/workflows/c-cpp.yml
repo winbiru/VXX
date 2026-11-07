@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        # Ubuntu 26.04's static OpenSSL requires libjitterentropy.a at link time.
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        # Static OpenSSL on Ubuntu 26.04 also needs entropy and compression libraries.
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Configure CMake
         run: cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Release
@@ -156,7 +156,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Linux ARM64 build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Build V++ on Linux ARM64
         run: |
@@ -247,7 +247,7 @@ jobs:
           # which is provided by libjitterentropy3-dev (not always pulled in
           # by libssl-dev). Without it, linking the host vpp-cli fails.
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config \
+            build-essential cmake libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config \
             gcc-powerpc64-linux-gnu gcc-riscv64-linux-gnu \
             gcc-loongarch64-linux-gnu libc6-dev-ppc64-cross \
             libc6-dev-riscv64-cross libc6-dev-loong64-cross \
@@ -286,7 +286,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install quality tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 clang-tidy lcov libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 clang-tidy lcov libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Run clang-tidy baseline
         run: |
@@ -321,7 +321,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install benchmark build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Build and exercise benchmark cases
         run: |

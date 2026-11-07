@@ -23,7 +23,7 @@
     jmp \dich
 #endif
 .endm
-#ifndef VPP_WINDOWS_BOUNDARY_TEST
+#if !defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_STAGE0)
 #include "../../common/vpp_aot_runtime_exports.inc"
 #endif
 
