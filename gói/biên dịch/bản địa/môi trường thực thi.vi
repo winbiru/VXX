@@ -1395,6 +1395,15 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
             nếu (thực thi liên kết các đối số hằng văn bản("-r") < 0) { mã trạng thái = -2; };
         };
     };
+    // GNU ld applies -x while reading input symbols, so place it before the
+    // object arguments. Keep relocatable module outputs' symbol tables intact.
+    nếu (mã trạng thái == -1 && chế độ xuất == 0 && linux == 1) {
+        nếu (liên kết ld == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-x") < 0) { mã trạng thái = -2; };
+        } hoặc {
+            nếu (thực thi liên kết các đối số hằng văn bản("-Wl,-x") < 0) { mã trạng thái = -2; };
+        };
+    };
     // Snapshot the first temporary object argument after optional linker
     // flags; otherwise cleanup unlinks '-r' and leaks the last object.
     đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
@@ -1476,20 +1485,6 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
             hoặc {
                 nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
                 thực thi các byte giải phóng(primitive);
-            };
-        };
-        // GCC creates a random ccXXXXXX.o for its temporary assembler output.
-        // GNU ld otherwise preserves that filename as a local STT_FILE symbol,
-        // so self-hosting executables differ despite identical machine code.
-        // Discard local symbols only in final Linux executables; relocatable
-        // module outputs retain their symbol tables for subsequent links.
-        nếu (mã trạng thái == -1) {
-            nếu (linux == 1) {
-                nếu (liên kết ld == 1) {
-                    nếu (thực thi liên kết các đối số hằng văn bản("-x") < 0) { mã trạng thái = -2; };
-                } hoặc {
-                    nếu (thực thi liên kết các đối số hằng văn bản("-Wl,-x") < 0) { mã trạng thái = -2; };
-                };
             };
         };
     };
