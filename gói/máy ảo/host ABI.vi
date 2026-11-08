@@ -124,20 +124,43 @@ hàm vm_thay_khớp(nguồn, mẫu, tại) {
     biến n = vm_get(nguồn, 1); biến m = vm_get(mẫu, 1);
     nếu (m <= 0 || tại < 0 || tại > n - m) { trả về 0; };
     biến dữ liệu nguồn = vm_get(nguồn, 2); biến dữ liệu mẫu = vm_get(mẫu, 2);
-    lặp(i = 0; i < m; i++) {
+    // Các test AOT dùng thao tác i32 trực tiếp: so bốn byte/lượt khi còn đủ
+    // dữ liệu, sau đó mới xử lý byte lẻ. Không đọc vượt biên của mẫu.
+    biến i = 0;
+    khi (i <= m - 4) {
+        nếu (máy đọc số nguyên ba mươi hai bit(dữ liệu nguồn + tại + i) !=
+            máy đọc số nguyên ba mươi hai bit(dữ liệu mẫu + i)) {
+            trả về 0;
+        };
+        i = i + 4;
+    };
+    khi (i < m) {
         nếu (máy đọc byte(dữ liệu nguồn + tại + i) != máy đọc byte(dữ liệu mẫu + i)) {
             trả về 0;
         };
+        i = i + 1;
     };
     biến kết thúc = tại + m; biến p = tại;
-    khi (p < kết thúc) { p = p + vm_utf8_width(nguồn, p); };
+    // Chỉ chuỗi đa byte cần phân tích độ rộng UTF-8 tại vị trí khớp.
+    khi (p < kết thúc) {
+        nếu (máy đọc byte(dữ liệu nguồn + p) < 128) { p = p + 1; }
+        hoặc { p = p + vm_utf8_width(nguồn, p); };
+    };
     trả về p == kết thúc;
 };
 hàm vm_sao_chép_byte(đích, vị trí đích, nguồn, vị trí nguồn, số lượng) {
-    biến dữ liệu đích = vm_get(đích, 2); biến dữ liệu nguồn = vm_get(nguồn, 2);
-    lặp(i = 0; i < số lượng; i++) {
-        máy ghi byte(dữ liệu đích + vị trí đích + i,
-                     máy đọc byte(dữ liệu nguồn + vị trí nguồn + i));
+    biến dữ liệu đích = vm_get(đích, 2) + vị trí đích;
+    biến dữ liệu nguồn = vm_get(nguồn, 2) + vị trí nguồn;
+    // Sao chép bốn byte mỗi lượt; xử lý phần dư mà không đọc ra ngoài vùng.
+    biến i = 0;
+    khi (i <= số lượng - 4) {
+        máy ghi số nguyên ba mươi hai bit(dữ liệu đích + i,
+             máy đọc số nguyên ba mươi hai bit(dữ liệu nguồn + i));
+        i = i + 4;
+    };
+    khi (i < số lượng) {
+        máy ghi byte(dữ liệu đích + i, máy đọc byte(dữ liệu nguồn + i));
+        i = i + 1;
     };
     trả về vị trí đích + số lượng;
 };
@@ -167,8 +190,11 @@ hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
     };
 
     biến tổng = n; vị trí = 0; biến số khớp = 0;
+    biến dữ liệu = vm_get(nguồn, 2);
+    biến byte đầu = máy đọc byte(vm_get(mẫu, 2));
     khi (vị trí < n) {
-        nếu (vm_thay_khớp(nguồn, mẫu, vị trí)) {
+        biến byte hiện tại = máy đọc byte(dữ liệu + vị trí);
+        nếu (byte hiện tại == byte đầu && vm_thay_khớp(nguồn, mẫu, vị trí)) {
             nếu (r >= m) {
                 biến thêm = r - m;
                 nếu (tổng > 16000000 - thêm) { trả về vm_error(3); };
@@ -179,22 +205,33 @@ hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
             số khớp = số khớp + 1;
             vị trí = vị trí + m;
         } hoặc {
-            vị trí = vị trí + vm_utf8_width(nguồn, vị trí);
+            // ASCII là một code point; tránh gọi bộ giải mã UTF-8 cho từng byte.
+            nếu (byte hiện tại < 128) { vị trí = vị trí + 1; }
+            hoặc { vị trí = vị trí + vm_utf8_width(nguồn, vị trí); };
         };
     };
     nếu (số khớp == 0) { trả về nguồn; };
 
     kết quả = vm_string(tổng); nếu (kết quả == 0) { trả về 0; };
     ra = 0; vị trí = 0;
+    biến đầu đoạn = 0;
     khi (vị trí < n) {
-        nếu (vm_thay_khớp(nguồn, mẫu, vị trí)) {
+        biến byte hiện tại = máy đọc byte(dữ liệu + vị trí);
+        nếu (byte hiện tại == byte đầu && vm_thay_khớp(nguồn, mẫu, vị trí)) {
+            // Sao chép trọn đoạn không khớp thay vì gọi hàm cho từng ký tự.
+            nếu (vị trí > đầu đoạn) {
+                ra = vm_sao_chép_byte(kết quả, ra, nguồn, đầu đoạn, vị trí - đầu đoạn);
+            };
             ra = vm_sao_chép_byte(kết quả, ra, thay, 0, r);
             vị trí = vị trí + m;
+            đầu đoạn = vị trí;
         } hoặc {
-            rộng = vm_utf8_width(nguồn, vị trí);
-            ra = vm_sao_chép_byte(kết quả, ra, nguồn, vị trí, rộng);
-            vị trí = vị trí + rộng;
+            nếu (byte hiện tại < 128) { vị trí = vị trí + 1; }
+            hoặc { vị trí = vị trí + vm_utf8_width(nguồn, vị trí); };
         };
+    };
+    nếu (vị trí > đầu đoạn) {
+        ra = vm_sao_chép_byte(kết quả, ra, nguồn, đầu đoạn, vị trí - đầu đoạn);
     };
     trả về kết quả;
 };

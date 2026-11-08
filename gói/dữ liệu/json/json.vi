@@ -80,8 +80,7 @@ lớp riêng tư Xử Lý Nội Bộ Json {
     };
 
     hàm công khai json phân tích(nội dung) {
-        bộ nội bộ = Bộ Xử Lý JSON();
-        trả về bộ nội bộ.json phân tích(nội dung);
+        trả về Bộ Xử Lý JSON().json phân tích(nội dung);
     };
 
     hàm công khai json tạo(giá trị) {
@@ -507,7 +506,11 @@ lớp riêng tư Bộ Xử Lý JSON {
         vị trí = trạng thái[1];
         n = máy ảo lấy độ dài(các byte);
         trạng thái[1] = vị trí + 1;
-        mình.json bỏ khoảng trắng(trạng thái);
+        nếu (vị trí + 1 < n) {
+            nếu (các byte[vị trí + 1] <= 32) {
+                mình.json bỏ khoảng trắng(trạng thái);
+            };
+        };
         vị trí = trạng thái[1];
         kết quả = [];
 
@@ -521,8 +524,13 @@ lớp riêng tư Bộ Xử Lý JSON {
         hoàn tất = sai;
         khi (!hoàn tất) {
             máy ảo thêm cuối danh sách(kết quả, mình.json đọc giá trị(trạng thái));
-            mình.json bỏ khoảng trắng(trạng thái);
             vị trí = trạng thái[1];
+            nếu (vị trí < n) {
+                nếu (các byte[vị trí] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                    vị trí = trạng thái[1];
+                };
+            };
             nếu (vị trí >= n) {
                 mình.json lỗi(trạng thái, "mảng thiếu dấu ]");
             };
@@ -535,7 +543,11 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "mảng thiếu dấu phẩy");
                 };
                 trạng thái[1] = vị trí + 1;
-                mình.json bỏ khoảng trắng(trạng thái);
+                nếu (vị trí + 1 < n) {
+                    nếu (các byte[vị trí + 1] <= 32) {
+                        mình.json bỏ khoảng trắng(trạng thái);
+                    };
+                };
             };
         };
         trả về kết quả;
@@ -546,7 +558,11 @@ lớp riêng tư Bộ Xử Lý JSON {
         vị trí = trạng thái[1];
         n = máy ảo lấy độ dài(các byte);
         trạng thái[1] = vị trí + 1;
-        mình.json bỏ khoảng trắng(trạng thái);
+        nếu (vị trí + 1 < n) {
+            nếu (các byte[vị trí + 1] <= 32) {
+                mình.json bỏ khoảng trắng(trạng thái);
+            };
+        };
         vị trí = trạng thái[1];
         kết quả = {};
 
@@ -567,9 +583,13 @@ lớp riêng tư Bộ Xử Lý JSON {
                 mình.json lỗi(trạng thái, "khóa đối tượng phải là chuỗi");
             };
             khóa = mình.json đọc chuỗi(trạng thái);
-            mình.json bỏ khoảng trắng(trạng thái);
-
             vị trí = trạng thái[1];
+            nếu (vị trí < n) {
+                nếu (các byte[vị trí] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                    vị trí = trạng thái[1];
+                };
+            };
             nếu (vị trí >= n) {
                 mình.json lỗi(trạng thái, "đối tượng thiếu dấu hai chấm");
             };
@@ -577,11 +597,19 @@ lớp riêng tư Bộ Xử Lý JSON {
                 mình.json lỗi(trạng thái, "đối tượng thiếu dấu hai chấm");
             };
             trạng thái[1] = vị trí + 1;
-            mình.json bỏ khoảng trắng(trạng thái);
+            nếu (vị trí + 1 < n) {
+                nếu (các byte[vị trí + 1] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                };
+            };
             đặt từ điển(kết quả, khóa, mình.json đọc giá trị(trạng thái));
-            mình.json bỏ khoảng trắng(trạng thái);
-
             vị trí = trạng thái[1];
+            nếu (vị trí < n) {
+                nếu (các byte[vị trí] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                    vị trí = trạng thái[1];
+                };
+            };
             nếu (vị trí >= n) {
                 mình.json lỗi(trạng thái, "đối tượng thiếu dấu }");
             };
@@ -594,17 +622,21 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "đối tượng thiếu dấu phẩy");
                 };
                 trạng thái[1] = vị trí + 1;
-                mình.json bỏ khoảng trắng(trạng thái);
+                nếu (vị trí + 1 < n) {
+                    nếu (các byte[vị trí + 1] <= 32) {
+                        mình.json bỏ khoảng trắng(trạng thái);
+                    };
+                };
             };
         };
         trả về kết quả;
     };
 
     hàm riêng tư json đọc giá trị(trạng thái) {
-        mình.json bỏ khoảng trắng(trạng thái);
         các byte = trạng thái[3];
         vị trí = trạng thái[1];
         n = máy ảo lấy độ dài(các byte);
+        // Các điểm gọi đều đã loại khoảng trắng ngay trước khi đọc giá trị.
         nếu (vị trí >= n) {
             mình.json lỗi(trạng thái, "thiếu giá trị");
         };
@@ -689,8 +721,18 @@ lớp riêng tư Bộ Xử Lý JSON {
         các byte = mình.json kiểm tra utf8(nội dung);
         // Bốn ô cố định: [chuỗi nguồn, vị trí byte, hàm tạo boolean, byte nguồn].
         trạng thái = [nội dung, 0, tạo boolean, các byte];
+        nếu (máy ảo lấy độ dài(các byte) > 0) {
+            nếu (các byte[0] <= 32) {
+                mình.json bỏ khoảng trắng(trạng thái);
+            };
+        };
         kết quả = mình.json đọc giá trị(trạng thái);
-        mình.json bỏ khoảng trắng(trạng thái);
+        vị trí = trạng thái[1];
+        nếu (vị trí < máy ảo lấy độ dài(các byte)) {
+            nếu (các byte[vị trí] <= 32) {
+                mình.json bỏ khoảng trắng(trạng thái);
+            };
+        };
         nếu (trạng thái[1] != máy ảo lấy độ dài(các byte)) {
             mình.json lỗi(trạng thái, "còn dữ liệu sau giá trị JSON");
         };

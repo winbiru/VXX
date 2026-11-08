@@ -187,6 +187,12 @@ int main(void) {
     handler.sa_handler = alarm_handler;
     sigemptyset(&handler.sa_mask);
     assert(sigaction(SIGALRM, &handler, &previous_handler) == 0);
+    // CTest/CI may launch this process with SIGALRM blocked. An armed timer
+    // then expires without calling the handler, falsely failing the EINTR test.
+    sigset_t alarm_set, previous_mask;
+    assert(sigemptyset(&alarm_set) == 0);
+    assert(sigaddset(&alarm_set, SIGALRM) == 0);
+    assert(sigprocmask(SIG_UNBLOCK, &alarm_set, &previous_mask) == 0);
     struct itimerval timer = {0};
     timer.it_value.tv_usec = 15000;
     timer.it_interval.tv_usec = 15000;
@@ -203,6 +209,7 @@ int main(void) {
     }
     assert(interrupted == 1);
     assert(elapsed >= 60 && elapsed < 500);
+    assert(sigprocmask(SIG_SETMASK, &previous_mask, NULL) == 0);
     assert(sigaction(SIGALRM, &previous_handler, NULL) == 0);
     memcpy(&retained_fd, memory + CTL, sizeof retained_fd);
     assert(retained_fd == serverfd);

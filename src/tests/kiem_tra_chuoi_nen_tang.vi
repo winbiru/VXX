@@ -114,6 +114,13 @@ hàm chính() {
     in tìm chuỗi chính xác("abc", "abc") == 0;
     in thay chính xác("aaaaa", "aa", "X") == "XXa";
     in thay chính xác("abababa", "aba", "X") == "XbX";
+    // So khớp theo khối i32 phải xử lý cả mẫu 1..4 byte và UTF-8 dài hơn.
+    in thay chính xác("aaaa", "a", "X") == "XXXX";
+    in thay chính xác("abcaba", "abc", "R") == "Raba";
+    in thay chính xác("aaaa", "aaaa", "R") == "R";
+    in thay chính xác("xViệtyViệt", "Việt", "V++") == "xV++yV++";
+    in thay chính xác("🚀🚀!", "🚀", "*") == "**!";
+    in thay chính xác("é🚀", "é🚀", "!") == "!";
     in thay chính xác("", "", ":") == ":";
     in thay chính xác("a𠮷", "", ":") == ":a:𠮷:";
 
