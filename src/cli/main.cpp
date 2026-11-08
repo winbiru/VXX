@@ -149,7 +149,9 @@ enum class SnippetMode {
 };
 
 static void verifyLockedProjectForSource(const fs::path &sourcePath);
-static int runSourceWithAvailableCompiler(const std::string &filename, bool captureErrors = false);
+static int runSourceWithAvailableCompiler(const std::string &filename,
+                                          bool captureErrors = false,
+                                          bool requireNative = false);
 
 // Chạy snippet; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runSnippet(const std::string &source,
@@ -340,7 +342,8 @@ static int runFile(const std::string &filename,
 // output/status riêng cho từng file để run_tests.sh giữ nguyên golden semantics.
 static int runBatchTestFiles(const fs::path &outputDir,
                              const std::vector<fs::path> &testFiles,
-                             bool forceCpp = false) {
+                             bool forceCpp = false,
+                             bool forceNative = false) {
     fs::create_directories(outputDir);
     for (const fs::path &testFile : testFiles) {
         std::ostringstream captured;
@@ -349,7 +352,7 @@ static int runBatchTestFiles(const fs::path &outputDir,
         int status = EXIT_FAILURE;
         try {
             status = forceCpp ? runFile(testFile.u8string(), SnippetMode::Execute)
-                              : runSourceWithAvailableCompiler(testFile.u8string(), true);
+                              : runSourceWithAvailableCompiler(testFile.u8string(), true, forceNative);
         } catch (const vietvm::runtime::RuntimeError &error) {
             printErrorMessage(messages::kCliUnhandledException,
                               vietvm::runtime::formatRuntimeError(error));
@@ -644,8 +647,10 @@ static std::string formatDocumentWithAvailableCompiler(const std::string &source
 // its V++ frontend and ASM backend. Stage 0 installations without the native
 // binary can still bootstrap using the original C++ pipeline. An explicitly
 // configured but missing compiler is an error (nativeVppCompiler checks it).
-static int runSourceWithAvailableCompiler(const std::string &filename, bool captureErrors) {
-    if (!nativeVppCompiler(false).empty()) return runVppCompiler(filename, "run", {}, {}, captureErrors);
+static int runSourceWithAvailableCompiler(const std::string &filename, bool captureErrors,
+                                          bool requireNative) {
+    if (requireNative || !nativeVppCompiler(false).empty())
+        return runVppCompiler(filename, "run", {}, {}, captureErrors);
     return runFile(filename, SnippetMode::Execute);
 }
 
@@ -3284,11 +3289,15 @@ static int runCli(int argc, char* argv[]) {
             if (command == "--batch-run-tests") {
                 int outputArgument = 2;
                 bool forceCpp = false;
+                bool forceNative = false;
                 if (argc > outputArgument &&
                     std::string(argv[outputArgument]).rfind("--compiler=", 0) == 0) {
                     const std::string choice = argv[outputArgument++];
                     if (choice == "--compiler=cpp") forceCpp = true;
-                    else if (choice == "--compiler=vpp") (void)nativeVppCompiler();
+                    else if (choice == "--compiler=vpp") {
+                        (void)nativeVppCompiler();
+                        forceNative = true;
+                    }
                     else return EXIT_FAILURE;
                 }
                 if (argc < outputArgument + 2) return EXIT_FAILURE;
@@ -3297,7 +3306,8 @@ static int runCli(int argc, char* argv[]) {
                 for (int index = outputArgument + 1; index < argc; ++index) {
                     testFiles.push_back(vietvm::core::utf8Path(argv[index]));
                 }
-                return runBatchTestFiles(vietvm::core::utf8Path(argv[outputArgument]), testFiles, forceCpp);
+                return runBatchTestFiles(vietvm::core::utf8Path(argv[outputArgument]), testFiles,
+                                         forceCpp, forceNative);
             }
             int commandWordOffset = 0;
             if (argc >= 3) {

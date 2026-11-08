@@ -1,0 +1,21 @@
+# Source path<TAB>diagnostic substring required from the V++/ASM compiler/runtime.
+# A nonzero exit code AND the specific diagnostic are both required. These
+# fixtures run with --compiler=vpp; Stage 0 VM diagnostics have separate goldens.
+src/tests/kiem_tra_loi_chia_cho_0.vi	không thể chia 10 cho 0
+src/tests/kiem_tra_loi_chia_du_cho_0.vi	chia dư cho 0
+src/tests/kiem_tra_loi_chia_du_so_thuc.vi	giá trị không phải số nguyên
+src/tests/kiem_tra_loi_can_so_nguyen.vi	giá trị không phải số nguyên
+src/tests/kiem_tra_loi_phep_tinh_can_so.vi	toán tử số chỉ áp dụng cho số
+src/tests/kiem_tra_loi_so_sanh_khac_kieu.vi	không thể so sánh hai kiểu dữ liệu khác nhau
+src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi	Native AOT: index out of range
+src/tests/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi	Native AOT: value cannot be indexed
+src/tests/kiem_tra_loi_ham_khong_ton_tai.vi	lời gọi chưa phân giải 'hamKhongTonTai'
+src/tests/kiem_tra_loi_sai_so_luong_doi_so.vi	Native AOT: function arity mismatch
+src/tests/kiem_tra_loi_khong_phai_doi_tuong.vi	Native AOT: expected instance
+src/tests/kiem_tra_loi_thuoc_tinh_khong_ton_tai.vi	Native AOT: property not found: ten
+src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi	Native AOT: method not found: khongCo
+src/tests/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.vi	Native AOT: method access denied: bíMat
+src/tests/kiem_tra_loi_tang_sai_kieu.vi	giá trị không phải số nguyên
+src/tests/kiem_tra_loi_giam_sai_kieu.vi	giá trị không phải số nguyên
+src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi	thành số thực: giá trị không thể chuyển đổi
+src/tests/kiem_tra_loi_tep_gia_thong_bao.vi	ngoại lệ không bắt được: đọc tệp: không thể mở tệp để đọc

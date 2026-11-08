@@ -1,0 +1,54 @@
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.dữ liệu.json.json.*;
+
+hàm thực hiện(tên, văn bản) {
+    nếu (tên == "json_escape_plain" || tên == "json_escape_mixed") {
+        trả về độ dài(json thoát(văn bản));
+    };
+    nếu (tên == "unicode_replace_ascii") {
+        trả về độ dài(thay chính xác(văn bản, "z", "X"));
+    };
+    nếu (tên == "unicode_replace_mixed") {
+        trả về độ dài(thay chính xác(văn bản, "Việt", "V++"));
+    };
+    ném "unknown benchmark";
+};
+
+hàm đo(tên, văn bản, n) {
+    checksum = 0;
+    lặp(i = 0; i < n; i++) { checksum += thực hiện(tên, văn bản); };
+    trả về checksum;
+};
+
+hàm chính() {
+    tên = đọc biến môi trường("BENCH_CASE", "json_escape_plain");
+    n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "16"));
+    nếu (n < 1 || n > 100000) { ném "invalid repetitions"; };
+    văn bản = "";
+    lặp(i = 0; i < 32; i++) {
+        nếu (tên == "json_escape_plain") {
+            văn bản += "Tiếng Việt 🌿𠮷 dữ liệu Unicode không cần escape. ";
+        } hoặc nếu (tên == "json_escape_mixed") {
+            văn bản += "Việt \"Nam\" \\ 🌿𠮷 dòng\n";
+        } hoặc nếu (tên == "unicode_replace_ascii" || tên == "unicode_replace_mixed") {
+            văn bản += "🇻🇳🌿𠮷漢字 tiếng Việt Việt 🧪 ";
+        } hoặc {
+            ném "unknown benchmark";
+        };
+    };
+    unit = thực hiện(tên, văn bản);
+    lặp(i = 0; i < 3; i++) {
+        check = đo(tên, văn bản, n);
+        nếu (check != unit * n) { ném "wrong checksum warmup"; };
+    };
+    start = thời gian đơn điệu mili giây();
+    check = đo(tên, văn bản, n);
+    elapsed = thời gian đơn điệu mili giây() - start;
+    nếu (check != unit * n || elapsed <= 0) { ném "wrong checksum"; };
+    in elapsed;
+    in check;
+    in unit;
+};

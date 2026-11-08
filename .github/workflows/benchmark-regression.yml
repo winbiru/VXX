@@ -39,6 +39,11 @@ jobs:
           cmake -S . -B build-benchmark-gate-cli -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
           cmake --build build-benchmark-gate-cli --parallel 2 --target vpp-cli
+          cmake -D"VPP_CLI=$PWD/build-benchmark-gate-cli/bin/vpp-cli" \
+            -D"VPP_ROOT=$PWD" \
+            -D"VPP_OUTPUT_DIR=$PWD/build-benchmark-gate-cli/native-compiler" \
+            -D"VPP_EXECUTABLE_SUFFIX=" \
+            -P scripts/quality/prepare_native_compiler.cmake
 
       - name: Compare two separately built Git revisions
         shell: bash
@@ -53,6 +58,7 @@ jobs:
           baseline="${PR_BASE_SHA:-${INPUT_BASELINE:-HEAD^}}"
           candidate="${PR_HEAD_SHA:-${INPUT_CANDIDATE:-HEAD}}"
           export VPP_EXEC="$PWD/build-benchmark-gate-cli/bin/vpp-cli"
+          export VPP_NATIVE_COMPILER="$PWD/build-benchmark-gate-cli/native-compiler/vpp-native"
           export VPP_GATE_SAMPLES=40 VPP_GATE_WARMUPS=3 VPP_GATE_TARGET_MS=50
           export VPP_GATE_CASES="${INPUT_CASES:-vm_verify,vm_dispatch_preverified,compiler_pipeline,gc_burst_collect_reuse}"
           bash scripts/quality/run_benchmark_gate.sh "$baseline" "$candidate" \

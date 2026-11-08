@@ -6,8 +6,9 @@ endforeach()
 get_filename_component(VPP_REPORT "${VPP_REPORT}" ABSOLUTE)
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    "VPP_AOT_ROOT=${VPP_ROOT}"
     "VPP_BENCHMARK_REPORT=${VPP_REPORT}"
-    "${VPP_EXEC}" run "${VPP_ROOT}/scripts/quality/compare_benchmarks.vi"
+    "${VPP_EXEC}" run --compiler=vpp "${VPP_ROOT}/scripts/quality/compare_benchmarks.vi"
     RESULT_VARIABLE status OUTPUT_VARIABLE result ERROR_VARIABLE errors TIMEOUT 240)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "V++ comparator execution: ${status}\n${result}\n${errors}")

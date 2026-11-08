@@ -27,8 +27,13 @@ if [ ! -x "$EXEC_PATH" ]; then
   echo "ERROR: VPP executable khong chay duoc: $EXEC_PATH" >&2
   exit 2
 fi
-# Runtime/JIT golden tests must use the VM even when a native compiler exists.
-# Native AOT and V++ compiler parity remain separate CTest gates.
+# Keep the package lookup root independent from the native ASM toolchain.
+# Do this before any fixture starts, including those that change VPP_HOME.
+export VPP_HOME="${VPP_HOME:-$ROOT_DIR}"
+export VPP_AOT_ROOT="${VPP_AOT_ROOT:-$ROOT_DIR}"
+# Ordinary integration tests run through the bootstrapped V++ compiler/ASM
+# backend. Keep an explicit Stage 0 lane for VM/JIT-specific contracts.
+NATIVE_COMMAND=("$EXEC_PATH" run --compiler=vpp)
 VM_COMMAND=("$EXEC_PATH" run --compiler=cpp)
 tmpdir=$(mktemp -d "src/tests/.tmp.XXXXXX")
 export VPP_PREFERENCES_HOME="$ROOT_DIR/$tmpdir/preferences"
@@ -43,7 +48,7 @@ HTTP_NETWORK_RESTRICTED=0
 # the execution environment denies bind(2), only tests that require localhost
 # sockets are skipped; protocol parsing/framing still runs as ordinary V++ tests.
 HTTP_FIXTURE_PID=""
-HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-120}"
+HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-600}"
 if [[ ! "$HTTP_FIXTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] ||
    [ "${#HTTP_FIXTURE_TIMEOUT}" -gt 4 ] || [ "$HTTP_FIXTURE_TIMEOUT" -gt 3600 ]; then
   echo "ERROR: VPP_HTTP_FIXTURE_TIMEOUT must be an integer from 1 to 3600 seconds" >&2
@@ -94,7 +99,7 @@ wait_http_value() {
 
 # The HTTP fixture exercises TCP listen/accept/recv/send. Keep its server
 # side under the strict migration gate as well as the client-side FFI tests.
-VPP_STRICT_SYSTEM_FFI_POSIX=1 "${VM_COMMAND[@]}" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
+VPP_STRICT_SYSTEM_FFI_POSIX=1 "${NATIVE_COMMAND[@]}" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
 if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
   if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
@@ -125,7 +130,8 @@ if cp src/tests/kiem_tra_package_tieng_viet.vi "$VPP_HOME_TEST_DIR/kiem_tra_pack
   cp -R "$ROOT_DIR/gói" "$VPP_HOME_TEST_DIR/gói" &&
   (
     cd "$VPP_HOME_TEST_DIR" &&
-    VPP_HOME="$VPP_HOME_TEST_DIR" "${VM_COMMAND[@]}" kiem_tra_package_tieng_viet.vi >"$ROOT_DIR/$vpp_home_out" 2>&1
+    VPP_HOME="$VPP_HOME_TEST_DIR" VPP_AOT_ROOT="$ROOT_DIR" \
+      "${NATIVE_COMMAND[@]}" kiem_tra_package_tieng_viet.vi >"$ROOT_DIR/$vpp_home_out" 2>&1
   ) &&
   diff -u src/tests/expected/kiem_tra_package_tieng_viet.expected "$vpp_home_out"; then
   echo "PASS: Vietnamese package import via VPP_HOME"; PASS=$((PASS+1))
@@ -140,6 +146,7 @@ TESTS=(
   src/tests/kiem_tra_thoat_vong_lap.vi
   src/tests/kiem_tra_khi.vi
   src/tests/kiem_tra_bien_dich_khi.vi
+  src/tests/kiem_tra_bien_dich_khi_vm.vi
   src/tests/kiem_tra_chon_ca.vi
   src/tests/kiem_tra_chuoi_co_ban.vi
   src/tests/kiem_tra_de_quy.vi
@@ -227,6 +234,7 @@ TESTS=(
   src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
   src/tests/kiem_tra_bien_dich_bieu_thuc_vi.vi
   src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi
+  src/tests/kiem_tra_bien_dich_chuong_trinh_vm.vi
   src/tests/kiem_tra_khai_bao_kieu_ffi_tu_chu.vi
   src/tests/kiemtrathamsotrung.vi
   src/tests/kiemtramacdinh.vi
@@ -346,7 +354,37 @@ TESTS=(
   src/tests/program.vi
 )
 
-RUNNABLE_TESTS=()
+# These fixtures explicitly compare against Stage 0 compiler snapshot/opcode
+# oracles (bien_dich_phan_tich_vm), or exercise VM-only task/JIT contracts.
+# Keep the C++ oracle tests visible as a compatibility lane until they can be
+# replaced by independent native V++ checks. Never silently fall back.
+VM_GOLDEN_TESTS=(
+  src/tests/kiem_tra_bien_dich_khi_vm.vi
+  src/tests/kiem_tra_goi_dong_thoi.vi
+  src/tests/kiem_tra_goi_bien_dich.vi
+  src/tests/kiem_tra_goi_bien_dich_moi.vi
+  src/tests/kiem_tra_kien_truc_oop_compiler.vi
+  src/tests/kiem_tra_lop_mo_rong_compiler.vi
+  src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi
+  src/tests/kiem_tra_goi_phan_tich_phu_thuoc.vi
+  src/tests/kiem_tra_goi_tai_lieu.vi
+  src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
+  src/tests/kiem_tra_bien_dich_chuong_trinh_vm.vi
+  src/tests/kiemtracompilervpp.vi
+  src/tests/kiem_tra_ir_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_module_tu_chu.vi
+  src/tests/kiem_tra_oracle_module_tu_chu.vi
+  src/tests/kiem_tra_oracle_chuoi_module.vi
+  src/tests/kiem_tra_escape_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_lien_ket_tu_chu.vi
+  src/tests/kiem_tra_tap_hop_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_quy_trinh_oop.vi
+  src/tests/kiem_tra_machine_jit.vi
+  src/tests/kiem_tra_vm_ieee754.vi
+)
+NATIVE_RUNNABLE_TESTS=()
+VM_RUNNABLE_TESTS=()
 for testfile in "${TESTS[@]}"; do
   base=$(basename "${testfile%.vi}")
   if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
@@ -356,14 +394,27 @@ for testfile in "${TESTS[@]}"; do
         ;;
     esac
   fi
-  RUNNABLE_TESTS+=("$testfile")
+  is_vm_test=0
+  for vm_test in "${VM_GOLDEN_TESTS[@]}"; do
+    if [ "$testfile" = "$vm_test" ]; then is_vm_test=1; break; fi
+  done
+  if [ "$is_vm_test" -eq 1 ]; then
+    VM_RUNNABLE_TESTS+=("$testfile")
+  else
+    NATIVE_RUNNABLE_TESTS+=("$testfile")
+  fi
 done
 
-# Chạy các golden test thường trong một tiến trình V++ duy nhất. Worker vẫn ghi
-# output/status riêng cho từng file nên phần so sánh expected bên dưới giữ nguyên
-# semantics, trong khi compiler có thể tái sử dụng AST module giữa các test.
-if ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${RUNNABLE_TESTS[@]}"; then
-  echo "ERROR: batch test worker failed" >&2
+# Both lanes produce identical per-file output/status artifacts for the
+# existing golden comparisons. Explicit --compiler=vpp forbids VM fallback.
+if [ "${#NATIVE_RUNNABLE_TESTS[@]}" -gt 0 ] &&
+   ! "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${NATIVE_RUNNABLE_TESTS[@]}"; then
+  echo "ERROR: V++ native batch test worker failed" >&2
+  exit 2
+fi
+if [ "${#VM_RUNNABLE_TESTS[@]}" -gt 0 ] &&
+   ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${VM_RUNNABLE_TESTS[@]}"; then
+  echo "ERROR: VM-specific batch test worker failed" >&2
   exit 2
 fi
 
@@ -461,7 +512,7 @@ case "$(uname -s)" in
           src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
         local_clock_status=$?
       else
-        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 "${VM_COMMAND[@]}" \
+        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 "${NATIVE_COMMAND[@]}" \
           src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
         local_clock_status=$?
       fi
@@ -475,7 +526,7 @@ case "$(uname -s)" in
     done
 
     strict_file_out="$tmpdir/strict_ffi_file.output"
-    if VPP_STRICT_SYSTEM_FFI_FILE=1 "${VM_COMMAND[@]}" src/tests/kiem_tra_ffi_tep.vi >"$strict_file_out" 2>&1 &&
+    if VPP_STRICT_SYSTEM_FFI_FILE=1 "${NATIVE_COMMAND[@]}" src/tests/kiem_tra_ffi_tep.vi >"$strict_file_out" 2>&1 &&
       diff -u src/tests/expected/kiem_tra_ffi_tep.expected "$strict_file_out"; then
       echo "PASS: System FFI strict public file API"; PASS=$((PASS+1))
     else
@@ -519,7 +570,9 @@ case "$(uname -s)" in
           continue
         fi
         strict_out="$tmpdir/strict_posix_${strict_mode}_${strict_name}.output"
-        if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "${VM_COMMAND[@]}" \
+        strict_command=("${NATIVE_COMMAND[@]}")
+        if [ "$strict_mode" = jit ]; then strict_command=("${VM_COMMAND[@]}"); fi
+        if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "${strict_command[@]}" \
           "src/tests/${strict_name}.vi" >"$strict_out" 2>&1 &&
           diff -u "src/tests/expected/${strict_name}.expected" "$strict_out"; then
           echo "PASS: System FFI strict POSIX $strict_name [$strict_mode]"; PASS=$((PASS+1))
@@ -572,9 +625,49 @@ case "$(uname -s)" in
     ;;
 esac
 
-# Các ca lỗi runtime dưới đây khóa cơ chế chẩn đoán từ trạng thái thực tế: VM phải
-# tự suy ra nguyên nhân và giải thích mà không cần nơi phát sinh gắn mã lỗi.
-EXPECTED_FAILURE_TESTS=( \
+# Native runtime/compile-time error checks run through the self-hosted V++
+# compiler. The shared UTF-8 manifest supplies platform-independent diagnostic
+# fragments; checking the exit status prevents successful runs from passing.
+NATIVE_FAILURE_TESTS=()
+NATIVE_FAILURE_DIAGNOSTICS=()
+NATIVE_FAILURE_MANIFEST="src/tests/expected/native_failures.tsv"
+while IFS=$'\t' read -r native_source native_diagnostic || [ -n "$native_source" ]; do
+  case "$native_source" in ''|'#'*) continue ;; esac
+  if [ ! -f "$native_source" ] || [ -z "$native_diagnostic" ]; then
+    echo "ERROR: invalid native failure entry: $native_source" >&2
+    exit 2
+  fi
+  NATIVE_FAILURE_TESTS+=("$native_source")
+  NATIVE_FAILURE_DIAGNOSTICS+=("$native_diagnostic")
+done < "$NATIVE_FAILURE_MANIFEST"
+
+if [ "${#NATIVE_FAILURE_TESTS[@]}" -gt 0 ] &&
+   ! "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${NATIVE_FAILURE_TESTS[@]}"; then
+  echo "ERROR: native expected-failure batch worker failed" >&2
+  exit 2
+fi
+for ((native_idx=0; native_idx<${#NATIVE_FAILURE_TESTS[@]}; native_idx++)); do
+  native_source="${NATIVE_FAILURE_TESTS[native_idx]}"
+  native_name="$(basename "$native_source" .vi)"
+  native_out="$tmpdir/${native_name}.output"
+  native_status_file="$tmpdir/${native_name}.status"
+  echo "== Running $native_source [V++ native expected failure] =="
+  if [ ! -f "$native_status_file" ]; then
+    echo "FAIL: $native_source (no native status)"; FAIL=$((FAIL+1))
+  elif [ "$(cat "$native_status_file")" -ne 1 ]; then
+    echo "FAIL: $native_source (expected native error exit 1, got $(cat "$native_status_file"))"; FAIL=$((FAIL+1))
+  elif grep -Fq -- "${NATIVE_FAILURE_DIAGNOSTICS[native_idx]}" "$native_out"; then
+    echo "PASS: $native_source [V++ native error]"; PASS=$((PASS+1))
+  else
+    echo "FAIL: $native_source (wrong native diagnostic)"; FAIL=$((FAIL+1))
+    cat "$native_out" >&2
+  fi
+done
+
+# The original detailed trace/diagnostic snapshots specifically check Stage 0
+# VM error explanations. Keep them in a named compatibility lane, independent
+# of the native failures above.
+VM_EXPECTED_FAILURE_TESTS=( \
   src/tests/kiem_tra_de_quy_vuot_gioi_han.vi \
   src/tests/kiem_tra_stack_trace.vi \
   src/tests/kiem_tra_stack_trace_module.vi \
@@ -603,12 +696,12 @@ EXPECTED_FAILURE_TESTS=( \
 
 # Các ca expected-failure cũng chạy trong một worker duy nhất để tái sử dụng
 # AST/mid-end cache. Mỗi test vẫn tạo CompilationContext và VM riêng.
-if ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${EXPECTED_FAILURE_TESTS[@]}"; then
+if ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${VM_EXPECTED_FAILURE_TESTS[@]}"; then
   echo "ERROR: expected-failure batch worker failed" >&2
   exit 2
 fi
 
-for runtime_failure_test in "${EXPECTED_FAILURE_TESTS[@]}"; do
+for runtime_failure_test in "${VM_EXPECTED_FAILURE_TESTS[@]}"; do
   runtime_failure_name="$(basename "$runtime_failure_test" .vi)"
   runtime_failure_out="$tmpdir/${runtime_failure_name}.output"
   runtime_failure_exp="src/tests/expected/${runtime_failure_name}.expected"

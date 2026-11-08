@@ -1219,11 +1219,13 @@ if (BUILD_TESTS)
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
         endif()
     endif()
-    foreach(vpp_case IN ITEMS compiler oop ffi)
+    foreach(vpp_case IN ITEMS compiler oop ffi vm-parity)
         if (vpp_case STREQUAL "compiler")
             set(vpp_cli_test vpp-compiler-vpp-cli)
         elseif (vpp_case STREQUAL "ffi")
             set(vpp_cli_test vpp-compiler-ffi-artifact)
+        elseif (vpp_case STREQUAL "vm-parity")
+            set(vpp_cli_test vpp-legacy-vm-parity)
         else()
             set(vpp_cli_test vpp-oop-pipeline)
         endif()
@@ -1236,7 +1238,7 @@ if (BUILD_TESTS)
                 "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_cli.cmake)
         set_tests_properties(${vpp_cli_test} PROPERTIES TIMEOUT 1200)
-        if (VPP_NATIVE_CLI_COMPILER)
+        if (VPP_NATIVE_CLI_COMPILER AND NOT vpp_case STREQUAL "vm-parity")
             set_tests_properties(${vpp_cli_test} PROPERTIES FIXTURES_REQUIRED native-cli-compiler)
         endif()
     endforeach()
@@ -1278,21 +1280,29 @@ if (BUILD_TESTS)
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/integration-backend"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.cmake)
     set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
-    add_test(NAME vpp-quantum-validation
-        COMMAND ${CMAKE_COMMAND} -E env "VPP_HOME=${CMAKE_SOURCE_DIR}"
-            $<TARGET_FILE:vpp-cli> run --compiler=cpp
-            "${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_luong_tu_qiskit.vi")
-    set_tests_properties(vpp-quantum-validation PROPERTIES
-        PASS_REGULAR_EXPRESSION "qiskit-validation-without-python: ok" TIMEOUT 90)
+    if (VPP_NATIVE_CLI_COMPILER)
+        add_test(NAME vpp-quantum-validation
+            COMMAND ${CMAKE_COMMAND} -E env "VPP_HOME=${CMAKE_SOURCE_DIR}"
+                "VPP_AOT_ROOT=${CMAKE_SOURCE_DIR}"
+                "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                $<TARGET_FILE:vpp-cli> run --compiler=vpp
+                "${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_luong_tu_qiskit.vi")
+        set_tests_properties(vpp-quantum-validation PROPERTIES
+            PASS_REGULAR_EXPRESSION "qiskit-validation-without-python: ok"
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 240)
+    endif()
 
-    if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
+    if (VPP_NATIVE_CLI_COMPILER AND UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
                  COMMAND ${CMAKE_COMMAND} -E env
                          "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                         "VPP_HOME=${CMAKE_SOURCE_DIR}"
+                         "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
                          ${CMAKE_SOURCE_DIR}/run_tests.sh)
         set_tests_properties(vpp-integration PROPERTIES
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    elseif (WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1)
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 14400)
+    elseif (VPP_NATIVE_CLI_COMPILER AND WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1)
         # The bundled module names are UTF-8 Vietnamese text.  PowerShell 7
         # reads UTF-8 scripts consistently, unlike legacy Windows PowerShell.
         find_program(VPP_POWERSHELL_EXECUTABLE NAMES pwsh)
@@ -1302,12 +1312,16 @@ if (BUILD_TESTS)
                              -NoLogo -NoProfile -NonInteractive
                              -ExecutionPolicy Bypass
                              -File ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1
-                             -VppExecutable $<TARGET_FILE:vpp-cli>)
+                             -VppExecutable $<TARGET_FILE:vpp-cli>
+                             -NativeCompiler ${VPP_NATIVE_CLI_COMPILER})
             set_tests_properties(vpp-integration PROPERTIES
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 14400)
         else()
             message(WARNING "PowerShell 7 (pwsh) was not found; Windows integration tests are disabled")
         endif()
+    else()
+        message(STATUS "V++ native compiler unavailable on this target; skipping native integration suite")
     endif()
 endif()
 

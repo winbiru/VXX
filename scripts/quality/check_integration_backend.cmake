@@ -53,4 +53,28 @@ file(READ "${output}/valid.output" actual)
 if(status STREQUAL "0" OR NOT actual MATCHES "VPP_NATIVE_COMPILER")
     message(FATAL_ERROR "Default backend ignored the native configuration")
 endif()
-message(STATUS "VM backend: explicit selection, UTF-8, diagnostics and unchanged default PASS")
+
+# An explicitly requested V++ backend must fail closed when the configured
+# native compiler is unavailable; executing successfully through C++ would
+# silently invalidate every self-hosted golden test.
+foreach(native_command IN ITEMS run batch)
+    if(native_command STREQUAL "run")
+        set(native_args run --compiler=vpp "${source}")
+    else()
+        set(native_args --batch-run-tests --compiler=vpp
+            "${VPP_OUTPUT_DIR}/explicit-native" "${source}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "VPP_HOME=${VPP_ROOT}"
+        "VPP_NATIVE_COMPILER=${VPP_OUTPUT_DIR}/missing-native-compiler"
+        "${VPP_CLI}" ${native_args}
+        RESULT_VARIABLE native_status OUTPUT_VARIABLE native_output
+        ERROR_VARIABLE native_errors TIMEOUT 30)
+    if(native_status STREQUAL "0")
+        message(FATAL_ERROR "Explicit V++ ${native_command} silently fell back to the C++ VM")
+    endif()
+    if(NOT "${native_output}${native_errors}" MATCHES "VPP_NATIVE_COMPILER")
+        message(FATAL_ERROR "Explicit V++ ${native_command} did not report the missing native compiler: ${native_status}\n${native_output}\n${native_errors}")
+    endif()
+endforeach()
+message(STATUS "VM backend: explicit selection, UTF-8, diagnostics; explicit V++ never falls back: PASS")

@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$VppExecutable
+    [string]$VppExecutable,
+    [string]$NativeCompiler = $env:VPP_NATIVE_COMPILER
 )
 
 # Full Windows counterpart to run_tests.sh.  The Unix runner is the canonical
@@ -19,6 +20,8 @@ $sessionDir = Join-Path (Join-Path $repoRoot "src\tests\.tmp") ("windows-" + [gu
 $externalVppHome = $null
 $fixtureProcess = $null
 $previousVppHome = $env:VPP_HOME
+$previousNativeCompiler = $env:VPP_NATIVE_COMPILER
+$previousAotRoot = $env:VPP_AOT_ROOT
 
 function Add-Pass {
     param([string]$Name)
@@ -100,7 +103,9 @@ function Invoke-Vpp {
         [string]$StdOut,
         [string]$StdErr,
         [string]$WorkingDirectory,
-        [hashtable]$Environment = @{}
+        [hashtable]$Environment = @{},
+        [ValidateSet("Native", "Vm")]
+        [string]$Backend = "Native"
     )
 
     Remove-Item -LiteralPath $StdOut, $StdErr -Force -ErrorAction SilentlyContinue
@@ -109,11 +114,44 @@ function Invoke-Vpp {
     # SetEnvironmentVariable(name, "") can remove the entry; that makes an
     # explicitly empty getenv() value indistinguishable from a missing key.
     # Start-Process -Environment keeps "" and $null distinct in the child.
-    # These are interpreter/JIT golden tests, including VM-only intrinsics and
-    # runtime diagnostics. Native compiler parity has its own CTest gates.
-    $vmArguments = @("run", "--compiler=cpp") + $Arguments
-    $process = Start-Process -FilePath $script:Vpp -ArgumentList $vmArguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
+    # JIT modes always test Stage 0; ordinary golden tests use native V++.
+    $useVm = $Backend -eq "Vm" -or $Environment["VPP_ENABLE_JIT"] -eq "1" -or $Environment["VPP_ENABLE_MACHINE_JIT"] -eq "1"
+    $compiler = if ($useVm) { "cpp" } else { "vpp" }
+    # Start-Process joins ArgumentList arrays into a command line. Preserve
+    # quoted fixture names such as "kiểm tra tên tiếng Việt cách từ.vi".
+    $quotedArguments = @($Arguments | ForEach-Object {
+        if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+    })
+    $runArguments = @("run", "--compiler=$compiler") + $quotedArguments
+    $process = Start-Process -FilePath $script:Vpp -ArgumentList $runArguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
     return $process.ExitCode
+}
+
+function Invoke-VppBatch {
+    param(
+        [string[]]$TestFiles,
+        [string]$OutputDirectory,
+        [ValidateSet("Native", "Vm")]
+        [string]$Backend
+    )
+
+    if ($TestFiles.Count -eq 0) { return }
+    New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+    $compiler = if ($Backend -eq "Vm") { "cpp" } else { "vpp" }
+    $arguments = @("--batch-run-tests", "--compiler=$compiler", $OutputDirectory) + $TestFiles
+    # Start-Process joins its ArgumentList into one Windows command line.
+    # Quote Unicode fixture paths that contain spaces, including the output dir.
+    $quotedArguments = @($arguments | ForEach-Object {
+        if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
+    })
+    $stdout = Join-Path $OutputDirectory "batch.stdout"
+    $stderr = Join-Path $OutputDirectory "batch.stderr"
+    $process = Start-Process -FilePath $script:Vpp -ArgumentList $quotedArguments `
+        -WorkingDirectory $repoRoot -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr -PassThru -Wait -NoNewWindow
+    if ($process.ExitCode -ne 0) {
+        throw "V++ $Backend golden batch failed (exit $($process.ExitCode)): $(Get-NormalizedUtf8Text $stdout) $(Get-NormalizedUtf8Text $stderr)"
+    }
 }
 
 function Start-VppServer {
@@ -125,7 +163,7 @@ function Start-VppServer {
     )
 
     Remove-Item -LiteralPath $StdOut, $StdErr -Force -ErrorAction SilentlyContinue
-    return Start-Process -FilePath $script:Vpp -ArgumentList @("run", "--compiler=cpp", $Source) -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -PassThru -NoNewWindow
+    return Start-Process -FilePath $script:Vpp -ArgumentList @("run", "--compiler=vpp", ('"' + $Source + '"')) -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -PassThru -NoNewWindow
 }
 
 function Stop-VppServer {
@@ -149,11 +187,19 @@ function Wait-ForHttp {
     param(
         [string]$Uri,
         [string]$ExpectedContent,
-        [int]$Attempts = 20
+        [int]$TimeoutSeconds = 600,
+        $ServerProcess = $null
     )
 
     $script:LastHttpProbeError = ""
-    for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
+    # Native V++ builds and links the fixture on first launch. Allow the
+    # self-hosted compiler to finish before deciding that HTTP startup failed.
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+        if ($null -ne $ServerProcess -and $ServerProcess.HasExited) {
+            $script:LastHttpProbeError = "fixture process exited with code $($ServerProcess.ExitCode)"
+            return $false
+        }
         try {
             # Local fixture checks must not inherit a corporate/runner proxy.
             # PowerShell/.NET can spend noticeable time initializing the first
@@ -167,7 +213,7 @@ function Wait-ForHttp {
         } catch {
             $script:LastHttpProbeError = $_.Exception.Message
         }
-        Start-Sleep -Milliseconds 100
+        Start-Sleep -Milliseconds 200
     }
     return $false
 }
@@ -175,7 +221,10 @@ function Wait-ForHttp {
 function Invoke-ExpectedTest {
     param(
         [string]$TestFile,
-        [hashtable]$Environment = @{}
+        [hashtable]$Environment = @{},
+        [ValidateSet("Native", "Vm")]
+        [string]$Backend = "Native",
+        [string]$BatchDirectory = ""
     )
 
     $base = [System.IO.Path]::GetFileNameWithoutExtension($TestFile)
@@ -190,13 +239,31 @@ function Invoke-ExpectedTest {
         return
     }
 
-    $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot -Environment $Environment
+    if ($BatchDirectory) {
+        $stdout = Join-Path $BatchDirectory "$base.output"
+        $statusPath = Join-Path $BatchDirectory "$base.status"
+        if (-not (Test-Path -LiteralPath $statusPath)) {
+            Add-Fail "$displayName (batch worker did not produce status)"
+            return
+        }
+        $rawStatus = (Get-NormalizedUtf8Text $statusPath).Trim()
+        [int]$exitCode = 0
+        if (-not [int]::TryParse($rawStatus, [ref]$exitCode)) {
+            Add-Fail "$displayName (invalid batch status: $rawStatus)"
+            return
+        }
+    } else {
+        $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot -Environment $Environment -Backend $Backend
+    }
     $matches = Test-ExpectedOutput -Expected $expected -Actual $stdout
     if ($exitCode -eq 0 -and $matches) {
         Add-Pass $displayName
     } else {
         Add-Fail $displayName
         Show-FailureDetails -StdErr $stderr -ExitCode $exitCode
+        if ($BatchDirectory -and $exitCode -ne 0) {
+            Write-Host (Get-NormalizedUtf8Text $stdout)
+        }
     }
 }
 
@@ -215,7 +282,7 @@ function Invoke-ExpectedFailureTest {
         return
     }
 
-    $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot
+    $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot -Backend Vm
     $matches = Test-ExpectedOutput -Expected $expected -Actual $stderr
     if ($exitCode -ne 0 -and $matches) {
         Add-Pass $displayName
@@ -226,6 +293,31 @@ function Invoke-ExpectedFailureTest {
             Add-Fail $displayName
         }
         Show-FailureDetails -StdErr $stderr -ExitCode $exitCode
+    }
+}
+
+function Invoke-NativeFailureTest {
+    param(
+        [string]$TestFile,
+        [string]$Diagnostic
+    )
+
+    $base = [System.IO.Path]::GetFileNameWithoutExtension($TestFile)
+    $stdout = Join-Path $sessionDir ("$base.native.output")
+    $stderr = Join-Path $sessionDir ("$base.native.stderr")
+    $displayName = $TestFile.Replace('\', '/')
+
+    Write-Host "== Running $displayName [V++ native expected failure] =="
+    $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot -Backend Native
+    $actualOutput = (Get-NormalizedUtf8Text $stdout) + "`n" + (Get-NormalizedUtf8Text $stderr)
+    # The selected fixtures fail deterministically with exit code 1. Reject
+    # crashes and successful execution even if their output contains the text.
+    if ($exitCode -eq 1 -and $actualOutput.Contains($Diagnostic)) {
+        Add-Pass "$displayName [V++ native error]"
+    } else {
+        Add-Fail "$displayName [V++ native error: expected exit 1 and '$Diagnostic']"
+        Show-FailureDetails -StdErr $stderr -ExitCode $exitCode
+        Write-Host $actualOutput
     }
 }
 
@@ -246,8 +338,10 @@ function Get-BashTestArray {
         if ($line.Trim() -eq ")") {
             return $tests.ToArray()
         }
-        if ($line -match '(src/tests/[^\s\\]+\.vi)') {
-            $tests.Add($Matches[1])
+        # Accept quoted UTF-8 fixture paths containing spaces as well.
+        $entry = $line.Trim().TrimEnd([char]'\').Trim().Trim('"')
+        if ($entry -match '^src/tests/.+\.vi$') {
+            $tests.Add($entry)
         }
     }
     throw "Không tìm thấy mảng $ArrayName hoàn chỉnh trong run_tests.sh"
@@ -257,9 +351,14 @@ try {
     if (-not (Test-Path -LiteralPath $script:Vpp -PathType Leaf)) {
         throw "Khong tim thay vpp-cli: $VppExecutable"
     }
+    if ([string]::IsNullOrWhiteSpace($NativeCompiler) -or -not (Test-Path -LiteralPath $NativeCompiler -PathType Leaf)) {
+        throw "V++ native compiler is required for integration tests: $NativeCompiler"
+    }
 
     New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
     $env:VPP_HOME = $repoRoot
+    $env:VPP_AOT_ROOT = $repoRoot
+    $env:VPP_NATIVE_COMPILER = (Resolve-Path -LiteralPath $NativeCompiler).Path
 
     # Fail early if Windows process creation loses the distinction between an
     # empty environment value and a missing variable. This fixture also runs
@@ -299,7 +398,7 @@ try {
     $fixtureStdOut = Join-Path $sessionDir "http_fixture.output"
     $fixtureStdErr = Join-Path $sessionDir "http_fixture.stderr"
     $fixtureProcess = Start-VppServer -Source (Join-Path $repoRoot "src\tests\http_fixture.vi") -StdOut $fixtureStdOut -StdErr $fixtureStdErr -WorkingDirectory $repoRoot
-    if (-not (Wait-ForHttp -Uri "http://127.0.0.1:18080/health" -ExpectedContent '{"ok":true}')) {
+    if (-not (Wait-ForHttp -Uri "http://127.0.0.1:18080/health" -ExpectedContent '{"ok":true}' -ServerProcess $fixtureProcess)) {
         # Start-Process keeps redirected log handles open on Windows. Stop and
         # wait for the fixture before reading its diagnostics, otherwise the
         # lock itself masks the real startup error.
@@ -335,6 +434,9 @@ try {
     }
 
     $tests = Get-BashTestArray -ArrayName "TESTS"
+    $vmGoldenTests = Get-BashTestArray -ArrayName "VM_GOLDEN_TESTS"
+    $nativeGoldenTests = [System.Collections.Generic.List[string]]::new()
+    $legacyGoldenTests = [System.Collections.Generic.List[string]]::new()
     foreach ($relativeTest in $tests) {
         # POSIX shell/signal fixture has a Windows-specific counterpart below.
         if ($relativeTest -eq "src/tests/kiem_tra_ffi_process_spawn.vi") {
@@ -343,7 +445,24 @@ try {
         if ($relativeTest -eq "src/tests/kiem_tra_ffi_moi_truong.vi") {
             continue # Already verified in both modes by the early preflight.
         }
-        Invoke-ExpectedTest -TestFile $relativeTest
+        if ($vmGoldenTests -contains $relativeTest) {
+            $legacyGoldenTests.Add($relativeTest)
+        } else {
+            $nativeGoldenTests.Add($relativeTest)
+        }
+    }
+    $nativeBatchDirectory = Join-Path $sessionDir "native-golden"
+    $legacyBatchDirectory = Join-Path $sessionDir "vm-golden"
+    Invoke-VppBatch -TestFiles $nativeGoldenTests.ToArray() -OutputDirectory $nativeBatchDirectory -Backend Native
+    Invoke-VppBatch -TestFiles $legacyGoldenTests.ToArray() -OutputDirectory $legacyBatchDirectory -Backend Vm
+    foreach ($relativeTest in $tests) {
+        if ($relativeTest -eq "src/tests/kiem_tra_ffi_process_spawn.vi" -or
+            $relativeTest -eq "src/tests/kiem_tra_ffi_moi_truong.vi") { continue }
+        if ($vmGoldenTests -contains $relativeTest) {
+            Invoke-ExpectedTest -TestFile $relativeTest -Backend Vm -BatchDirectory $legacyBatchDirectory
+        } else {
+            Invoke-ExpectedTest -TestFile $relativeTest -BatchDirectory $nativeBatchDirectory
+        }
     }
 
     # Windows file I/O now shares the managed stdio FFI path with POSIX.
@@ -353,7 +472,7 @@ try {
         Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_tep.vi" -Environment @{ VPP_ENABLE_JIT = $fileMode; VPP_STRICT_SYSTEM_FFI_FILE = "1" }
         $fileStdout = Join-Path $sessionDir "legacy-file-$fileMode.output"
         $fileStderr = Join-Path $sessionDir "legacy-file-$fileMode.stderr"
-        $fileExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_tep_cu.vi") -StdOut $fileStdout -StdErr $fileStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $fileMode }
+        $fileExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_tep_cu.vi") -StdOut $fileStdout -StdErr $fileStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $fileMode } -Backend Vm
         $fileError = Get-NormalizedUtf8Text $fileStderr
         if ($fileExit -ne 0 -and $null -ne $fileError -and
             $fileError.Contains("System FFI strict file: legacy VM file opcode is disabled")) {
@@ -372,7 +491,7 @@ try {
         Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc_windows.vi" -Environment @{ VPP_WINDOWS_DIRECTORY_FFI = "0"; VPP_WINDOWS_PATH_FFI = "0"; VPP_ENABLE_JIT = $directoryMode }
         $fsStdout = Join-Path $sessionDir "legacy-filesystem-$directoryMode.output"
         $fsStderr = Join-Path $sessionDir "legacy-filesystem-$directoryMode.stderr"
-        $fsExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_thu_muc_cu.vi") -StdOut $fsStdout -StdErr $fsStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $directoryMode }
+        $fsExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_thu_muc_cu.vi") -StdOut $fsStdout -StdErr $fsStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $directoryMode } -Backend Vm
         $fsError = Get-NormalizedUtf8Text $fsStderr
         if ($fsExit -ne 0 -and $null -ne $fsError -and
             $fsError.Contains("legacy filesystem opcode is disabled")) {
@@ -389,7 +508,7 @@ try {
         foreach ($dnsLegacyFixture in @("kiem_tra_ffi_opcode_dns_cu", "kiem_tra_ffi_opcode_socket_phan_giai_cu")) {
             $dnsStdout = Join-Path $sessionDir "$dnsLegacyFixture-$dnsMode.output"
             $dnsStderr = Join-Path $sessionDir "$dnsLegacyFixture-$dnsMode.stderr"
-            $dnsExit = Invoke-Vpp -Arguments @("src/tests/$dnsLegacyFixture.vi") -StdOut $dnsStdout -StdErr $dnsStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $dnsMode }
+            $dnsExit = Invoke-Vpp -Arguments @("src/tests/$dnsLegacyFixture.vi") -StdOut $dnsStdout -StdErr $dnsStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $dnsMode } -Backend Vm
             $dnsError = Get-NormalizedUtf8Text $dnsStderr
             if ($dnsExit -ne 0 -and $null -ne $dnsError -and
                 $dnsError.Contains("System FFI: legacy DNS opcode is disabled")) {
@@ -419,7 +538,7 @@ try {
     foreach ($processMode in @("0", "1")) {
         $processStdout = Join-Path $sessionDir "legacy-process-$processMode.output"
         $processStderr = Join-Path $sessionDir "legacy-process-$processMode.stderr"
-        $processExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_process_cu.vi") -StdOut $processStdout -StdErr $processStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $processMode }
+        $processExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_process_cu.vi") -StdOut $processStdout -StdErr $processStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $processMode } -Backend Vm
         $processError = Get-NormalizedUtf8Text $processStderr
         if ($processExit -ne 0 -and $null -ne $processError -and
             $processError.Contains("System FFI: legacy process opcode is disabled")) {
@@ -436,7 +555,7 @@ try {
         Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_local_windows.vi" -Environment @{ VPP_ENABLE_JIT = $utcMode }
         $utcStdout = Join-Path $sessionDir "legacy-utc-$utcMode.output"
         $utcStderr = Join-Path $sessionDir "legacy-utc-$utcMode.stderr"
-        $utcExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_utc_cu.vi") -StdOut $utcStdout -StdErr $utcStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $utcMode }
+        $utcExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_utc_cu.vi") -StdOut $utcStdout -StdErr $utcStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $utcMode } -Backend Vm
         $utcError = Get-NormalizedUtf8Text $utcStderr
         if ($utcExit -ne 0 -and $null -ne $utcError -and
             $utcError.Contains("System FFI: legacy UTC clock opcode is disabled")) {
@@ -453,7 +572,7 @@ try {
         Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_entropy.vi" -Environment @{ VPP_ENABLE_JIT = $entropyMode }
         $entropyStdout = Join-Path $sessionDir "legacy-entropy-$entropyMode.output"
         $entropyStderr = Join-Path $sessionDir "legacy-entropy-$entropyMode.stderr"
-        $entropyExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_entropy_cu.vi") -StdOut $entropyStdout -StdErr $entropyStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $entropyMode }
+        $entropyExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_entropy_cu.vi") -StdOut $entropyStdout -StdErr $entropyStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $entropyMode } -Backend Vm
         $entropyError = Get-NormalizedUtf8Text $entropyStderr
         if ($entropyExit -ne 0 -and $null -ne $entropyError -and
             $entropyError.Contains("System FFI: legacy secure entropy opcode is disabled")) {
@@ -475,7 +594,7 @@ try {
         )) {
             $clockStdout = Join-Path $sessionDir "legacy-$($oldClockTest.Name)-$timeMode.output"
             $clockStderr = Join-Path $sessionDir "legacy-$($oldClockTest.Name)-$timeMode.stderr"
-            $clockExit = Invoke-Vpp -Arguments @($oldClockTest.File) -StdOut $clockStdout -StdErr $clockStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $timeMode }
+            $clockExit = Invoke-Vpp -Arguments @($oldClockTest.File) -StdOut $clockStdout -StdErr $clockStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $timeMode } -Backend Vm
             $clockError = Get-NormalizedUtf8Text $clockStderr
             if ($clockExit -ne 0 -and $null -ne $clockError -and
                 $clockError.Contains($oldClockTest.Diagnostic)) {
@@ -487,7 +606,21 @@ try {
         }
     }
 
-    $expectedFailureTests = Get-BashTestArray -ArrayName "EXPECTED_FAILURE_TESTS"
+    # Share the same native diagnostic manifest as the Unix integration runner.
+    $failureManifest = Join-Path $repoRoot "src\tests\expected\native_failures.tsv"
+    foreach ($line in [System.IO.File]::ReadAllLines($failureManifest, [System.Text.UTF8Encoding]::new($false))) {
+        if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith("#")) {
+            continue
+        }
+        $parts = $line.Split([char]"`t", 2)
+        if ($parts.Count -ne 2 -or -not (Test-Path -LiteralPath (Join-Path $repoRoot $parts[0]) -PathType Leaf) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+            throw "Invalid native failure manifest entry: $line"
+        }
+        Invoke-NativeFailureTest -TestFile $parts[0] -Diagnostic $parts[1]
+    }
+
+    # Preserve the original exact VM trace checks as a separate compatibility lane.
+    $expectedFailureTests = Get-BashTestArray -ArrayName "VM_EXPECTED_FAILURE_TESTS"
     foreach ($relativeTest in $expectedFailureTests) {
         Invoke-ExpectedFailureTest -TestFile $relativeTest
     }
@@ -521,7 +654,7 @@ try {
     }
 
     Write-Host "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
-    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Backend Vm -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
 
     Write-Host ""
     Write-Host "=== PASS: $script:PassCount, FAIL: $script:FailCount ==="
@@ -535,6 +668,16 @@ try {
         Remove-Item Env:VPP_HOME -ErrorAction SilentlyContinue
     } else {
         $env:VPP_HOME = $previousVppHome
+    }
+    if ($null -eq $previousNativeCompiler) {
+        Remove-Item Env:VPP_NATIVE_COMPILER -ErrorAction SilentlyContinue
+    } else {
+        $env:VPP_NATIVE_COMPILER = $previousNativeCompiler
+    }
+    if ($null -eq $previousAotRoot) {
+        Remove-Item Env:VPP_AOT_ROOT -ErrorAction SilentlyContinue
+    } else {
+        $env:VPP_AOT_ROOT = $previousAotRoot
     }
     Remove-Item -LiteralPath $sessionDir -Recurse -Force -ErrorAction SilentlyContinue
     foreach ($oopTemporary in @(".tmp_oop_zip.txt", ".tmp_oop_zip.zip", ".tmp_oop_manifest.json")) {

@@ -42,6 +42,16 @@ hàm vm_real(v) {
 };
 hàm vm_string(n) {
     nếu (n < 0 || n > 16000000) { trả về vm_error(3); };
+    // Chuỗi ngắn giữ bytes ngay sau header giá trị. Tránh cấp phát hai
+    // khối cho mỗi khóa JSON, token, đoạn escape hoặc phép nối nhỏ.
+    // scan=2 chỉ truy vết ô chỉ mục UTF-8 tại v[3], bỏ qua bytes nội tuyến.
+    nếu (n <= 31) {
+        biến ngắn = vm_alloc(n + 17, 2);
+        nếu (ngắn == 0) { trả về 0; };
+        vm_set(ngắn, 0, 3); vm_set(ngắn, 1, n);
+        vm_set(ngắn, 2, ngắn + 16); vm_set(ngắn, 3, -1);
+        trả về ngắn;
+    };
     biến raw = vm_alloc(n + 1, 0); biến v = vm_alloc(16, 1);
     nếu (raw == 0 || v == 0) { trả về 0; };
     // The fourth word is a lazy UTF-8 index: -1 unknown, <= -2 stores
@@ -58,7 +68,13 @@ hàm vm_slice(s, start, n) {
     nếu (vm_tag(s) != 3 || start < 0 || n < 0) { trả về vm_error(3); };
     nếu (start > vm_get(s, 1) || n > vm_get(s, 1) - start) { trả về vm_error(3); };
     biến v = vm_string(n); nếu (v == 0) { trả về 0; };
-    lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(v, 2) + i, máy đọc byte(vm_get(s, 2) + start + i)); };
+    biến nguồn = vm_get(s, 2) + start; biến đích = vm_get(v, 2);
+    biến i = 0;
+    khi (i <= n - 4) {
+        máy ghi số nguyên ba mươi hai bit(đích + i, máy đọc số nguyên ba mươi hai bit(nguồn + i));
+        i = i + 4;
+    };
+    khi (i < n) { máy ghi byte(đích + i, máy đọc byte(nguồn + i)); i = i + 1; };
     trả về v;
 };
 hàm vm_equal(a, b) {
@@ -72,8 +88,16 @@ hàm vm_equal(a, b) {
     nếu (ta != tb) { trả về 0; };
     nếu (ta != 3) { trả về a == b; };
     biến n = vm_get(a, 1); nếu (n != vm_get(b, 1)) { trả về 0; };
-    lặp(i = 0; i < n; i++) {
-        nếu (máy đọc byte(vm_get(a, 2) + i) != máy đọc byte(vm_get(b, 2) + i)) { trả về 0; };
+    biến nguồn a = vm_get(a, 2); biến nguồn b = vm_get(b, 2);
+    biến i = 0;
+    khi (i <= n - 4) {
+        nếu (máy đọc số nguyên ba mươi hai bit(nguồn a + i) !=
+            máy đọc số nguyên ba mươi hai bit(nguồn b + i)) { trả về 0; };
+        i = i + 4;
+    };
+    khi (i < n) {
+        nếu (máy đọc byte(nguồn a + i) != máy đọc byte(nguồn b + i)) { trả về 0; };
+        i = i + 1;
     };
     trả về 1;
 };
@@ -228,7 +252,10 @@ hàm vm_map_put(v, key, value) {
     trả về 0;
 };
 hàm vm_integer_text(n) {
-    biến raw = vm_alloc(16, 0); nếu (raw == 0) { trả về 0; };
+    // Số nguyên i32 cần tối đa 11 byte. Tạo trực tiếp chuỗi nội tuyến,
+    // ghi chữ số ngược rồi đảo tại chỗ, bỏ một lần cấp phát bộ đệm tạm.
+    biến s = vm_string(11); nếu (s == 0) { trả về 0; };
+    biến raw = vm_get(s, 2);
     biến count = 0; biến negative = n < 0;
     nếu (n > 0) { n = 0 - n; };
     khi (n <= -10) {
@@ -237,8 +264,12 @@ hàm vm_integer_text(n) {
     };
     máy ghi byte(raw + count, 48 - n); count = count + 1;
     nếu (negative) { máy ghi byte(raw + count, 45); count = count + 1; };
-    biến s = vm_string(count); nếu (s == 0) { trả về 0; };
-    lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(raw + count - i - 1)); };
+    lặp(i = 0; i < máy chia số nguyên ba mươi hai bit(count, 2); i++) {
+        biến left = máy đọc byte(raw + i);
+        máy ghi byte(raw + i, máy đọc byte(raw + count - i - 1));
+        máy ghi byte(raw + count - i - 1, left);
+    };
+    vm_set(s, 1, count);
     trả về s;
 };
 // UINT32_MAX = 2*10^9 + 147483648 + (bits - INT32_MIN).
@@ -256,8 +287,19 @@ hàm vm_unsigned_text(bits) {
 hàm vm_concat(a, b) {
     biến n = vm_get(a, 1); biến m = vm_get(b, 1); biến s = vm_string(n + m);
     nếu (s == 0) { trả về 0; };
-    lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(vm_get(a, 2) + i)); };
-    lặp(i = 0; i < m; i++) { máy ghi byte(vm_get(s, 2) + n + i, máy đọc byte(vm_get(b, 2) + i)); };
+    biến đích = vm_get(s, 2); biến nguồn a = vm_get(a, 2); biến nguồn b = vm_get(b, 2);
+    biến i = 0;
+    khi (i <= n - 4) {
+        máy ghi số nguyên ba mươi hai bit(đích + i, máy đọc số nguyên ba mươi hai bit(nguồn a + i));
+        i = i + 4;
+    };
+    khi (i < n) { máy ghi byte(đích + i, máy đọc byte(nguồn a + i)); i = i + 1; };
+    i = 0;
+    khi (i <= m - 4) {
+        máy ghi số nguyên ba mươi hai bit(đích + n + i, máy đọc số nguyên ba mươi hai bit(nguồn b + i));
+        i = i + 4;
+    };
+    khi (i < m) { máy ghi byte(đích + n + i, máy đọc byte(nguồn b + i)); i = i + 1; };
     trả về s;
 };
 hàm vm_text(v) {

@@ -98,6 +98,7 @@ node_modules/
 !plans/improvement-plan-2026-10-31.md
 !benchmark/BASELINE.md
 !benchmark/NATIVE.md
+!benchmark/UNICODE_JSON_AB.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
 !docs/vm-asm.md

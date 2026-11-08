@@ -237,7 +237,12 @@ hàm vm_collect(root) {
         biến header = object - 16;
         vm_set(4198464, 11, vm_get(header, 3));
         vm_set(header, 3, 0);
-        nếu (vm_get(header, 1) == 1) {
+        biến kiểu quét = vm_get(header, 1);
+        // Chuỗi ngắn có vùng UTF-8 nội tuyến. Chỉ ô v[3] có thể giữ
+        // con trỏ tới bảng chỉ mục UTF-8; các byte chuỗi không phải con trỏ.
+        nếu (kiểu quét == 2) {
+            vm_mark(vm_get(object, 3), epoch);
+        } hoặc nếu (kiểu quét == 1) {
             lặp(i = 16; i < vm_get(header, 0); i = i + 4) {
                 vm_mark(máy đọc số nguyên ba mươi hai bit(header + i), epoch);
             };

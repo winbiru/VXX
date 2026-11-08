@@ -24,6 +24,15 @@ hàm chính() {
     in json phân tích("false") == sai;
     in json phân tích("null") == rỗng;
     in json phân tích("[-17,-16,0,4095,4096]")[4] == 4096;
+    // Nhánh số một chữ số phải trả i32 đúng dấu và không nuốt phần thập
+    // phân, số mũ hay chữ số kế tiếp.
+    số nhanh = json phân tích("[0,1,9,-0,-1,-9]");
+    in số nhanh[0] == 0 && số nhanh[1] == 1 && số nhanh[2] == 9 &&
+        số nhanh[3] == 0 && số nhanh[4] == -1 && số nhanh[5] == -9;
+    số dài = json phân tích("[10,19,-10,-19,1.5,1e2,-1e2]");
+    in số dài[0] == 10 && số dài[1] == 19 && số dài[2] == -10 &&
+        số dài[3] == -19 && số dài[4] == 1.5 && số dài[5] == 100.0 &&
+        số dài[6] == -100.0;
 
     // Khoảng trắng ở đầu/cuối và giữa các giá trị lồng nhau phải giữ nguyên ngữ nghĩa.
     dữ liệu = json phân tích(" \t\r\n{ \"n\" : [ \t-12, \n3.5, 1e3 ], \"u\" : \"Việt 🚀\" }\r\n");
@@ -37,7 +46,8 @@ hàm chính() {
     mẫu lỗi = ["\"\\uD83D\"", "\"\\uDE80\"", "\"\\uD83D\\u0041\"",
                    "\"\\x00\"", "\"chưa đóng", "{\"k\":1,}", "[1,]", "1 2",
                    "", điều khiển + "1", "1" + điều khiển,
-                   "[1," + điều khiển + "2]", "{\"a\":" + điều khiển + "1}"];
+                   "[1," + điều khiển + "2]", "{\"a\":" + điều khiển + "1}",
+                   "01", "-01", "1e", "-1e", "1.", "-1.", "9a", "[1e,2]"];
     bị từ chối = 0;
     lặp(i = 0; i < máy ảo lấy độ dài(mẫu lỗi); i++) {
         thử {
@@ -47,4 +57,48 @@ hàm chính() {
         };
     };
     in bị từ chối == máy ảo lấy độ dài(mẫu lỗi);
+
+    // Ngưỡng chuyển sang nối chuỗi theo đoạn: bảo toàn thứ tự và escape.
+    mảng dài = [];
+    chuỗi mong đợi = "[";
+    lặp(i = 0; i < 512; i++) {
+        máy ảo thêm cuối danh sách(mảng dài, i);
+        nếu (i > 0) { chuỗi mong đợi += ","; };
+        chuỗi mong đợi += i;
+    };
+    chuỗi mong đợi += "]";
+    in json tạo(mảng dài) == chuỗi mong đợi;
+    chuỗi đặc biệt = "Việt 🌿\"\\\n";
+    máy ảo thêm cuối danh sách(mảng dài, chuỗi đặc biệt);
+    máy ảo thêm cuối danh sách(mảng dài, [1, rỗng, 3]);
+    mảng đọc lại = json phân tích(json tạo(mảng dài));
+    in máy ảo lấy độ dài(mảng đọc lại) == 514 && mảng đọc lại[0] == 0 &&
+        mảng đọc lại[511] == 511 && mảng đọc lại[512] == chuỗi đặc biệt;
+    in mảng đọc lại[513][0] == 1 && mảng đọc lại[513][1] == rỗng &&
+        mảng đọc lại[513][2] == 3;
+
+    // Nhánh parser số nguyên: 2..5 chữ số, i32 biên, số thực và Unicode trộn.
+    dãy số = json phân tích("[10,99,100,999,1000,9999,10000,99999,-10,-2147483648,2147483647]");
+    in dãy số[0] == 10 && dãy số[3] == 999 && dãy số[5] == 9999 &&
+        dãy số[7] == 99999 && dãy số[8] == -10 &&
+        dãy số[9] == -2147483648 && dãy số[10] == 2147483647;
+    dãy trộn = json phân tích("[10, 9, 11, -12, 1.25, 2e2, 99999, \"Việt 🌿\", null, [11]]");
+    in dãy trộn[0] == 10 && dãy trộn[1] == 9 && dãy trộn[2] == 11 &&
+        dãy trộn[3] == -12 && dãy trộn[4] == 1.25 && dãy trộn[5] == 200.0 &&
+        dãy trộn[6] == 99999 && dãy trộn[7] == "Việt 🌿" &&
+        dãy trộn[8] == rỗng && dãy trộn[9][0] == 11;
+
+    // Chính xác qua ngưỡng serializer 512 phần tử và parser dài.
+    lặp(kích thước = 511; kích thước <= 513; kích thước++) {
+        nguồn số = "[";
+        lặp(i = 0; i < kích thước; i++) {
+            nếu (i > 0) { nguồn số += ","; };
+            nguồn số += i;
+        };
+        nguồn số += "]";
+        đã đọc = json phân tích(nguồn số);
+        in máy ảo lấy độ dài(đã đọc) == kích thước &&
+            đã đọc[kích thước - 1] == kích thước - 1 &&
+            json tạo(đã đọc) == nguồn số;
+    };
 };

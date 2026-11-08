@@ -110,12 +110,7 @@ hàm chính() {
     thử { biên dịch phân tích chương trình thuần("nếu (đúng) {} nếu không {};"); }
     bắt lỗi (e) { lỗi_cũ = đúng; };
     in lỗi_cũ;
-    lỗi_cũ = sai;
-    thử { biên dịch phân tích("hàm chính() { nếu (đúng) {} nếu không {}; };"); }
-    bắt lỗi (e) { lỗi_cũ = đúng; };
-    in lỗi_cũ;
-
-    // Parser C++ và parser self-host cùng loại bỏ các chuỗi nhánh sai ngữ pháp.
+    // Native V++ parser phải loại bỏ những chuỗi nhánh sai ngữ pháp.
     mã_sai = [
         "hàm chính() { nếu (đúng) {} hoặc {} hoặc {}; };",
         "hàm chính() { hoặc {}; };",
@@ -128,10 +123,6 @@ hàm chính() {
         thử { biên dịch phân tích chương trình thuần(mã_sai[i]); }
         bắt lỗi (e) { lỗi_vpp = đúng; };
         in lỗi_vpp;
-        lỗi_cpp = sai;
-        thử { biên dịch phân tích(mã_sai[i]); }
-        bắt lỗi (e) { lỗi_cpp = đúng; };
-        in lỗi_cpp;
     };
 
     vòng = biên dịch phân tích ngữ nghĩa thuần(
@@ -201,18 +192,13 @@ hàm chính() {
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
 
-    // Bí danh `như` được khai báo theo lexical scope và namespace module C++.
-    // So hai trường hợp top-level với oracle C++.
+    // Bí danh `như` được khai báo theo lexical scope và namespace module.
     mã_trùng_bí_danh = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
         "nhập gói.biên dịch.chính.* như trợ_lý;";
     lỗi_vpp = sai;
     thử { biên dịch phân tích ngữ nghĩa thuần(mã_trùng_bí_danh); }
     bắt lỗi (e) { lỗi_vpp = đúng; };
     in lỗi_vpp;
-    lỗi_cpp = sai;
-    thử { biên dịch phân tích(mã_trùng_bí_danh); }
-    bắt lỗi (e) { lỗi_cpp = đúng; };
-    in lỗi_cpp;
 
     mã_bí_danh_riêng = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
         "nhập gói.biên dịch.chính.* như trình_dịch;";
@@ -220,10 +206,6 @@ hàm chính() {
     thử { biên dịch phân tích ngữ nghĩa thuần(mã_bí_danh_riêng); }
     bắt lỗi (e) { lỗi_vpp = đúng; };
     in !lỗi_vpp;
-    lỗi_cpp = sai;
-    thử { biên dịch phân tích(mã_bí_danh_riêng); }
-    bắt lỗi (e) { lỗi_cpp = đúng; };
-    in !lỗi_cpp;
 
     lỗi = sai;
     thử { biên dịch phân tích ngữ nghĩa thuần(
@@ -250,7 +232,7 @@ hàm chính() {
     bắt lỗi (e) { lỗi = đúng; };
     in !lỗi;
 
-    // C++ Semantic::declareAssignmentTarget cấm ghi vào function ID.
+    // Semantic pass V++ cấm ghi vào function ID.
     // Tham số/biến cục bộ có thể che tên hàm, kể cả khai báo biến ở sau.
     các_ca_gán_hàm = [
         {"nguồn": "đích = 2; hàm đích() {}; hàm chính() {};", "hợp lệ": sai},
@@ -271,10 +253,6 @@ hàm chính() {
         lỗi_vpp = sai;
         thử { biên dịch phân tích ngữ nghĩa thuần(ca["nguồn"]); }
         bắt lỗi (e) { lỗi_vpp = đúng; };
-        lỗi_cpp = sai;
-        thử { biên dịch phân tích(ca["nguồn"]); }
-        bắt lỗi (e) { lỗi_cpp = đúng; };
         in lỗi_vpp == !ca["hợp lệ"];
-        in lỗi_vpp == lỗi_cpp;
     };
 };

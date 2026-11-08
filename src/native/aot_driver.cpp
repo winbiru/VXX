@@ -190,8 +190,14 @@ int compilerMain(Program &program,int argc,char **argv) {
         fields[1]=source.u8string();fields[2]=output.u8string();fields[5]=base.u8string();
     }
     const auto root=installation(false);
+    // VPP_HOME is the library/package installation root. VPP_AOT_ROOT is
+    // the assembler/linker toolchain root. An external package installation
+    // may intentionally have no scripts/quality/native_aot_link directory.
+    fs::path libraryRoot = root;
+    if (const char *home=std::getenv("VPP_HOME"); home && *home)
+        libraryRoot=fs::absolute(core::utf8Path(home));
     const auto prepared=program.invokeName("biên dịch chuẩn bị dòng lệnh máy",
-        {make_list_value(std::move(fields)),root.u8string(),canonicalTriple(hostTarget())});
+        {make_list_value(std::move(fields)),libraryRoot.u8string(),canonicalTriple(hostTarget())});
     profiler.mark("vpp-cli-and-assembly");
     const auto &request=values(prepared);
     if(request.size()!=2||!std::holds_alternative<std::string>(request[0])||

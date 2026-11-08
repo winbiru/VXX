@@ -86,7 +86,12 @@ hàm riêng tư biên dịch nguồn tìm gói(gốc, đích) {
     nếu (là tệp(tệp)) { trả về tệp; };
     tệp = biên dịch nguồn chuẩn đường(nền + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
-    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên + ".vi");
+    // Stage 0 maps bare `nhập tùy chọn` to the persistent preferences API.
+    // The optional-value helpers are still reachable explicitly as
+    // `gói.lõi.tùy chọn`; preserve that distinction in the self-host compiler.
+    tên lõi = tên;
+    nếu (tên == "tùy chọn") { tên lõi = "tùy chọn bền vững"; };
+    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên lõi + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
     trả về "";
 };

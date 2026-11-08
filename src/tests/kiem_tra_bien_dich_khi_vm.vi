@@ -1,0 +1,27 @@
+// Oracle lịch sử: VM/C++ chỉ dùng để đối chiếu cú pháp và scripting VM.
+// Hành vi self-host V++ được kiểm tra riêng trong kiem_tra_bien_dich_khi.vi.
+nhập gói.biên dịch.chính.biên dịch phân tích;
+nhập gói.lõi.kịch bản.kịch bản chạy;
+nhập kiểm thử;
+
+hàm chính() {
+    biến nguồn = "hàm chính() { biến x = 0; biến tổng = 0; " +
+        "khi (sai) { in 99; }; khi (x < 8) { x++; " +
+        "nếu (x == 2) { bỏ qua; }; nếu (x == 5) { thoát; }; tổng += x; }; " +
+        "in tổng; in x; };";
+    khẳng định bằng(kịch bản chạy(nguồn), "8\n5\n");
+
+    nguồn = "hàm chính() { biến n = 0; biến a = 0; khi (a < 2) { a++; " +
+        "lặp (b = 0; b < 3; b++) { khi (đúng) { n++; thoát; }; }; }; in n; };";
+    khẳng định bằng(kịch bản chạy(nguồn), "6\n");
+
+    biến mã sai = ["khi () {};", "khi (đúng; sai; đúng) {};", "khi (đúng;) {};",
+                   "khi đúng {};", "khi (đúng) in 1;", "khi (đúng)"];
+    lặp (i = 0; i < độ dài(mã sai); i++) {
+        biến lỗi = sai;
+        thử { biên dịch phân tích(mã sai[i]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        khẳng định đúng(lỗi, "parser C++ phải từ chối cú pháp khi sai");
+    };
+    in "khi: VM oracle đạt";
+};

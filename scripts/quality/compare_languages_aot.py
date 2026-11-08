@@ -13,9 +13,8 @@ import platform
 import random
 import statistics
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 
 CASES = ("arithmetic", "branch_loop", "fibonacci", "list_128", "unicode_replace", "json_parse")
@@ -56,21 +55,35 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=9)
     parser.add_argument("--target-ms", type=float, default=60)
+    parser.add_argument("--runtimes", default="vpp-aot-vpp,vpp-i32,c,rust,cpp,node,java,python,ruby",
+                        help="Comma-separated subset of benchmark runtimes available on this OS")
+    parser.add_argument("--environment-label", default="native host",
+                        help="Measurement environment (for example Docker ARM64 or emulated x86_64)")
     args = parser.parse_args()
     if args.runs < 3 or args.target_ms < 10:
         parser.error("Cần ít nhất 3 mẫu và target >= 10 ms")
+    requested = args.runtimes.split(",")
+    valid = {AOT_NAME, "vpp-vm", "vpp-i32", "c", "rust", "cpp", "node", "java", "python", "ruby"}
+    if not requested or len(set(requested)) != len(requested) or any(name not in valid for name in requested):
+        parser.error("Danh sách --runtimes không hợp lệ hoặc bị trùng")
     manifest = json.loads(args.manifest.read_text())
-    selected = {r["name"]: r for r in manifest["runtimes"] if r["name"] in
-                ("cpp", "node", "java", "python", "ruby")}
-    required = ("cpp", "node", "java", "python", "ruby")
-    if not all(name in selected for name in required):
-        raise ValueError("Manifest thiếu ngôn ngữ đối chứng")
-    for name, path, cases in ((AOT_NAME, args.aot, CASES),
-                              ("vpp-i32", args.typed, NUMERIC),
-                              ("c", args.c, NUMERIC), ("rust", args.rust, NUMERIC)):
-        selected[name] = dict(name=name, executable=str(path.resolve()), arguments=[],
-                              environment={}, cases=list(cases))
-    order_names = (AOT_NAME, "vpp-i32", "c", "rust", "cpp", "node", "java", "python", "ruby")
+    selected = {r["name"]: r for r in manifest["runtimes"] if r["name"] in requested}
+    for name, path, cases, option in ((AOT_NAME, args.aot, CASES, "aot"),
+                                     ("vpp-i32", args.typed, NUMERIC, "typed"),
+                                     ("c", args.c, NUMERIC, "c"),
+                                     ("rust", args.rust, NUMERIC, "rust")):
+        # A manifest entry is authoritative for portable builds. AOT/i32 are
+        # explicitly supplied native artifacts, while --c/--rust only override
+        # manifest entries if their path differs from the CLI default.
+        override = (name not in selected or name in (AOT_NAME, "vpp-i32") or
+                    path != parser.get_default(option))
+        if name in requested and override:
+            selected[name] = dict(name=name, executable=str(path.resolve()), arguments=[],
+                                  environment={}, cases=list(cases))
+    missing = [name for name in requested if name not in selected]
+    if missing:
+        raise ValueError(f"Manifest thiếu các bộ chạy: {', '.join(missing)}")
+    order_names = requested
     runners = [selected[name] for name in order_names]
     metadata = []
     for runner in runners:
@@ -78,8 +91,11 @@ def main():
         metadata.append(dict(name=runner["name"], executable=str(path),
                              sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                              arguments=runner["arguments"], cases=runner["cases"]))
-    report = dict(date=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date().isoformat(),
+    # A stock Windows Python does not ship the IANA zone database.
+    report = dict(date=datetime.now(timezone.utc).date().isoformat(),
+                  generated_at_utc=datetime.now(timezone.utc).isoformat(),
                   platform=platform.platform(), machine=platform.machine(),
+                  environment_label=args.environment_label,
                   seed=17, runs=args.runs, target_ms=args.target_ms,
                   warmup_batches=3, measurement="in-process batch, excludes compilation and startup",
                   manifest=str(args.manifest.resolve()),
@@ -95,7 +111,11 @@ def main():
                    BENCH_ITERATIONS=str(n), BENCH_SEED="17", PYTHONDONTWRITEBYTECODE="1")
         env.update(runner.get("environment", {}))
         p = subprocess.run([runner["executable"], *runner["arguments"]],
-                           env=env, capture_output=True, text=True, timeout=120, check=True)
+                           env=env, capture_output=True, text=True, timeout=120)
+        if p.returncode:
+            raise RuntimeError(f"Benchmark process failed ({runner['name']}/{case}, n={n}, "
+                               f"exit={p.returncode}):\nstdout: {p.stdout[-4000:]}\n"
+                               f"stderr: {p.stderr[-4000:]}")
         row = json.loads(p.stdout.strip())
         checks = [expected(case, 17 + i) for i in range(16)]
         if (row["case"] != case or row["iterations"] != n or row["seed"] != 17

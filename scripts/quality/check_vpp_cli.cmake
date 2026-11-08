@@ -40,7 +40,6 @@ if (VPP_CASE STREQUAL "compiler")
     file(COPY "${fixtures}/main.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     set(main "${VPP_OUTPUT_DIR}/main.vi")
     set(expected "init\n42\n7\n7\n2\ntiếng Việt\nđúng\n")
-    vpp_check("${expected}" run --compiler=cpp "${main}")
     vpp_check("${expected}" run --compiler=vpp "${main}")
     # Legacy VM programs resolve relative runtime I/O from the entry file's
     # directory. The native compiler runs in a subprocess and must retain the
@@ -52,7 +51,6 @@ if (VPP_CASE STREQUAL "compiler")
         "nhập gói.nhập xuất.tệp.*; in đọc tệp(\"relative.txt\");\n")
     file(WRITE "${VPP_OUTPUT_DIR}/relative.txt" "wrong-directory")
     set(relative_main "${relative_dir}/main.vi")
-    vpp_check("relative-ok\n" run --compiler=cpp "${relative_main}")
     vpp_check("relative-ok\n" run --compiler=vpp "${relative_main}")
     vpp_check("relative-ok\n" run "${relative_main}")
     # The batch runner's .output golden includes compiler diagnostics even
@@ -186,7 +184,6 @@ if (VPP_CASE STREQUAL "compiler")
     file(COPY "${fixtures}/closure.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     set(closure_source "${VPP_OUTPUT_DIR}/closure.vi")
     set(closure_artifact "${VPP_OUTPUT_DIR}/closure.vbc")
-    vpp_check("1\n" run --compiler=cpp "${closure_source}")
     vpp_check("1\n" run --compiler=vpp "${closure_source}")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_EXEC}" build --compiler=vpp "${closure_source}" -o "${closure_artifact}"
@@ -207,12 +204,11 @@ if (VPP_CASE STREQUAL "compiler")
         message(FATAL_ERROR "Compiler V++ chấp nhận closure trùng tham số")
     endif()
     vpp_check("${expected}" run --artifact "${artifact}")
-    # Exercise boundary arithmetic through both source compilers, and then run
-    # the V++-generated artifact after its source has been removed.
+    # Exercise boundary arithmetic through V++, then run the generated
+    # artifact after its source has been removed.
     file(COPY "${fixtures}/i32.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     set(i32_source "${VPP_OUTPUT_DIR}/i32.vi")
     set(i32_expected "-2147483648\n2147483647\n1\n-2147483648\n2147483646\n2147483647\n2147483647\n-2147483647\n-2147483648\n-2147483648\n2147483647\n1\n-2147483648\n-2147483648\n-2147483648\n2147483647\n2147483647\n-2147483648\n")
-    vpp_check("${i32_expected}" run --compiler=cpp "${i32_source}")
     vpp_check("${i32_expected}" run --compiler=vpp "${i32_source}")
     set(i32_artifact "${VPP_OUTPUT_DIR}/i32.vbc")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
@@ -257,7 +253,6 @@ elseif (VPP_CASE STREQUAL "selfhost")
     set(source "${VPP_ROOT}/src/tests/kiem_tra_selfhost_i32_artifact.vi")
     set(artifact "${VPP_OUTPUT_DIR}/selfhost-i32-artifact.vbc")
     set(expected "selfhost_i32_artifact_ok\n")
-    vpp_check("${expected}" run --compiler=cpp "${source}")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_EXEC}" build --compiler=vpp "${source}" -o "${artifact}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
@@ -273,7 +268,6 @@ elseif (VPP_CASE STREQUAL "oop")
     file(COPY "${fixtures}/api.vi" "${fixtures}/inheritance.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     set(source "${VPP_OUTPUT_DIR}/inheritance.vi")
     set(expected "10\n11\n21\n")
-    vpp_check("${expected}" run --compiler=cpp "${source}")
     vpp_check("${expected}" run --compiler=vpp "${source}")
     set(artifact "${VPP_OUTPUT_DIR}/objects.vbc")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
@@ -297,6 +291,34 @@ elseif (VPP_CASE STREQUAL "oop")
     file(COPY "${fixtures}/stdlib_collection.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     vpp_check("42\n1\n2\n3\n" run --compiler=vpp "${VPP_OUTPUT_DIR}/stdlib_collection.vi")
     message(STATUS "V++ OOP imported interfaces, inheritance and artifact: PASS")
+elseif (VPP_CASE STREQUAL "vm-parity")
+    # Stage 0 compatibility is a named, isolated test. Ordinary CLI/OOP
+    # regression cases above execute only the self-hosted V++/ASM compiler.
+    set(compiler_fixtures "${VPP_ROOT}/src/tests/fixtures/checkcompilervpp")
+    file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/lib")
+    file(COPY "${compiler_fixtures}/lib/math.vi" DESTINATION "${VPP_OUTPUT_DIR}/lib")
+    file(COPY "${compiler_fixtures}/main.vi" DESTINATION "${VPP_OUTPUT_DIR}")
+    vpp_check("init\n42\n7\n7\n2\ntiếng Việt\nđúng\n"
+        run --compiler=cpp "${VPP_OUTPUT_DIR}/main.vi")
+    set(relative_dir "${VPP_OUTPUT_DIR}/relative-runtime")
+    file(MAKE_DIRECTORY "${relative_dir}")
+    file(WRITE "${relative_dir}/relative.txt" "relative-ok")
+    file(WRITE "${relative_dir}/main.vi"
+        "nhập gói.nhập xuất.tệp.*; in đọc tệp(\"relative.txt\");\n")
+    vpp_check("relative-ok\n" run --compiler=cpp "${relative_dir}/main.vi")
+    file(COPY "${compiler_fixtures}/closure.vi"
+        DESTINATION "${VPP_OUTPUT_DIR}")
+    vpp_check("1\n" run --compiler=cpp "${VPP_OUTPUT_DIR}/closure.vi")
+    file(COPY "${compiler_fixtures}/i32.vi"
+        DESTINATION "${VPP_OUTPUT_DIR}")
+    set(i32_expected "-2147483648\n2147483647\n1\n-2147483648\n2147483646\n2147483647\n2147483647\n-2147483647\n-2147483648\n-2147483648\n2147483647\n1\n-2147483648\n-2147483648\n-2147483648\n2147483647\n2147483647\n-2147483648\n")
+    vpp_check("${i32_expected}" run --compiler=cpp "${VPP_OUTPUT_DIR}/i32.vi")
+    set(oop_fixtures "${VPP_ROOT}/src/tests/fixtures/check_oop_pipeline")
+    file(COPY "${VPP_ROOT}/src/tests/fixtures/oop_pipeline/base.vi" DESTINATION "${VPP_OUTPUT_DIR}")
+    file(COPY "${oop_fixtures}/api.vi" "${oop_fixtures}/inheritance.vi"
+        DESTINATION "${VPP_OUTPUT_DIR}")
+    vpp_check("10\n11\n21\n" run --compiler=cpp "${VPP_OUTPUT_DIR}/inheritance.vi")
+    message(STATUS "Isolated Stage 0 C++ VM compatibility: PASS")
 elseif (VPP_CASE STREQUAL "ffi")
     # Exercise the native foreign descriptor table through the V++ compiler,
     # the serialized five-region artifact, and a source-free native replay.

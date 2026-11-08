@@ -40,6 +40,7 @@ case "$*" in
 esac
 SHELL
 chmod +x "$repo/fixture-cli.sh"
+export VPP_NATIVE_COMPILER="$repo/fixture-cli.sh"
 git -C "$repo" init -q
 git -C "$repo" add .
 git -C "$repo" -c core.hooksPath=/dev/null -c user.name=Fixture \

@@ -9,7 +9,6 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 nhập gói.lõi.bảng mã.bảng mã unicode tám bit độ dài đoạn;
-nhập gói.lõi.bảng mã.mã hóa bảng mã;
 nhập gói.lõi.bảng mã.giải mã bảng mã;
 nhập gói.văn bản.chuỗi.độ dài;
 nhập gói.văn bản.chuỗi.chuỗi thường;
@@ -22,54 +21,49 @@ lớp riêng tư Xử Lý Nội Bộ Json {
     // Ghi chú hàm: escape một chuỗi UTF-8 hợp lệ theo JSON (quote, backslash và ký tự điều khiển).
     hàm công khai json thoát(giá trị) {
         văn bản = thành chuỗi(giá trị);
+        // Một bản quét byte: ký tự UTF-8 nhiều byte không thể là dấu nháy,
+        // backslash hay C0. Giữ nguyên cả chuỗi khi không phải escape,
+        // tránh cấp phát từng ký tự và mã hóa bảng mã ở vòng lặp nóng.
+        các byte = chuỗi thành byte máy ảo(văn bản);
+        n = máy ảo lấy độ dài(các byte);
+        vị trí = 0;
+        đầu đoạn = 0;
+        có thoát = sai;
         kết quả = "";
         thập lục phân = "0123456789abcdef";
-
-        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
-            c = văn bản[i];
-            nếu (c == "\"") {
-                kết quả = kết quả + "\\\"";
-            } hoặc {
-                nếu (c == "\\") {
-                    kết quả = kết quả + "\\\\";
-                } hoặc {
-                    // C0 control characters đều là một byte trong UTF-8. Dùng primitive
-                    // bảng mã chỉ để lấy byte; quy tắc escape vẫn nằm hoàn toàn ở V++.
-                    các byte = mã hóa bảng mã(c, "UTF-8");
-                    nếu (máy ảo lấy độ dài(các byte) == 1 && các byte[0] < 32) {
-                        mã = các byte[0];
-                        nếu (mã == 8) {
-                            kết quả = kết quả + "\\b";
-                        } hoặc {
-                            nếu (mã == 9) {
-                                kết quả = kết quả + "\\t";
-                            } hoặc {
-                                nếu (mã == 10) {
-                                    kết quả = kết quả + "\\n";
-                                } hoặc {
-                                    nếu (mã == 12) {
-                                        kết quả = kết quả + "\\f";
-                                    } hoặc {
-                                        nếu (mã == 13) {
-                                            kết quả = kết quả + "\\r";
-                                        } hoặc {
-                                            cao = 0;
-                                            thấp = mã;
-                                            nếu (thấp >= 16) {
-                                                cao = 1;
-                                                thấp = thấp - 16;
-                                            };
-                                            kết quả = kết quả + "\\u00" + thập lục phân[cao] + thập lục phân[thấp];
-                                        };
-                                    };
-                                };
-                            };
-                        };
-                    } hoặc {
-                        kết quả = kết quả + c;
-                    };
+        khi (vị trí < n) {
+            mã = các byte[vị trí];
+            nếu (mã >= 128) {
+                rộng = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
+                nếu (rộng < 1) { ném "bảng mã: cần đúng một ký tự Unicode"; };
+                vị trí += rộng;
+            } hoặc nếu (mã == 34 || mã == 92 || mã < 32) {
+                nếu (vị trí > đầu đoạn) {
+                    kết quả += máy ảo cắt chuỗi theo byte(văn bản, đầu đoạn, vị trí - đầu đoạn);
                 };
+                có thoát = đúng;
+                nếu (mã == 34) { kết quả += "\\\""; }
+                hoặc nếu (mã == 92) { kết quả += "\\\\"; }
+                hoặc nếu (mã == 8) { kết quả += "\\b"; }
+                hoặc nếu (mã == 9) { kết quả += "\\t"; }
+                hoặc nếu (mã == 10) { kết quả += "\\n"; }
+                hoặc nếu (mã == 12) { kết quả += "\\f"; }
+                hoặc nếu (mã == 13) { kết quả += "\\r"; }
+                hoặc {
+                    cao = 0;
+                    thấp = mã;
+                    nếu (thấp >= 16) { cao = 1; thấp -= 16; };
+                    kết quả += "\\u00" + thập lục phân[cao] + thập lục phân[thấp];
+                };
+                vị trí += 1;
+                đầu đoạn = vị trí;
+            } hoặc {
+                vị trí += 1;
             };
+        };
+        nếu (!có thoát) { trả về văn bản; };
+        nếu (vị trí > đầu đoạn) {
+            kết quả += máy ảo cắt chuỗi theo byte(văn bản, đầu đoạn, vị trí - đầu đoạn);
         };
         trả về kết quả;
     };
@@ -380,6 +374,28 @@ lớp riêng tư Bộ Xử Lý JSON {
         vị trí = trạng thái[1];
         n = máy ảo lấy độ dài(các byte);
         bắt đầu = vị trí;
+
+        // Số dương một chữ số được xử lý tại json đọc giá trị. Chỉ cần
+        // nhánh âm một chữ số ở đây để các số dài không quét tiền tố lần hai.
+        nếu (các byte[vị trí] == 45 && vị trí + 1 < n) {
+            vị trí nhanh = vị trí + 1;
+            chữ số nhanh = các byte[vị trí nhanh];
+            nếu (chữ số nhanh >= 48 && chữ số nhanh <= 57) {
+                tiếp theo = vị trí nhanh + 1;
+                có hậu tố số = sai;
+                nếu (tiếp theo < n) {
+                    c kế = các byte[tiếp theo];
+                    nếu ((c kế >= 48 && c kế <= 57) || c kế == 46 ||
+                        c kế == 101 || c kế == 69) {
+                        có hậu tố số = đúng;
+                    };
+                };
+                nếu (!có hậu tố số) {
+                    trạng thái[1] = tiếp theo;
+                    trả về 48 - chữ số nhanh;
+                };
+            };
+        };
         số thực = sai;
 
         âm = sai;
@@ -521,6 +537,134 @@ lớp riêng tư Bộ Xử Lý JSON {
             };
         };
 
+        // Tiêu thụ liên tiếp các số nguyên một chữ số trong cùng vòng lặp.
+        // Chỉ chấp nhận dấu ',' hoặc ']' ngay sau số; mọi trường hợp còn lại
+        // chuyển về parser đầy đủ để giữ ngữ nghĩa, kể cả 10, 1.5, 1e3.
+        khi (vị trí < n) {
+            chữ số = các byte[vị trí];
+            nếu (chữ số < 48 || chữ số > 57 || vị trí + 1 >= n) { thoát; };
+            dấu = các byte[vị trí + 1];
+            nếu (dấu != 44 && dấu != 93) { thoát; };
+            máy ảo thêm cuối danh sách(kết quả, chữ số - 48);
+            vị trí += 2;
+            trạng thái[1] = vị trí;
+            nếu (dấu == 93) { trả về kết quả; };
+            nếu (vị trí < n) {
+                nếu (các byte[vị trí] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                    vị trí = trạng thái[1];
+                };
+            };
+        };
+
+        // Đường nhanh cho số dương 2..5 chữ số: tránh vòng kiểm tra tràn i32
+        // và dispatch parser cho mỗi phần tử. Mọi số dài/âm/số thực vẫn đi
+        // qua đường tổng quát ở dưới.
+        khi (vị trí + 2 < n) {
+            chữ số đầu = các byte[vị trí];
+            nếu (chữ số đầu < 49 || chữ số đầu > 57) { thoát; };
+            chữ số hai = các byte[vị trí + 1];
+            nếu (chữ số hai < 48 || chữ số hai > 57) { thoát; };
+            số = (chữ số đầu - 48) * 10 + chữ số hai - 48;
+            kế = vị trí + 2;
+            nếu (kế < n) {
+                c = các byte[kế];
+                nếu (c >= 48 && c <= 57) {
+                    số = số * 10 + c - 48;
+                    kế += 1;
+                    nếu (kế < n) {
+                        c = các byte[kế];
+                        nếu (c >= 48 && c <= 57) {
+                            số = số * 10 + c - 48;
+                            kế += 1;
+                            nếu (kế < n) {
+                                c = các byte[kế];
+                                nếu (c >= 48 && c <= 57) {
+                                    số = số * 10 + c - 48;
+                                    kế += 1;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+            nếu (kế >= n) { thoát; };
+            dấu = các byte[kế];
+            nếu (dấu != 44 && dấu != 93) { thoát; };
+            máy ảo thêm cuối danh sách(kết quả, số);
+            vị trí = kế + 1;
+            trạng thái[1] = vị trí;
+            nếu (dấu == 93) { trả về kết quả; };
+            nếu (vị trí < n && các byte[vị trí] <= 32) {
+                mình.json bỏ khoảng trắng(trạng thái);
+                vị trí = trạng thái[1];
+            };
+        };
+
+        // Đọc liên tiếp các số nguyên i32 dài mà không gọi parser tổng quát
+        // cho từng phần tử. Tích lũy âm giữ nguyên miền -2147483648..2147483647.
+        // Nếu gặp số thực, số mũ, tràn hoặc dấu phân cách bất thường thì
+        // giữ vị trí ban đầu để parser đầy đủ quyết định/ghi lỗi như trước.
+        khi (vị trí < n) {
+            bắt đầu số = vị trí;
+            âm = sai;
+            nếu (các byte[vị trí] == 45) {
+                âm = đúng;
+                vị trí += 1;
+            };
+            nếu (vị trí >= n) { vị trí = bắt đầu số; thoát; };
+            chữ số = các byte[vị trí];
+            nếu (chữ số < 48 || chữ số > 57) { vị trí = bắt đầu số; thoát; };
+
+            giá trị âm = 0;
+            trong i32 = đúng;
+            chữ số cuối = 7;
+            nếu (âm) { chữ số cuối = 8; };
+            nếu (chữ số == 48) {
+                vị trí += 1;
+            } hoặc {
+                khi (vị trí < n) {
+                    chữ số = các byte[vị trí];
+                    nếu (chữ số < 48 || chữ số > 57) { thoát; };
+                    chữ số = chữ số - 48;
+                    nếu (giá trị âm < -214748364 ||
+                        (giá trị âm == -214748364 && chữ số > chữ số cuối)) {
+                        trong i32 = sai;
+                        thoát;
+                    };
+                    giá trị âm = giá trị âm * 10 - chữ số;
+                    vị trí += 1;
+                };
+            };
+            nếu (!trong i32) { vị trí = bắt đầu số; thoát; };
+
+            // Khoảng trắng JSON giữa số và dấu phân cách cũng hợp lệ.
+            khi (vị trí < n) {
+                c = các byte[vị trí];
+                nếu (c == 32 || c == 9 || c == 10 || c == 13) {
+                    vị trí += 1;
+                } hoặc { thoát; };
+            };
+            nếu (vị trí >= n) { vị trí = bắt đầu số; thoát; };
+            dấu = các byte[vị trí];
+            nếu (dấu != 44 && dấu != 93) { vị trí = bắt đầu số; thoát; };
+
+            nếu (âm) {
+                máy ảo thêm cuối danh sách(kết quả, giá trị âm);
+            } hoặc {
+                máy ảo thêm cuối danh sách(kết quả, 0 - giá trị âm);
+            };
+            vị trí += 1;
+            trạng thái[1] = vị trí;
+            nếu (dấu == 93) { trả về kết quả; };
+            nếu (vị trí < n) {
+                nếu (các byte[vị trí] <= 32) {
+                    mình.json bỏ khoảng trắng(trạng thái);
+                    vị trí = trạng thái[1];
+                };
+            };
+        };
+
         hoàn tất = sai;
         khi (!hoàn tất) {
             máy ảo thêm cuối danh sách(kết quả, mình.json đọc giá trị(trạng thái));
@@ -554,6 +698,7 @@ lớp riêng tư Bộ Xử Lý JSON {
     };
 
     hàm riêng tư json đọc đối tượng(trạng thái) {
+        nội dung = trạng thái[0];
         các byte = trạng thái[3];
         vị trí = trạng thái[1];
         n = máy ảo lấy độ dài(các byte);
@@ -582,7 +727,26 @@ lớp riêng tư Bộ Xử Lý JSON {
             nếu (các byte[vị trí] != 34) {
                 mình.json lỗi(trạng thái, "khóa đối tượng phải là chuỗi");
             };
-            khóa = mình.json đọc chuỗi(trạng thái);
+            // Khóa JSON thông thường không có dấu escape. Trả trực tiếp
+            // nguyên đoạn nguồn thay vì đi qua bộ đọc chuỗi tổng quát.
+            đầu khóa = vị trí + 1;
+            cuối khóa = đầu khóa;
+            khóa trực tiếp = đúng;
+            khi (cuối khóa < n) {
+                c khóa = các byte[cuối khóa];
+                nếu (c khóa == 34) { thoát; };
+                nếu (c khóa == 92 || c khóa < 32) {
+                    khóa trực tiếp = sai;
+                    thoát;
+                };
+                cuối khóa += 1;
+            };
+            nếu (khóa trực tiếp && cuối khóa < n) {
+                khóa = mình.json đoạn nguồn(nội dung, đầu khóa, cuối khóa - đầu khóa);
+                trạng thái[1] = cuối khóa + 1;
+            } hoặc {
+                khóa = mình.json đọc chuỗi(trạng thái);
+            };
             vị trí = trạng thái[1];
             nếu (vị trí < n) {
                 nếu (các byte[vị trí] <= 32) {
@@ -680,6 +844,23 @@ lớp riêng tư Bộ Xử Lý JSON {
             };
             mình.json lỗi(trạng thái, "literal không hợp lệ");
         };
+        // Đọc trực tiếp một chữ số trong bộ phân phối giá trị để bỏ cả một
+        // lượt gọi hàm json đọc số cho các mảng số nguyên ngắn phổ biến.
+        nếu (c >= 48 && c <= 57) {
+            vị trí sau = vị trí + 1;
+            cần đọc tiếp = sai;
+            nếu (vị trí sau < n) {
+                c sau = các byte[vị trí sau];
+                nếu ((c sau >= 48 && c sau <= 57) || c sau == 46 ||
+                    c sau == 101 || c sau == 69) {
+                    cần đọc tiếp = đúng;
+                };
+            };
+            nếu (!cần đọc tiếp) {
+                trạng thái[1] = vị trí sau;
+                trả về c - 48;
+            };
+        };
         nếu (c == 45 || (c >= 48 && c <= 57)) {
             trả về mình.json đọc số(trạng thái);
         };
@@ -750,6 +931,27 @@ lớp riêng tư Bộ Xử Lý JSON {
         trả về sai;
     };
 
+    // Với mảng rất dài, ghép các đoạn cân bằng để tránh sao chép lại
+    // toàn bộ tiền tố sau mỗi phần tử. Lá nhỏ không cần danh sách mảnh.
+    hàm riêng tư json tạo đoạn mảng(giá trị, đang xử lý, từ, đến) {
+        nếu (đến - từ > 32) {
+            giữa = từ + ((đến - từ) >> 1);
+            trả về mình.json tạo đoạn mảng(giá trị, đang xử lý, từ, giữa) + "," +
+                mình.json tạo đoạn mảng(giá trị, đang xử lý, giữa, đến);
+        };
+        kết quả = "";
+        lặp(i = từ; i < đến; i++) {
+            nếu (i > từ) { kết quả += ","; };
+            phần tử = giá trị[i];
+            nếu (loại của(phần tử) == "số nguyên") {
+                kết quả += phần tử;
+            } hoặc {
+                kết quả += mình.json tạo nội bộ(phần tử, đang xử lý);
+            };
+        };
+        trả về kết quả;
+    };
+
     hàm riêng tư json tạo nội bộ(giá trị, đang xử lý) {
         kiểu = loại của(giá trị);
 
@@ -786,11 +988,22 @@ lớp riêng tư Bộ Xử Lý JSON {
         kết quả = "";
         nếu (kiểu == "danh sách" || kiểu == "tuple") {
             kết quả = "[";
-            lặp(i = 0; i < máy ảo lấy độ dài(giá trị); i++) {
-                nếu (i > 0) {
-                    kết quả = kết quả + ",";
+            số phần tử = máy ảo lấy độ dài(giá trị);
+            nếu (số phần tử >= 512) {
+                kết quả += mình.json tạo đoạn mảng(giá trị, đang xử lý, 0, số phần tử);
+            } hoặc {
+                lặp(i = 0; i < số phần tử; i++) {
+                    nếu (i > 0) {
+                        kết quả += ",";
+                    };
+                    phần tử = giá trị[i];
+                    // Tránh gọi đệ quy và tạo chuỗi tạm cho mỗi số nguyên.
+                    nếu (loại của(phần tử) == "số nguyên") {
+                        kết quả += phần tử;
+                    } hoặc {
+                        kết quả += mình.json tạo nội bộ(phần tử, đang xử lý);
+                    };
                 };
-                kết quả = kết quả + mình.json tạo nội bộ(giá trị[i], đang xử lý);
             };
             kết quả = kết quả + "]";
         } hoặc {

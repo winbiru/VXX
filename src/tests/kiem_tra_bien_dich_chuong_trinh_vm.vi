@@ -1,0 +1,61 @@
+// Legacy Stage 0 compiler oracle. This is intentionally VM-only: the
+// biên dịch phân tích API currently consumes biên_dich_phan_tich_vm.
+// Native parser/semantic assertions live in kiem_tra_bien_dich_chuong_trinh_vi.vi.
+nhập gói.biên dịch.chính.biên dịch phân tích;
+
+hàm chính() {
+    lỗi = sai;
+    thử { biên dịch phân tích("hàm chính() { nếu (đúng) {} nếu không {}; };"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+
+    mã_sai = [
+        "hàm chính() { nếu (đúng) {} hoặc {} hoặc {}; };",
+        "hàm chính() { hoặc {}; };",
+        "hàm chính() { nếu (đúng) {} hoặc nếu {}; };",
+        "hàm chính() { nếu (đúng) {} hoặc nếu (sai) in 1; };",
+        "hàm chính() { nếu (đúng) {} hoặc sai {}; };"
+    ];
+    lặp(i = 0; i < độ dài(mã_sai); i++) {
+        lỗi = sai;
+        thử { biên dịch phân tích(mã_sai[i]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        in lỗi;
+    };
+
+    mã_trùng_bí_danh = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
+        "nhập gói.biên dịch.chính.* như trợ_lý;";
+    lỗi = sai;
+    thử { biên dịch phân tích(mã_trùng_bí_danh); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+
+    mã_bí_danh_riêng = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
+        "nhập gói.biên dịch.chính.* như trình_dịch;";
+    lỗi = sai;
+    thử { biên dịch phân tích(mã_bí_danh_riêng); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in !lỗi;
+
+    các_ca_gán_hàm = [
+        {"nguồn": "đích = 2; hàm đích() {}; hàm chính() {};", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích = 3; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích += 1; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích++; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { biến đích = 0; đích = 1; };",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích = 1; biến đích = 0; };",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() {}; hàm phụ(đích) { đích++; }; hàm chính() {};",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() { trả về 2; }; hàm chính() { in đích(); };",
+         "hợp lệ": đúng}
+    ];
+    lặp(i = 0; i < độ dài(các_ca_gán_hàm); i++) {
+        ca = các_ca_gán_hàm[i];
+        lỗi = sai;
+        thử { biên dịch phân tích(ca["nguồn"]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        in lỗi == !ca["hợp lệ"];
+    };
+};

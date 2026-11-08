@@ -144,11 +144,13 @@ jobs:
           # linker and machine-code checks without sanitizer instrumentation.
           # Selective imports needs the excluded native compiler/ASM VM fixtures.
           # Bit operators also needs the excluded native-cli-compiler fixture.
-          # Exercise frontend, runtime and integration with ASan/UBSan here.
+          # Exercise the C++ frontend and runtime with ASan/UBSan here.
+          # The V++ native integration suite runs in the normal regression job;
+          # its self-hosted ASM binary is not instrumented by these sanitizers.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
+              --exclude-regex '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-integration$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -332,11 +334,20 @@ jobs:
           build-benchmark-smoke/bin/vpp-benchmark-baseline --iterations 1 \
             > build-benchmark-smoke/measurements.jsonl
 
+      - name: Bootstrap native V++ compiler for benchmark checks
+        run: |
+          cmake -D"VPP_CLI=$PWD/build-benchmark-smoke/bin/vpp-cli" \
+            -D"VPP_ROOT=$PWD" \
+            -D"VPP_OUTPUT_DIR=$PWD/build-benchmark-smoke/native-compiler" \
+            -D"VPP_EXECUTABLE_SUFFIX=" \
+            -P scripts/quality/prepare_native_compiler.cmake
+          echo "VPP_NATIVE_COMPILER=$PWD/build-benchmark-smoke/native-compiler/vpp-native" >> "$GITHUB_ENV"
+
       - name: Validate the statistical comparator written in V++
         run: |
           mkdir -p build-benchmark-smoke/fixtures
           VPP_HOME="$PWD" VPP_BENCHMARK_FIXTURES="$PWD/build-benchmark-smoke/fixtures" \
-            build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
+            build-benchmark-smoke/bin/vpp-cli run --compiler=vpp \
             scripts/quality/test_benchmark_gate.vi
 
       - name: Validate shared benchmark harness across Git revisions
@@ -376,7 +387,8 @@ jobs:
           export VPP_GATE_COLLECTOR_SHA="smoke" VPP_GATE_COMPARATOR_SHA="smoke"
           export VPP_GATE_CLI_SHA="smoke" VPP_GATE_CPU="smoke" VPP_GATE_OS="$(uname -sr)"
           export VPP_GATE_CASES=vm_verify VPP_GATE_SAMPLES=10 VPP_GATE_TARGET_MS=10
-          build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
+          VPP_HOME="$PWD" VPP_AOT_ROOT="$PWD" \
+          build-benchmark-smoke/bin/vpp-cli run --compiler=vpp \
             scripts/quality/collect_benchmark_gate.vi
           # Identical-binary smoke validates collection and evidence. Shared
           # runner noise can make valid samples statistically inconclusive.

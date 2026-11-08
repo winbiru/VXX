@@ -192,6 +192,10 @@ hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
     biến tổng = n; vị trí = 0; biến số khớp = 0;
     biến dữ liệu = vm_get(nguồn, 2);
     biến byte đầu = máy đọc byte(vm_get(mẫu, 2));
+    // Byte ASCII chỉ xuất hiện tại biên điểm mã UTF-8, kể cả trong chuỗi
+    // chứa byte lỗi. Với mẫu bắt đầu bằng ASCII có thể quét từng byte,
+    // không phải giải mã độ rộng UTF-8 ở mọi vị trí không khớp.
+    biến mẫu bắt đầu ascii = byte đầu < 128;
     khi (vị trí < n) {
         biến byte hiện tại = máy đọc byte(dữ liệu + vị trí);
         nếu (byte hiện tại == byte đầu && vm_thay_khớp(nguồn, mẫu, vị trí)) {
@@ -206,7 +210,7 @@ hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
             vị trí = vị trí + m;
         } hoặc {
             // ASCII là một code point; tránh gọi bộ giải mã UTF-8 cho từng byte.
-            nếu (byte hiện tại < 128) { vị trí = vị trí + 1; }
+            nếu (mẫu bắt đầu ascii || byte hiện tại < 128) { vị trí = vị trí + 1; }
             hoặc { vị trí = vị trí + vm_utf8_width(nguồn, vị trí); };
         };
     };
@@ -226,7 +230,7 @@ hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
             vị trí = vị trí + m;
             đầu đoạn = vị trí;
         } hoặc {
-            nếu (byte hiện tại < 128) { vị trí = vị trí + 1; }
+            nếu (mẫu bắt đầu ascii || byte hiện tại < 128) { vị trí = vị trí + 1; }
             hoặc { vị trí = vị trí + vm_utf8_width(nguồn, vị trí); };
         };
     };
@@ -316,6 +320,27 @@ hàm vm_file_fd(token) {
     biến slot = thực thi tệp dữ liệu ô nhớ(token); nếu (slot < 0) { trả về -1; };
     trả về vm_get(2064 + slot * 16, 1);
 };
+// Chuyển UTF-8 thành danh sách byte với dung lượng biết trước.
+hàm vm_byte_array(a) {
+    nếu (vm_tag(a) != 3) { trả về vm_error(2); };
+    biến n = vm_get(a, 1);
+    nếu (n > 2000000) { trả về vm_error(1); };
+    biến danh_sách_byte = vm_vector(4);
+    nếu (danh_sách_byte == 0) { trả về 0; };
+    nếu (n > 2) {
+        biến dữ liệu_byte = vm_alloc(n * 4, 1);
+        nếu (dữ liệu_byte == 0) { trả về 0; };
+        vm_set(danh_sách_byte, 2, n);
+        vm_set(danh_sách_byte, 3, dữ liệu_byte);
+    };
+    vm_set(danh_sách_byte, 1, n);
+    biến nơi_ghi = vm_get(danh_sách_byte, 3);
+    biến nơi_đọc = vm_get(a, 2);
+    lặp(i = 0; i < n; i++) {
+        vm_set(nơi_ghi, i, vm_int(máy đọc byte(nơi_đọc + i)));
+    };
+    trả về danh_sách_byte;
+};
 hàm vm_host(state, op, args) {
     vm_set(4198464, 13, op);
     biến n = vm_get(args, 1);
@@ -355,8 +380,7 @@ hàm vm_host(state, op, args) {
         lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(tuple, vm_at(a, i)); }; trả về tuple;
     };
     nếu (op == 153) {
-        nếu (vm_tag(a) != 3) { trả về vm_error(2); }; biến danh_sách_byte = vm_vector(4);
-        lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(danh_sách_byte, vm_int(máy đọc byte(vm_get(a, 2) + i))); }; trả về danh_sách_byte;
+        trả về vm_byte_array(a);
     };
     nếu (op == 154 || op == 155) {
         nếu (vm_tag(a) != 4) { trả về vm_error(2); }; biến size = vm_get(a, 1);

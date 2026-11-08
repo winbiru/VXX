@@ -87,6 +87,12 @@ if [ ! -x "$cli" ]; then
   echo "V++ CLI missing or not executable: $cli" >&2
   exit 3
 fi
+native_compiler=${VPP_NATIVE_COMPILER:-}
+if [ -z "$native_compiler" ] || [ ! -x "$native_compiler" ]; then
+  echo "VPP_NATIVE_COMPILER must point to the bootstrapped V++ native compiler" >&2
+  exit 3
+fi
+export VPP_HOME="$root" VPP_AOT_ROOT="$root"
 
 export VPP_GATE_ROOT="$root" VPP_GATE_OUTPUT="$output"
 export VPP_GATE_BASELINE_BIN="$baseline_bin" VPP_GATE_CANDIDATE_BIN="$candidate_bin"
@@ -128,7 +134,7 @@ printf 'harness_commit=%s\nharness_archive_sha256=%s\nbaseline_revision_snapshot
   "$harness_sha" "$harness_archive_hash" "$baseline_revision_hash" "$candidate_revision_hash" \
   >> "$output/identities.txt"
 
-"$cli" run --compiler=cpp "$root/scripts/quality/collect_benchmark_gate.vi" \
+"$cli" run --compiler=vpp "$root/scripts/quality/collect_benchmark_gate.vi" \
   | tee "$output/collection.log"
 
 # The single V++ comparator determines PASS/FAIL/INCONCLUSIVE/INVALID and
