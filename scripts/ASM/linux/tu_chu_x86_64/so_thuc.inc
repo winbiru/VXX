@@ -138,13 +138,24 @@ Lvm_so_thuc_sai_x86:
 
 // Decimal conversion is implemented by the V++ runtime; adapt its stack ABI
 // to the SysV register ABI used by the VM native primitives.
+// These VM-only targets are optional in standalone compiler executables.
+// A missing target must fail safely if a conversion is invoked accidentally.
+.weak "vpp_fn_vm_f64_parse"
+.weak "vpp_fn_vm_f64_text"
 .globl vpp_native_f64_parse
 .type vpp_native_f64_parse, @function
 vpp_native_f64_parse:
     subq $40, %rsp
     movl %edi, (%rsp)
     movl %esi, 4(%rsp)
+    leaq vpp_fn_vm_f64_parse(%rip), %rax
+    testq %rax, %rax
+    jz Lvm_f64_parse_unavailable
     call "vpp_fn_vm_f64_parse"
+    addq $40, %rsp
+    ret
+Lvm_f64_parse_unavailable:
+    movl $-1, %eax
     addq $40, %rsp
     ret
 .size vpp_native_f64_parse, .-vpp_native_f64_parse
@@ -155,7 +166,14 @@ vpp_native_f64_text:
     subq $40, %rsp
     movl %edi, (%rsp)
     movl %esi, 4(%rsp)
+    leaq vpp_fn_vm_f64_text(%rip), %rax
+    testq %rax, %rax
+    jz Lvm_f64_text_unavailable
     call "vpp_fn_vm_f64_text"
+    addq $40, %rsp
+    ret
+Lvm_f64_text_unavailable:
+    movl $-1, %eax
     addq $40, %rsp
     ret
 .size vpp_native_f64_text, .-vpp_native_f64_text

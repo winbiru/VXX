@@ -269,7 +269,8 @@ hàm as_rm(s, width, opcode, reg, o, escape, tail) {
 hàm as_condition(t) {
     nếu (as_eq(t, "e") == 1 || as_eq(t, "z") == 1) { trả về 4; };
     nếu (as_eq(t, "ne") == 1 || as_eq(t, "nz") == 1) { trả về 5; };
-    nếu (as_eq(t, "b") == 1) { trả về 2; }; nếu (as_eq(t, "ae") == 1) { trả về 3; };
+    nếu (as_eq(t, "b") == 1 || as_eq(t, "c") == 1) { trả về 2; };
+    nếu (as_eq(t, "ae") == 1 || as_eq(t, "nc") == 1) { trả về 3; };
     nếu (as_eq(t, "be") == 1) { trả về 6; }; nếu (as_eq(t, "a") == 1) { trả về 7; };
     nếu (as_eq(t, "s") == 1) { trả về 8; }; nếu (as_eq(t, "ns") == 1) { trả về 9; };
     nếu (as_eq(t, "p") == 1) { trả về 10; }; nếu (as_eq(t, "l") == 1) { trả về 12; };
@@ -327,7 +328,11 @@ hàm as_instruction(s, mnemonic, args) {
     nếu (as_eq(mnemonic, "syscall") == 1) { as_emit(s, 15); trả về as_emit(s, 5); };
     nếu (as_eq(mnemonic, "ud2") == 1) { as_emit(s, 15); trả về as_emit(s, 11); };
     nếu (as_eq(mnemonic, "cltd") == 1) { trả về as_emit(s, 153); };
-    nếu (as_eq(mnemonic, "rep") == 1) { nếu (as_eq(args, "stosb") != 1) { trả về as_error(s); }; as_emit(s, 243); trả về as_emit(s, 170); };
+    nếu (as_eq(mnemonic, "rep") == 1) {
+        nếu (as_eq(args, "stosb") == 1) { as_emit(s, 243); trả về as_emit(s, 170); };
+        nếu (as_eq(args, "stosq") == 1) { as_emit(s, 243); as_emit(s, 72); trả về as_emit(s, 171); };
+        trả về as_error(s);
+    };
     nếu (as_eq(mnemonic, "call") == 1 || byte lấy(mnemonic, 0) == 106) {
         target = as_unquote(as_trim(args, 0, byte dài(args)));
         nếu (as_eq(mnemonic, "call") == 1) { as_emit(s, 232); }
@@ -480,9 +485,12 @@ hàm as_directive(s, op, args) {
         as_set(s, 9, sec); trả về 0;
     };
     nếu (as_eq(op, ".type") == 1 || as_eq(op, ".size") == 1) { trả về 0; };
-    nếu (as_eq(op, ".globl") == 1) {
+    nếu (as_eq(op, ".globl") == 1 || as_eq(op, ".weak") == 1) {
         name = as_unquote(as_trim(args, 0, byte dài(args))); id = as_symbol(s, name, 0); byte hủy(name);
-        nếu (id < 0) { trả về -1; }; byte ghi số nguyên ba mươi hai bit(as_get(s, 6), id * 24 + 12, 1); trả về 0;
+        nếu (id < 0) { trả về -1; };
+        nếu (as_eq(op, ".weak") == 1) { byte ghi số nguyên ba mươi hai bit(as_get(s, 6), id * 24 + 12, 2); }
+        hoặc { byte ghi số nguyên ba mươi hai bit(as_get(s, 6), id * 24 + 12, 1); };
+        trả về 0;
     };
     nếu (as_eq(op, ".p2align") == 1) {
         power = as_number(s, args); nếu (power < 0 || power > 12) { trả về as_error(s); };
@@ -572,12 +580,13 @@ hàm as_symbols(s) {
 
     syms = as_get(s, 6); names = as_get(s, 7); out = as_get(s, 34);
     as_zeros(out, 24); index = 1;
-    lặp (global = 0; global <= 1; global++) {
+    lặp (global = 0; global <= 2; global++) {
         nếu (global == 1) { as_set(s, 19, index); };
         lặp (i = 0; i < byte dài(syms); i = i + 24) {
             name = byte đọc số nguyên ba mươi hai bit(syms, i); sec = byte đọc số nguyên ba mươi hai bit(syms, i + 4);
             nếu (as_numeric_ref(names, name) == 1) { bỏ qua; };
-            binding = byte đọc số nguyên ba mươi hai bit(syms, i + 12); nếu (sec == 0) { binding = 1; };
+            binding = byte đọc số nguyên ba mươi hai bit(syms, i + 12);
+            nếu (sec == 0 && binding == 0) { binding = 1; };
             nếu (binding != global) { bỏ qua; };
             byte ghi số nguyên ba mươi hai bit(syms, i + 20, index); index = index + 1;
             byte đẩy số nguyên ba mươi hai bit(out, name); byte thêm(out, binding * 16); byte thêm(out, 0); byte thêm(out, sec); byte thêm(out, 0);

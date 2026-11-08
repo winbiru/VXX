@@ -11,6 +11,8 @@ nhập host ABI.*;
 nhập nạp chương trình.*;
 nhập runtime.*;
 nhập thực thi.*;
+// The Linux ASM f64 parse/text bridge resolves these V++ runtime functions.
+nhập số thực tự chủ.*;
 
 hàm vm_absolute(s, cwd) {
     nếu (vm_get(s, 1) > 0) { nếu (máy đọc byte(vm_get(s, 2)) == 47) { trả về s; }; };

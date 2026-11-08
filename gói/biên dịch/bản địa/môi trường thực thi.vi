@@ -1312,6 +1312,7 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
     biến tạm = thực thi các byte mới();
     nếu (tạm <= 0) { trả về -1; };
     biến mã trạng thái = -1;
+    biến bước = 0;
     biến đã tạo = 0;
     biến tệp thực thi chỉ mục = -1;
     biến mã tệp mở = -1;
@@ -1408,6 +1409,7 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
     // Snapshot the first temporary object argument after optional linker
     // flags; otherwise cleanup unlinks '-r' and leaks the last object.
     đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
+    bước = 1;
     nếu (chế độ xuất == 1) {
         biến runtime chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, 0);
         nếu (runtime chiều dài <= 0) { mã trạng thái = -2; }
@@ -1443,6 +1445,7 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
     nếu (mã trạng thái == -1) {
         nếu (vị trí đang xét != tổng số) { mã trạng thái = -2; };
     };
+    nếu (mã trạng thái == -1) { bước = 2; };
     nếu (chế độ xuất == 0) {
         // Linux AOT executables boot directly through the ASM _start and use
         // raw syscalls. Keep the object-only modes relocatable for bootstrap.
@@ -1513,12 +1516,14 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
         nếu (máy đóng(mã tệp mở) != 0) { mã trạng thái = -2; };
         mã tệp mở = -1;
     };
+    nếu (mã trạng thái == -1) { bước = 3; };
     nếu (mã trạng thái == -1) {
         biến số đối số dòng lệnh = máy đọc số nguyên ba mươi hai bit(3800);
         máy ghi số nguyên ba mươi hai bit(134222848 + số đối số dòng lệnh * 8, 0);
         máy ghi số nguyên ba mươi hai bit(134222848 + số đối số dòng lệnh * 8 + 4, 0);
         nếu (thực thi liên kết khởi chạy đợi() != 0) { mã trạng thái = -2; };
     };
+    nếu (mã trạng thái == -1) { bước = 4; };
     nếu (mã trạng thái == -1) {
         nếu (chế độ xuất == 0) {
             nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
@@ -1547,7 +1552,11 @@ hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết
     nếu (macos runtime object > 0) { thực thi các byte giải phóng(macos runtime object); };
     thực thi các byte giải phóng(tạm);
     nếu (mã trạng thái == 0) { trả về 0; };
-    trả về -1;
+    nếu (bước == 0) { trả về thực thi liên kết báo lỗi("V++ linker: preparing arguments failed\n"); };
+    nếu (bước == 1) { trả về thực thi liên kết báo lỗi("V++ linker: writing source object failed\n"); };
+    nếu (bước == 2) { trả về thực thi liên kết báo lỗi("V++ linker: preparing executable link failed\n"); };
+    nếu (bước == 3) { trả về thực thi liên kết báo lỗi("V++ linker: spawning linker failed\n"); };
+    trả về thực thi liên kết báo lỗi("V++ linker: checking or publishing output failed\n");
 };
 
 hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {

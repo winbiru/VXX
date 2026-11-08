@@ -119,6 +119,66 @@ pointer:
 answer:
 .long 42
 """)
+execute("weak-undefined", """.text
+.weak optional_function
+.globl main
+main:
+leaq optional_function(%rip), %rax
+testq %rax, %rax
+jz 1f
+call optional_function
+ret
+1:
+movl $42, %eax
+ret
+""")
+execute("rep-stosq", """.text
+.globl main
+main:
+subq $32, %rsp
+movq $99, (%rsp)
+leaq (%rsp), %rdi
+movl $1, %ecx
+xorl %eax, %eax
+rep stosq
+movl (%rsp), %eax
+addl $42, %eax
+addq $32, %rsp
+ret
+""")
+
+# jc/jnc are the carry/no-carry spellings for jb/jae. Their instruction
+# encodings and relocations must match byte-for-byte, including branch fixups.
+carry_source = """.text
+.globl main
+main:
+movl $0, %eax
+cmpl $1, %eax
+{carry} 1f
+movl $1, %eax
+ret
+1:
+cmpl $0, %eax
+{no_carry} 2f
+movl $2, %eax
+ret
+2:
+movl $42, %eax
+ret
+"""
+carry_alias = assemble("carry-aliases", carry_source.format(carry="jc", no_carry="jnc"))
+carry_canonical = assemble("carry-canonical", carry_source.format(carry="jb", no_carry="jae"))
+assert carry_alias.read_bytes() == carry_canonical.read_bytes(), "carry condition aliases differ from canonical encodings"
+
+# The executable exercises both carry flag outcomes using the native linker.
+carry_archive = directory / "carry-aliases.archive"
+carry_archive.write_bytes(packed(carry_alias.read_bytes()))
+carry_exe = directory / "carry-aliases.exe"
+carry_link = subprocess.run([str(harness), str(carry_archive), str(carry_exe)],
+                            env=dict(env, VPP_HOME=str(host_root)), capture_output=True, timeout=120)
+assert carry_link.returncode == 0, carry_link.stderr
+assert subprocess.run([str(carry_exe)], timeout=30).returncode == 42, "carry aliases executed incorrectly"
+print("NATIVE_ASSEMBLER_CARRY_ALIASES=PASS", flush=True)
 
 invalid = {
     "unknown-instruction": ".text\nnot_an_instruction %eax\n",

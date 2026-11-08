@@ -401,6 +401,40 @@ hàm elf bản địa điểm vào() {
     trả về địa chỉ điểm vào;
 };
 
+// Report the failing relocation and its symbol before rejecting the object.
+// This stays on the failure path and does not change linker acceptance rules.
+hàm elf bản địa báo lỗi tái định vị(lý do, đối tượng, đoạn, độ dời, loại, ký hiệu) {
+    biến thông báo = "V++ native ELF relocation: ";
+    thực thi liên kết thêm cuối văn bản(thông báo, lý do);
+    thực thi liên kết thêm cuối văn bản(thông báo, " object=");
+    thực thi bộ nhớ đệm thêm cuối số(thông báo, đối tượng);
+    thực thi liên kết thêm cuối văn bản(thông báo, " section=");
+    thực thi bộ nhớ đệm thêm cuối số(thông báo, đoạn);
+    thực thi liên kết thêm cuối văn bản(thông báo, " offset=");
+    thực thi bộ nhớ đệm thêm cuối số(thông báo, độ dời);
+    thực thi liên kết thêm cuối văn bản(thông báo, " type=");
+    thực thi bộ nhớ đệm thêm cuối số(thông báo, loại);
+    thực thi liên kết thêm cuối văn bản(thông báo, " symbol_index=");
+    thực thi bộ nhớ đệm thêm cuối số(thông báo, ký hiệu);
+    nếu (ký hiệu >= 0 && ký hiệu < elf bản địa trường đối tượng(đối tượng, 24)) {
+        biến tệp = elf bản địa trường đối tượng(đối tượng, 0);
+        biến vị trí = elf bản địa ký hiệu độ lệch(đối tượng, ký hiệu);
+        biến tên = elf bản địa đọc i32(tệp, vị trí);
+        biến dài = elf bản địa trường đối tượng(đối tượng, 32);
+        nếu (tên > 0 && tên < dài) {
+            biến đầu = elf bản địa trường đối tượng(đối tượng, 28) + tên;
+            thực thi liên kết thêm cuối văn bản(thông báo, " symbol=");
+            lặp (i = 0; i < 128 && i < dài - tên; i++) {
+                biến chữ = thực thi các byte lấy(tệp, đầu + i);
+                nếu (chữ == 0) { thoát; };
+                thực thi các byte thêm cuối(thông báo, chữ);
+            };
+        };
+    };
+    thực thi các byte thêm cuối(thông báo, 10);
+    trả về thực thi liên kết báo lỗi(thông báo);
+};
+
 hàm elf bản địa tái định vị(đầu ra) {
     biến đầu ra ô nhớ = thực thi các byte ô nhớ(đầu ra);
     nếu (đầu ra ô nhớ < 0) { trả về -1; };
@@ -412,51 +446,51 @@ hàm elf bản địa tái định vị(đầu ra) {
         lặp (k = 1; k < elf bản địa trường đối tượng(j, 16); k++) {
             biến phần = phần đầu + độ lệch bảng + k * 64;
             nếu (elf bản địa đọc i32(tệp, phần + 4) != 4) { bỏ qua; };
-            nếu (elf bản địa đọc i32(tệp, phần + 56) != 24) { trả về -1; };
-            nếu (elf bản địa đọc i32(tệp, phần + 60) != 0) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, phần + 56) != 24) { trả về elf bản địa báo lỗi tái định vị("invalid RELA entry size", j, k, 0, 0, 0); };
+            nếu (elf bản địa đọc i32(tệp, phần + 60) != 0) { trả về elf bản địa báo lỗi tái định vị("invalid RELA entry high word", j, k, 0, 0, 0); };
             biến vị trí = elf bản địa đọc i32(tệp, phần + 24);
             biến chiều dài = elf bản địa đọc i32(tệp, phần + 32);
             biến mục tiêu = elf bản địa đọc i32(tệp, phần + 44);
-            nếu (mục tiêu <= 0) { trả về -1; };
-            nếu (mục tiêu >= elf bản địa trường đối tượng(j, 16)) { trả về -1; };
+            nếu (mục tiêu <= 0) { trả về elf bản địa báo lỗi tái định vị("invalid target section", j, k, 0, 0, 0); };
+            nếu (mục tiêu >= elf bản địa trường đối tượng(j, 16)) { trả về elf bản địa báo lỗi tái định vị("out of range target section", j, k, 0, 0, 0); };
             biến đoạn = elf bản địa tìm đoạn(j, mục tiêu);
-            nếu (đoạn < 0) { trả về -1; };
+            nếu (đoạn < 0) { trả về elf bản địa báo lỗi tái định vị("target section not allocated", j, k, 0, 0, 0); };
             biến bảng ký hiệu = elf bản địa đọc i32(tệp, phần + 40);
-            nếu (bảng ký hiệu < 1) { trả về -1; };
-            nếu (bảng ký hiệu >= elf bản địa trường đối tượng(j, 16)) { trả về -1; };
+            nếu (bảng ký hiệu < 1) { trả về elf bản địa báo lỗi tái định vị("invalid symbol table", j, k, 0, 0, 0); };
+            nếu (bảng ký hiệu >= elf bản địa trường đối tượng(j, 16)) { trả về elf bản địa báo lỗi tái định vị("out of range symbol table", j, k, 0, 0, 0); };
             biến đầu ký hiệu = phần đầu + độ lệch bảng + bảng ký hiệu * 64;
-            nếu (elf bản địa đọc i32(tệp, đầu ký hiệu + 4) != 2) { trả về -1; };
-            nếu (phần đầu + elf bản địa đọc i32(tệp, đầu ký hiệu + 24) != elf bản địa trường đối tượng(j, 20)) { trả về -1; };
-            nếu (chiều dài < 0) { trả về -1; };
-            nếu (chiều dài - máy chia số nguyên ba mươi hai bit(chiều dài, 24) * 24 != 0) { trả về -1; };
-            nếu (vị trí < 0) { trả về -1; };
-            nếu (vị trí > elf bản địa trường đối tượng(j, 8) - chiều dài) { trả về -1; };
+            nếu (elf bản địa đọc i32(tệp, đầu ký hiệu + 4) != 2) { trả về elf bản địa báo lỗi tái định vị("not a symbol table", j, k, 0, 0, 0); };
+            nếu (phần đầu + elf bản địa đọc i32(tệp, đầu ký hiệu + 24) != elf bản địa trường đối tượng(j, 20)) { trả về elf bản địa báo lỗi tái định vị("symbol table mismatch", j, k, 0, 0, 0); };
+            nếu (chiều dài < 0) { trả về elf bản địa báo lỗi tái định vị("negative RELA size", j, k, 0, 0, 0); };
+            nếu (chiều dài - máy chia số nguyên ba mươi hai bit(chiều dài, 24) * 24 != 0) { trả về elf bản địa báo lỗi tái định vị("misaligned RELA size", j, k, 0, 0, 0); };
+            nếu (vị trí < 0) { trả về elf bản địa báo lỗi tái định vị("negative RELA offset", j, k, 0, 0, 0); };
+            nếu (vị trí > elf bản địa trường đối tượng(j, 8) - chiều dài) { trả về elf bản địa báo lỗi tái định vị("RELA outside object", j, k, 0, 0, 0); };
             lặp (m = 0; m < chiều dài; m = m + 24) {
                 biến r = phần đầu + vị trí + m;
-                nếu (elf bản địa đọc i32(tệp, r + 4) != 0) { trả về -1; };
+                nếu (elf bản địa đọc i32(tệp, r + 4) != 0) { trả về elf bản địa báo lỗi tái định vị("relocation offset high word", j, k, m, 0, 0); };
                 biến dời = elf bản địa đọc i32(tệp, r);
                 biến loại = elf bản địa đọc i32(tệp, r + 8);
                 biến chỉ số ký hiệu = elf bản địa đọc i32(tệp, r + 12);
                 biến bù = elf bản địa đọc i32(tệp, r + 16);
                 biến bù cao = elf bản địa đọc i32(tệp, r + 20);
-                nếu (bù < 0) { nếu (bù cao != -1) { trả về -1; }; }
-                hoặc { nếu (bù cao != 0) { trả về -1; }; };
+                nếu (bù < 0) { nếu (bù cao != -1) { trả về elf bản địa báo lỗi tái định vị("negative addend high word", j, k, dời, loại, chỉ số ký hiệu); }; }
+                hoặc { nếu (bù cao != 0) { trả về elf bản địa báo lỗi tái định vị("positive addend high word", j, k, dời, loại, chỉ số ký hiệu); }; };
                 biến rộng = 4;
                 nếu (loại == 1) { rộng = 8; }
-                hoặc nếu (loại != 2) { nếu (loại != 4) { trả về -1; }; };
-                nếu (dời < 0) { trả về -1; };
-                nếu (dời > elf bản địa trường đoạn(đoạn, 20) - rộng) { trả về -1; };
+                hoặc nếu (loại != 2) { nếu (loại != 4) { trả về elf bản địa báo lỗi tái định vị("unsupported relocation type", j, k, dời, loại, chỉ số ký hiệu); }; };
+                nếu (dời < 0) { trả về elf bản địa báo lỗi tái định vị("negative relocation offset", j, k, m, loại, chỉ số ký hiệu); };
+                nếu (dời > elf bản địa trường đoạn(đoạn, 20) - rộng) { trả về elf bản địa báo lỗi tái định vị("relocation outside section", j, k, dời, loại, chỉ số ký hiệu); };
                 biến đích = elf bản địa trường đoạn(đoạn, 24) + dời;
-                nếu (đích > máy đọc số nguyên ba mươi hai bit(67199984) - rộng) { trả về -1; };
+                nếu (đích > máy đọc số nguyên ba mươi hai bit(67199984) - rộng) { trả về elf bản địa báo lỗi tái định vị("relocation outside output", j, k, dời, loại, chỉ số ký hiệu); };
                 biến ký hiệu địa chỉ = elf bản địa giải ký hiệu(j, chỉ số ký hiệu);
-                nếu (ký hiệu địa chỉ < 0) { trả về -1; };
+                nếu (ký hiệu địa chỉ < 0) { trả về elf bản địa báo lỗi tái định vị("unresolved symbol", j, k, dời, loại, chỉ số ký hiệu); };
                 biến nền = ký hiệu địa chỉ;
                 nếu (loại != 1) { nền = nền - (4194304 + đích); };
                 // Check before adding, so i32 wrap cannot hide a bad addend.
-                nếu (nền > 0) { nếu (bù > 2147483647 - nền) { trả về -1; }; };
-                nếu (nền < 0) { nếu (bù < (-2147483647 - 1) - nền) { trả về -1; }; };
+                nếu (nền > 0) { nếu (bù > 2147483647 - nền) { trả về elf bản địa báo lỗi tái định vị("positive relocation overflow", j, k, dời, loại, chỉ số ký hiệu); }; };
+                nếu (nền < 0) { nếu (bù < (-2147483647 - 1) - nền) { trả về elf bản địa báo lỗi tái định vị("negative relocation overflow", j, k, dời, loại, chỉ số ký hiệu); }; };
                 biến giá trị = nền + bù;
-                nếu (loại == 1) { nếu (giá trị < 0) { trả về -1; }; };
+                nếu (loại == 1) { nếu (giá trị < 0) { trả về elf bản địa báo lỗi tái định vị("negative absolute relocation", j, k, dời, loại, chỉ số ký hiệu); }; };
                 máy ghi số nguyên ba mươi hai bit(đầu ra nền + đích, giá trị);
                 nếu (loại == 1) { máy ghi số nguyên ba mươi hai bit(đầu ra nền + đích + 4, 0); };
             };
