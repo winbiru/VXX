@@ -34,14 +34,41 @@
 #include <CommonCrypto/CommonDigest.h>
 #include <crt_externs.h>
 #include <mach-o/dyld.h>
+#define CC_SHA256_Cleanup(ctx) ((void)(ctx))
 #elif defined(__linux__)
-#include <openssl/sha.h>
-// Use the same SHA-256 cache format on both POSIX native hosts.
-#define CC_SHA256_CTX SHA256_CTX
-#define CC_SHA256_DIGEST_LENGTH SHA256_DIGEST_LENGTH
-#define CC_SHA256_Init SHA256_Init
-#define CC_SHA256_Update SHA256_Update
-#define CC_SHA256_Final SHA256_Final
+#include <openssl/evp.h>
+// OpenSSL 3 deprecates SHA256_Init/Update/Final. Keep the cache's SHA-256
+// digest and streaming format while using the supported EVP interface.
+typedef EVP_MD_CTX *CC_SHA256_CTX;
+#define CC_SHA256_DIGEST_LENGTH 32
+static int vpp_sha256_init(CC_SHA256_CTX *ctx) {
+    *ctx = EVP_MD_CTX_new();
+    if (!*ctx) return 0;
+    if (EVP_DigestInit_ex(*ctx, EVP_sha256(), NULL) == 1) return 1;
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+    return 0;
+}
+static int vpp_sha256_update(CC_SHA256_CTX *ctx, const void *data, size_t size) {
+    return *ctx && EVP_DigestUpdate(*ctx, data, size) == 1;
+}
+static int vpp_sha256_final(unsigned char *hash, CC_SHA256_CTX *ctx) {
+    if (!*ctx) return 0;
+    unsigned int length = 0;
+    int ok = EVP_DigestFinal_ex(*ctx, hash, &length) == 1 &&
+             length == CC_SHA256_DIGEST_LENGTH;
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+    return ok;
+}
+static void vpp_sha256_cleanup(CC_SHA256_CTX *ctx) {
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+}
+#define CC_SHA256_Init vpp_sha256_init
+#define CC_SHA256_Update vpp_sha256_update
+#define CC_SHA256_Final vpp_sha256_final
+#define CC_SHA256_Cleanup vpp_sha256_cleanup
 #define CC_LONG size_t
 #endif
 
@@ -639,15 +666,20 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
         FILE *file = fopen(executable, "rb");
         if (!file) return -1;
         CC_SHA256_CTX digest;
-        CC_SHA256_Init(&digest);
+        if (!CC_SHA256_Init(&digest)) { fclose(file); return -1; }
         unsigned char block[16384];
         size_t count;
+        int failed = 0;
         while ((count = fread(block, 1, sizeof block, file)) != 0)
-            CC_SHA256_Update(&digest, block, (CC_LONG)count);
-        int failed = ferror(file);
+            if (!CC_SHA256_Update(&digest, block, (CC_LONG)count)) {
+                failed = 1;
+                break;
+            }
+        if (ferror(file)) failed = 1;
         if (fclose(file) != 0) failed = 1;
+        if (!failed && !CC_SHA256_Final(vpp_cache_compiler, &digest)) failed = 1;
+        CC_SHA256_Cleanup(&digest);
         if (failed) return -1;
-        CC_SHA256_Final(vpp_cache_compiler, &digest);
         vpp_cache_initialized = 1;
         atexit(vpp_native_cache_report);
     }
@@ -659,10 +691,13 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
     if (lstat(directory, &info) != 0 || !S_ISDIR(info.st_mode)) return -1;
     unsigned char hash[CC_SHA256_DIGEST_LENGTH];
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, vpp_cache_compiler, sizeof vpp_cache_compiler);
-    CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length);
-    CC_SHA256_Final(hash, &digest);
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, vpp_cache_compiler,
+                                         sizeof vpp_cache_compiler) &&
+                         CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length) &&
+                         CC_SHA256_Final(hash, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed) return -1;
     char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
 #ifdef VPP_NATIVE_VPP_RUNTIME
     // The native boundary computes SHA-256; V++ owns its byte-to-hex
@@ -742,12 +777,14 @@ int32_t vpp_native_cache_read(int32_t key_handle, int32_t data_handle) {
         fread(data->data, 1, data_size, file) != data_size ||
         fgetc(file) != EOF || ferror(file)) goto cache_read_done;
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, header, 16);
-    CC_SHA256_Update(&digest, saved_key, key_size);
-    CC_SHA256_Update(&digest, data->data, data_size);
-    CC_SHA256_Final(hash, &digest);
-    if (memcmp(hash, header + 16, sizeof hash) != 0) goto cache_read_done;
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, header, 16) &&
+                         CC_SHA256_Update(&digest, saved_key, key_size) &&
+                         CC_SHA256_Update(&digest, data->data, data_size) &&
+                         CC_SHA256_Final(hash, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed || memcmp(hash, header + 16, sizeof hash) != 0)
+        goto cache_read_done;
     data->length = data_size;
     data->data[data_size] = 0;
     hit = 1;
@@ -790,11 +827,13 @@ int32_t vpp_native_cache_write(int32_t key_handle, int32_t data_handle) {
     FILE *file = fdopen(fd, "wb");
     if (!file) { close(fd); unlink(temporary); return -1; }
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, header, 16);
-    CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length);
-    CC_SHA256_Update(&digest, data->data, (CC_LONG)data->length);
-    CC_SHA256_Final(header + 16, &digest);
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, header, 16) &&
+                         CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length) &&
+                         CC_SHA256_Update(&digest, data->data, (CC_LONG)data->length) &&
+                         CC_SHA256_Final(header + 16, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed) { fclose(file); unlink(temporary); return -1; }
     int failed = fwrite(header, 1, sizeof header, file) != sizeof header ||
         fwrite(key->data, 1, key->length, file) != key->length ||
         fwrite(data->data, 1, data->length, file) != data->length;

@@ -180,17 +180,27 @@ int main(void) {
     memcpy(&retained_fd, memory + CTL, sizeof retained_fd);
     assert(retained_fd == serverfd);
     // SIGALRM must not leak EINTR to the guest or restart the full timeout.
+    // Use repeated signals: a single 15ms alarm can be delayed or coalesced
+    // under Rosetta/loaded CI, leaving the EINTR path untested. Repeated
+    // interrupts also catch implementations that restart the full deadline.
     struct sigaction handler = {0}, previous_handler;
     handler.sa_handler = alarm_handler;
     sigemptyset(&handler.sa_mask);
     assert(sigaction(SIGALRM, &handler, &previous_handler) == 0);
     struct itimerval timer = {0};
     timer.it_value.tv_usec = 15000;
+    timer.it_interval.tv_usec = 15000;
     assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
     put(12, 100);
     int64_t started = monotonic_ms();
     assert(vpp_native_os_socket(2, CTL) == -ETIMEDOUT);
     int64_t elapsed = monotonic_ms() - started;
+    struct itimerval disarmed = {0};
+    assert(setitimer(ITIMER_REAL, &disarmed, NULL) == 0);
+    if (interrupted != 1 || elapsed < 60 || elapsed >= 500) {
+        fprintf(stderr, "socket EINTR timeout: signal=%d elapsed=%lldms\n",
+                (int)interrupted, (long long)elapsed);
+    }
     assert(interrupted == 1);
     assert(elapsed >= 60 && elapsed < 500);
     assert(sigaction(SIGALRM, &previous_handler, NULL) == 0);
