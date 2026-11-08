@@ -63,6 +63,27 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# The self-hosted Linux x86-64 linker loads this freestanding ASM object from
+# VPP_HOME. It is generated from checked-in assembly and intentionally is not
+# committed; a clean CI checkout must build it before running native tests.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+    CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    file(GLOB VPP_LINUX_HOST_ASM_PARTS CONFIGURE_DEPENDS
+        "${CMAKE_SOURCE_DIR}/scripts/ASM/linux/tu_chu_x86_64/*.inc")
+    set(VPP_LINUX_HOST_ASM_OBJECT
+        "${CMAKE_SOURCE_DIR}/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o")
+    add_custom_command(OUTPUT "${VPP_LINUX_HOST_ASM_OBJECT}"
+        COMMAND bash "${CMAKE_SOURCE_DIR}/scripts/quality/prepare_linux_freestanding_host.sh"
+            "${VPP_LINUX_HOST_ASM_OBJECT}"
+        DEPENDS "${CMAKE_SOURCE_DIR}/scripts/ASM/linux/vpp_linux_host_x86_64.s"
+            "${CMAKE_SOURCE_DIR}/scripts/quality/prepare_linux_freestanding_host.sh"
+            ${VPP_LINUX_HOST_ASM_PARTS}
+        COMMENT "Assembling freestanding V++ Linux x86-64 host from sources"
+        VERBATIM)
+    add_custom_target(vpp-linux-freestanding-host ALL
+        DEPENDS "${VPP_LINUX_HOST_ASM_OBJECT}")
+endif()
+
 # Explicit ownership keeps target dependencies directional; no target is
 # allowed to use the old catch-all `helpers` grouping.
 set(VPP_CORE_SOURCES
@@ -1009,6 +1030,7 @@ if (BUILD_TESTS)
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-check"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm.cmake)
             set_tests_properties(vpp-vm-asm PROPERTIES
+                FIXTURES_SETUP vm-asm
                 FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 900)
             add_test(NAME vpp-vm-asm-selfhost
                 COMMAND ${CMAKE_COMMAND}
@@ -1018,7 +1040,7 @@ if (BUILD_TESTS)
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-selfhost"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm_selfhost.cmake)
             set_tests_properties(vpp-vm-asm-selfhost PROPERTIES
-                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler"
+                FIXTURES_REQUIRED "native-stage1;native-cli-compiler;vm-asm"
                 PROCESSORS 2 TIMEOUT 4200)
 
             add_test(NAME vpp-selective-imports
@@ -1030,8 +1052,7 @@ if (BUILD_TESTS)
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/selective-imports"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_selective_imports.cmake)
             set_tests_properties(vpp-selective-imports PROPERTIES
-                DEPENDS vpp-vm-asm
-                FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 300)
+                FIXTURES_REQUIRED "native-stage1;native-cli-compiler;vm-asm" TIMEOUT 300)
 
         endif()
         if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$") OR

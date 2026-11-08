@@ -3,6 +3,31 @@ foreach(required IN ITEMS VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR
         message(FATAL_ERROR "VM ASM test missing ${required}")
     endif()
 endforeach()
+# CMAKE_HOST_SYSTEM_PROCESSOR is empty under `cmake -P` on some CMake
+# versions. OS_PLATFORM is populated without a configured project.
+cmake_host_system_information(RESULT host_arch QUERY OS_PLATFORM)
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND
+    host_arch MATCHES "^(x86_64|amd64)$")
+    # Direct CTest/script invocations may bypass the default CMake build.
+    # Rebuild from source even when a stale ignored .o exists in the checkout.
+    set(host_object "${VPP_ROOT}/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o")
+    execute_process(COMMAND bash
+        "${VPP_ROOT}/scripts/quality/prepare_linux_freestanding_host.sh"
+        "${host_object}"
+        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_output
+        ERROR_VARIABLE host_errors TIMEOUT 120)
+    if (NOT host_status STREQUAL "0")
+        message(FATAL_ERROR "Linux freestanding ASM host failed (${host_status}):\n${host_output}\n${host_errors}")
+    endif()
+    execute_process(COMMAND nm --defined-only "${host_object}"
+        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_symbols
+        ERROR_VARIABLE host_errors TIMEOUT 15)
+    if (NOT host_status STREQUAL "0" OR
+        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_parse([\r\n]|$)" OR
+        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_text([\r\n]|$)")
+        message(FATAL_ERROR "Linux ASM host missing f64 runtime bridges: ${host_object}\n${host_errors}\n${host_symbols}")
+    endif()
+endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(ENV{VPP_HOME} "${VPP_ROOT}")
 set(vm "${VPP_OUTPUT_DIR}/vpp-vm")
