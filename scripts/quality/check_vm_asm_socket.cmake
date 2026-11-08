@@ -89,7 +89,7 @@ foreach(socket_arch IN LISTS socket_arches)
         list(APPEND socket_extra_objects "${syscalls_obj}")
     endif()
     execute_process(COMMAND "${VPP_SOCKET_CLANG}" ${arch_flags}
-        -Wall -Wextra -Werror
+        -Wall -Wextra -Werror -pthread
         "${VPP_ROOT}/src/tests/fixtures/vm_asm_socket_harness.c"
         "${socket_obj}" ${socket_extra_objects} -o "${socket_bin}"
         RESULT_VARIABLE code ERROR_VARIABLE errors TIMEOUT 30)

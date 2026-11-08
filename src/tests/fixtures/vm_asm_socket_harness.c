@@ -2,8 +2,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +22,29 @@ static int socket_bind_forbidden;
 static volatile sig_atomic_t interrupted;
 static void alarm_handler(int signal_number) {
     (void)signal_number;
-    interrupted = 1;
+    interrupted++;
+}
+struct alarm_sender {
+    pthread_t target;
+    atomic_int stop;
+    atomic_int sent;
+    atomic_int error;
+};
+static void *send_alarm_to_waiter(void *opaque) {
+    struct alarm_sender *sender = opaque;
+    const struct timespec interval = {.tv_nsec = 10000000};
+    while (!atomic_load(&sender->stop)) {
+        struct timespec remaining = interval;
+        while (nanosleep(&remaining, &remaining) < 0 && errno == EINTR) {}
+        if (atomic_load(&sender->stop)) break;
+        int error = pthread_kill(sender->target, SIGALRM);
+        if (error != 0) {
+            atomic_store(&sender->error, error);
+            break;
+        }
+        atomic_fetch_add(&sender->sent, 1);
+    }
+    return NULL;
 }
 static int64_t monotonic_ms(void) {
     struct timespec now;
@@ -180,35 +204,39 @@ int main(void) {
     memcpy(&retained_fd, memory + CTL, sizeof retained_fd);
     assert(retained_fd == serverfd);
     // SIGALRM must not leak EINTR to the guest or restart the full timeout.
-    // Use repeated signals: a single 15ms alarm can be delayed or coalesced
-    // under Rosetta/loaded CI, leaving the EINTR path untested. Repeated
-    // interrupts also catch implementations that restart the full deadline.
+    // setitimer(ITIMER_REAL) may not deliver while poll runs in macOS CI;
+    // target the waiting thread explicitly so repeated EINTR is exercised.
     struct sigaction handler = {0}, previous_handler;
     handler.sa_handler = alarm_handler;
     sigemptyset(&handler.sa_mask);
     assert(sigaction(SIGALRM, &handler, &previous_handler) == 0);
-    // CTest/CI may launch this process with SIGALRM blocked. An armed timer
-    // then expires without calling the handler, falsely failing the EINTR test.
+    // CTest/CI may launch this process with SIGALRM blocked.
     sigset_t alarm_set, previous_mask;
     assert(sigemptyset(&alarm_set) == 0);
     assert(sigaddset(&alarm_set, SIGALRM) == 0);
     assert(sigprocmask(SIG_UNBLOCK, &alarm_set, &previous_mask) == 0);
-    struct itimerval timer = {0};
-    timer.it_value.tv_usec = 15000;
-    timer.it_interval.tv_usec = 15000;
-    assert(setitimer(ITIMER_REAL, &timer, NULL) == 0);
-    put(12, 100);
+    interrupted = 0;
+    struct alarm_sender sender = {.target = pthread_self()};
+    atomic_init(&sender.stop, 0);
+    atomic_init(&sender.sent, 0);
+    atomic_init(&sender.error, 0);
+    pthread_t alarm_thread;
+    assert(pthread_create(&alarm_thread, NULL, send_alarm_to_waiter, &sender) == 0);
+    put(12, 300);
     int64_t started = monotonic_ms();
     assert(vpp_native_os_socket(2, CTL) == -ETIMEDOUT);
     int64_t elapsed = monotonic_ms() - started;
-    struct itimerval disarmed = {0};
-    assert(setitimer(ITIMER_REAL, &disarmed, NULL) == 0);
-    if (interrupted != 1 || elapsed < 60 || elapsed >= 500) {
-        fprintf(stderr, "socket EINTR timeout: signal=%d elapsed=%lldms\n",
-                (int)interrupted, (long long)elapsed);
+    atomic_store(&sender.stop, 1);
+    assert(pthread_join(alarm_thread, NULL) == 0);
+    if (interrupted < 1 || atomic_load(&sender.error) != 0 ||
+        elapsed < 180 || elapsed >= 2000) {
+        fprintf(stderr, "socket EINTR timeout: signal=%d sent=%d error=%d elapsed=%lldms\n",
+                (int)interrupted, atomic_load(&sender.sent),
+                atomic_load(&sender.error), (long long)elapsed);
     }
-    assert(interrupted == 1);
-    assert(elapsed >= 60 && elapsed < 500);
+    assert(interrupted >= 1);
+    assert(atomic_load(&sender.error) == 0);
+    assert(elapsed >= 180 && elapsed < 2000);
     assert(sigprocmask(SIG_SETMASK, &previous_mask, NULL) == 0);
     assert(sigaction(SIGALRM, &previous_handler, NULL) == 0);
     memcpy(&retained_fd, memory + CTL, sizeof retained_fd);
