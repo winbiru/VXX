@@ -1229,13 +1229,21 @@ if (BUILD_TESTS)
         else()
             set(vpp_cli_test vpp-oop-pipeline)
         endif()
+        # The explicit Stage 0 VM compatibility case uses --compiler=cpp;
+        # it must remain runnable in instrumented coverage builds that omit
+        # the self-hosted native compiler bootstrap fixture.
+        set(vpp_cli_native_compiler_arg)
+        if (NOT vpp_case STREQUAL "vm-parity" AND VPP_NATIVE_CLI_COMPILER)
+            set(vpp_cli_native_compiler_arg
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}")
+        endif()
         add_test(NAME ${vpp_cli_test}
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
                 "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                 "-DVPP_CASE=${vpp_case}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vpp-cli-${vpp_case}"
-                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                ${vpp_cli_native_compiler_arg}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_cli.cmake)
         set_tests_properties(${vpp_cli_test} PROPERTIES TIMEOUT 1200)
         if (VPP_NATIVE_CLI_COMPILER AND NOT vpp_case STREQUAL "vm-parity")

@@ -67,16 +67,17 @@ find "$BUILD_DIR" -type f -name '*.gcda' -delete
 # though its name does not start with vpp-native-.
 # Selective imports also builds the ASM VM and needs both native fixtures.
 # The instrumented HTTP fixture compiles its network modules before listening.
-# Full V++ self-hosted integration runs in the normal regression jobs; it
-# executes ASM outside the C++ coverage instrumentation and is intentionally
-# excluded here to avoid an expensive duplicate test run.
+# Full V++ self-hosted integration and quantum validation run in the normal
+# regression jobs; they execute ASM outside the C++ coverage instrumentation
+# and are intentionally excluded here to avoid duplicate work and a missing
+# native-cli-compiler bootstrap when its fixture is filtered out.
 STAGE="ctest"
 STAGE_STARTED=$SECONDS
 echo '[coverage] Run instrumented CTest suite'
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
   ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
     --output-on-failure --no-tests=error --output-log "$BUILD_DIR/ctest.log" \
-    -E '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-integration$)'
+    -E '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-quantum-validation$|vpp-integration$)'
 report_duration
 
 STAGE="capture"
