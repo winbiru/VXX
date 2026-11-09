@@ -34,7 +34,7 @@ hàm riêng tư biên dịch lắp ráp lệnh aarch64(các byte, vị trí) {
     trả về mã;
 };
 
-hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả) {
+hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả, bảng byte = rỗng, bảng hex = rỗng) {
     nếu (kiến trúc != "x86_64" && kiến trúc != "aarch64") {
         ném "assembly Machine IR chưa hỗ trợ kiến trúc";
     };
@@ -52,6 +52,9 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
     số byte dòng = 0;
     liên kết trước = -1;
     lệnh aarch64 elf = kiến trúc == "aarch64" && hệ điều hành != "macos";
+    // Mach-O little endian: mỗi .long giữ nguyên 4 byte mã máy, giảm
+    // số chuỗi ASM phải tạo. Không áp dụng trên ELF vì mapping symbols $x.
+    lệnh aarch64 mach = kiến trúc == "aarch64" && hệ điều hành == "macos" && bảng hex != rỗng;
     lặp (r = 0; r < độ dài(các liên kết); r++) {
         mục = các liên kết[r];
         vị trí liên kết = mục["offset"];
@@ -70,10 +73,19 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
                 văn bản += ".inst " + biên dịch lắp ráp lệnh aarch64(các byte, vị trí) + "\n";
                 số byte dòng += 4;
                 vị trí += 4;
+            } hoặc nếu (lệnh aarch64 mach) {
+                nếu (vị trí + 4 > bắt đầu lệnh gọi) { ném "assembly AArch64: mã lệnh không thẳng hàng"; };
+                nếu (số byte dòng == 0) { văn bản += ".long 0x"; }
+                hoặc { văn bản += ", 0x"; };
+                văn bản += bảng hex[các byte[vị trí + 3]] + bảng hex[các byte[vị trí + 2]] +
+                    bảng hex[các byte[vị trí + 1]] + bảng hex[các byte[vị trí]];
+                số byte dòng += 4;
+                vị trí += 4;
             } hoặc {
                 nếu (số byte dòng == 0) { văn bản += ".byte "; }
                 hoặc { văn bản += ", "; };
-                văn bản += "" + các byte[vị trí];
+                nếu (bảng byte == rỗng) { văn bản += "" + các byte[vị trí]; }
+                hoặc { văn bản += bảng byte[các byte[vị trí]]; };
                 số byte dòng += 1;
                 vị trí += 1;
             };
@@ -114,10 +126,19 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
             văn bản += ".inst " + biên dịch lắp ráp lệnh aarch64(các byte, vị trí) + "\n";
             vị trí += 4;
             số byte dòng += 4;
+        } hoặc nếu (lệnh aarch64 mach) {
+            nếu (vị trí + 4 > độ dài(các byte)) { ném "assembly AArch64: lệnh không đủ 4 byte"; };
+            nếu (số byte dòng == 0) { văn bản += ".long 0x"; }
+            hoặc { văn bản += ", 0x"; };
+            văn bản += bảng hex[các byte[vị trí + 3]] + bảng hex[các byte[vị trí + 2]] +
+                bảng hex[các byte[vị trí + 1]] + bảng hex[các byte[vị trí]];
+            vị trí += 4;
+            số byte dòng += 4;
         } hoặc {
             nếu (số byte dòng == 0) { văn bản += ".byte "; }
             hoặc { văn bản += ", "; };
-            văn bản += "" + các byte[vị trí];
+            nếu (bảng byte == rỗng) { văn bản += "" + các byte[vị trí]; }
+            hoặc { văn bản += bảng byte[các byte[vị trí]]; };
             vị trí += 1;
             số byte dòng += 1;
         };

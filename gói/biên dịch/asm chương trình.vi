@@ -1938,7 +1938,7 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng) {
     bắt đầu bước = 0;
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
@@ -1952,7 +1952,7 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
         thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
     };
-    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát);
+    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát, bảng byte, bảng hex);
     nếu (thống kê != rỗng) {
         thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         thống kê["count"] = thống kê["count"] + 1;
@@ -1977,6 +1977,17 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
     nếu (độ dài(dây) == 5) { ngoại = dây[4]; };
     // Dùng các phần thay vì nối lại toàn bộ assembly khi thêm từng hàm.
     phần = [];
+    // Chuỗi decimal cho các byte dùng lại ở mọi thân hàm trong một lần biên dịch.
+    bảng byte = [];
+    lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(bảng byte, "" + i); };
+    bảng hex = rỗng;
+    nếu (đích["kiến trúc"] == "aarch64" && đích["hệ điều hành"] == "macos") {
+        bảng hex = [];
+        chữ hex = "0123456789abcdef";
+        lặp(i = 0; i < 256; i++) {
+            máy ảo thêm cuối danh sách(bảng hex, chữ hex[i / 16] + chữ hex[i % 16]);
+        };
+    };
     bảng i32 = {};
     // Runtime bootstrap của compiler không mang runtime VM AOT đầy đủ.
     // Không để peephole AOT của chương trình tự áp dụng lên compiler và tạo
@@ -2016,7 +2027,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
             dạng["ký hiệu"] = ký hiệu; nhanh["" + i] = dạng;
             phát = biên dịch mã máy hàm(đích["kiến trúc"], dạng["máy"], đích["hệ điều hành"]);
             máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                đích["hệ điều hành"], ký hiệu, phát));
+                đích["hệ điều hành"], ký hiệu, phát, bảng byte, bảng hex));
         };
     };
     // Chỉ thử bộ chọn ở tên phương thức có ít nhất một thân hàm đã chứng minh.
@@ -2071,12 +2082,12 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
                 phát = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn, đích["hệ điều hành"]);
                 hậu tố = "i"; nếu (chế độ == 1) { hậu tố = "m"; };
                 máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                    đích["hệ điều hành"], "vpp_aot_fast_" + hậu tố + số, phát));
+                    đích["hệ điều hành"], "vpp_aot_fast_" + hậu tố + số, phát, bảng byte, bảng hex));
             };
             máy chọn ô = biên dịch asm bộ chọn vô hộp(ids, nhanh, số, sai, đúng);
             phát ô = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn ô, đích["hệ điều hành"]);
             máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                đích["hệ điều hành"], "vpp_aot_fast_s" + số, phát ô));
+                đích["hệ điều hành"], "vpp_aot_fast_s" + số, phát ô, bảng byte, bảng hex));
         };
         ids ascii = [];
         lặp(i = 0; i < độ dài(các hàm); i++) {
@@ -2092,7 +2103,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         máy chọn ascii = biên dịch asm bộ chọn ascii chỉ số(ids ascii, nhanh);
         phát ascii = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn ascii, đích["hệ điều hành"]);
         máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-            đích["hệ điều hành"], "vpp_aot_fast_ascii_index_m1", phát ascii));
+            đích["hệ điều hành"], "vpp_aot_fast_ascii_index_m1", phát ascii, bảng byte, bảng hex));
     };
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.fast_paths", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
@@ -2101,12 +2112,12 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         thống kê = {"lower_ms": 0, "machine_ms": 0, "assemble_ms": 0, "count": 0};
     };
     lặp(i = 0; i < độ dài(các hàm); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex));
     };
     lặp(i = 0; i < độ dài(khởi tạo); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex));
     };
-    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê));
+    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex));
     nếu (thống kê != rỗng) {
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);

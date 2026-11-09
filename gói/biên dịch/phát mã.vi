@@ -1215,8 +1215,11 @@ lớp công khai Bộ Phát Bytecode {
         trạng thái["lớp hiện tại"] = tên lớp;
         trạng thái["phương thức lớp"] = {};
         phương thức = khai lớp["phương thức"];
-        // Đăng ký mọi function ID trước khi phát thân phương thức. Các lời
-        // gọi nội bộ được phép trỏ tới phương thức khai báo phía sau.
+        // Giữ ID của các phương thức khai báo sau cho lời gọi tiến, nhưng
+        // C++ chỉ cấp StringPool và function slot khi phát từng phương thức.
+        // Hoãn tên để không đẩy methodNameIndex của phương thức trước đi xa.
+        hoãn chuỗi trước = lấy từ điển(sổ, "hoãn chuỗi", sai);
+        sổ["hoãn chuỗi"] = đúng;
         lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
             khai hàm = biểu diễn trung gian["hàm"][phương thức[i]];
             tên hàm = khai hàm["tên"];
@@ -1227,22 +1230,24 @@ lớp công khai Bộ Phát Bytecode {
                 mã định danh = biên dịch sổ cấp hàm(sổ, "", tên hàm);
             };
             trạng thái["phương thức lớp"][khai hàm["tên ngắn"]] = mã định danh;
-            các ô nhớ = trạng thái["slots"];
-            lặp(j = máy ảo lấy độ dài(các ô nhớ); j <= mã định danh; j++) { máy ảo thêm cuối danh sách(các ô nhớ, ""); };
-            các ô nhớ[mã định danh] = tên hàm;
         };
+        sổ["hoãn chuỗi"] = hoãn chuỗi trước;
         lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
             danh sách hàm biểu diễn trung gian = biểu diễn trung gian["hàm"][phương thức[i]];
             tên hàm = danh sách hàm biểu diễn trung gian["tên"];
             mã định danh = trạng thái["phương thức lớp"][danh sách hàm biểu diễn trung gian["tên ngắn"]];
             trạng thái["số receiver đã tra"] = -1;
+            // Tương đương allocateFunction() ngay trước emitFunction() của C++:
+            // slot của receiver ở method đầu tiên phải được cấp trước khi
+            // function ID của method kế tiếp được đưa vào bảng slot.
+            các ô nhớ = trạng thái["slots"];
+            lặp(j = máy ảo lấy độ dài(các ô nhớ); j <= mã định danh; j++) { máy ảo thêm cuối danh sách(các ô nhớ, ""); };
+            các ô nhớ[mã định danh] = tên hàm;
             tên hàm chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, tên hàm);
-            nếu (lấy từ điển(sổ, "hoãn chuỗi", sai)) {
-                bản ghi = sổ["hàm"][mã định danh];
-                bản ghi["tên index"] = tên hàm chỉ mục;
-                bản ghi["tên index runtime"] = tên hàm chỉ mục;
-                sổ["hàm"][mã định danh] = bản ghi;
-            };
+            bản ghi = sổ["hàm"][mã định danh];
+            bản ghi["tên index"] = tên hàm chỉ mục;
+            bản ghi["tên index runtime"] = tên hàm chỉ mục;
+            sổ["hàm"][mã định danh] = bản ghi;
             thân = mình.biên dịch phát mã thân phương thức(danh sách hàm biểu diễn trung gian, trạng thái);
             máy ảo thêm cuối danh sách(các hàm, {"tên": tên hàm, "id": mã định danh,
                            "tên index": tên hàm chỉ mục, "bytecode": thân,
