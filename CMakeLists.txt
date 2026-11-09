@@ -325,6 +325,7 @@ target_link_libraries(vpp-tooling PUBLIC vpp-compiler vpp-bytecode)
 
 vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_runtime.cpp
+    ${CMAKE_SOURCE_DIR}/src/native/aot_workers.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_native_core.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp
@@ -1289,6 +1290,32 @@ if (BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.cmake)
     set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
     if (VPP_NATIVE_CLI_COMPILER)
+        # Verify that parallel V++ IR lowering emits byte-for-byte identical
+        # artifacts to the serial compiler, including nested imports.
+        add_test(NAME vpp-compiler-workers-parity
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-workers"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_compiler_workers.cmake)
+        set_tests_properties(vpp-compiler-workers-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+
+        # Dedicated native-worker regression so CI can isolate concurrency,
+        # cancellation and graph-transfer failures without the full suite.
+        # This explicitly uses the self-hosted V++ compiler; no VM fallback.
+        add_test(NAME vpp-native-aot-workers
+            COMMAND ${CMAKE_COMMAND} -E env
+                "VPP_HOME=${CMAKE_SOURCE_DIR}"
+                "VPP_AOT_ROOT=${CMAKE_SOURCE_DIR}"
+                "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                $<TARGET_FILE:vpp-cli> run --compiler=vpp
+                "${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_worker.vi")
+        set_tests_properties(vpp-native-aot-workers PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600
+            PASS_REGULAR_EXPRESSION "native worker: đạt")
+
         add_test(NAME vpp-quantum-validation
             COMMAND ${CMAKE_COMMAND} -E env "VPP_HOME=${CMAKE_SOURCE_DIR}"
                 "VPP_AOT_ROOT=${CMAKE_SOURCE_DIR}"

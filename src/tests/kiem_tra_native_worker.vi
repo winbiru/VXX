@@ -1,0 +1,267 @@
+nhập gói.lõi.đồng thời.*;
+nhập gói.kiểm thử.chính.*;
+nhập gói.hệ thống.nền tảng.ngủ mili giây;
+
+// Runtime instance and class metadata must also cross the worker boundary.
+lớp Nút Worker {
+    hàm khởi tạo(giá_trị) {
+        mình.giá trị = giá_trị;
+        mình.vòng = mình;
+    };
+    hàm công khai đọc() { trả về mình.giá trị; };
+};
+
+// Run with --compiler=vpp to exercise the real AOT worker primitives.
+hàm chính() {
+    giá_trị = [5, 6];
+    thay_đổi = hàm(x) {
+        x[0] = x[0] + 10;
+        trả về x;
+    };
+    mã = chạy luồng(thay_đổi, [giá_trị]);
+    kết_quả = chờ luồng(mã);
+    khẳng định bằng(kết_quả[0], 15);
+    khẳng định bằng(kết_quả[1], 6);
+    khẳng định bằng(giá_trị[0], 5);
+    khẳng định bằng(chờ luồng(mã)[0], 15);
+    khẳng định bằng(trạng thái luồng(mã), "hoàn tất");
+    khẳng định sai(hủy luồng(mã));
+
+    số = 40;
+    khép = hàm(x) { trả về số + x; };
+    mã_khép = chạy luồng(khép, [2]);
+    số = 900;
+    khẳng định bằng(chờ luồng(mã_khép), 42);
+
+    // A returned closure keeps its independent captured cells alive after
+    // the source worker has exited and its Program heap has been destroyed.
+    mã_trả_hàm = chạy luồng(hàm() {
+        giá_trị_bắt = [40];
+        trả về hàm(n) {
+            giá_trị_bắt[0] = giá_trị_bắt[0] + n;
+            trả về giá_trị_bắt[0];
+        };
+    });
+    hàm_nhận = chờ luồng(mã_trả_hàm);
+    khẳng định bằng(hàm_nhận(2), 42);
+    khẳng định bằng(hàm_nhận(3), 45);
+
+    // A timed wait leaves the worker running and a later wait can join it.
+    mã_hẹn = chạy luồng(hàm() { luồng máy ảo nghỉ(100); trả về 81; });
+    khẳng định bằng(chờ luồng(mã_hẹn, 0), rỗng);
+    khẳng định bằng(chờ luồng(mã_hẹn, 1000), 81);
+
+    lồng = hàm() {
+        con = chạy luồng(hàm() { trả về [7, 8]; });
+        trả về chờ luồng(con);
+    };
+    mã_lồng = chạy luồng(lồng);
+    khẳng định bằng(chờ luồng(mã_lồng)[1], 8);
+
+    lỗi = chạy luồng(hàm() { ném "worker-native-boom"; });
+    hành_động = hàm() { chờ luồng(lỗi); };
+    khẳng định ném lỗi(hành_động, "worker-native-boom");
+    khẳng định bằng(trạng thái luồng(lỗi), "lỗi");
+
+    ngủ = chạy luồng(hàm() { luồng máy ảo nghỉ(60000); trả về 999; });
+    khẳng định bằng(chờ luồng(ngủ, 0), rỗng);
+    khẳng định đúng(hủy luồng(ngủ));
+    khẳng định bằng(luồng máy ảo đợi(ngủ, -1)[0], 2);
+    khẳng định bằng(trạng thái luồng(ngủ), "đã hủy");
+    khẳng định sai(hủy luồng(ngủ));
+
+    // Cloning an object graph must retain its cycles and shared identities
+    // without handing the worker a mutable reference to the parent heap.
+    vòng = [rỗng, 4];
+    vòng[0] = vòng;
+    mã_vòng = chạy luồng(hàm(x) {
+        x[1] = 17;
+        trả về x;
+    }, [vòng]);
+    bản_sao_vòng = chờ luồng(mã_vòng);
+    khẳng định bằng(bản_sao_vòng[0][0][1], 17);
+    khẳng định bằng(vòng[1], 4);
+    bản_sao_vòng[1] = 27;
+    khẳng định bằng(bản_sao_vòng[0][1], 27);
+
+    chia_sẻ = [4];
+    cặp = [chia_sẻ, chia_sẻ];
+    mã_cặp = chạy luồng(hàm(x) {
+        x[0][0] = 31;
+        trả về x;
+    }, [cặp]);
+    bản_sao_cặp = chờ luồng(mã_cặp);
+    khẳng định bằng(bản_sao_cặp[1][0], 31);
+    bản_sao_cặp[0][0] = 44;
+    khẳng định bằng(bản_sao_cặp[1][0], 44);
+    khẳng định bằng(chia_sẻ[0], 4);
+
+    chia_chung = [12];
+    khép_chung = hàm(x) {
+        chia_chung[0] = 38;
+        trả về [chia_chung, x];
+    };
+    mã_chung = chạy luồng(khép_chung, [chia_chung]);
+    bản_sao_chung = chờ luồng(mã_chung);
+    khẳng định bằng(bản_sao_chung[1][0], 38);
+    khẳng định bằng(chia_chung[0], 12);
+
+    nút = Nút Worker(5);
+    mã_nút = chạy luồng(hàm(x) {
+        x.giá trị = 70;
+        trả về x;
+    }, [nút]);
+    bản_sao_nút = chờ luồng(mã_nút);
+    khẳng định bằng(bản_sao_nút.đọc(), 70);
+    nút_vòng = bản_sao_nút.vòng;
+    khẳng định bằng(nút_vòng.đọc(), 70);
+    khẳng định bằng(nút.đọc(), 5);
+
+    từ_điển = {"vòng": rỗng, "giá trị": 3};
+    từ_điển["vòng"] = từ_điển;
+    mã_từ_điển = chạy luồng(hàm(x) { x["giá trị"] = 8; trả về x; }, [từ_điển]);
+    bản_sao_từ_điển = chờ luồng(mã_từ_điển);
+    khẳng định bằng(bản_sao_từ_điển["vòng"]["giá trị"], 8);
+    khẳng định bằng(từ_điển["giá trị"], 3);
+
+    // A deeply nested value must cross both thread boundaries without
+    // recursively consuming one native C++ call frame per collection.
+    sâu = [91];
+    lặp (i = 0; i < 4096; i++) { sâu = [sâu]; };
+    mã_sâu = chạy luồng(hàm(x) { trả về x; }, [sâu]);
+    bản_sao_sâu = chờ luồng(mã_sâu);
+    lặp (i = 0; i < 4096; i++) { bản_sao_sâu = bản_sao_sâu[0]; };
+    khẳng định bằng(bản_sao_sâu[0], 91);
+
+    // A burst of concurrent native workers must finish without interfering
+    // with each other's activation stacks or global snapshots.
+    mã_hàng_đợi = [];
+    lặp (i = 0; i < 24; i++) {
+        thêm(mã_hàng_đợi, chạy luồng(hàm(n) { trả về n * n; }, [i]));
+    };
+    lặp (i = 0; i < 24; i++) {
+        khẳng định bằng(chờ luồng(mã_hàng_đợi[i]), i * i);
+    };
+
+    // Two OS workers can concurrently await the same target and each gets
+    // its own copy of the completed result.
+    mục_tiêu = chạy luồng(hàm() {
+        luồng máy ảo nghỉ(35);
+        trả về [56];
+    });
+    người_chờ_1 = chạy luồng(hàm(mã) { trả về chờ luồng(mã); }, [mục_tiêu]);
+    người_chờ_2 = chạy luồng(hàm(mã) { trả về chờ luồng(mã); }, [mục_tiêu]);
+    khẳng định bằng(chờ luồng(người_chờ_1)[0], 56);
+    khẳng định bằng(chờ luồng(người_chờ_2)[0], 56);
+
+    // Public V++ worker resource wrapper owns its task lifetime and supports
+    // idempotent closing both before and after its callback has finished.
+    tài_nguyên = Luồng Công Việc(hàm(n) { trả về n + 1; }, [41]);
+    khẳng định bằng(tài_nguyên.chờ(), 42);
+    khẳng định bằng(tài_nguyên.trạng thái(), "hoàn tất");
+    khẳng định đúng(tài_nguyên.đóng());
+    khẳng định sai(tài_nguyên.đóng());
+    khẳng định ném lỗi(hàm() { tài_nguyên.chờ(); }, "luồng công việc: đã đóng");
+
+    tài_nguyên_đang_chạy = Luồng Công Việc(hàm() {
+        luồng máy ảo nghỉ(60000);
+        trả về 17;
+    });
+    khẳng định đúng(tài_nguyên_đang_chạy.đóng());
+    khẳng định bằng(trạng thái luồng(tài_nguyên_đang_chạy.mã), "đã hủy");
+    khẳng định sai(tài_nguyên_đang_chạy.đóng());
+
+    // Cancellation and normal completion compete for one terminal state:
+    // once cancel() returns true, wait() must never report Done.
+    lặp (i = 0; i < 64; i++) {
+        mã_đua = chạy luồng(hàm() { trả về 111; });
+        hủy_được = hủy luồng(mã_đua);
+        trạng_thái_cuối = luồng máy ảo đợi(mã_đua, -1)[0];
+        nếu (hủy_được) { khẳng định bằng(trạng_thái_cuối, 2); };
+        nếu (!hủy_được) { khẳng định bằng(trạng_thái_cuối, 1); };
+    };
+
+    // Errors race cancellation just like normal completion. A successful
+    // cancel must never leave the worker in Failed status.
+    lặp (i = 0; i < 64; i++) {
+        mã_đua_lỗi = chạy luồng(hàm() { ném "worker-race-error"; });
+        hủy_được = hủy luồng(mã_đua_lỗi);
+        trạng_thái_cuối = luồng máy ảo đợi(mã_đua_lỗi, -1)[0];
+        nếu (hủy_được) { khẳng định bằng(trạng_thái_cuối, 2); };
+        nếu (!hủy_được) { khẳng định bằng(trạng_thái_cuối, 3); };
+    };
+
+    // Cancel an OS worker blocked in an unbounded wait. Repeated attempts
+    // exercise the cancellation notification and its wakeup handshake.
+    lặp (i = 0; i < 16; i++) {
+        đang_ngủ = chạy luồng(hàm() { luồng máy ảo nghỉ(60000); });
+        đang_chờ = chạy luồng(hàm(mã) { trả về chờ luồng(mã); }, [đang_ngủ]);
+        ngủ mili giây(2);
+        khẳng định đúng(hủy luồng(đang_chờ));
+        khẳng định bằng(luồng máy ảo đợi(đang_chờ, -1)[0], 2);
+        khẳng định đúng(hủy luồng(đang_ngủ));
+        khẳng định bằng(luồng máy ảo đợi(đang_ngủ, -1)[0], 2);
+    };
+
+    // Only one side of a wait cycle may enter the wait. Both failures must
+    // propagate to their callers without leaving a worker deadlocked.
+    điểm_mốc = chạy luồng(hàm() { trả về 1; });
+    khẳng định bằng(chờ luồng(điểm_mốc), 1);
+    mã_a = điểm_mốc + 1;
+    mã_b = điểm_mốc + 2;
+    a = chạy luồng(hàm(đích) {
+        luồng máy ảo nghỉ(20);
+        trả về chờ luồng(đích);
+    }, [mã_b]);
+    b = chạy luồng(hàm(đích) {
+        luồng máy ảo nghỉ(20);
+        trả về chờ luồng(đích);
+    }, [mã_a]);
+    khẳng định bằng(a, mã_a);
+    khẳng định bằng(b, mã_b);
+    khẳng định ném lỗi(hàm() { chờ luồng(a); }, "thread_vm_wait: phát hiện vòng đợi giữa các worker");
+    khẳng định ném lỗi(hàm() { chờ luồng(b); }, "thread_vm_wait: phát hiện vòng đợi giữa các worker");
+
+    mã_tự_chờ = b + 1;
+    tự_chờ = chạy luồng(hàm(id) { trả về chờ luồng(id); }, [mã_tự_chờ]);
+    khẳng định bằng(tự_chờ, mã_tự_chờ);
+    khẳng định ném lỗi(hàm() { chờ luồng(tự_chờ); }, "thread_vm_wait: worker không thể đợi chính mình");
+
+    // A worker executing repeated native numeric loops must reach safepoints
+    // even when the loop body is compiled into optimized machine code.
+    mã_vòng_bận = chạy luồng(hàm() {
+        khi (đúng) {
+            tổng = 0;
+            lặp (j = 0; j < 250000; j++) { tổng = tổng + 1; };
+        };
+    });
+    ngủ mili giây(20);
+    khẳng định đúng(hủy luồng(mã_vòng_bận));
+    khẳng định bằng(luồng máy ảo đợi(mã_vòng_bận, -1)[0], 2);
+
+    // Cancellation is a runtime control signal; user catch blocks may not
+    // swallow it and allow a cancelled worker to complete successfully.
+    mã_bắt_hủy = chạy luồng(hàm() {
+        thử {
+            luồng máy ảo nghỉ(60000);
+        } bắt lỗi (e) {
+            trả về "đã nuốt hủy";
+        };
+        trả về "thoát bình thường";
+    });
+    ngủ mili giây(10);
+    khẳng định đúng(hủy luồng(mã_bắt_hủy));
+    khẳng định bằng(luồng máy ảo đợi(mã_bắt_hủy, -1)[0], 2);
+
+    // Root shutdown must join running workers, including nested children.
+    không_chờ = chạy luồng(hàm() {
+        chạy luồng(hàm() { luồng máy ảo nghỉ(60000); });
+        luồng máy ảo nghỉ(60000);
+    });
+    ngủ mili giây(20);
+
+    khẳng định ném lỗi(hàm() { chạy luồng(123456789); });
+    khẳng định ném lỗi(hàm() { chờ luồng(123456789); });
+    khẳng định ném lỗi(hàm() { luồng máy ảo nghỉ(1); });
+    in "native worker: đạt";
+};

@@ -605,6 +605,17 @@ lớp công khai Bộ Phát Bytecode {
                 mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), số đối số, 0, 0);
                 trả về đúng;
             };
+            // Lời gọi không ghi receiver trong thân lớp chỉ được tra trong
+            // các phương thức đã đăng ký của chính lớp hiện tại. Không dùng
+            // bảng tên ngắn toàn cục vì có thể bỏ qua phạm vi riêng tư.
+            nếu (mã == "gọi tên" && lấy từ điển(trạng thái, "lớp hiện tại", "") != "") {
+                phương thức lớp = lấy từ điển(trạng thái, "phương thức lớp", {});
+                nếu (máy ảo có khóa từ điển(phương thức lớp, tên)) {
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
+                                         số đối số, phương thức lớp[tên], 0);
+                    trả về đúng;
+                };
+            };
             chỉ mục hàm = trạng thái["chỉ mục hàm đã khai"];
             nếu (máy ảo có khóa từ điển(chỉ mục hàm, tên)) {
                 mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
@@ -1066,8 +1077,16 @@ lớp công khai Bộ Phát Bytecode {
         };
 
         phụ thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], đích);
-        cây = biên dịch kiểu cây(sổ, đồ thị, đích);
-        biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng);
+        nếu (máy ảo có khóa từ điển(phiên, "IR đã chuẩn bị")) {
+            cache = phiên["IR đã chuẩn bị"];
+            nếu (!máy ảo có khóa từ điển(cache, đích)) {
+                ném "biên dịch worker: thiếu IR của mô-đun '" + đích + "'";
+            };
+            biểu diễn trung gian = cache[đích];
+        } hoặc {
+            cây = biên dịch kiểu cây(sổ, đồ thị, đích);
+            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng);
+        };
         phần = mình.biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian, sổ, phụ thuộc, đồ thị, phiên);
         máy ảo thêm cuối danh sách(phiên["đã phát"], {"định danh": đích, "phần": phần});
 
@@ -1193,19 +1212,29 @@ lớp công khai Bộ Phát Bytecode {
             cha chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, kiểu lớp cha) + 1;
         };
         mình.biên dịch phát mã lệnh(đỉnh, biên dịch mã thao tác("OP_TAO_LOP"), 0, tên chỉ mục, cha chỉ mục);
+        trạng thái["lớp hiện tại"] = tên lớp;
+        trạng thái["phương thức lớp"] = {};
         phương thức = khai lớp["phương thức"];
+        // Đăng ký mọi function ID trước khi phát thân phương thức. Các lời
+        // gọi nội bộ được phép trỏ tới phương thức khai báo phía sau.
         lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
-            danh sách hàm biểu diễn trung gian = biểu diễn trung gian["hàm"][phương thức[i]];
-            tên hàm = danh sách hàm biểu diễn trung gian["tên"];
+            khai hàm = biểu diễn trung gian["hàm"][phương thức[i]];
+            tên hàm = khai hàm["tên"];
             mã định danh = -1;
             nếu (lấy từ điển(phiên, "đa mô đun", sai)) {
                 mã định danh = biên dịch sổ tìm hàm trực tiếp(sổ, trạng thái["mô đun"], tên hàm);
             } hoặc {
                 mã định danh = biên dịch sổ cấp hàm(sổ, "", tên hàm);
             };
+            trạng thái["phương thức lớp"][khai hàm["tên ngắn"]] = mã định danh;
             các ô nhớ = trạng thái["slots"];
             lặp(j = máy ảo lấy độ dài(các ô nhớ); j <= mã định danh; j++) { máy ảo thêm cuối danh sách(các ô nhớ, ""); };
             các ô nhớ[mã định danh] = tên hàm;
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
+            danh sách hàm biểu diễn trung gian = biểu diễn trung gian["hàm"][phương thức[i]];
+            tên hàm = danh sách hàm biểu diễn trung gian["tên"];
+            mã định danh = trạng thái["phương thức lớp"][danh sách hàm biểu diễn trung gian["tên ngắn"]];
             trạng thái["số receiver đã tra"] = -1;
             tên hàm chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, tên hàm);
             nếu (lấy từ điển(sổ, "hoãn chuỗi", sai)) {
@@ -1232,6 +1261,8 @@ lớp công khai Bộ Phát Bytecode {
                 };
             };
         };
+        trạng thái["lớp hiện tại"] = "";
+        trạng thái["phương thức lớp"] = {};
         trả về đúng;
     };
 

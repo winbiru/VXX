@@ -93,6 +93,7 @@ venv/
 node_modules/
 .cache/
 *.md
+!docs/concurrency-workers.md
 !docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md
 !plans/improvement-plan-2026-10-31.md

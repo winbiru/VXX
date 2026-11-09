@@ -26,6 +26,7 @@ nhập gói.biên dịch.soát lỗi mã nguồn.biên dịch soát lỗi lệnh
 nhập gói.biên dịch.soát lỗi mã nguồn.biên dịch soát lỗi lệnh bộ đệm;
 nhập gói.nhập xuất.đường dẫn.là thư mục;
 nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
+nhập gói.biên dịch.đo hiệu năng.*;
 
 hàm công khai biên dịch hướng dẫn dòng lệnh máy() {
     trả về "V++ native compiler\n" +
@@ -280,9 +281,14 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     } hoặc {
         sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
     };
+    đường hồ sơ = biên dịch hồ sơ đường();
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
+    biên dịch hồ sơ ghi(đường hồ sơ, "artifact.to_wire", bắt đầu);
     nếu (lệnh == "vm-build") { trả về ["complete", biên dịch VM ghi(dây, đầu ra)]; };
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4]);
+    biên dịch hồ sơ ghi(đường hồ sơ, "asm.total", bắt đầu);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };
     trả về ["execute", asm];
 };

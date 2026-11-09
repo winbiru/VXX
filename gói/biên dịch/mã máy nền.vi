@@ -37,19 +37,23 @@ lớp công khai Tiện Ích Mã Máy {
         trả về cao * 65536 + thấp;
     };
 
-    // Chia nguyên signed sau khi trừ remainder chính xác; hỗ trợ word âm.
+    // Phân tách word i32 thành các byte bằng phép bit thuần V++.
+    // Mask 255 giữ đúng giá trị u8 kể cả khi shift word âm có sign extension.
     hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trước) {
-        các byte = [];
-        số = từ máy;
-        lặp (i = 0; i < 4; i++) {
-            byte = số % 256;
-            nếu (byte < 0) { byte += 256; };
-            máy ảo thêm cuối danh sách(các byte, byte);
-            số = (số - byte) / 256;
-        };
-        lặp (i = 0; i < 4; i++) {
-            nếu (ít trước) { máy ảo thêm cuối danh sách(ra, các byte[i]); }
-            hoặc { máy ảo thêm cuối danh sách(ra, các byte[3 - i]); };
+        b0 = từ máy & 255;
+        b1 = (từ máy >> 8) & 255;
+        b2 = (từ máy >> 16) & 255;
+        b3 = (từ máy >> 24) & 255;
+        nếu (ít trước) {
+            máy ảo thêm cuối danh sách(ra, b0);
+            máy ảo thêm cuối danh sách(ra, b1);
+            máy ảo thêm cuối danh sách(ra, b2);
+            máy ảo thêm cuối danh sách(ra, b3);
+        } hoặc {
+            máy ảo thêm cuối danh sách(ra, b3);
+            máy ảo thêm cuối danh sách(ra, b2);
+            máy ảo thêm cuối danh sách(ra, b1);
+            máy ảo thêm cuối danh sách(ra, b0);
         };
         trả về ra;
     };

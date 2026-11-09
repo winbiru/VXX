@@ -1,8 +1,10 @@
 // aarch64: phát byte mã máy kiến trúc riêng.
 // Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+// Opcode cố định dùng literal i32 để tránh parse hex trong mỗi lệnh phát.
+// Quy đổi uint32 hex sang signed i32: 0x52800000 -> 1384120320,
+// 0xd65f03c0 -> -698416192. Opcode tính động vẫn dùng helper hex.
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
-nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm thập lục phân;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
@@ -12,13 +14,13 @@ lớp công khai Bộ Phát AARCH64 {
     hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
-                        biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("52800000") + thấp * 32, ít);
-                        biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("72a00000") + cao * 32, ít);
+                        biên dịch mã máy thêm từ máy(ra, 1384120320 + thấp * 32, ít);
+                        biên dịch mã máy thêm từ máy(ra, 1923088384 + cao * 32, ít);
                     } hoặc {
-                        nếu (loại == "cộng") { biên dịch mã máy thêm thập lục phân(ra, "0b010000", ít); }
-                        hoặc { biên dịch mã máy thêm thập lục phân(ra, "4b010000", ít); };
+                        nếu (loại == "cộng") { biên dịch mã máy thêm từ máy(ra, 184614912, ít); }
+                        hoặc { biên dịch mã máy thêm từ máy(ra, 1258356736, ít); };
                     };
-                    biên dịch mã máy thêm thập lục phân(ra, "d65f03c0", ít);
+                    biên dịch mã máy thêm từ máy(ra, -698416192, ít);
         trả về ra;
     };
 
@@ -43,17 +45,17 @@ lớp công khai Bộ Phát AARCH64 {
     hàm riêng tư biên dịch mã máy aarch64 chuyển(ra, đích, nguồn) {
         nếu (đích != nguồn) {
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân("2a0003e0") + nguồn * 65536 + đích);
+                704644064 + nguồn * 65536 + đích);
         };
     };
 
     hàm riêng tư biên dịch mã máy aarch64 nạp hằng(ra, đích, giá trị) {
         nửa = biên dịch mã máy trả về(giá trị);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("52800000") + nửa["lo"] * 32 + đích);
+            1384120320 + nửa["lo"] * 32 + đích);
         nếu (nửa["hi"] != 0) {
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân("72a00000") + nửa["hi"] * 32 + đích);
+                1923088384 + nửa["hi"] * 32 + đích);
         };
     };
 
@@ -62,8 +64,8 @@ lớp công khai Bộ Phát AARCH64 {
         lặp (i = 0; i < các byte; i += 4095) {
             bước = còn;
             nếu (bước > 4095) { bước = 4095; };
-            nền = biên dịch mã máy từ máy thập lục phân("910003ff");
-            nếu (trừ) { nền = biên dịch mã máy từ máy thập lục phân("d10003ff"); };
+            nền = -1862269953;
+            nếu (trừ) { nền = -788528129; };
             mình.biên dịch mã máy aarch64 từ máy(ra, nền + bước * 1024);
             còn -= bước;
         };
@@ -73,19 +75,19 @@ lớp công khai Bộ Phát AARCH64 {
         nếu (độ lệch < 0 || độ lệch > 2147483647 || độ lệch % 4 != 0) {
             ném "AArch64: offset stack không hợp lệ";
         };
-        cơ sở = biên dịch mã máy từ máy thập lục phân("b9000000");
-        nếu (tải) { cơ sở = biên dịch mã máy từ máy thập lục phân("b9400000"); };
+        cơ sở = -1191182336;
+        nếu (tải) { cơ sở = -1186988032; };
         nếu (độ lệch <= 16380) {
             mình.biên dịch mã máy aarch64 từ máy(ra, cơ sở + độ lệch * 256 + 992 + thành ghi);
             trả về;
         };
-        mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("910003eb"));
+        mình.biên dịch mã máy aarch64 từ máy(ra, -1862269973);
         còn = độ lệch;
         lặp (i = 0; i < độ lệch; i += 4095) {
             bước = còn;
             nếu (bước > 4095) { bước = 4095; };
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân("9100016b") + bước * 1024);
+                -1862270613 + bước * 1024);
             còn -= bước;
         };
         mình.biên dịch mã máy aarch64 từ máy(ra, cơ sở + 352 + thành ghi);
@@ -348,8 +350,8 @@ lớp công khai Bộ Phát AARCH64 {
         vị trí lệnh = [];
 
         nếu (!dùng thành ghi || giữ thành ghi) {
-            biên dịch mã máy thêm thập lục phân(ra, "a9bf7bfd", đúng);
-            biên dịch mã máy thêm thập lục phân(ra, "910003fd", đúng);
+            biên dịch mã máy thêm từ máy(ra, -1447068675, đúng);
+            biên dịch mã máy thêm từ máy(ra, -1862269955, đúng);
         };
         nếu (khung > 0) {
             mình.biên dịch mã máy aarch64 điều chỉnh con trỏ ngăn xếp(ra, khung, đúng);
@@ -357,7 +359,7 @@ lớp công khai Bộ Phát AARCH64 {
         lặp (n = 0; n < số thành ghi giữ; n++) {
             thành ghi giữ = 19 + n;
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân("f90003e0") + n * 1024 + thành ghi giữ);
+                -117439520 + n * 1024 + thành ghi giữ);
         };
         lặp (i = 0; i < tham số; i++) {
             nếu (i < 8) {
@@ -384,9 +386,9 @@ lớp công khai Bộ Phát AARCH64 {
                     đích = 9;
                     nếu (dùng thành ghi) { đích = mình.biên dịch mã máy aarch64 thành ghi(ô nhớ + d, giữ thành ghi); };
                     nếu (đích ghi thẳng[i] >= 0) { đích = mình.biên dịch mã máy aarch64 thành ghi(đích ghi thẳng[i], giữ thành ghi); };
-                    mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("52800000") + nửa["lo"] * 32 + đích);
+                    mình.biên dịch mã máy aarch64 từ máy(ra, 1384120320 + nửa["lo"] * 32 + đích);
                     nếu (!dùng thành ghi || nửa["hi"] != 0) {
-                        mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("72a00000") + nửa["hi"] * 32 + đích);
+                        mình.biên dịch mã máy aarch64 từ máy(ra, 1923088384 + nửa["hi"] * 32 + đích);
                     };
                     nếu (đích ghi thẳng[i] < 0) {
                         mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, ô nhớ + d, dùng thành ghi, giữ thành ghi);
@@ -465,19 +467,19 @@ lớp công khai Bộ Phát AARCH64 {
                         máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số,
                             "điều kiện": đúng, "nhánh so sánh": đúng, "mã điều kiện": ghép nhánh[i]});
                         mình.biên dịch mã máy aarch64 từ máy(ra,
-                            biên dịch mã máy từ máy thập lục phân("54000000") + ghép nhánh[i]);
+                            1409286144 + ghép nhánh[i]);
                     } hoặc {
                         nguồn = 9;
                         nếu (dùng thành ghi) { nguồn = mình.biên dịch mã máy aarch64 thành ghi(ô nhớ + d - 1, giữ thành ghi); };
                         mình.biên dịch mã máy aarch64 truy cập(ra, đúng, nguồn, ô nhớ + d - 1, dùng thành ghi, giữ thành ghi);
                         máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số, "điều kiện": đúng, "thanh ghi": nguồn, "nhánh so sánh": sai});
-                        mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("34000000") + nguồn);
+                        mình.biên dịch mã máy aarch64 từ máy(ra, 872415232 + nguồn);
                     };
                 }
                 ca "Jump": {
                     nếu (số < 0 || số >= máy ảo lấy độ dài(lệnh)) { ném "ARM64 jump không hợp lệ"; };
                     máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số, "điều kiện": sai});
-                    biên dịch mã máy thêm thập lục phân(ra, "14000000", đúng);
+                    biên dịch mã máy thêm từ máy(ra, 335544320, đúng);
                 }
                 ca "Call": {
                     nếu (số < 0 || d < số || mã phép toán["symbol"] == "") {
@@ -505,7 +507,7 @@ lớp công khai Bộ Phát AARCH64 {
                         mình.biên dịch mã máy aarch64 truy cập byte(ra, sai, 9, (n - 8) * bước tham số);
                     };
                     máy ảo thêm cuối danh sách(tái định vị, {"offset": máy ảo lấy độ dài(ra), "symbol": mã phép toán["symbol"]});
-                    biên dịch mã máy thêm thập lục phân(ra, "94000000", đúng);
+                    biên dịch mã máy thêm từ máy(ra, -1811939328, đúng);
                     mình.biên dịch mã máy aarch64 điều chỉnh con trỏ ngăn xếp(ra, kích cỡ, sai);
                     mình.biên dịch mã máy aarch64 truy cập(ra, sai, 0, ô nhớ + d - số, dùng thành ghi, giữ thành ghi);
                 }
@@ -520,15 +522,15 @@ lớp công khai Bộ Phát AARCH64 {
                     lặp (n = 0; n < số thành ghi giữ; n++) {
                         thành ghi giữ = 19 + n;
                         mình.biên dịch mã máy aarch64 từ máy(ra,
-                            biên dịch mã máy từ máy thập lục phân("f94003e0") + n * 1024 + thành ghi giữ);
+                            -113245216 + n * 1024 + thành ghi giữ);
                     };
                     nếu (khung > 0) {
                         mình.biên dịch mã máy aarch64 điều chỉnh con trỏ ngăn xếp(ra, khung, sai);
                     };
-                    nếu (!dùng thành ghi || giữ thành ghi) { biên dịch mã máy thêm thập lục phân(ra, "a8c17bfd", đúng); };
-                    biên dịch mã máy thêm thập lục phân(ra, "d65f03c0", đúng);
+                    nếu (!dùng thành ghi || giữ thành ghi) { biên dịch mã máy thêm từ máy(ra, -1463714819, đúng); };
+                    biên dịch mã máy thêm từ máy(ra, -698416192, đúng);
                 }
-                ca "Trap": { biên dịch mã máy thêm thập lục phân(ra, "d4200000", đúng); }
+                ca "Trap": { biên dịch mã máy thêm từ máy(ra, -736100352, đúng); }
                 mặc định: { ném "AArch64 MachineOpcode C++ chưa định nghĩa: " + mã; }
             };
             };
@@ -542,15 +544,15 @@ lớp công khai Bộ Phát AARCH64 {
             biểu thức điều kiện = f["điều kiện"];
             phạm vi = 33554432;
             mô đun = 67108864;
-            cơ sở = biên dịch mã máy từ máy thập lục phân("14000000");
+            cơ sở = 335544320;
             hệ số = 1;
             nếu (biểu thức điều kiện) {
                 phạm vi = 262144;
                 mô đun = 524288;
-                cơ sở = biên dịch mã máy từ máy thập lục phân("34000000") + f["thanh ghi"];
+                cơ sở = 872415232 + f["thanh ghi"];
                 hệ số = 32;
                 nếu (f["nhánh so sánh"]) {
-                    cơ sở = biên dịch mã máy từ máy thập lục phân("54000000") + f["mã điều kiện"];
+                    cơ sở = 1409286144 + f["mã điều kiện"];
                 };
             };
             nếu (từ máy chênh < -phạm vi || từ máy chênh >= phạm vi) {
@@ -578,13 +580,13 @@ lớp công khai Bộ Phát AARCH64 {
         // CBNZ divisor,+12; MOVN result,#0; B +8; SDIV result,left,right.
         // Chia 0 trả -1, và ARM SDIV giữ INT32_MIN/-1 ở INT32_MIN.
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("35000060") + phải);
+            889192544 + phải);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("12800000") + trái);
+            310378496 + trái);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("14000002"));
+            335544322);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("1ac00c00") + phải * 65536 + trái * 32 + trái);
+            448793600 + phải * 65536 + trái * 32 + trái);
         mình.biên dịch mã máy aarch64 truy cập(ra, sai, trái, ô nhớ + d - 2, dùng thành ghi, giữ thành ghi);
     };
 
@@ -604,15 +606,15 @@ lớp công khai Bộ Phát AARCH64 {
         // SDIV quotient,left,right; MSUB left,quotient,right,left.
         // INT32_MIN % -1 = 0, chia 0 = -1.
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("35000060") + phải);
+            889192544 + phải);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("12800000") + trái);
+            310378496 + trái);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("14000003"));
+            335544323);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("1ac00c00") + phải * 65536 + trái * 32 + thương);
+            448793600 + phải * 65536 + trái * 32 + thương);
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân("1b008000") + phải * 65536 + trái * 1024 + thương * 32 + trái);
+            453017600 + phải * 65536 + trái * 1024 + thương * 32 + trái);
         mình.biên dịch mã máy aarch64 truy cập(ra, sai, trái, ô nhớ + d - 2, dùng thành ghi, giữ thành ghi);
     };
 
@@ -628,8 +630,8 @@ lớp công khai Bộ Phát AARCH64 {
         nếu (đích ghi >= 0) { đích = mình.biên dịch mã máy aarch64 thành ghi(đích ghi, giữ thành ghi); };
         nếu (hằng nhỏ >= 0 && nguồn trái >= 0 && dùng thành ghi) {
             nguồn = mình.biên dịch mã máy aarch64 thành ghi(nguồn trái, giữ thành ghi);
-            nền = biên dịch mã máy từ máy thập lục phân("11000000");
-            nếu (cơ sở == "4b000000") { nền = biên dịch mã máy từ máy thập lục phân("51000000"); };
+            nền = 285212672;
+            nếu (cơ sở == "4b000000") { nền = 1358954496; };
             mình.biên dịch mã máy aarch64 từ máy(ra, nền + hằng nhỏ * 1024 + nguồn * 32 + đích);
             trả về;
         };
@@ -685,12 +687,12 @@ lớp công khai Bộ Phát AARCH64 {
         };
         nếu (so sánh tức thời) {
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân("7100001f") + hằng * 1024 + trái * 32);
+                1895825439 + hằng * 1024 + trái * 32);
         } hoặc {
-            mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("6b00001f") + phải * 65536 + trái * 32);
+            mình.biên dịch mã máy aarch64 từ máy(ra, 1795162143 + phải * 65536 + trái * 32);
         };
         nếu (!bỏ boolean) {
-            mình.biên dịch mã máy aarch64 từ máy(ra, biên dịch mã máy từ máy thập lục phân("1a9f07e0") + biểu thức điều kiện ngược * 4096 + đích);
+            mình.biên dịch mã máy aarch64 từ máy(ra, 446629856 + biểu thức điều kiện ngược * 4096 + đích);
             nếu (đích ghi < 0) {
                 mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, ô nhớ + d - 2, dùng thành ghi, giữ thành ghi);
             };

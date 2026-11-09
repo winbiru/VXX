@@ -11,6 +11,70 @@ nhập gói.biên dịch.kiểu mô đun.Bộ Đăng Ký Kiểu;
 nhập gói.biên dịch.đồ thị mô đun.biên dịch dựng đồ thị nguồn thuần;
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.đồng thời.chạy luồng;
+nhập gói.lõi.đồng thời.chờ luồng;
+nhập gói.lõi.đồng thời.hủy luồng;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+
+// Mỗi worker nhận cây cú pháp đã chuẩn hóa kiểu và trả về IR độc lập.
+// Không chia sẻ sổ đăng ký, StringPool hoặc emitter với các worker.
+hàm riêng tư biên dịch worker hạ IR(cây) {
+    trả về biên dịch hạ IR từ cây thuần(cây, đúng);
+};
+
+hàm riêng tư biên dịch worker số luồng() {
+    cấu hình = đọc biến môi trường("VPP_COMPILER_WORKERS", "2");
+    thử {
+        số luồng = thành số nguyên(cấu hình);
+        nếu (số luồng < 0 || số luồng > 8) {
+            ném "VPP_COMPILER_WORKERS phải trong khoảng 0..8";
+        };
+        trả về số luồng;
+    } bắt lỗi (e) {
+        ném "biên dịch worker: VPP_COMPILER_WORKERS không hợp lệ: " + thành chuỗi(cấu hình);
+    };
+};
+
+// Tạo tối đa N worker cùng lúc. Join theo thứ tự mô-đun để kết quả và lỗi
+// có thứ tự ổn định; nếu có lỗi, hủy/join toàn bộ worker còn lại.
+hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, giới hạn) {
+    // `đồ thị["mô đun"]` chỉ chứa phụ thuộc, còn root nằm ở `điểm vào`.
+    các tên = [đồ thị["điểm vào"]];
+    phụ thuộc = đồ thị["mô đun"];
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        máy ảo thêm cuối danh sách(các tên, phụ thuộc[i]["định danh"]);
+    };
+    cache = {};
+    đang chạy = [];
+    đã nhận = 0;
+    thử {
+        lặp(i = 0; i < máy ảo lấy độ dài(các tên); i++) {
+            tên = các tên[i];
+            cây = bộ kiểu.cây(tên);
+            mã luồng = chạy luồng(biên dịch worker hạ IR, [cây]);
+            máy ảo thêm cuối danh sách(đang chạy, {"tên": tên, "mã": mã luồng});
+            nếu (máy ảo lấy độ dài(đang chạy) - đã nhận >= giới hạn) {
+                mục = đang chạy[đã nhận];
+                cache[mục["tên"]] = chờ luồng(mục["mã"]);
+                đã nhận += 1;
+            };
+        };
+        lặp(i = đã nhận; i < máy ảo lấy độ dài(đang chạy); i++) {
+            mục = đang chạy[i];
+            cache[mục["tên"]] = chờ luồng(mục["mã"]);
+            đã nhận += 1;
+        };
+    } bắt lỗi (e) {
+        lặp(i = đã nhận; i < máy ảo lấy độ dài(đang chạy); i++) {
+            thử { hủy luồng(đang chạy[i]["mã"]); } bắt lỗi (hủy lỗi) {};
+            thử { chờ luồng(đang chạy[i]["mã"]); } bắt lỗi (chờ lỗi) {};
+        };
+        ném "biên dịch worker hạ IR: " + thành chuỗi(e);
+    };
+    trả về cache;
+};
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Liên Kết Bytecode {
@@ -132,6 +196,11 @@ lớp công khai Bộ Liên Kết Bytecode {
         nếu (điểm vào != -1) {
             máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
                             "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
+        } hoặc {
+            // Không có chính(): chạy top-level thành công phải trả status 0,
+            // dù biểu thức cuối còn giá trị nguyên trên ngăn xếp.
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_BIEN_SO"),
+                            "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         };
         máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
                         "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
@@ -165,8 +234,18 @@ lớp công khai Bộ Liên Kết Bytecode {
         phiên = {"đa mô đun": đúng, "cạnh dùng": [],
                  "đã phát": [], "id tối đa": -1, "ngoại": []};
         tên gốc = đồ thị["điểm vào"];
-        cây gốc = bộ kiểu.cây(tên gốc);
-        biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng);
+        số worker = biên dịch worker số luồng();
+        // Đồ thị có một phụ thuộc vẫn có hai mô-đun: root + dependency.
+        nếu (số worker > 1 && máy ảo lấy độ dài(đồ thị["mô đun"]) > 0) {
+            phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker);
+            nếu (!máy ảo có khóa từ điển(phiên["IR đã chuẩn bị"], tên gốc)) {
+                ném "biên dịch worker: thiếu IR của mô-đun gốc";
+            };
+            biểu diễn trung gian gốc = phiên["IR đã chuẩn bị"][tên gốc];
+        } hoặc {
+            cây gốc = bộ kiểu.cây(tên gốc);
+            biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng);
+        };
         gốc dữ liệu = biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian gốc, sổ,
             biên dịch sổ tìm mô đun(sổ["mô đun"], tên gốc), đồ thị, phiên);
         bảng hàm = [];
@@ -277,6 +356,9 @@ lớp công khai Bộ Liên Kết Bytecode {
         nếu (điểm vào != -1) {
             máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
                  "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
+        } hoặc {
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_BIEN_SO"),
+                 "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         };
         máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
              "toán hạng": 0, "chỉ số": 0, "giá trị": 0});

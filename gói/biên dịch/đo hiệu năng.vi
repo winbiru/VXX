@@ -1,0 +1,29 @@
+// Hồ sơ hiệu năng compiler do V++ thu thập, chỉ bật khi có đường dẫn log.
+// Không ghi stdout để giữ nguyên kết quả golden và CLI.
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
+nhập gói.nhập xuất.tệp.ghi nối tệp;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm công khai biên dịch hồ sơ đường() {
+    trả về đọc biến môi trường("VPP_COMPILER_PROFILE_FILE", "");
+};
+
+hàm công khai biên dịch hồ sơ bắt đầu(đường) {
+    nếu (đường == "") { trả về 0; };
+    trả về thời gian đơn điệu mili giây();
+};
+
+hàm công khai biên dịch hồ sơ ghi(đường, bước, bắt đầu) {
+    nếu (đường == "") { trả về 0; };
+    trôi = thời gian đơn điệu mili giây() - bắt đầu;
+    ghi nối tệp(đường, "VPP_COMPILER_PROFILE " + bước + " " + thành chuỗi(trôi) + " ms\n");
+    trả về 0;
+};
+
+// Ghi bộ đếm và tổng thời gian đã cộng dồn từ nhiều thân hàm.
+hàm công khai biên dịch hồ sơ ghi số(đường, bước, giá trị) {
+    nếu (đường == "") { trả về 0; };
+    ghi nối tệp(đường, "VPP_COMPILER_PROFILE " + bước + " " + thành chuỗi(giá trị) + "\n");
+    trả về 0;
+};

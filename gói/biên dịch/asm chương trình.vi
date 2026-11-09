@@ -9,6 +9,7 @@ nhập gói.biên dịch.đích.biên dịch phân tích đích;
 nhập gói.biên dịch.sản phẩm biên dịch.Bộ Mã Hóa Sản Phẩm Biên Dịch;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.biên dịch.asm vô hộp.*;
+nhập gói.biên dịch.đo hiệu năng.*;
 
 hàm công khai biên dịch asm tên nội tại() {
     // BEGIN native intrinsic opcodes: đối chiếu bởi vpp-opcode-abi.
@@ -1937,14 +1938,31 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng) {
+    bắt đầu bước = 0;
+    nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
     máy = hạ.hạ();
+    nếu (thống kê != rỗng) {
+        thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+        bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+    };
     phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]);
-    trả về biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát);
+    nếu (thống kê != rỗng) {
+        thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+        bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+    };
+    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát);
+    nếu (thống kê != rỗng) {
+        thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+        thống kê["count"] = thống kê["count"] + 1;
+    };
+    trả về kết quả;
 };
 
 hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) {
+    đường hồ sơ = biên dịch hồ sơ đường();
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
     codec.kiểm tra dây(dây, "bytecode V++ đồ thị đã liên kết");
     đích = biên dịch phân tích đích(bộ ba);
@@ -1977,6 +1995,8 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         };
         nếu (thêm mới == 0) { thoát; };
     };
+    biên dịch hồ sơ ghi(đường hồ sơ, "asm.specialize", bắt đầu);
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     nhanh = {};
     lặp(i = 0; i < độ dài(các hàm); i++) {
         dạng = lấy từ điển(bảng i32, "" + i, rỗng);
@@ -2074,13 +2094,27 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
             đích["hệ điều hành"], "vpp_aot_fast_ascii_index_m1", phát ascii));
     };
+    biên dịch hồ sơ ghi(đường hồ sơ, "asm.fast_paths", bắt đầu);
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+    thống kê = rỗng;
+    nếu (đường hồ sơ != "") {
+        thống kê = {"lower_ms": 0, "machine_ms": 0, "assemble_ms": 0, "count": 0};
+    };
     lặp(i = 0; i < độ dài(các hàm); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê));
     };
     lặp(i = 0; i < độ dài(khởi tạo); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê));
     };
-    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32));
+    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê));
+    nếu (thống kê != rỗng) {
+        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
+        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);
+        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.machine_ms", thống kê["machine_ms"]);
+        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.assemble_ms", thống kê["assemble_ms"]);
+    };
+    biên dịch hồ sơ ghi(đường hồ sơ, "asm.functions", bắt đầu);
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     tiền tố = "";
     meta = ".section .data.rel.ro,\"aw\",@progbits\n";
     nếu (đích["hệ điều hành"] == "macos") { tiền tố = "_"; meta = ".section __DATA,__const\n"; };
@@ -2147,5 +2181,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         độ dài(khởi tạo) + ",.Laot_initializers," + tiền tố + "vpp_aot_entry\n.long " + cờ + ",1\n.quad " + độ dài(ngoại) + ",.Laot_foreign\n.quad " +
         độ dài(các hàm) + ",.Laot_i32_functions\n";
     máy ảo thêm cuối danh sách(phần, meta + "\n#define VPP_NATIVE_DYNAMIC_RUNTIME 1\n#include \"common/vpp_aot_dynamic_runtime.inc\"\n");
-    trả về biên dịch lắp ráp nối các phần(phần);
+    kết quả = biên dịch lắp ráp nối các phần(phần);
+    biên dịch hồ sơ ghi(đường hồ sơ, "asm.metadata", bắt đầu);
+    trả về kết quả;
 };

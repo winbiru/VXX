@@ -214,6 +214,7 @@ TESTS=(
   src/tests/kiem_tra_goi_xml.vi
   src/tests/kiem_tra_goi_luu_tru.vi
   src/tests/kiem_tra_goi_dong_thoi.vi
+  src/tests/kiem_tra_native_worker.vi
   src/tests/kiem_tra_goi_tuy_chon.vi
   src/tests/kiem_tra_goi_bang_ma.vi
   src/tests/kiem_tra_vm_ieee754.vi
@@ -337,6 +338,7 @@ TESTS=(
   src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi
+  src/tests/kiem_tra_lop_phuong_thuc_forward.vi
   src/tests/kiem_tra_object_model.vi
   src/tests/kiem_tra_constructor_tham_so.vi
   src/tests/kiem_tra_visibility_instance.vi
@@ -360,7 +362,6 @@ TESTS=(
 # replaced by independent native V++ checks. Never silently fall back.
 VM_GOLDEN_TESTS=(
   src/tests/kiem_tra_bien_dich_khi_vm.vi
-  src/tests/kiem_tra_goi_dong_thoi.vi
   src/tests/kiem_tra_goi_bien_dich.vi
   src/tests/kiem_tra_goi_bien_dich_moi.vi
   src/tests/kiem_tra_kien_truc_oop_compiler.vi

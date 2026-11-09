@@ -17,6 +17,8 @@ namespace vietvm::native::aot {
 using Value = runtime::StackValue;
 struct Program;
 struct Frame;
+struct WorkerState;
+struct WorkerTask;
 using Function = int (*)(int);
 using AotBoundary2Operation = void (*)(Frame &, int, int);
 
@@ -151,12 +153,26 @@ struct Program {
     std::unordered_set<std::string> capabilities;
     int lastForeignError = 0;
     std::function<void(const std::string &)> output;
-    std::function<Value(const std::vector<Value> &)> executeArtifact;
+    // The callback receives its execution Program explicitly so workers never
+    // invoke compiler functions against a concurrent parent Program.
+    std::function<Value(Program &, const std::vector<Value> &)> executeArtifact;
     std::function<Value(const std::vector<Value> &)> executeSource;
     std::exception_ptr pendingError;
+    // All nested workers share one registry, but execute in independent
+    // Programs/heaps. Only the root Program owns registry shutdown.
+    std::shared_ptr<WorkerState> workerState;
+    std::shared_ptr<WorkerTask> currentWorker;
+    bool ownsWorkerState = true;
 
     Program();
+    ~Program();
+    Program(const Program &) = delete;
+    Program &operator=(const Program &) = delete;
     const std::string &string(int index) const;
+    Value threadIntrinsic(int operation, const std::vector<Value> &args);
+    void workerSafepoint();
+    void initializeWorkerRuntime();
+    void shutdownWorkerRuntime() noexcept;
     Value invoke(int function, std::vector<Value> arguments = {},
                  runtime::InstanceHandle receiver = {}, runtime::ClassHandle owner = {},
                  runtime::ClosureHandle closure = {});

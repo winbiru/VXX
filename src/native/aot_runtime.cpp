@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <vector>
 #if defined(__APPLE__)
 #include <execinfo.h>
@@ -87,6 +88,9 @@ struct CpuScope {
     }
 };
 thread_local std::vector<Frame *> nativeFrames;
+// A complete V++ print is one atomic output record even when several worker
+// Programs use the same host stream at the same time.
+std::mutex aotPrintMutex;
 // Local bindings are heap-backed because closures can retain them after a
 // call. Reuse only cells owned exclusively by the finished frame; captured
 // cells stay alive with their original identity. Keep the cache thread-local
@@ -252,6 +256,7 @@ bool representationIntrinsic(Opcode opcode, const std::vector<Value> &args,
 } // namespace
 
 Program::Program() {
+    initializeWorkerRuntime();
     capabilities = {"system.env.read", "system.process.id",
                                "system.process.parent_id", "system.time.sleep",
                                "system.process.new", "system.process.arg",
@@ -299,7 +304,10 @@ Program::Program() {
                                "system.ffi.layout",
                                "system.user.id", "system.user.effective_id",
                                "system.group.id", "system.group.effective_id"};
-    output = [](const std::string &text) { std::cout << text; };
+    output = [](const std::string &text) {
+        std::lock_guard<std::mutex> lock(aotPrintMutex);
+        std::cout << text;
+    };
 }
 const std::string &Program::string(int index) const {
     if (index < 0 || static_cast<std::size_t>(index) >= strings.size()) fail("StringPool index");
@@ -991,6 +999,7 @@ bool Frame::runRangeModSumI32Loop(int baseSlot, int targetSlot, int bound,
     if(!base||!target)return false;
     int total=0;
     for(int i=0;i<bound;++i) {
+        if((i & 4095)==0)program.workerSafepoint();
         const int value=wrapRuntimeInt32(std::int64_t(*base)+i);
         int remainder=0;
         if(value!=std::numeric_limits<int>::min()||divisor!=-1)
@@ -1298,6 +1307,12 @@ void Frame::intrinsic(int operation) {
     const auto *descriptor = bytecode::intrinsicByOpcode(operation);
     if (!descriptor) fail("unknown intrinsic");
     auto args = take(static_cast<int>(descriptor->arity)); Value result = make_null_value(); std::string error;
+    if (operation == OP_VM_THREAD_SPAWN || operation == OP_VM_THREAD_WAIT ||
+        operation == OP_VM_THREAD_CANCEL || operation == OP_VM_THREAD_STATUS ||
+        operation == OP_VM_THREAD_PARK) {
+        push(program.threadIntrinsic(operation, args));
+        return;
+    }
     if (runtime::isFileMachinePrimitive(operation)) {
         push(runtime::executeFileMachinePrimitive(static_cast<Opcode>(operation),
             args, program.capabilities, program.machineFiles));
@@ -1366,7 +1381,7 @@ void Frame::intrinsic(int operation) {
     if (operation == OP_VM_BYTECODE_CHAY || operation == OP_NATIVE_ARTIFACT_CHAY) {
         if (!program.executeArtifact) fail("native artifact compiler unavailable");
         try {
-            push(program.executeArtifact(args));
+            push(program.executeArtifact(program, args));
         } catch (const runtime::LanguageException &) {
             throw;
         } catch (const std::exception &exception) {
@@ -1423,7 +1438,10 @@ bool Frame::defaultMatches() {
     switches.back().second = true; return true;
 }
 void Frame::print() { program.output(sv_to_string(pop()) + "\n"); }
-void Frame::safepoint() { if (program.heap.needsCollection()) program.collect(); }
+void Frame::safepoint() {
+    program.workerSafepoint();
+    if (program.heap.needsCollection()) program.collect();
+}
 void Program::collect() {
     CpuScope profile("heap.collect");
     std::vector<Value> roots;

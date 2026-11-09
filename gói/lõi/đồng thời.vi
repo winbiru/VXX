@@ -1,6 +1,6 @@
-// vi.concurrent — tác vụ trễ với timeout/hủy.
-// Public API chọn thao tác và diễn giải snapshot ở V++; VM chỉ quản lý
-// worker thread/task registry. 0.2 chỉ truyền kết quả scalar.
+// vi.concurrent — tác vụ trễ và worker với timeout/hủy.
+// Public API và chính sách tác vụ viết bằng V++; Native AOT quản lý các
+// OS thread, registry và snapshot sâu giữa các runtime heap độc lập.
 
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
 nhập gói.lõi.chuyển kiểu.loại của;
@@ -23,15 +23,6 @@ hàm riêng tư đồng thời yêu cầu mã tác vụ(giá trị, tên hàm) {
     trả về mã;
 };
 
-hàm riêng tư đồng thời yêu cầu kết quả vô hướng(giá trị) {
-    kiểu = loại của(giá trị);
-    nếu (kiểu == "số nguyên" || kiểu == "số thực" ||
-        kiểu == "chuỗi" || kiểu == "rỗng") {
-        trả về giá trị;
-    };
-    ném "tác vụ sau: kết quả phiên bản 0.2 chỉ hỗ trợ scalar";
-};
-
 hàm công khai tác vụ sau(độ trễ mili giây, kết quả) {
     độ trễ mili giây = đồng thời yêu cầu số nguyên(
         độ trễ mili giây,
@@ -41,10 +32,8 @@ hàm công khai tác vụ sau(độ trễ mili giây, kết quả) {
     nếu (độ trễ mili giây < 0 || độ trễ mili giây > 86400000) {
         ném "tác vụ sau: độ trễ phải trong 0..86400000 ms";
     };
-    kết quả = đồng thời yêu cầu kết quả vô hướng(kết quả);
     công việc = hàm() {
-        // Park là primitive VM có thể bị đánh thức bởi cooperative cancel.
-        // Registry, trạng thái và policy tác vụ đều nằm ở V++.
+        // Park có thể bị đánh thức bởi cooperative cancellation.
         luồng máy ảo nghỉ(độ trễ mili giây);
         trả về kết quả;
     };
@@ -92,9 +81,9 @@ hàm công khai trạng thái tác vụ(mã tác vụ) {
     trả về "đã hủy";
 };
 
-// Chạy một callback V++ trên OS thread riêng. VM chụp snapshot sâu của closure,
+// Chạy một callback V++ trên OS thread riêng. Runtime chụp snapshot sâu của closure,
 // globals và đối_số trước khi worker bắt đầu, vì vậy mutable object không bị
-// chia sẻ ngầm giữa hai heap. Kết quả được sao chép ngược về VM gọi khi join.
+// chia sẻ ngầm giữa hai heap. Kết quả được sao chép ngược về bên gọi khi join.
 hàm công khai chạy luồng(công việc, đối số = rỗng) {
     nếu (đối số == rỗng) { đối số = []; };
     nếu (loại của(đối số) != "danh sách") {

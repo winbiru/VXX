@@ -1,8 +1,10 @@
 #include "vpp/native/aot.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -252,6 +254,96 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
 #else
         "program";
 #endif
+#if defined(__APPLE__) && defined(__aarch64__)
+    // The self-hosted macOS runtime only needs V++-emitted ASM, the V++
+    // runtime object and the platform ASM primitives. Running a fresh CMake
+    // configure/build for each test source dominates short AOT executions.
+    // Keep CMake available for parity checks with VPP_AOT_DIRECT_LINK=0.
+    const char *runtimeChoice=std::getenv("VPP_AOT_RUNTIME");
+    const char *directChoice=std::getenv("VPP_AOT_DIRECT_LINK");
+    if(runtimeChoice&&std::string(runtimeChoice)=="vpp"&&
+       !(directChoice&&std::string(directChoice)=="0")) {
+        fs::path runtimeObject=root/"build/native-vpp-runtime/runtime.o";
+        if(const char *configured=std::getenv("VPP_AOT_VPP_OBJECT");configured&&*configured)
+            runtimeObject=core::utf8Path(configured);
+        if(!runtimeObject.is_absolute()||!fs::is_regular_file(runtimeObject))
+            throw std::runtime_error("Native AOT: V++ runtime object missing: "+runtimeObject.u8string());
+        const auto asmRoot=root/"scripts/ASM";
+        const auto programObject=temporary.path/"program.o";
+        const auto primitiveSource=asmRoot/"macos/vpp_aot_primitives_aarch64.S";
+        const auto localPrimitive=temporary.path/"primitives.o";
+        const auto runChecked=[&](std::vector<std::string> command,const char *description) {
+            const auto result=process(command,true);
+            if(result.status)throw std::runtime_error(std::string("Native AOT: ")+description+
+                " failed ("+std::to_string(result.status)+")\n"+result.output);
+        };
+        runChecked({"clang","-c",source.u8string(),"-DVPP_AOT_VPP_RUNTIME=1",
+            "-I"+asmRoot.u8string(),"-I"+(asmRoot/"common").u8string(),
+            "-o",programObject.u8string()},"V++ program assembly");
+        profiler.mark("assemble-vpp-program");
+
+        // Cache just the immutable platform primitives, not program output.
+        // Hash their source contents (including transitive ASM includes) so
+        // concurrent tests never reuse an object built from older sources.
+        std::uint64_t digest=14695981039346656037ULL;
+        const auto hashBytes=[&](const char *bytes,std::size_t count) {
+            for(std::size_t i=0;i<count;++i) {
+                digest^=static_cast<unsigned char>(bytes[i]);
+                digest*=1099511628211ULL;
+            }
+        };
+        const std::string cacheVersion="macos-arm64-vpp-stack-abi-1";
+        hashBytes(cacheVersion.data(),cacheVersion.size());
+        std::vector<fs::path> sources;
+        for(const auto &entry:fs::recursive_directory_iterator(asmRoot)) {
+            if(entry.is_regular_file()&&
+               (entry.path().extension()==".S"||entry.path().extension()==".inc"))
+                sources.push_back(entry.path());
+        }
+        std::sort(sources.begin(),sources.end());
+        for(const auto &input:sources) {
+            const auto name=input.lexically_relative(asmRoot).generic_u8string();
+            hashBytes(name.data(),name.size());
+            std::ifstream stream(input,std::ios::binary);
+            if(!stream)throw std::runtime_error("Native AOT: cannot read ASM dependency: "+input.u8string());
+            char buffer[4096];
+            while(stream.read(buffer,sizeof(buffer))||stream.gcount()>0)
+                hashBytes(buffer,static_cast<std::size_t>(stream.gcount()));
+            if(stream.bad())throw std::runtime_error("Native AOT: cannot hash ASM dependency: "+input.u8string());
+        }
+        const fs::path cacheDirectory=runtimeObject.parent_path()/".vpp-aot-link-cache";
+        std::error_code cacheError;
+        fs::create_directories(cacheDirectory,cacheError);
+        const fs::path cachedPrimitive=cacheDirectory/("primitives-"+std::to_string(digest)+".o");
+        const bool cacheAvailable=!cacheError&&fs::is_directory(cacheDirectory);
+        fs::path primitiveObject=localPrimitive;
+        if(cacheAvailable&&fs::is_regular_file(cachedPrimitive)&&fs::file_size(cachedPrimitive)>0) {
+            primitiveObject=cachedPrimitive;
+            profiler.mark("reuse-vpp-primitives");
+        } else {
+            runChecked({"clang","-c",primitiveSource.u8string(),
+                "-DVPP_NATIVE_RUNTIME_STACK_ABI=1","-o",localPrimitive.u8string()},
+                "V++ platform primitives assembly");
+            profiler.mark("assemble-vpp-primitives");
+            if(cacheAvailable) {
+                // A hard link publishes a complete object atomically; races
+                // from parallel CTest workers safely retain the first copy.
+                std::error_code linkError;
+                fs::create_hard_link(localPrimitive,cachedPrimitive,linkError);
+                if(!linkError||fs::is_regular_file(cachedPrimitive))
+                    primitiveObject=cachedPrimitive;
+            }
+        }
+        runChecked({"clang",programObject.u8string(),primitiveObject.u8string(),
+            runtimeObject.u8string(),"-Wl,-dead_strip","-o",executable.u8string()},
+            "V++ executable link");
+        profiler.mark("link-vpp-executable");
+        if(std::getenv("VPP_AOT_KEEP_ASM"))
+            fs::copy_file(source,fs::path(absolute.u8string()+".S"),fs::copy_options::overwrite_existing);
+        fs::rename(executable,absolute);
+        return;
+    }
+#endif
     // Installed toolchains keep libraries under <root>/lib. A developer's
     // Stage 0 checkout can instead use the existing CMake build libraries.
     fs::path libraries=root;
@@ -289,10 +381,15 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
     configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+cmakePath(root),
         "-DVPP_AOT_LIB_ROOT="+cmakePath(libraries),"-DVPP_AOT_SOURCE="+cmakePath(source),
         "-DVPP_AOT_OUTPUT="+cmakePath(executable)});
+#if !defined(_WIN32)
+    // Windows links its platform libraries directly; its CMake link project
+    // does not consume this POSIX-only flag. Passing it produces an unused-cli
+    // warning that contaminates the golden output of every native batch test.
 #if defined(VPP_AOT_LINK_LEGACY_LIBFFI) && VPP_AOT_LINK_LEGACY_LIBFFI
     configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=ON");
 #else
     configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=OFF");
+#endif
 #endif
     auto configured=process(configure);
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
@@ -323,7 +420,7 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             for(std::size_t k=0;k<f.extentCount;++k)descriptor.bufferExtents.push_back({f.extents[k].parameter,f.extents[k].lengthParameter,f.extents[k].fixed});
             program.foreignFunctions.push_back(std::move(descriptor));
         }
-        program.executeArtifact=[&program,spec](const std::vector<Value> &wire)->Value {
+        program.executeArtifact=[spec](Program &executor,const std::vector<Value> &wire)->Value {
             TemporaryDirectory temporary(fs::temp_directory_path());
             const auto executable=temporary.path/
 #if defined(_WIN32)
@@ -332,7 +429,7 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
                 "artifact";
 #endif
             if(spec->compiler) {
-                const auto assembly=program.invokeName("biên dịch asm chương trình",
+                const auto assembly=executor.invokeName("biên dịch asm chương trình",
                     {make_list_value(wire),canonicalTriple(hostTarget()),make_int_value(0)});
                 if(!std::holds_alternative<std::string>(assembly))
                     throw std::runtime_error("Native AOT: expected V++ assembly text");
