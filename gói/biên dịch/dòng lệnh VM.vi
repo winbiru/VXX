@@ -15,7 +15,9 @@ hàm công khai biên dịch dòng lệnh VM(args, thư viện) {
     source = biên dịch nguồn chuẩn đường(args[1]);
     output = biên dịch nguồn chuẩn đường(args[3]);
     nếu (source == output) { ném "VM ASM: output must not overwrite source"; };
-    product = biên dịch nguồn tệp tự chủ(source, thư viện);
+    // Standalone ASM VM has no OS-thread host ABI. Keep its compiler serial;
+    // native compiler entry points still use VPP_COMPILER_WORKERS (default 2).
+    product = biên dịch nguồn tệp tự chủ(source, thư viện, 0);
     trả về biên dịch VM ghi(biên dịch nạp sản phẩm biên dịch(product), output);
 };
 hàm chính() {};

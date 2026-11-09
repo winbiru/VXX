@@ -151,17 +151,6 @@ lớp công khai Bộ Tách Từ Vựng {
             thành chuỗi(dòng) + ", cột " + thành chuỗi(cột);
     };
 
-    // Copy each source byte once. Building a token by repeatedly appending
-    // immutable strings performs quadratic copying for long identifiers and
-    // string literals, while byte spans preserve UTF-8 and escape spelling.
-    hàm riêng tư biên dịch từ vựng đoạn(các byte, bắt đầu, kết thúc) {
-        đoạn = [];
-        lặp(j = bắt đầu; j < kết thúc; j++) {
-            máy ảo thêm cuối danh sách(đoạn, các byte[j]);
-        };
-        trả về chuỗi từ byte máy ảo(đoạn);
-    };
-
     // Lex UTF-8 bằng các code point: không tách đôi ký tự tiếng Việt.
     // Chưa dùng trong bootstrap C++; API này là pass độc lập có thể kiểm thử.
     hàm công khai biên dịch từ tố hóa thô(mã nguồn) {
@@ -178,8 +167,6 @@ lớp công khai Bộ Tách Từ Vựng {
         mã ký tự cơ bản = [];
         lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(mã ký tự cơ bản, chuỗi từ byte máy ảo([i])); };
         vị trí byte = [0];
-        cột byte = [1];
-        cột hiện tại = 1;
         vị trí = 0;
         khi (vị trí < số byte) {
             bước = 1;
@@ -189,22 +176,22 @@ lớp công khai Bộ Tách Từ Vựng {
             } hoặc {
                 bước = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
                 nếu (bước < 1) { ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ"; };
-                đoạn = [];
-                lặp(j = 0; j < bước; j++) { máy ảo thêm cuối danh sách(đoạn, các byte[vị trí + j]); };
-                c = chuỗi từ byte máy ảo(đoạn);
+                // UTF-8 width is validated above, so this slice preserves a
+                // complete code point without allocating a temporary list.
+                c = máy ảo cắt chuỗi theo byte(mã nguồn, vị trí, bước);
             };
             máy ảo thêm cuối danh sách(ký tự, c);
             vị trí += bước;
-            nếu (c == "\n") { cột hiện tại = 1; }
-            hoặc { cột hiện tại += bước; };
             máy ảo thêm cuối danh sách(vị trí byte, vị trí);
-            máy ảo thêm cuối danh sách(cột byte, cột hiện tại);
         };
         n = máy ảo lấy độ dài(ký tự);
         kết quả = [];
         i = 0;
         dòng = 1;
         cột = 1;
+        // The byte column only depends on the byte offset of this line's
+        // first code point. Avoid allocating a column entry for every code point.
+        đầu byte dòng = 0;
         khi (i < n) {
             c = ký tự[i];
             tiếp = "";
@@ -215,7 +202,10 @@ lớp công khai Bộ Tách Từ Vựng {
             // method and comparing several strings for every code point.
             mã ASCII = các byte[vị trí byte[i]];
             nếu (mã ASCII == 32 || (mã ASCII >= 9 && mã ASCII <= 13)) {
-                nếu (c == "\n") { dòng += 1; cột = 1; }
+                nếu (c == "\n") {
+                    dòng += 1; cột = 1;
+                    đầu byte dòng = vị trí byte[i + 1];
+                }
                 hoặc { cột += 1; };
                 i += 1;
             } hoặc {
@@ -243,7 +233,10 @@ lớp công khai Bộ Tách Từ Vựng {
                                 cột += 2;
                                 đóng = đúng;
                             } hoặc {
-                                nếu (a == "\n") { dòng += 1; cột = 1; }
+                                nếu (a == "\n") {
+                                    dòng += 1; cột = 1;
+                                    đầu byte dòng = vị trí byte[i + 1];
+                                }
                                 hoặc { cột += 1; };
                                 i += 1;
                             };
@@ -274,7 +267,8 @@ lớp công khai Bộ Tách Từ Vựng {
                                 };
                             };
                             nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột); };
-                            giá trị = mình.biên dịch từ vựng đoạn(các byte, vị trí byte[đầu], vị trí byte[i]);
+                            giá trị = máy ảo cắt chuỗi theo byte(mã nguồn,
+                                vị trí byte[đầu], vị trí byte[i] - vị trí byte[đầu]);
                         } hoặc {
                             // Toán tử dài nhất được nhận trước.
                             đôi = sai;
@@ -334,12 +328,13 @@ lớp công khai Bộ Tách Từ Vựng {
                                         i += 1;
                                         cột += 1;
                                     };
-                                    giá trị = mình.biên dịch từ vựng đoạn(các byte, vị trí byte[đầu], vị trí byte[i]);
+                                    giá trị = máy ảo cắt chuỗi theo byte(mã nguồn,
+                                        vị trí byte[đầu], vị trí byte[i] - vị trí byte[đầu]);
                                 };
                             };
                         };
                         máy ảo thêm cuối danh sách(kết quả, mình.biên dịch từ vựng từ tố(
-                            giá trị, đầu dòng, cột byte[đầu],
+                            giá trị, đầu dòng, vị trí byte[đầu] - đầu byte dòng + 1,
                             vị trí byte[đầu], vị trí byte[i], đầu cột, đầu, i
                         ));
                     };

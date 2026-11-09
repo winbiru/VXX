@@ -285,7 +285,8 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
 std::string makeLoweringSource(const compiler::IrProgram &ir,
                                std::string_view functionName, bool leaf = false,
                                const Target *emitTarget = nullptr,
-                               bool emitObject = false, bool emitAssembly = false) {
+                               bool emitObject = false, bool emitAssembly = false,
+                               const std::vector<std::string> *leafNames = nullptr) {
     if (emitObject && !emitTarget)
         throw std::runtime_error("V++ object writer cần target phát mã máy");
     const auto abiName = nativeAbiSymbol(functionName);
@@ -326,6 +327,20 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
     }
     code << "]};\n";
     if (leaf) {
+        if (leafNames) {
+            code << "  names = [";
+            for (std::size_t i = 0; i < leafNames->size(); ++i) {
+                if (i) code << ',';
+                code << quoted(nativeAbiSymbol((*leafNames)[i]));
+            }
+            code << "];\n  lặp (i = 0; i < độ dài(names); i++) {\n"
+                 << "    thử {\n"
+                 << "      fn = biên dịch máy hạ lá(ir, names[i]);\n"
+                 << "      in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n"
+                 << "    } bắt lỗi (e) { in \"E:unsupported leaf\"; };\n"
+                 << "  };\n}\n";
+            return code.str();
+        }
         code << "  fn = biên dịch máy hạ lá(ir, " << quoted(abiName) << ");\n"
              << "  in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n";
     } else {
@@ -471,6 +486,35 @@ std::string makeVppLeafSource(const Target &target, const RawLeaf &leaf) {
          << "    hex += bảng[(b - b % 16) / 16] + bảng[b % 16];\n"
          << "  };\n"
          << "  in \"B:\" + hex;\n}\n";
+    return code.str();
+}
+
+std::string makeVppLeavesSource(const std::vector<std::pair<Target, RawLeaf>> &requests) {
+    std::ostringstream code;
+    code << "nhập gói.biên dịch.mã máy.*;\nhàm chính() {\n  requests = [";
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (i) code << ',';
+        const auto &[target, leaf] = requests[i];
+        const char *kind = nullptr;
+        switch (leaf.kind) {
+            case RawLeafKind::ReturnConstantI32: kind = "hằng"; break;
+            case RawLeafKind::AddI32Arguments: kind = "cộng"; break;
+            case RawLeafKind::SubI32Arguments: kind = "trừ"; break;
+            default: throw std::runtime_error("V++ leaf encoder: loại hàm chưa định nghĩa");
+        }
+        code << '[' << quoted(architectureName(target.arch)) << ',' << quoted(kind)
+             << ',' << leaf.constant << ',' << quoted(targetOperatingSystem(target)) << ']';
+    }
+    code << "];\n  bảng = \"0123456789abcdef\";\n"
+         << "  lặp (i = 0; i < độ dài(requests); i++) {\n"
+         << "    request = requests[i];\n"
+         << "    byte = biên dịch mã máy lá(request[0], request[1], request[2], request[3]);\n"
+         << "    hex = \"\";\n"
+         << "    lặp (j = 0; j < độ dài(byte); j++) {\n"
+         << "      b = byte[j];\n"
+         << "      nếu (b < 0 || b > 255) { ném \"V++ leaf encoder trả byte ngoài u8\"; };\n"
+         << "      hex += bảng[(b - b % 16) / 16] + bảng[b % 16];\n"
+         << "    };\n    in \"B:\" + hex;\n  };\n}\n";
     return code.str();
 }
 
@@ -866,6 +910,24 @@ RawLeafLowering lowerRawLeafVpp(const compiler::IrProgram &ir,
     }
 }
 
+std::vector<RawLeafLowering> lowerRawLeavesVpp(const compiler::IrProgram &ir,
+                                             const std::vector<std::string> &functionNames,
+                                             const std::filesystem::path &sourceBase) {
+    if (functionNames.empty()) return {};
+    std::istringstream lines(executeVppSource(makeLoweringSource(
+        ir, functionNames.front(), true, nullptr, false, false, &functionNames), sourceBase));
+    std::vector<RawLeafLowering> results;
+    for (const auto &name : functionNames) {
+        std::string line;
+        if (!std::getline(lines, line)) throw std::runtime_error("V++ leaf batch: missing " + name);
+        if (line == "E:unsupported leaf") results.push_back({{}, "unsupported leaf: " + name});
+        else results.push_back({decodeLeafLowering(line), {}});
+    }
+    std::string extra;
+    if (std::getline(lines, extra)) throw std::runtime_error("V++ leaf batch: extra lowering record");
+    return results;
+}
+
 MachineEmission emitMachineFunctionVpp(const Target &target,
                                       const MachineFunction &function,
                                       const std::filesystem::path &sourceBase) {
@@ -884,6 +946,22 @@ RawLeafResult emitRawLeafVpp(const Target &target, const RawLeaf &leaf,
     } catch (const std::exception &e) {
         return {{}, std::string("V++ native leaf encoder: ") + e.what()};
     }
+}
+
+std::vector<RawLeafResult> emitRawLeavesVpp(
+    const std::vector<std::pair<Target, RawLeaf>> &requests,
+    const std::filesystem::path &sourceBase) {
+    if (requests.empty()) return {};
+    std::istringstream lines(executeVppSource(makeVppLeavesSource(requests), sourceBase));
+    std::vector<RawLeafResult> results;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        std::string line;
+        if (!std::getline(lines, line)) throw std::runtime_error("V++ leaf batch: missing byte record");
+        results.push_back(decodeLeafOutput(line));
+    }
+    std::string extra;
+    if (std::getline(lines, extra)) throw std::runtime_error("V++ leaf batch: extra byte record");
+    return results;
 }
 
 RawObjectResult emitRawObjectBytesVpp(const Target &target,

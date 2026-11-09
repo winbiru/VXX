@@ -25,6 +25,12 @@ RawLeafLowering lowerRawLeafVpp(const compiler::IrProgram &ir,
                                 std::string_view functionName,
                                 const std::filesystem::path &sourceBase);
 
+// Amortize Stage 0 frontend/assembly/linking across independent parity cases.
+// Results retain request order, including individual lowering failures.
+std::vector<RawLeafLowering> lowerRawLeavesVpp(const compiler::IrProgram &ir,
+                                             const std::vector<std::string> &functionNames,
+                                             const std::filesystem::path &sourceBase);
+
 // Bootstrap bridge: execute the V++ Machine IR encoder inside the CLI VM.
 MachineEmission emitMachineFunctionVpp(const Target &target,
                                       const MachineFunction &function,
@@ -34,6 +40,10 @@ MachineEmission emitMachineFunctionVpp(const Target &target,
 // 16 supported architectures. Keep the C++ emitter as the reference oracle.
 RawLeafResult emitRawLeafVpp(const Target &target, const RawLeaf &leaf,
                              const std::filesystem::path &sourceBase);
+
+std::vector<RawLeafResult> emitRawLeavesVpp(
+    const std::vector<std::pair<Target, RawLeaf>> &requests,
+    const std::filesystem::path &sourceBase);
 
 // Production relocatable object writer, implemented by gói/biên dịch/đối tượng.vi.
 // The C++ object writer remains available as an independent parity oracle.

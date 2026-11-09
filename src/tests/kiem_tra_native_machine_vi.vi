@@ -109,6 +109,28 @@ hàm native kiểm tra giữ hằng vòng lặp() {
 }
 
 hàm chính() {
+    // Symbol ABI: toàn bộ miền byte, vị trí đầu/sau và UTF-8 đa byte.
+    đầu = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+    sau = đầu + "0123456789";
+    lặp (byte = 0; byte < 128; byte++) {
+        ký tự = chuỗi từ byte máy ảo([byte]);
+        hợp lệ đầu = sai; hợp lệ sau = sai;
+        lặp (j = 0; j < độ dài(đầu); j++) {
+            nếu (ký tự == đầu[j]) { hợp lệ đầu = đúng; };
+        };
+        lặp (j = 0; j < độ dài(sau); j++) {
+            nếu (ký tự == sau[j]) { hợp lệ sau = đúng; };
+        };
+        nếu (biên dịch mã máy ký hiệu hợp lệ(ký tự) != hợp lệ đầu ||
+            biên dịch mã máy ký hiệu hợp lệ("a" + ký tự) != hợp lệ sau) {
+            ném "Symbol ABI ASCII sai tại byte " + byte;
+        };
+    };
+    nếu (biên dịch mã máy ký hiệu hợp lệ("") ||
+        biên dịch mã máy ký hiệu hợp lệ("hàm") ||
+        biên dịch mã máy ký hiệu hợp lệ("a🌿")) {
+        ném "Symbol ABI không chặn rỗng hoặc UTF-8 ngoài ASCII";
+    };
     native kiểm tra giữ hằng vòng lặp();
     // W1 = W0 +/- imm12; ngoài miền immediate thì MOVZ W9 là lệnh đầu.
     native kiểm tra immediate("Add", 0, 1, 0, 0, 17);

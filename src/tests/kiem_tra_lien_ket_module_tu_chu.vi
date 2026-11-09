@@ -108,8 +108,10 @@ hàm chính() {
         "dep": "hàm chính() { in 2; };"
     });
     in không_gọi["điểm vào"] == -1;
-    in độ dài(không_gọi["bytecode"]) == 3;
-    in không_gọi["bytecode"][2]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
+    in độ dài(không_gọi["bytecode"]) == 4;
+    in không_gọi["bytecode"][2]["op"] == biên dịch mã thao tác("OP_BIEN_SO") &&
+        không_gọi["bytecode"][2]["toán hạng"] == 0 &&
+        không_gọi["bytecode"][3]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
 
     lỗi = sai;
     thử {

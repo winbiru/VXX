@@ -1,0 +1,98 @@
+foreach(required IN ITEMS VPP_EXEC VPP_ROOT VPP_NATIVE_COMPILER VPP_OUTPUT_DIR)
+    if(NOT DEFINED ${required})
+        message(FATAL_ERROR "Native batch check missing ${required}")
+    endif()
+endforeach()
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/expected")
+file(REMOVE "${VPP_OUTPUT_DIR}/batch.profile" "${VPP_OUTPUT_DIR}/uncached.profile")
+file(WRITE "${VPP_OUTPUT_DIR}/before.vi" "nhập shared.*; hàm chính() { in giá trị(); };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/after.vi" "nhập shared.*; hàm phụ() { trả về 19; }; hàm chính() { in giá trị(); in phụ(); };\n")
+# The executable changes an import between requests in the SAME compiler.
+# A batch must read it again, and a changed immediate must miss the memo.
+file(WRITE "${VPP_OUTPUT_DIR}/change.vi" [=[nhập gói.nhập xuất.tệp.ghi tệp;
+hàm chính() { ghi tệp("shared.vi", "hàm giá trị() { trả về 11; };\n"); in "đã đổi 🌿"; };
+]=])
+file(WRITE "${VPP_OUTPUT_DIR}/bad.vi" "hàm chính( {\n")
+file(WRITE "${VPP_OUTPUT_DIR}/runtime.vi" "hàm chính() { a = [1]; in a[4]; };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/expected/before.expected" "7\n")
+file(WRITE "${VPP_OUTPUT_DIR}/expected/after.expected" "11\n19\n")
+set(sources)
+foreach(name IN ITEMS before change bad runtime after)
+    list(APPEND sources "${VPP_OUTPUT_DIR}/${name}.vi")
+endforeach()
+set(environment "VPP_HOME=${VPP_ROOT}" "VPP_AOT_ROOT=${VPP_ROOT}"
+    "VPP_NATIVE_COMPILER=${VPP_NATIVE_COMPILER}" "VPP_AOT_DIRECT_LINK_CPP=1"
+    "VPP_NATIVE_GOLDEN_FAIL_FAST=0" "VPP_COMPILER_PROFILE_FILE=")
+foreach(mode IN ITEMS single batch uncached)
+    file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/${mode}")
+    file(WRITE "${VPP_OUTPUT_DIR}/shared.vi" "hàm giá trị() { trả về 7; };\n")
+    if(mode STREQUAL "single")
+        foreach(source IN LISTS sources)
+            get_filename_component(name "${source}" NAME_WE)
+            execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${environment}
+                "${VPP_EXEC}" run --compiler=vpp "${source}"
+                OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE status TIMEOUT 45)
+            file(WRITE "${VPP_OUTPUT_DIR}/single/${name}.output" "${output}${errors}")
+            file(WRITE "${VPP_OUTPUT_DIR}/single/${name}.status" "${status}\n")
+        endforeach()
+    else()
+        if(mode STREQUAL "uncached")
+            set(disabled 1)
+        else()
+            set(disabled 0)
+        endif()
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${environment}
+            "VPP_NATIVE_NO_CACHE=${disabled}"
+            "VPP_COMPILER_PROFILE_FILE=${VPP_OUTPUT_DIR}/${mode}.profile"
+            "${VPP_EXEC}" --batch-run-tests --compiler=vpp "${VPP_OUTPUT_DIR}/${mode}" ${sources}
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+        if(NOT status STREQUAL "0")
+            message(FATAL_ERROR "Native ${mode} worker failed: ${status}\n${output}\n${errors}")
+        endif()
+        foreach(name IN ITEMS before change bad runtime after)
+            foreach(extension IN ITEMS output status)
+                file(READ "${VPP_OUTPUT_DIR}/single/${name}.${extension}" expected)
+                file(READ "${VPP_OUTPUT_DIR}/${mode}/${name}.${extension}" actual)
+                string(REPLACE "\r\n" "\n" expected "${expected}")
+                string(REPLACE "\r\n" "\n" actual "${actual}")
+                if(NOT actual STREQUAL expected)
+                    message(FATAL_ERROR "Native ${mode}/${name}.${extension} differs from isolated compiler\nexpected: ${expected}\nactual: ${actual}")
+                endif()
+            endforeach()
+            file(READ "${VPP_OUTPUT_DIR}/${mode}/${name}.milliseconds" elapsed)
+            if(NOT elapsed MATCHES "^[0-9]+\n$")
+                message(FATAL_ERROR "Native batch missing timing: ${name}")
+            endif()
+        endforeach()
+    endif()
+endforeach()
+file(READ "${VPP_OUTPUT_DIR}/batch/before.output" before)
+file(READ "${VPP_OUTPUT_DIR}/batch/after.output" after)
+string(REPLACE "\r\n" "\n" before "${before}")
+string(REPLACE "\r\n" "\n" after "${after}")
+if(NOT before STREQUAL "7\n" OR NOT after STREQUAL "11\n19\n")
+    message(FATAL_ERROR "Native batch reused stale imported source or leaked function IDs")
+endif()
+file(READ "${VPP_OUTPUT_DIR}/batch.profile" profile)
+if(NOT profile MATCHES "asm.cache.hits [1-9][0-9]*")
+    message(FATAL_ERROR "Native batch did not reuse identical Machine IR bodies")
+endif()
+# Fail-fast must stop after the first golden mismatch, leaving its evidence.
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/fail-fast")
+file(REMOVE "${VPP_OUTPUT_DIR}/fail-fast/after.status")
+file(WRITE "${VPP_OUTPUT_DIR}/shared.vi" "hàm giá trị() { trả về 8; };\n")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${environment}
+    "VPP_NATIVE_GOLDEN_FAIL_FAST=1" "${VPP_EXEC}" --batch-run-tests --compiler=vpp
+    "${VPP_OUTPUT_DIR}/fail-fast" "${VPP_OUTPUT_DIR}/before.vi" "${VPP_OUTPUT_DIR}/after.vi"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 45)
+if(status STREQUAL "0" OR NOT EXISTS "${VPP_OUTPUT_DIR}/fail-fast/before.status" OR
+    EXISTS "${VPP_OUTPUT_DIR}/fail-fast/after.status" OR NOT errors MATCHES "GOLDEN FAIL")
+    message(FATAL_ERROR "Native batch fail-fast did not stop with evidence: ${status}\n${output}\n${errors}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${environment}
+    "${VPP_EXEC}" run --compiler=vpp "${VPP_ROOT}/src/tests/kiem_tra_asm_cache.vi"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if(NOT status STREQUAL "0" OR NOT output MATCHES "ASM cache parity: đạt")
+    message(FATAL_ERROR "Cold/warm/disabled ASM parity failed: ${status}\n${output}\n${errors}")
+endif()
+message(STATUS "Native batch: isolated/cached/uncached parity, source edits, error recovery, UTF-8, cwd and fail-fast: PASS")

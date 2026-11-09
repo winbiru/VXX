@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$VppExecutable,
-    [string]$NativeCompiler = $env:VPP_NATIVE_COMPILER
+    [string]$NativeCompiler = $env:VPP_NATIVE_COMPILER,
+    [string]$LogDirectory = $env:VPP_TEST_LOG_DIR
 )
 
 # Full Windows counterpart to run_tests.sh.  The Unix runner is the canonical
@@ -15,6 +16,7 @@ $script:Vpp = (Resolve-Path -LiteralPath $VppExecutable).Path
 $script:PassCount = 0
 $script:FailCount = 0
 $script:FailedTests = @()
+$script:SuiteSucceeded = $false
 $script:LastHttpProbeError = ""
 $sessionDir = Join-Path (Join-Path $repoRoot "src\tests\.tmp") ("windows-" + [guid]::NewGuid().ToString())
 $externalVppHome = $null
@@ -132,7 +134,8 @@ function Invoke-VppBatch {
         [string[]]$TestFiles,
         [string]$OutputDirectory,
         [ValidateSet("Native", "Vm")]
-        [string]$Backend
+        [string]$Backend,
+        [string]$BatchName = "batch"
     )
 
     if ($TestFiles.Count -eq 0) { return }
@@ -144,8 +147,10 @@ function Invoke-VppBatch {
     $quotedArguments = @($arguments | ForEach-Object {
         if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
     })
-    $stdout = Join-Path $OutputDirectory "batch.stdout"
-    $stderr = Join-Path $OutputDirectory "batch.stderr"
+    # Preserve each shard's progress and diagnostics, including when CTest
+    # terminates a long-running integration job before the PowerShell finally.
+    $stdout = Join-Path $OutputDirectory "$BatchName.stdout"
+    $stderr = Join-Path $OutputDirectory "$BatchName.stderr"
     $process = Start-Process -FilePath $script:Vpp -ArgumentList $quotedArguments `
         -WorkingDirectory $repoRoot -RedirectStandardOutput $stdout `
         -RedirectStandardError $stderr -PassThru -Wait -NoNewWindow
@@ -453,16 +458,26 @@ try {
     }
     $nativeBatchDirectory = Join-Path $sessionDir "native-golden"
     $legacyBatchDirectory = Join-Path $sessionDir "vm-golden"
-    Invoke-VppBatch -TestFiles $nativeGoldenTests.ToArray() -OutputDirectory $nativeBatchDirectory -Backend Native
-    Invoke-VppBatch -TestFiles $legacyGoldenTests.ToArray() -OutputDirectory $legacyBatchDirectory -Backend Vm
-    foreach ($relativeTest in $tests) {
-        if ($relativeTest -eq "src/tests/kiem_tra_ffi_process_spawn.vi" -or
-            $relativeTest -eq "src/tests/kiem_tra_ffi_moi_truong.vi") { continue }
-        if ($vmGoldenTests -contains $relativeTest) {
-            Invoke-ExpectedTest -TestFile $relativeTest -Backend Vm -BatchDirectory $legacyBatchDirectory
-        } else {
+    # Native AOT links each fixture separately. Verify small shards immediately
+    # so a systematic stdout regression (for example a CMake warning emitted
+    # by every program) fails within one shard instead of wasting four hours.
+    $nativeBatchSize = 12
+    $maxNativeGoldenFailures = 5
+    for ($start = 0; $start -lt $nativeGoldenTests.Count; $start += $nativeBatchSize) {
+        $count = [Math]::Min($nativeBatchSize, $nativeGoldenTests.Count - $start)
+        $chunk = $nativeGoldenTests.GetRange($start, $count).ToArray()
+        Invoke-VppBatch -TestFiles $chunk -OutputDirectory $nativeBatchDirectory `
+            -Backend Native -BatchName ("native-{0:D4}" -f $start)
+        foreach ($relativeTest in $chunk) {
             Invoke-ExpectedTest -TestFile $relativeTest -BatchDirectory $nativeBatchDirectory
         }
+        if ($script:FailCount -ge $maxNativeGoldenFailures) {
+            throw "Windows native golden tests: $($script:FailCount) failures after $($start + $count) fixtures; stopping early. See native-golden shard logs."
+        }
+    }
+    Invoke-VppBatch -TestFiles $legacyGoldenTests.ToArray() -OutputDirectory $legacyBatchDirectory -Backend Vm
+    foreach ($relativeTest in $legacyGoldenTests) {
+        Invoke-ExpectedTest -TestFile $relativeTest -Backend Vm -BatchDirectory $legacyBatchDirectory
     }
 
     # Windows file I/O now shares the managed stdio FFI path with POSIX.
@@ -662,6 +677,7 @@ try {
         Write-Host ("Failed tests: " + ($script:FailedTests -join ', '))
         throw "Windows V++ regression suite failed with $script:FailCount failure(s)."
     }
+    $script:SuiteSucceeded = $true
 } finally {
     Stop-VppServer $fixtureProcess
     if ($null -eq $previousVppHome) {
@@ -679,7 +695,24 @@ try {
     } else {
         $env:VPP_AOT_ROOT = $previousAotRoot
     }
-    Remove-Item -LiteralPath $sessionDir -Recurse -Force -ErrorAction SilentlyContinue
+    $removeSession = $true
+    if (-not $script:SuiteSucceeded -and (Test-Path -LiteralPath $sessionDir)) {
+        try {
+            if ([string]::IsNullOrWhiteSpace($LogDirectory)) {
+                $LogDirectory = Join-Path $repoRoot "build/integration-logs"
+            }
+            New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
+            $evidence = Join-Path $LogDirectory ("windows-" + [guid]::NewGuid().ToString())
+            Copy-Item -LiteralPath $sessionDir -Destination $evidence -Recurse -Force
+            Write-Host "Integration failure evidence: $evidence"
+        } catch {
+            $removeSession = $false
+            Write-Warning "Could not copy integration evidence; original logs retained at ${sessionDir}: $_"
+        }
+    }
+    if ($removeSession) {
+        Remove-Item -LiteralPath $sessionDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
     foreach ($oopTemporary in @(".tmp_oop_zip.txt", ".tmp_oop_zip.zip", ".tmp_oop_manifest.json")) {
         Remove-Item -LiteralPath (Join-Path $repoRoot "src/tests/$oopTemporary") -Force -ErrorAction SilentlyContinue
     }

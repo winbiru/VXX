@@ -1445,6 +1445,7 @@ void Frame::safepoint() {
 void Program::collect() {
     CpuScope profile("heap.collect");
     std::vector<Value> roots;
+    roots.push_back(compilerSessionCache);
     for (const auto &[id, value] : globals) if (value) roots.push_back(value->value);
     for (const auto &[name, klass] : classes) roots.emplace_back(klass);
     for (const auto *frame : frames) {

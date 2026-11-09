@@ -89,6 +89,15 @@ jobs:
         # Installed native smoke verifies the compiler Stage 1 -> Stage 2 -> Stage 3.
         run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
+      - name: Preserve integration timings (x86-64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-linux-x86-64
+          path: cmake-build-debug/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Preserve native AOT parity evidence on failure (x86-64)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -96,6 +105,7 @@ jobs:
           name: native-aot-parity-linux-x86-64
           path: |
             cmake-build-debug/native-aot-vpp-parity/
+            cmake-build-debug/integration-logs/
             cmake-build-debug/Testing/Temporary/LastTest.log
             cmake-build-debug/Testing/Temporary/LastTestsFailed.log
           if-no-files-found: ignore
@@ -137,6 +147,7 @@ jobs:
         run: |
           cmake -S . -B cmake-build-sanitized \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DVPP_BUILD_NATIVE_CLI=OFF \
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized --parallel 2
@@ -150,6 +161,7 @@ jobs:
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
+              --label-exclude native-toolchain \
               --exclude-regex '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-integration$)'
 
   linux-arm64:
@@ -221,6 +233,15 @@ jobs:
         # Native AOT bootstrap is covered by installed smoke above.
         run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
+      - name: Preserve integration timings (ARM64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-linux-arm64
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Preserve native AOT parity evidence on failure (ARM64)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -228,6 +249,7 @@ jobs:
           name: native-aot-parity-linux-arm64
           path: |
             build/native-aot-vpp-parity/
+            build/integration-logs/
             build/Testing/Temporary/LastTest.log
             build/Testing/Temporary/LastTestsFailed.log
           if-no-files-found: ignore
@@ -508,7 +530,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ctest-windows-diagnostics
-          path: build/Testing/Temporary/
+          path: |
+            build/Testing/Temporary/
+            build/integration-logs/
+            src/tests/.tmp/windows-*/native-golden/
+            src/tests/.tmp/windows-*/vm-golden/
+          include-hidden-files: true
           if-no-files-found: ignore
 
       - name: Link and run Windows x86-64 native COFF calls
@@ -589,6 +616,26 @@ jobs:
       - name: Run macOS full V++ regression suite
         # Installed smoke verifies full-language native Stage 1 -> Stage 2 -> Stage 3.
         run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^vpp-native-compiler-driver$'
+
+      - name: Preserve integration timings (macOS)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-macos
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve macOS regression diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-macos-diagnostics
+          path: |
+            build/integration-logs/
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+          if-no-files-found: ignore
 
       - name: Run macOS RC compiler hardening checks
         shell: bash

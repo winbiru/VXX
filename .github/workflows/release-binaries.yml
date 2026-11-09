@@ -139,6 +139,25 @@ jobs:
             Remove-Item $first, $second -Force
           }
 
+      - name: Preserve release integration timings
+        if: always() && runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-integration-timings-${{ matrix.os }}
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve release test diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-diagnostics-${{ matrix.os }}
+          path: |
+            build/Testing/Temporary/
+            build/integration-logs/
+          if-no-files-found: ignore
+
       - name: Package VDK
         run: cpack --config build/CPackConfig.cmake -C Release -B build/vdk-artifacts
 

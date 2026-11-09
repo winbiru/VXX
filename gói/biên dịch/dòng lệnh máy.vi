@@ -230,7 +230,7 @@ hàm công khai biên dịch xuất lắp ráp máy(đường, đầu ra, bộ b
 // Host đã chuẩn hóa đường dẫn và chặn các alias của tệp nguồn. Kết quả chỉ
 // còn một thao tác ABI: hoàn tất, liên kết ASM, hoặc liên kết rồi chạy.
 // Việc đọc nguồn/artifact, chọn pipeline, kiểm tra wire và phát ASM ở V++.
-hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba) {
+hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm = rỗng) {
     lệnh = kế hoạch[0];
     đường = kế hoạch[1];
     đầu ra = kế hoạch[2];
@@ -257,7 +257,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     nếu (thư viện == "") { ném "Native CLI: set VPP_HOME to the installed toolchain"; };
     nếu (lệnh == "artifact") {
         dây = biên dịch sản phẩm biên dịch giải mã dây(đọc tệp(đường));
-        trả về ["execute", biên dịch asm chương trình(dây, bộ ba)];
+        trả về ["execute", biên dịch asm chương trình(dây, bộ ba, sai, bộ đệm)];
     };
     nếu (lệnh == "disassemble") {
         sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
@@ -287,7 +287,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     biên dịch hồ sơ ghi(đường hồ sơ, "artifact.to_wire", bắt đầu);
     nếu (lệnh == "vm-build") { trả về ["complete", biên dịch VM ghi(dây, đầu ra)]; };
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4]);
+    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm);
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.total", bắt đầu);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };
     trả về ["execute", asm];

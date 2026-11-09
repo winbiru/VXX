@@ -15,6 +15,7 @@ if (MSVC AND NOT BUILD_SHARED_LIBS AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 option(VPP_ENABLE_COVERAGE "Enable GCC/Clang coverage instrumentation" OFF)
+option(VPP_BUILD_NATIVE_CLI "Bootstrap the native compiler in the default build" ON)
 option(VPP_ENABLE_CLANG_TIDY "Run clang-tidy while compiling C++ targets" OFF)
 
 if (VPP_ENABLE_COVERAGE)
@@ -988,6 +989,17 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_socket_dns_vi.cmake)
         set_tests_properties(vpp-native-socket-dns-vi-fixture PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 420)
+        add_test(NAME vpp-native-dns-hosts-integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+                "-DVPP_COMPILER=vpp"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DCMAKE_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_hosts_integration.cmake)
+        set_tests_properties(vpp-native-dns-hosts-integration PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 420)
         foreach(tool IN ITEMS benchmark quantum)
             if(tool STREQUAL "benchmark")
                 set(tool_source scripts/quality/test_benchmark_gate.vi)
@@ -1289,6 +1301,12 @@ if (BUILD_TESTS)
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/integration-backend"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.cmake)
     set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
+    if(UNIX)
+        add_test(NAME vpp-integration-workers
+            COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_test_workers.sh
+                "${CMAKE_SOURCE_DIR}")
+        set_tests_properties(vpp-integration-workers PROPERTIES TIMEOUT 20)
+    endif()
     if (VPP_NATIVE_CLI_COMPILER)
         # Verify that parallel V++ IR lowering emits byte-for-byte identical
         # artifacts to the serial compiler, including nested imports.
@@ -1301,6 +1319,28 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_compiler_workers.cmake)
         set_tests_properties(vpp-compiler-workers-parity PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+
+        add_test(NAME vpp-native-batch-parity
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-batch"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_batch.cmake)
+        set_tests_properties(vpp-native-batch-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 300)
+
+        if (UNIX)
+            add_test(NAME vpp-native-linker-cache-parity
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-linker-cache"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_linker_cache.cmake)
+            set_tests_properties(vpp-native-linker-cache-parity PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
+        endif()
 
         # Dedicated native-worker regression so CI can isolate concurrency,
         # cancellation and graph-transfer failures without the full suite.
@@ -1333,10 +1373,11 @@ if (BUILD_TESTS)
                          "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
                          "VPP_HOME=${CMAKE_SOURCE_DIR}"
                          "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                         "VPP_TEST_LOG_DIR=${CMAKE_CURRENT_BINARY_DIR}/integration-logs"
                          ${CMAKE_SOURCE_DIR}/run_tests.sh)
         set_tests_properties(vpp-integration PROPERTIES
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 14400)
+            FIXTURES_REQUIRED native-cli-compiler PROCESSORS 3 TIMEOUT 14400)
     elseif (VPP_NATIVE_CLI_COMPILER AND WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1)
         # The bundled module names are UTF-8 Vietnamese text.  PowerShell 7
         # reads UTF-8 scripts consistently, unlike legacy Windows PowerShell.
@@ -1348,7 +1389,8 @@ if (BUILD_TESTS)
                              -ExecutionPolicy Bypass
                              -File ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1
                              -VppExecutable $<TARGET_FILE:vpp-cli>
-                             -NativeCompiler ${VPP_NATIVE_CLI_COMPILER})
+                             -NativeCompiler ${VPP_NATIVE_CLI_COMPILER}
+                             -LogDirectory ${CMAKE_CURRENT_BINARY_DIR}/integration-logs)
             set_tests_properties(vpp-integration PROPERTIES
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 14400)
@@ -1358,6 +1400,33 @@ if (BUILD_TESTS)
     else()
         message(STATUS "V++ native compiler unavailable on this target; skipping native integration suite")
     endif()
+    # A second full native compiler/link job can starve a bootstrap process
+    # long enough to trip its own 60s/600s child timeout. Mark the expensive
+    # suites as two CTest processor slots, so CI's --parallel 2 runs them
+    # without another competing native compiler. Keep all tests enabled.
+    foreach(vpp_heavy_test IN ITEMS
+            vpp-native-leaf-vpp-parity
+            vpp-native-compiler-driver
+            vpp-native-object-parity
+            vpp-native-dynamic-vpp-runtime
+            vpp-vm-asm
+            vpp-vm-asm-selfhost
+            vpp-compiler-bytecode-bootstrap
+            vpp-benchmark-vpp-tool)
+        if(TEST ${vpp_heavy_test})
+            set_tests_properties(${vpp_heavy_test} PROPERTIES PROCESSORS 2)
+        endif()
+    endforeach()
+    # Instrumented jobs omit native bootstrap fixtures. Label their consumers
+    # from dependencies so new tests cannot escape a name-based exclusion.
+    get_property(vpp_registered_tests DIRECTORY PROPERTY TESTS)
+    foreach(vpp_test IN LISTS vpp_registered_tests)
+        get_property(vpp_required TEST ${vpp_test} PROPERTY FIXTURES_REQUIRED)
+        get_property(vpp_setup TEST ${vpp_test} PROPERTY FIXTURES_SETUP)
+        if ("${vpp_required};${vpp_setup}" MATCHES "(^|;)(native-stage1|native-cli-compiler|vm-asm)(;|$)")
+            set_property(TEST ${vpp_test} APPEND PROPERTY LABELS native-toolchain)
+        endif()
+    endforeach()
 endif()
 
 if (BUILD_BENCHMARKS)
@@ -1383,7 +1452,11 @@ if (VPP_NATIVE_CLI_TARGET)
     set(VPP_NATIVE_CLI_EXECUTABLE "${VPP_NATIVE_CLI_DIR}/vpp-native${CMAKE_EXECUTABLE_SUFFIX}")
     # Generate the installed compiler in the normal build. Otherwise a plain
     # cmake --install can silently copy an outdated native-cli/vpp-native.
-    add_custom_target(vpp-native-cli ALL
+    set(VPP_NATIVE_CLI_ALL)
+    if (VPP_BUILD_NATIVE_CLI)
+        set(VPP_NATIVE_CLI_ALL ALL)
+    endif()
+    add_custom_target(vpp-native-cli ${VPP_NATIVE_CLI_ALL}
         COMMAND ${CMAKE_COMMAND}
             "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
             "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"

@@ -6,6 +6,7 @@
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phát AARCH64 {
@@ -30,7 +31,12 @@ lớp công khai Bộ Phát AARCH64 {
     // mỗi lệnh gồm {"opcode", "immediate", "operand", "depthBefore", "symbol"}.
     // Không nhận IR động/không có kiểu; relocation CALL để object writer xử lý.
     hàm riêng tư biên dịch mã máy aarch64 từ máy(ra, từ máy) {
-        biên dịch mã máy thêm từ máy(ra, từ máy, đúng);
+        // Hot path: hàng nghìn instruction/fixture. Ghi trực tiếp byte LE
+        // để không tạo đối tượng Tiện Ích Mã Máy cho từng word được phát.
+        máy ảo thêm cuối danh sách(ra, từ máy & 255);
+        máy ảo thêm cuối danh sách(ra, (từ máy >> 8) & 255);
+        máy ảo thêm cuối danh sách(ra, (từ máy >> 16) & 255);
+        máy ảo thêm cuối danh sách(ra, (từ máy >> 24) & 255);
     };
 
     // Ánh xạ cố định qua mọi nhánh/vòng lặp; bỏ qua scratch W9/W10.
@@ -113,16 +119,61 @@ lớp công khai Bộ Phát AARCH64 {
         tham số = danh sách hàm biểu diễn trung gian["parameterCount"];
         ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
         sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
-        lệnh = danh sách hàm biểu diễn trung gian["instructions"];
+        lệnh gốc = danh sách hàm biểu diễn trung gian["instructions"];
         nếu (tham số < 0 || ô nhớ < tham số || ô nhớ < 0 ||
-            sâu nhất < 0 || ô nhớ + sâu nhất > 134217724 || máy ảo lấy độ dài(lệnh) == 0) {
+            sâu nhất < 0 || ô nhớ + sâu nhất > 134217724 || máy ảo lấy độ dài(lệnh gốc) == 0) {
             ném "AArch64 machine IR/frame không hợp lệ";
+        };
+        // Convert dynamic instruction maps once to parallel scalar arrays.
+        // Opcode IDs match MachineOpcode in raw_codegen.h; hot passes avoid
+        // per-instruction maps, strings, and temporary record allocations.
+        lệnh = [];
+        hằng lệnh = [];
+        toán hạng lệnh = [];
+        độ sâu lệnh = [];
+        ký hiệu lệnh = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh gốc); i++) {
+            nguồn = lệnh gốc[i];
+            mã = -1;
+            chọn (nguồn["opcode"]) {
+                ca "PushConstant": { mã = 0; }
+                ca "LoadSlot": { mã = 1; }
+                ca "StoreSlot": { mã = 2; }
+                ca "Drop": { mã = 3; }
+                ca "Add": { mã = 4; }
+                ca "Sub": { mã = 5; }
+                ca "Mul": { mã = 6; }
+                ca "Div": { mã = 7; }
+                ca "Mod": { mã = 8; }
+                ca "Equal": { mã = 9; }
+                ca "NotEqual": { mã = 10; }
+                ca "Less": { mã = 11; }
+                ca "LessEqual": { mã = 12; }
+                ca "Greater": { mã = 13; }
+                ca "GreaterEqual": { mã = 14; }
+                ca "BranchZero": { mã = 15; }
+                ca "Jump": { mã = 16; }
+                ca "Call": { mã = 17; }
+                ca "Return": { mã = 18; }
+                ca "Trap": { mã = 19; }
+                ca "BitAnd": { mã = 20; }
+                ca "BitOr": { mã = 21; }
+                ca "BitXor": { mã = 22; }
+                ca "ShiftLeft": { mã = 23; }
+                ca "ShiftRight": { mã = 24; }
+                mặc định: { ném "AArch64: opcode Machine IR không hợp lệ"; }
+            };
+            máy ảo thêm cuối danh sách(lệnh, mã);
+            máy ảo thêm cuối danh sách(hằng lệnh, nguồn["immediate"]);
+            máy ảo thêm cuối danh sách(toán hạng lệnh, nguồn["operand"]);
+            máy ảo thêm cuối danh sách(độ sâu lệnh, nguồn["depthBefore"]);
+            máy ảo thêm cuối danh sách(ký hiệu lệnh, nguồn["symbol"]);
         };
         bước tham số = 8;
         nếu (hệ điều hành == "macos") { bước tham số = 4; };
         có lời gọi = sai;
         lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
-            nếu (lệnh[i]["opcode"] == "Call") { có lời gọi = đúng; };
+            nếu (lệnh[i] == 17) { có lời gọi = đúng; };
         };
         giữ thành ghi = có lời gọi && tham số <= 8 && ô nhớ + sâu nhất <= 10;
         dùng thành ghi = giữ thành ghi || (!có lời gọi && tham số <= 8 && ô nhớ + sâu nhất <= 16);
@@ -141,26 +192,26 @@ lớp công khai Bộ Phát AARCH64 {
         };
         lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
             op = lệnh[i];
-            nếu ((op["opcode"] == "Jump" || op["opcode"] == "BranchZero") &&
-                op["operand"] >= 0 && op["operand"] < máy ảo lấy độ dài(lệnh)) {
-                đích nhảy[op["operand"]] = đúng;
+            nếu ((op == 16 || op == 15) &&
+                toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < máy ảo lấy độ dài(lệnh)) {
+                đích nhảy[toán hạng lệnh[i]] = đúng;
             };
         };
         lặp (i = 0; i + 1 < máy ảo lấy độ dài(lệnh); i++) {
             hiện tại = lệnh[i];
             sau = lệnh[i + 1];
             mã ghép = -1;
-            chọn (hiện tại["opcode"]) {
-                ca "Equal": { mã ghép = 1; }
-                ca "NotEqual": { mã ghép = 0; }
-                ca "Less": { mã ghép = 10; }
-                ca "LessEqual": { mã ghép = 12; }
-                ca "Greater": { mã ghép = 13; }
-                ca "GreaterEqual": { mã ghép = 11; }
+            chọn (hiện tại) {
+                ca 9: { mã ghép = 1; }
+                ca 10: { mã ghép = 0; }
+                ca 11: { mã ghép = 10; }
+                ca 12: { mã ghép = 12; }
+                ca 13: { mã ghép = 13; }
+                ca 14: { mã ghép = 11; }
             };
-            nếu (mã ghép >= 0 && hiện tại["depthBefore"] >= 2 &&
-                sau["opcode"] == "BranchZero" &&
-                sau["depthBefore"] == hiện tại["depthBefore"] - 1 &&
+            nếu (mã ghép >= 0 && độ sâu lệnh[i] >= 2 &&
+                sau == 15 &&
+                độ sâu lệnh[i + 1] == độ sâu lệnh[i] - 1 &&
                 !đích nhảy[i + 1]) {
                 ghép nhánh[i] = mã ghép;
                 ghép nhánh[i + 1] = mã ghép;
@@ -191,87 +242,115 @@ lớp công khai Bộ Phát AARCH64 {
                 a = lệnh[i];
                 b = lệnh[i + 1];
                 c = lệnh[i + 2];
-                toán tử = c["opcode"];
-                là nhị phân = toán tử == "Add" || toán tử == "Sub" || toán tử == "Mul" ||
-                    toán tử == "Equal" || toán tử == "NotEqual" || toán tử == "Less" ||
-                    toán tử == "LessEqual" || toán tử == "Greater" || toán tử == "GreaterEqual";
-                nếu (a["opcode"] == "LoadSlot" && b["opcode"] == "LoadSlot" &&
+                toán tử = c;
+                là nhị phân = toán tử == 4 || toán tử == 5 || toán tử == 6 ||
+                    toán tử == 9 || toán tử == 10 || toán tử == 11 ||
+                    toán tử == 12 || toán tử == 13 || toán tử == 14;
+                nếu (a == 1 && b == 1 &&
                     là nhị phân && !đích nhảy[i + 1] && !đích nhảy[i + 2] &&
-                    a["operand"] >= 0 && a["operand"] < ô nhớ &&
-                    b["operand"] >= 0 && b["operand"] < ô nhớ &&
-                    a["depthBefore"] >= 0 && a["depthBefore"] + 1 < sâu nhất &&
-                    b["depthBefore"] == a["depthBefore"] + 1 &&
-                    c["depthBefore"] == b["depthBefore"] + 1) {
+                    toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ &&
+                    toán hạng lệnh[i + 1] >= 0 && toán hạng lệnh[i + 1] < ô nhớ &&
+                    độ sâu lệnh[i] >= 0 && độ sâu lệnh[i] + 1 < sâu nhất &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i] + 1 &&
+                    độ sâu lệnh[i + 2] == độ sâu lệnh[i + 1] + 1) {
                     bỏ nạp[i] = đúng;
                     bỏ nạp[i + 1] = đúng;
-                    nguồn trái trực tiếp[i + 2] = a["operand"];
-                    nguồn phải trực tiếp[i + 2] = b["operand"];
+                    nguồn trái trực tiếp[i + 2] = toán hạng lệnh[i];
+                    nguồn phải trực tiếp[i + 2] = toán hạng lệnh[i + 1];
                 };
                 // ADD/SUB imm12 dùng trực tiếp slot nguồn và hằng 0..4095.
-                nếu (a["opcode"] == "LoadSlot" && b["opcode"] == "PushConstant" &&
-                    (toán tử == "Add" || toán tử == "Sub") &&
+                nếu (a == 1 && b == 0 &&
+                    (toán tử == 4 || toán tử == 5) &&
                     !đích nhảy[i + 1] && !đích nhảy[i + 2] &&
-                    a["operand"] >= 0 && a["operand"] < ô nhớ &&
-                    b["immediate"] >= 0 && b["immediate"] <= 4095 &&
-                    a["depthBefore"] >= 0 && a["depthBefore"] + 1 < sâu nhất &&
-                    b["depthBefore"] == a["depthBefore"] + 1 &&
-                    c["depthBefore"] == b["depthBefore"] + 1) {
+                    toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ &&
+                    hằng lệnh[i + 1] >= 0 && hằng lệnh[i + 1] <= 4095 &&
+                    độ sâu lệnh[i] >= 0 && độ sâu lệnh[i] + 1 < sâu nhất &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i] + 1 &&
+                    độ sâu lệnh[i + 2] == độ sâu lệnh[i + 1] + 1) {
                     bỏ nạp[i] = đúng;
                     bỏ nạp[i + 1] = đúng;
-                    nguồn trái trực tiếp[i + 2] = a["operand"];
-                    hằng trực tiếp[i + 2] = b["immediate"];
+                    nguồn trái trực tiếp[i + 2] = toán hạng lệnh[i];
+                    hằng trực tiếp[i + 2] = hằng lệnh[i + 1];
                 };
                 // Hằng ngoài imm12 vẫn bỏ được MOV qua eval-stack register.
-                nếu (a["opcode"] == "LoadSlot" && b["opcode"] == "PushConstant" &&
-                    (toán tử == "Add" || toán tử == "Sub") &&
-                    (b["immediate"] < 0 || b["immediate"] > 4095) &&
+                nếu (a == 1 && b == 0 &&
+                    (toán tử == 4 || toán tử == 5) &&
+                    (hằng lệnh[i + 1] < 0 || hằng lệnh[i + 1] > 4095) &&
                     !đích nhảy[i + 1] && !đích nhảy[i + 2] &&
-                    a["operand"] >= 0 && a["operand"] < ô nhớ &&
-                    a["depthBefore"] >= 0 && a["depthBefore"] + 1 < sâu nhất &&
-                    b["depthBefore"] == a["depthBefore"] + 1 &&
-                    c["depthBefore"] == b["depthBefore"] + 1) {
+                    toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ &&
+                    độ sâu lệnh[i] >= 0 && độ sâu lệnh[i] + 1 < sâu nhất &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i] + 1 &&
+                    độ sâu lệnh[i + 2] == độ sâu lệnh[i + 1] + 1) {
                     bỏ nạp[i] = đúng;
                     bỏ nạp[i + 1] = đúng;
-                    nguồn trái trực tiếp[i + 2] = a["operand"];
+                    nguồn trái trực tiếp[i + 2] = toán hạng lệnh[i];
                     có hằng phép tính[i + 2] = đúng;
-                    hằng phép tính[i + 2] = b["immediate"];
+                    hằng phép tính[i + 2] = hằng lệnh[i + 1];
                 };
                 // CMP đọc slot trực tiếp, dùng CMP imm12 hoặc W9 làm scratch.
-                là so sánh = toán tử == "Equal" || toán tử == "NotEqual" ||
-                    toán tử == "Less" || toán tử == "LessEqual" ||
-                    toán tử == "Greater" || toán tử == "GreaterEqual";
-                nếu (a["opcode"] == "LoadSlot" && b["opcode"] == "PushConstant" &&
+                là so sánh = toán tử == 9 || toán tử == 10 ||
+                    toán tử == 11 || toán tử == 12 ||
+                    toán tử == 13 || toán tử == 14;
+                nếu (a == 1 && b == 0 &&
                     là so sánh && !đích nhảy[i + 1] && !đích nhảy[i + 2] &&
-                    a["operand"] >= 0 && a["operand"] < ô nhớ &&
-                    a["depthBefore"] >= 0 && a["depthBefore"] + 1 < sâu nhất &&
-                    b["depthBefore"] == a["depthBefore"] + 1 &&
-                    c["depthBefore"] == b["depthBefore"] + 1) {
+                    toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ &&
+                    độ sâu lệnh[i] >= 0 && độ sâu lệnh[i] + 1 < sâu nhất &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i] + 1 &&
+                    độ sâu lệnh[i + 2] == độ sâu lệnh[i + 1] + 1) {
                     bỏ nạp[i] = đúng;
                     bỏ nạp[i + 1] = đúng;
-                    nguồn trái trực tiếp[i + 2] = a["operand"];
+                    nguồn trái trực tiếp[i + 2] = toán hạng lệnh[i];
                     có hằng so sánh[i + 2] = đúng;
-                    hằng so sánh[i + 2] = b["immediate"];
+                    hằng so sánh[i + 2] = hằng lệnh[i + 1];
                 };
             };
         };
         // W10 không được ánh xạ thành slot, và ở hàm lá không có CALL.
         // Giữ một hằng tải lặp lại trong vùng back-edge, tránh nạp lại
         // hằng ở mỗi vòng; các phép khác dùng W9 nếu cần scratch.
-        trong vòng = [];
-        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
-            máy ảo thêm cuối danh sách(trong vòng, sai);
+        // Mark all back-edge intervals with a difference array. Repeatedly
+        // filling [target, branch] becomes quadratic for nested loops.
+        số lệnh = máy ảo lấy độ dài(lệnh);
+        thay đổi vòng = [];
+        lặp (i = 0; i <= số lệnh; i++) {
+            máy ảo thêm cuối danh sách(thay đổi vòng, 0);
         };
-        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+        lặp (i = 0; i < số lệnh; i++) {
             op = lệnh[i];
-            nếu ((op["opcode"] == "Jump" || op["opcode"] == "BranchZero") &&
-                op["operand"] >= 0 && op["operand"] < i) {
-                lặp (j = op["operand"]; j <= i; j++) { trong vòng[j] = đúng; };
+            nếu ((op == 16 || op == 15) &&
+                toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < i) {
+                đầu vòng = toán hạng lệnh[i];
+                thay đổi vòng[đầu vòng] = thay đổi vòng[đầu vòng] + 1;
+                thay đổi vòng[i + 1] = thay đổi vòng[i + 1] - 1;
             };
+        };
+        trong vòng = [];
+        vòng đang mở = 0;
+        lặp (i = 0; i < số lệnh; i++) {
+            vòng đang mở += thay đổi vòng[i];
+            máy ảo thêm cuối danh sách(trong vòng, vòng đang mở > 0);
         };
         có hằng giữ = sai;
         hằng giữ = 0;
         nếu (dùng thành ghi && !có lời gọi) {
-            lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            // Count loop candidates once, then choose the first eligible
+            // instruction with at least two occurrences, as before.
+            tần số hằng = {};
+            lặp (i = 0; i < số lệnh; i++) {
+                nếu (trong vòng[i]) {
+                    nếu (có hằng phép tính[i]) {
+                        khóa = "" + hằng phép tính[i];
+                        tần số hằng[khóa] = lấy từ điển(tần số hằng, khóa, 0) + 1;
+                    };
+                    nếu (có hằng so sánh[i] &&
+                        (hằng so sánh[i] < 0 || hằng so sánh[i] > 4095) &&
+                        (!có hằng phép tính[i] || hằng phép tính[i] != hằng so sánh[i])) {
+                        khóa = "" + hằng so sánh[i];
+                        tần số hằng[khóa] = lấy từ điển(tần số hằng, khóa, 0) + 1;
+                    };
+                };
+            };
+            lặp (i = 0; i < số lệnh; i++) {
                 ứng cử = sai;
                 giá trị = 0;
                 nếu (có hằng phép tính[i]) { ứng cử = đúng; giá trị = hằng phép tính[i]; };
@@ -279,16 +358,10 @@ lớp công khai Bộ Phát AARCH64 {
                     ứng cử = đúng; giá trị = hằng so sánh[i];
                 };
                 nếu (ứng cử && trong vòng[i] && !có hằng giữ) {
-                    số lần = 0;
-                    lặp (j = 0; j < máy ảo lấy độ dài(lệnh); j++) {
-                        nếu (trong vòng[j] &&
-                            ((có hằng phép tính[j] && hằng phép tính[j] == giá trị) ||
-                             (có hằng so sánh[j] && hằng so sánh[j] == giá trị &&
-                              (giá trị < 0 || giá trị > 4095)))) {
-                            số lần += 1;
-                        };
+                    nếu (lấy từ điển(tần số hằng, "" + giá trị, 0) >= 2) {
+                        có hằng giữ = đúng;
+                        hằng giữ = giá trị;
                     };
-                    nếu (số lần >= 2) { có hằng giữ = đúng; hằng giữ = giá trị; };
                 };
             };
         };
@@ -309,38 +382,38 @@ lớp công khai Bộ Phát AARCH64 {
                 a = lệnh[i];
                 b = lệnh[i + 1];
                 c = lệnh[i + 2];
-                mã ghi = a["opcode"];
-                có kết quả = mã ghi == "PushConstant" || mã ghi == "Add" ||
-                    mã ghi == "Sub" || mã ghi == "Mul" || mã ghi == "Equal" ||
-                    mã ghi == "NotEqual" || mã ghi == "Less" ||
-                    mã ghi == "LessEqual" || mã ghi == "Greater" || mã ghi == "GreaterEqual";
-                nếu (b["opcode"] == "StoreSlot" && c["opcode"] == "Drop" &&
+                mã ghi = a;
+                có kết quả = mã ghi == 0 || mã ghi == 4 ||
+                    mã ghi == 5 || mã ghi == 6 || mã ghi == 9 ||
+                    mã ghi == 10 || mã ghi == 11 ||
+                    mã ghi == 12 || mã ghi == 13 || mã ghi == 14;
+                nếu (b == 2 && c == 3 &&
                     !đích nhảy[i + 1] && !đích nhảy[i + 2] &&
-                    b["operand"] >= 0 && b["operand"] < ô nhớ &&
-                    b["depthBefore"] == c["depthBefore"] &&
-                    b["depthBefore"] >= 1) {
+                    toán hạng lệnh[i + 1] >= 0 && toán hạng lệnh[i + 1] < ô nhớ &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i + 2] &&
+                    độ sâu lệnh[i + 1] >= 1) {
                     nếu (có kết quả &&
-                        ((mã ghi == "PushConstant" && a["depthBefore"] + 1 == b["depthBefore"]) ||
-                         (mã ghi != "PushConstant" && a["depthBefore"] - 1 == b["depthBefore"]))) {
-                        đích ghi thẳng[i] = b["operand"];
+                        ((mã ghi == 0 && độ sâu lệnh[i] + 1 == độ sâu lệnh[i + 1]) ||
+                         (mã ghi != 0 && độ sâu lệnh[i] - 1 == độ sâu lệnh[i + 1]))) {
+                        đích ghi thẳng[i] = toán hạng lệnh[i + 1];
                         bỏ lưu[i + 1] = đúng;
                     };
-                    nếu (mã ghi == "LoadSlot" && a["depthBefore"] + 1 == b["depthBefore"] &&
-                        a["operand"] >= 0 && a["operand"] < ô nhớ && !bỏ nạp[i]) {
+                    nếu (mã ghi == 1 && độ sâu lệnh[i] + 1 == độ sâu lệnh[i + 1] &&
+                        toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ && !bỏ nạp[i]) {
                         bỏ nạp[i] = đúng;
-                        nguồn gán thẳng[i + 1] = a["operand"];
+                        nguồn gán thẳng[i + 1] = toán hạng lệnh[i];
                     };
                 };
             };
             lặp (i = 0; i + 1 < máy ảo lấy độ dài(lệnh); i++) {
                 a = lệnh[i];
                 b = lệnh[i + 1];
-                nếu (a["opcode"] == "LoadSlot" && b["opcode"] == "Return" &&
+                nếu (a == 1 && b == 18 &&
                     !đích nhảy[i + 1] && !bỏ nạp[i] &&
-                    a["operand"] >= 0 && a["operand"] < ô nhớ &&
-                    b["depthBefore"] == a["depthBefore"] + 1) {
+                    toán hạng lệnh[i] >= 0 && toán hạng lệnh[i] < ô nhớ &&
+                    độ sâu lệnh[i + 1] == độ sâu lệnh[i] + 1) {
                     bỏ nạp[i] = đúng;
-                    nguồn trả thẳng[i + 1] = a["operand"];
+                    nguồn trả thẳng[i + 1] = toán hạng lệnh[i];
                 };
             };
         };
@@ -374,15 +447,15 @@ lớp công khai Bộ Phát AARCH64 {
         lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
             máy ảo thêm cuối danh sách(vị trí lệnh, máy ảo lấy độ dài(ra));
             mã phép toán = lệnh[i];
-            mã = mã phép toán["opcode"];
-            d = mã phép toán["depthBefore"];
-            số = mã phép toán["operand"];
+            mã = mã phép toán;
+            d = độ sâu lệnh[i];
+            số = toán hạng lệnh[i];
             nếu (d < 0 || d > sâu nhất) { ném "AArch64: độ sâu stack không hợp lệ"; };
             nếu (!bỏ nạp[i] && !bỏ lưu[i]) {
             chọn (mã) {
-                ca "PushConstant": {
+                ca 0: {
                     nếu (d >= sâu nhất) { ném "ARM64 eval stack overflow"; };
-                    nửa = biên dịch mã máy trả về(mã phép toán["immediate"]);
+                    nửa = biên dịch mã máy trả về(hằng lệnh[i]);
                     đích = 9;
                     nếu (dùng thành ghi) { đích = mình.biên dịch mã máy aarch64 thành ghi(ô nhớ + d, giữ thành ghi); };
                     nếu (đích ghi thẳng[i] >= 0) { đích = mình.biên dịch mã máy aarch64 thành ghi(đích ghi thẳng[i], giữ thành ghi); };
@@ -394,7 +467,7 @@ lớp công khai Bộ Phát AARCH64 {
                         mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, ô nhớ + d, dùng thành ghi, giữ thành ghi);
                     };
                 }
-                ca "LoadSlot": {
+                ca 1: {
                     nếu (số < 0 || số >= ô nhớ || d >= sâu nhất) { ném "ARM64 load slot ngoài frame"; };
                     nếu (dùng thành ghi) {
                         mình.biên dịch mã máy aarch64 chuyển(ra,
@@ -405,7 +478,7 @@ lớp công khai Bộ Phát AARCH64 {
                         mình.biên dịch mã máy aarch64 truy cập(ra, sai, 9, ô nhớ + d, sai);
                     };
                 }
-                ca "StoreSlot": {
+                ca 2: {
                     nếu (số < 0 || số >= ô nhớ || d == 0) { ném "ARM64 store slot ngoài frame"; };
                     nếu (nguồn gán thẳng[i] >= 0) {
                         mình.biên dịch mã máy aarch64 chuyển(ra,
@@ -422,46 +495,48 @@ lớp công khai Bộ Phát AARCH64 {
                         };
                     };
                 }
-                ca "Drop": {
+                ca 3: {
                     nếu (d == 0) { ném "ARM64 eval stack underflow"; };
                 }
-                ca "Add": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "0b000000", dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], hằng trực tiếp[i], có hằng phép tính[i], hằng phép tính[i], có hằng giữ, hằng giữ);
+                ca 4: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 184549376, dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], hằng trực tiếp[i], có hằng phép tính[i], hằng phép tính[i], có hằng giữ, hằng giữ);
                 }
-                ca "Sub": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "4b000000", dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], hằng trực tiếp[i], có hằng phép tính[i], hằng phép tính[i], có hằng giữ, hằng giữ);
+                ca 5: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 1258291200, dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], hằng trực tiếp[i], có hằng phép tính[i], hằng phép tính[i], có hằng giữ, hằng giữ);
                 }
-                ca "Mul": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "1b007c00", dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i]);
+                ca 6: {
+                    // Peephole đã bỏ LoadSlot và có thể bỏ StoreSlot.
+                    // MUL phải dùng cùng nguồn/đích đã chọn như ADD/SUB.
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 453016576, dùng thành ghi, giữ thành ghi, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i]);
                 }
-                ca "BitAnd": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "0a000000", dùng thành ghi, giữ thành ghi);
+                ca 20: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 167772160, dùng thành ghi, giữ thành ghi);
                 }
-                ca "BitOr": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "2a000000", dùng thành ghi, giữ thành ghi);
+                ca 21: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 704643072, dùng thành ghi, giữ thành ghi);
                 }
-                ca "BitXor": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "4a000000", dùng thành ghi, giữ thành ghi);
+                ca 22: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 1241513984, dùng thành ghi, giữ thành ghi);
                 }
-                ca "ShiftLeft": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "1ac02000", dùng thành ghi, giữ thành ghi);
+                ca 23: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 448798720, dùng thành ghi, giữ thành ghi);
                 }
-                ca "ShiftRight": {
-                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, "1ac02800", dùng thành ghi, giữ thành ghi);
+                ca 24: {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, ô nhớ, 448800768, dùng thành ghi, giữ thành ghi);
                 }
-                ca "Div": {
+                ca 7: {
                     mình.biên dịch mã máy aarch64 phép chia(ra, d, ô nhớ, dùng thành ghi, giữ thành ghi);
                 }
-                ca "Mod": {
+                ca 8: {
                     mình.biên dịch mã máy aarch64 phép dư(ra, d, ô nhớ, dùng thành ghi, giữ thành ghi);
                 }
-                ca "Equal": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 1, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "NotEqual": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 0, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "Less": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 10, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "LessEqual": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 12, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "Greater": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 13, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "GreaterEqual": { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 11, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
-                ca "BranchZero": {
+                ca 9: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 1, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 10: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 0, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 11: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 10, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 12: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 12, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 13: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 13, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 14: { mình.biên dịch mã máy aarch64 số sánh(ra, d, ô nhớ, 11, dùng thành ghi, giữ thành ghi, ghép nhánh[i] >= 0, nguồn trái trực tiếp[i], nguồn phải trực tiếp[i], đích ghi thẳng[i], có hằng so sánh[i], hằng so sánh[i], có hằng giữ, hằng giữ); }
+                ca 15: {
                     nếu (d == 0 || số < 0 || số >= máy ảo lấy độ dài(lệnh)) { ném "ARM64 branch không hợp lệ"; };
                     nếu (ghép nhánh[i] >= 0) {
                         máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số,
@@ -476,13 +551,13 @@ lớp công khai Bộ Phát AARCH64 {
                         mình.biên dịch mã máy aarch64 từ máy(ra, 872415232 + nguồn);
                     };
                 }
-                ca "Jump": {
+                ca 16: {
                     nếu (số < 0 || số >= máy ảo lấy độ dài(lệnh)) { ném "ARM64 jump không hợp lệ"; };
                     máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số, "điều kiện": sai});
                     biên dịch mã máy thêm từ máy(ra, 335544320, đúng);
                 }
-                ca "Call": {
-                    nếu (số < 0 || d < số || mã phép toán["symbol"] == "") {
+                ca 17: {
+                    nếu (số < 0 || d < số || ký hiệu lệnh[i] == "") {
                         ném "ARM64 call thiếu arguments/symbol";
                     };
                     trực tiếp = số;
@@ -506,12 +581,12 @@ lớp công khai Bộ Phát AARCH64 {
                         };
                         mình.biên dịch mã máy aarch64 truy cập byte(ra, sai, 9, (n - 8) * bước tham số);
                     };
-                    máy ảo thêm cuối danh sách(tái định vị, {"offset": máy ảo lấy độ dài(ra), "symbol": mã phép toán["symbol"]});
+                    máy ảo thêm cuối danh sách(tái định vị, {"offset": máy ảo lấy độ dài(ra), "symbol": ký hiệu lệnh[i]});
                     biên dịch mã máy thêm từ máy(ra, -1811939328, đúng);
                     mình.biên dịch mã máy aarch64 điều chỉnh con trỏ ngăn xếp(ra, kích cỡ, sai);
                     mình.biên dịch mã máy aarch64 truy cập(ra, sai, 0, ô nhớ + d - số, dùng thành ghi, giữ thành ghi);
                 }
-                ca "Return": {
+                ca 18: {
                     nếu (d == 0) { ném "ARM64 return không có giá trị"; };
                     nếu (nguồn trả thẳng[i] >= 0) {
                         mình.biên dịch mã máy aarch64 chuyển(ra, 0,
@@ -530,7 +605,7 @@ lớp công khai Bộ Phát AARCH64 {
                     nếu (!dùng thành ghi || giữ thành ghi) { biên dịch mã máy thêm từ máy(ra, -1463714819, đúng); };
                     biên dịch mã máy thêm từ máy(ra, -698416192, đúng);
                 }
-                ca "Trap": { biên dịch mã máy thêm từ máy(ra, -736100352, đúng); }
+                ca 19: { biên dịch mã máy thêm từ máy(ra, -736100352, đúng); }
                 mặc định: { ném "AArch64 MachineOpcode C++ chưa định nghĩa: " + mã; }
             };
             };
@@ -631,7 +706,7 @@ lớp công khai Bộ Phát AARCH64 {
         nếu (hằng nhỏ >= 0 && nguồn trái >= 0 && dùng thành ghi) {
             nguồn = mình.biên dịch mã máy aarch64 thành ghi(nguồn trái, giữ thành ghi);
             nền = 285212672;
-            nếu (cơ sở == "4b000000") { nền = 1358954496; };
+            nếu (cơ sở == 1258291200) { nền = 1358954496; };
             mình.biên dịch mã máy aarch64 từ máy(ra, nền + hằng nhỏ * 1024 + nguồn * 32 + đích);
             trả về;
         };
@@ -641,7 +716,7 @@ lớp công khai Bộ Phát AARCH64 {
             nếu (có hằng giữ && hằng lớn == hằng giữ) { phải = 10; }
             hoặc { mình.biên dịch mã máy aarch64 nạp hằng(ra, phải, hằng lớn); };
             mình.biên dịch mã máy aarch64 từ máy(ra,
-                biên dịch mã máy từ máy thập lục phân(cơ sở) + phải * 65536 + trái * 32 + đích);
+                cơ sở + phải * 65536 + trái * 32 + đích);
             trả về;
         };
         nếu (dùng thành ghi && nguồn trái >= 0 && nguồn phải >= 0) {
@@ -652,7 +727,7 @@ lớp công khai Bộ Phát AARCH64 {
             mình.biên dịch mã máy aarch64 truy cập(ra, đúng, phải, ô nhớ + d - 1, dùng thành ghi, giữ thành ghi);
         };
         mình.biên dịch mã máy aarch64 từ máy(ra,
-            biên dịch mã máy từ máy thập lục phân(cơ sở) + phải * 65536 + trái * 32 + đích);
+            cơ sở + phải * 65536 + trái * 32 + đích);
         nếu (đích ghi < 0) {
             mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, ô nhớ + d - 2, dùng thành ghi, giữ thành ghi);
         };
@@ -710,4 +785,3 @@ hàm công khai biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu 
     bộ chuyển tiếp = Bộ Phát AARCH64();
     trả về bộ chuyển tiếp.biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành);
 };
-

@@ -217,7 +217,7 @@ lớp công khai Bộ Liên Kết Bytecode {
     // Linker nhiều mô-đun: mỗi initializer có bytecode và slot riêng, còn
     // StringPool và function ID là duy nhất trong toàn phiên. Không nối trực
     // tiếp các initializer vì jump/slot đều là offset cục bộ của emitter.
-    hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+    hàm công khai biên dịch liên kết đồ thị thuần(đồ thị, số worker = rỗng) {
         nếu (lấy từ điển(đồ thị, "loại", "") != "đồ thị mô đun V++") {
             ném "biên dịch liên kết: cần đồ thị mô đun V++";
         };
@@ -234,7 +234,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         phiên = {"đa mô đun": đúng, "cạnh dùng": [],
                  "đã phát": [], "id tối đa": -1, "ngoại": []};
         tên gốc = đồ thị["điểm vào"];
-        số worker = biên dịch worker số luồng();
+        nếu (số worker == rỗng) { số worker = biên dịch worker số luồng(); };
         // Đồ thị có một phụ thuộc vẫn có hai mô-đun: root + dependency.
         nếu (số worker > 1 && máy ảo lấy độ dài(đồ thị["mô đun"]) > 0) {
             phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker);
@@ -386,9 +386,9 @@ hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
     trả về bộ chuyển tiếp.biên dịch chương trình tự chủ(mã nguồn);
 };
 
-hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+hàm công khai biên dịch liên kết đồ thị thuần(đồ thị, số worker = rỗng) {
     bộ chuyển tiếp = Bộ Liên Kết Bytecode();
-    trả về bộ chuyển tiếp.biên dịch liên kết đồ thị thuần(đồ thị);
+    trả về bộ chuyển tiếp.biên dịch liên kết đồ thị thuần(đồ thị, số worker);
 };
 
 hàm công khai biên dịch chương trình mô đun tự chủ(điểm vào, nguồn) {

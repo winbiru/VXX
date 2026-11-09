@@ -157,6 +157,9 @@ struct Program {
     // invoke compiler functions against a concurrent parent Program.
     std::function<Value(Program &, const std::vector<Value> &)> executeArtifact;
     std::function<Value(const std::vector<Value> &)> executeSource;
+    // Host-owned root for a compiler batch's V++ Machine IR/ASM memo. Each
+    // source still gets a fresh frontend/linker and a separate executable.
+    Value compilerSessionCache = make_null_value();
     std::exception_ptr pendingError;
     // All nested workers share one registry, but execute in independent
     // Programs/heaps. Only the root Program owns registry shutdown.

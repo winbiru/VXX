@@ -34,7 +34,15 @@ hàm riêng tư biên dịch lắp ráp lệnh aarch64(các byte, vị trí) {
     trả về mã;
 };
 
-hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả, bảng byte = rỗng, bảng hex = rỗng) {
+hàm công khai biên dịch lắp ráp đầu(hệ điều hành, tên) {
+    nếu (!biên dịch mã máy ký hiệu hợp lệ(tên)) {
+        ném "assembly: ký hiệu xuất không hợp lệ";
+    };
+    nếu (hệ điều hành == "macos") { tên = "_" + tên; };
+    trả về ".text\n.globl " + tên + "\n" + tên + ":\n";
+};
+
+hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả, bảng byte = rỗng, bảng hex = rỗng, có đầu = đúng) {
     nếu (kiến trúc != "x86_64" && kiến trúc != "aarch64") {
         ném "assembly Machine IR chưa hỗ trợ kiến trúc";
     };
@@ -44,9 +52,8 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
     các byte = kết quả["bytes"];
     các liên kết = kết quả["relocations"];
     nếu (độ dài(các byte) == 0) { ném "assembly: mã máy rỗng"; };
-    tên xuất = tên;
-    nếu (hệ điều hành == "macos") { tên xuất = "_" + tên; };
-    phần = [".text\n.globl " + tên xuất + "\n" + tên xuất + ":\n"];
+    phần = [];
+    nếu (có đầu) { máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp đầu(hệ điều hành, tên)); };
     văn bản = "";
     vị trí = 0;
     số byte dòng = 0;

@@ -27,3 +27,11 @@ hàm công khai biên dịch hồ sơ ghi số(đường, bước, giá trị) {
     ghi nối tệp(đường, "VPP_COMPILER_PROFILE " + bước + " " + thành chuỗi(giá trị) + "\n");
     trả về 0;
 };
+
+hàm công khai biên dịch hồ sơ ghi thân(đường, id, tên, hạ, máy, lắp ráp) {
+    nếu (đường == "") { trả về 0; };
+    ghi nối tệp(đường, "VPP_COMPILER_PROFILE asm.body.function id=" + thành chuỗi(id) +
+        " lower_ms=" + thành chuỗi(hạ) + " machine_ms=" + thành chuỗi(máy) +
+        " assemble_ms=" + thành chuỗi(lắp ráp) + " name=" + tên + "\n");
+    trả về 0;
+};

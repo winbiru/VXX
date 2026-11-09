@@ -46,6 +46,7 @@ echo '[coverage] Configure instrumented C++ build'
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Debug \
   -DVPP_ENABLE_COVERAGE=ON \
+  -DVPP_BUILD_NATIVE_CLI=OFF \
   -DBUILD_TESTS=ON \
   -DBUILD_BENCHMARKS=OFF
 report_duration
@@ -63,8 +64,8 @@ find "$BUILD_DIR" -type f -name '*.gcda' -delete
 # against the uninstrumented Release toolchain in the mandatory build/ARM64
 # jobs. Match the ASan/UBSan exclusions: instrumented Stage 0 makes these
 # fixtures prohibitively slow without providing useful C++ coverage.
-# The bit-operators test also requires the native-cli-compiler fixture, even
-# though its name does not start with vpp-native-.
+# The dependency-derived native-toolchain label excludes all consumers of
+# those fixtures, including compiler workers and future non-native names.
 # Selective imports also builds the ASM VM and needs both native fixtures.
 # The instrumented HTTP fixture compiles its network modules before listening.
 # Full V++ self-hosted integration and quantum validation run in the normal
@@ -77,6 +78,7 @@ echo '[coverage] Run instrumented CTest suite'
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
   ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
     --output-on-failure --no-tests=error --output-log "$BUILD_DIR/ctest.log" \
+    --label-exclude native-toolchain \
     -E '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-quantum-validation$|vpp-integration$)'
 report_duration
 

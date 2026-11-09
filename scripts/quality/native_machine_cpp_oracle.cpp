@@ -223,10 +223,16 @@ void verifyLeafParity(const std::filesystem::path &source) {
     const std::vector<std::string> invalid = {
         "tru_dao", "hang_tran", "hang_tran_trung_gian", "hang_chia", "chua_ho_tro",
     };
-    std::size_t verified = 0;
-    for (const auto &name : valid) {
+    auto names = valid;
+    names.insert(names.end(), invalid.begin(), invalid.end());
+    const auto lowered = vietvm::native::lowerRawLeavesVpp(ir, names, source.parent_path());
+    std::vector<std::pair<vietvm::native::Target, vietvm::native::RawLeaf>> requests;
+    std::vector<vietvm::native::RawLeafResult> expected;
+    std::vector<std::string> labels;
+    for (std::size_t i = 0; i < valid.size(); ++i) {
+        const auto &name = valid[i];
         const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(ir, name, source.parent_path());
+        const auto &vpp = lowered.at(i);
         if (!cpp || !vpp || cpp.leaf.kind != vpp.leaf.kind ||
             cpp.leaf.constant != vpp.leaf.constant) {
             throw std::runtime_error(name + ": leaf lowering differs; C++=" +
@@ -236,27 +242,31 @@ void verifyLeafParity(const std::filesystem::path &source) {
         for (const auto &triple : targets) {
             const auto parsed = vietvm::native::parseTarget(triple);
             if (!parsed.target) throw std::runtime_error(triple + ": " + parsed.error);
-            const auto a = vietvm::native::emitRawLeaf(*parsed.target, cpp.leaf);
-            const auto b = vietvm::native::emitRawLeafVpp(*parsed.target, vpp.leaf,
-                                                         source.parent_path());
-            if (!a || !b || a.bytes != b.bytes) {
-                throw std::runtime_error(name + "/" + triple + ": leaf byte mismatch; C++=" +
-                                         (a ? toHex(a.bytes) : a.error) + "; V++=" +
-                                         (b ? toHex(b.bytes) : b.error));
-            }
-            ++verified;
+            requests.emplace_back(*parsed.target, vpp.leaf);
+            expected.push_back(vietvm::native::emitRawLeaf(*parsed.target, cpp.leaf));
+            labels.push_back(name + "/" + triple);
         }
     }
-    for (const auto &name : invalid) {
+    for (std::size_t i = 0; i < invalid.size(); ++i) {
+        const auto &name = invalid[i];
         const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(ir, name,
-                                                        source.parent_path());
+        const auto &vpp = lowered.at(valid.size() + i);
         if (cpp || vpp)
             throw std::runtime_error(name + ": unsupported leaf was accepted");
     }
+    const auto encoded = vietvm::native::emitRawLeavesVpp(requests, source.parent_path());
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        const auto &a = expected[i];
+        const auto &b = encoded.at(i);
+        if (!a || !b || a.bytes != b.bytes) {
+            throw std::runtime_error(labels[i] + ": leaf byte mismatch; C++=" +
+                                     (a ? toHex(a.bytes) : a.error) + "; V++=" +
+                                     (b ? toHex(b.bytes) : b.error));
+        }
+    }
     std::cout << "Leaf C++/V++ lowerer parity: " << valid.size() + invalid.size()
               << "/" << valid.size() + invalid.size() << "\n";
-    std::cout << "Leaf C++/V++ ISA bytes: " << verified << "/" << verified << "\n";
+    std::cout << "Leaf C++/V++ ISA bytes: " << encoded.size() << "/" << requests.size() << "\n";
 }
 
 void verifyTargetParity(const std::filesystem::path &source) {

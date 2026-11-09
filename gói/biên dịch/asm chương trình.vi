@@ -5,11 +5,13 @@ nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp mã máy;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
 nhập gói.biên dịch.đích.biên dịch phân tích đích;
 nhập gói.biên dịch.sản phẩm biên dịch.Bộ Mã Hóa Sản Phẩm Biên Dịch;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.biên dịch.asm vô hộp.*;
 nhập gói.biên dịch.đo hiệu năng.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm công khai biên dịch asm tên nội tại() {
     // BEGIN native intrinsic opcodes: đối chiếu bởi vpp-opcode-abi.
@@ -1938,11 +1940,28 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng) {
     bắt đầu bước = 0;
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
     máy = hạ.hạ();
+    khóa = "";
+    nếu (bộ đệm != rỗng) {
+        // Machine IR do lowerer vừa tạo chỉ chứa i32 và symbol ASCII ABI.
+        // Biểu diễn đầy đủ giữ cả function/string IDs, nhánh, frame, target
+        // và relocation; không dùng tên hàm hay đường nguồn làm cache key.
+        khóa = đích["kiến trúc"] + "/" + đích["hệ điều hành"] + "/" + thành chuỗi(máy);
+        thân cũ = lấy từ điển(bộ đệm["thân"], khóa, rỗng);
+        nếu (thân cũ != rỗng) {
+            bộ đệm["trúng"] = bộ đệm["trúng"] + 1;
+            nếu (thống kê != rỗng) {
+                thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+                thống kê["count"] = thống kê["count"] + 1;
+            };
+            trả về biên dịch lắp ráp đầu(đích["hệ điều hành"], tên) + thân cũ;
+        };
+        bộ đệm["trượt"] = bộ đệm["trượt"] + 1;
+    };
     nếu (thống kê != rỗng) {
         thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
@@ -1952,7 +1971,19 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
         thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
     };
-    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát, bảng byte, bảng hex);
+    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát, bảng byte, bảng hex, bộ đệm == rỗng);
+    nếu (bộ đệm != rỗng) {
+        kích cỡ = độ dài(khóa) + độ dài(kết quả);
+        // Giới hạn phiên batch ở 64 MiB; giải phóng cả map khi đầy.
+        nếu (bộ đệm["byte"] + kích cỡ > 67108864) {
+            bộ đệm["thân"] = {}; bộ đệm["byte"] = 0;
+        };
+        nếu (kích cỡ <= 67108864) {
+            bộ đệm["thân"][khóa] = kết quả;
+            bộ đệm["byte"] = bộ đệm["byte"] + kích cỡ;
+        };
+        kết quả = biên dịch lắp ráp đầu(đích["hệ điều hành"], tên) + kết quả;
+    };
     nếu (thống kê != rỗng) {
         thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         thống kê["count"] = thống kê["count"] + 1;
@@ -1960,7 +1991,7 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
     trả về kết quả;
 };
 
-hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) {
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
@@ -2112,17 +2143,36 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) 
         thống kê = {"lower_ms": 0, "machine_ms": 0, "assemble_ms": 0, "count": 0};
     };
     lặp(i = 0; i < độ dài(các hàm); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex));
+        hạ trước = 0; máy trước = 0; lắp ráp trước = 0;
+        nếu (thống kê != rỗng) {
+            hạ trước = thống kê["lower_ms"];
+            máy trước = thống kê["machine_ms"];
+            lắp ráp trước = thống kê["assemble_ms"];
+        };
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm));
+        nếu (thống kê != rỗng) {
+            tên = "<anonymous>";
+            nếu (các hàm[i][1] >= 0) { tên = chuỗi[các hàm[i][1]]; };
+            biên dịch hồ sơ ghi thân(đường hồ sơ, i, tên,
+                thống kê["lower_ms"] - hạ trước,
+                thống kê["machine_ms"] - máy trước,
+                thống kê["assemble_ms"] - lắp ráp trước);
+        };
     };
     lặp(i = 0; i < độ dài(khởi tạo); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm));
     };
-    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex));
+    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm));
     nếu (thống kê != rỗng) {
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.machine_ms", thống kê["machine_ms"]);
         biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.assemble_ms", thống kê["assemble_ms"]);
+        nếu (bộ đệm != rỗng) {
+            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.hits", bộ đệm["trúng"]);
+            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.misses", bộ đệm["trượt"]);
+            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.bytes", bộ đệm["byte"]);
+        };
     };
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.functions", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);

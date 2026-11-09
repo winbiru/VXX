@@ -123,7 +123,9 @@ hàm chính() {
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(nhỏ);
     trước = codec.tuần tự();
     lặp(i = 0; i < độ dài(nhỏ["bytecode"]); i++) {
-        nếu (nhỏ["bytecode"][i]["op"] == biên dịch mã thao tác("OP_BIEN_SO")) {
+        // Mutate the printed value, preserving the linker's explicit exit 0.
+        nếu (nhỏ["bytecode"][i]["op"] == biên dịch mã thao tác("OP_BIEN_SO") &&
+            nhỏ["bytecode"][i]["toán hạng"] == 7) {
             nhỏ["bytecode"][i]["toán hạng"] = 8;
         };
     };

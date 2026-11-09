@@ -9,10 +9,13 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <sstream>
 #include <stdexcept>
 #if defined(_WIN32)
 #include <windows.h>
 #else
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #if defined(__APPLE__)
@@ -46,7 +49,8 @@ public:
         previous=now;
     }
 };
-ProcessResult process(const std::vector<std::string> &arguments, bool captureStderr = false) {
+ProcessResult process(const std::vector<std::string> &arguments, bool captureStderr = false,
+                      const fs::path &stderrPath = {}) {
     ProcessResult result;
 #if defined(_WIN32)
     // Windows CRT quoting, without a shell or command substitution.
@@ -64,13 +68,25 @@ ProcessResult process(const std::vector<std::string> &arguments, bool captureStd
     SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};HANDLE input=nullptr,output=nullptr;
     if(!CreatePipe(&input,&output,&security,0))throw std::runtime_error("Native AOT: CreatePipe failed");
     SetHandleInformation(input,HANDLE_FLAG_INHERIT,0);
+    HANDLE diagnostics=INVALID_HANDLE_VALUE;
+    if(!stderrPath.empty()) {
+        diagnostics=CreateFileW(stderrPath.c_str(),GENERIC_WRITE,FILE_SHARE_READ,&security,
+                                CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(diagnostics==INVALID_HANDLE_VALUE) {
+            CloseHandle(input);CloseHandle(output);
+            throw std::runtime_error("Native AOT: cannot capture child diagnostics");
+        }
+    }
     STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;
     startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=output;
-    startup.hStdError=captureStderr?output:GetStdHandle(STD_ERROR_HANDLE);
+    startup.hStdError=diagnostics!=INVALID_HANDLE_VALUE?diagnostics:
+        captureStderr?output:GetStdHandle(STD_ERROR_HANDLE);
     PROCESS_INFORMATION child{};
     if(!CreateProcessW(nullptr,command.data(),nullptr,nullptr,TRUE,0,nullptr,nullptr,&startup,&child)) {
+        if(diagnostics!=INVALID_HANDLE_VALUE)CloseHandle(diagnostics);
         CloseHandle(input);CloseHandle(output);throw std::runtime_error("Native AOT: CreateProcess failed");
     }
+    if(diagnostics!=INVALID_HANDLE_VALUE)CloseHandle(diagnostics);
     CloseHandle(output);char buffer[8192];DWORD count=0;
     while(ReadFile(input,buffer,sizeof(buffer),&count,nullptr)&&count)result.output.append(buffer,count);
     CloseHandle(input);WaitForSingleObject(child.hProcess,INFINITE);DWORD status=1;GetExitCodeProcess(child.hProcess,&status);
@@ -92,7 +108,11 @@ ProcessResult process(const std::vector<std::string> &arguments, bool captureStd
     if(child<0){close(descriptors[0]);close(descriptors[1]);throw std::runtime_error("Native AOT: fork failed");}
     if(child==0) {
         close(descriptors[0]);if(dup2(descriptors[1],STDOUT_FILENO)<0)_exit(127);
-        if(captureStderr&&dup2(descriptors[1],STDERR_FILENO)<0)_exit(127);
+        if(!stderrPath.empty()) {
+            const int diagnostics=open(stderrPath.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0600);
+            if(diagnostics<0||dup2(diagnostics,STDERR_FILENO)<0)_exit(127);
+            close(diagnostics);
+        } else if(captureStderr&&dup2(descriptors[1],STDERR_FILENO)<0)_exit(127);
         close(descriptors[1]);
         std::vector<char *> argv;for(const auto &argument:arguments)argv.push_back(const_cast<char *>(argument.c_str()));argv.push_back(nullptr);
         execvp(argv[0],argv.data());_exit(127);
@@ -165,10 +185,8 @@ const std::vector<Value> &values(const Value &value) {
     const auto *list=std::get_if<runtime::ListHandle>(&value);
     if(!list||!*list)throw std::runtime_error("Native AOT: expected wire arrays");return (*list)->elements;
 }
-int compilerMain(Program &program,int argc,char **argv) {
+int compilerCommand(Program &program,std::vector<Value> arguments,bool captureErrors=false) {
     PhaseTimer profiler;
-    std::vector<Value> arguments;
-    for(int i=1;i<argc;++i)arguments.emplace_back(argv[i]);
     const auto plan=program.invokeName("biên dịch phân tích dòng lệnh máy",
                                       {make_list_value(std::move(arguments))});
     auto fields=values(plan);
@@ -199,7 +217,8 @@ int compilerMain(Program &program,int argc,char **argv) {
     if (const char *home=std::getenv("VPP_HOME"); home && *home)
         libraryRoot=fs::absolute(core::utf8Path(home));
     const auto prepared=program.invokeName("biên dịch chuẩn bị dòng lệnh máy",
-        {make_list_value(std::move(fields)),libraryRoot.u8string(),canonicalTriple(hostTarget())});
+        {make_list_value(std::move(fields)),libraryRoot.u8string(),canonicalTriple(hostTarget()),
+         program.compilerSessionCache});
     profiler.mark("vpp-cli-and-assembly");
     const auto &request=values(prepared);
     if(request.size()!=2||!std::holds_alternative<std::string>(request[0])||
@@ -222,8 +241,83 @@ int compilerMain(Program &program,int argc,char **argv) {
         "program";
 #endif
     compileAssembly(text,executable,root);
-    const auto result=process({executable.u8string()});
+    const auto result=process({executable.u8string()},captureErrors);
     program.output(result.output);return result.status;
+}
+
+int compilerBatchTests(Program &program,int argc,char **argv) {
+    if(argc<4)throw std::runtime_error("Native AOT: batch requires output directory and sources");
+    const auto originalCwd=fs::current_path();
+    const auto outputDir=fs::absolute(core::utf8Path(argv[2]));
+    fs::create_directories(outputDir);
+    std::vector<fs::path> sources;
+    for(int i=3;i<argc;++i)
+        sources.push_back(fs::weakly_canonical(fs::absolute(core::utf8Path(argv[i]))));
+    const char *disabled=std::getenv("VPP_NATIVE_NO_CACHE");
+    if(!disabled||std::string(disabled)!="1") {
+        runtime::MapValue memo;
+        memo.entries={{"thân",make_map_value({})},{"byte",0},{"trúng",0},{"trượt",0}};
+        program.compilerSessionCache=make_map_value(std::move(memo));
+    }
+    const char *setting=std::getenv("VPP_NATIVE_GOLDEN_FAIL_FAST");
+    const bool failFast=setting&&std::string(setting)=="1";
+    for(std::size_t i=0;i<sources.size();++i) {
+        const auto &source=sources[i];
+        const auto started=std::chrono::steady_clock::now();
+        std::cerr<<"[test "<<i+1<<'/'<<sources.size()<<"] START vpp "<<source.u8string()<<std::endl;
+        std::ostringstream captured;
+        const auto savedOutput=program.output;
+        program.output=[&captured](const std::string &text){captured<<text;};
+        auto *savedErrors=std::cerr.rdbuf(captured.rdbuf());
+        int status=1;
+        try {
+            // Match `vpp-cli run --compiler=vpp`: relative fixture I/O is
+            // based on the source directory. Test programs run in children,
+            // so their globals, environment and runtime heaps stay isolated.
+            fs::current_path(source.parent_path());
+            status=compilerCommand(program,{std::string("run"),source.u8string()},true);
+        } catch(const std::exception &error) {
+            captured<<error.what()<<'\n';
+        } catch(...) {
+            captured<<"Native AOT: unknown failure\n";
+        }
+        program.output=savedOutput;
+        std::cerr.rdbuf(savedErrors);
+        fs::current_path(originalCwd);
+        const auto base=source.stem().u8string();
+        std::ofstream output(outputDir/core::utf8Path(base+".output"),std::ios::binary);
+        std::ofstream statusFile(outputDir/core::utf8Path(base+".status"));
+        std::ofstream timingFile(outputDir/core::utf8Path(base+".milliseconds"));
+        const auto elapsed=std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now()-started).count();
+        output<<captured.str();statusFile<<status<<'\n';timingFile<<elapsed<<'\n';
+        output.close();statusFile.close();timingFile.close();
+        if(!output||!statusFile||!timingFile)
+            throw std::runtime_error("Native AOT: cannot write batch evidence");
+        std::cerr<<"[test "<<i+1<<'/'<<sources.size()<<"] DONE vpp "<<source.u8string()
+                 <<" exit="<<status<<" elapsed_ms="<<elapsed<<std::endl;
+        if(failFast) {
+            const auto expectedPath=source.parent_path()/"expected"/core::utf8Path(base+".expected");
+            std::ifstream expected(expectedPath,std::ios::binary);
+            const std::string text{std::istreambuf_iterator<char>(expected),{}};
+            if(status!=0||!expected||text!=captured.str()) {
+                std::cerr<<"GOLDEN FAIL "<<source.u8string()<<" (exit="<<status
+                         <<", expected="<<expectedPath.u8string()<<")\n";
+                return 1;
+            }
+        }
+        // Retain only the explicitly rooted memo and compiler globals.
+        program.collect();
+    }
+    return 0;
+}
+
+int compilerMain(Program &program,int argc,char **argv) {
+    if(argc>1&&std::string(argv[1])=="--batch-run-tests")
+        return compilerBatchTests(program,argc,argv);
+    std::vector<Value> arguments;
+    for(int i=1;i<argc;++i)arguments.emplace_back(argv[i]);
+    return compilerCommand(program,std::move(arguments));
 }
 } // namespace
 
@@ -369,18 +463,229 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
             }
         }
     }
+#if defined(__APPLE__) && defined(__aarch64__)
+    // The default Stage 0 AOT link otherwise configures a fresh CMake project
+    // for every golden fixture. Opt in during integration after parity checks;
+    // this uses the same bootstrap ABI and archives, without invoking the VM.
+    const char *directCpp=std::getenv("VPP_AOT_DIRECT_LINK_CPP");
+    const char *selectedRuntime=std::getenv("VPP_AOT_RUNTIME");
+    if(directCpp&&std::string(directCpp)=="1"&&
+       (!selectedRuntime||!*selectedRuntime||std::string(selectedRuntime)=="cpp")) {
+        // Instrumented archives require the flags recovered by the CMake
+        // linker below. Keep that path for coverage and sanitizer builds.
+        bool instrumented=false;
+        std::ifstream configuration(libraries/"CMakeCache.txt");
+        for(std::string line;std::getline(configuration,line);) {
+            if(line=="VPP_ENABLE_COVERAGE:BOOL=ON"||
+               ((line.find("CMAKE_CXX_FLAGS:STRING=")==0||
+                 line.find("CMAKE_EXE_LINKER_FLAGS:STRING=")==0)&&
+                line.find("-fsanitize=")!=std::string::npos)) {
+                instrumented=true;
+                break;
+            }
+        }
+        if(!instrumented) {
+            const fs::path asmRoot=root/"scripts/ASM";
+            const fs::path runtimeSource=root/"src/runtime/native/vpp_aot_runtime.c";
+            const fs::path machineSource=asmRoot/"macos/vpp_aot_stage0_machine_aarch64.S";
+            const fs::path programObject=temporary.path/"program.o";
+            const fs::path localRuntime=temporary.path/"bootstrap-runtime.o";
+            const fs::path localMachine=temporary.path/"stage0-machine.o";
+            const auto checked=[&](const std::vector<std::string> &args,const char *name) {
+                const auto result=process(args,true);
+                if(result.status)throw std::runtime_error(std::string("Native AOT: direct ")+name+
+                    " failed ("+std::to_string(result.status)+")\n"+result.output);
+            };
+            checked({"clang++","-c",source.u8string(),"-I"+asmRoot.u8string(),
+                     "-I"+(asmRoot/"common").u8string(),"-o",programObject.u8string()},
+                    "program assembly");
+            profiler.mark("assemble-stage0-program");
+
+            // Content-addressed immutable bootstrap objects can be shared by
+            // multiple concurrent test processes. A hard link publishes only
+            // fully written objects, so readers never see partial output.
+            std::vector<fs::path> dependencies{runtimeSource,machineSource};
+            for(const auto &folder:{asmRoot/"macos/aot_arm64",asmRoot/"common"}) {
+                if(!fs::is_directory(folder))continue;
+                for(const auto &entry:fs::recursive_directory_iterator(folder)) {
+                    if(entry.is_regular_file()&&
+                       (entry.path().extension()==".inc"||entry.path().extension()==".S"))
+                        dependencies.push_back(entry.path());
+                }
+            }
+            std::sort(dependencies.begin(),dependencies.end());
+            std::uint64_t digest=14695981039346656037ULL;
+            const auto hashBytes=[&](const char *bytes,std::size_t size) {
+                for(std::size_t i=0;i<size;++i) {
+                    digest^=static_cast<unsigned char>(bytes[i]);
+                    digest*=1099511628211ULL;
+                }
+            };
+            const std::string version="darwin-arm64-stage0-clang-release-1";
+            hashBytes(version.data(),version.size());
+            for(const auto &dependency:dependencies) {
+                const auto name=dependency.lexically_relative(root).generic_u8string();
+                hashBytes(name.data(),name.size());
+                std::ifstream content(dependency,std::ios::binary);
+                if(!content)throw std::runtime_error("Native AOT: missing direct link dependency: "+dependency.u8string());
+                char bytes[4096];
+                while(content.read(bytes,sizeof(bytes))||content.gcount()>0)
+                    hashBytes(bytes,static_cast<std::size_t>(content.gcount()));
+                if(content.bad())throw std::runtime_error("Native AOT: cannot hash direct link dependency: "+dependency.u8string());
+            }
+            const auto cacheDirectory=libraries/"native-stage0-direct-cache";
+            std::error_code cacheError;
+            fs::create_directories(cacheDirectory,cacheError);
+            const bool cacheAvailable=!cacheError&&fs::is_directory(cacheDirectory);
+            const auto cached=[&](const fs::path &local,const std::string &name,
+                                  const std::vector<std::string> &args) -> fs::path {
+                const auto target=cacheDirectory/(name+"-"+std::to_string(digest)+".o");
+                if(cacheAvailable&&fs::is_regular_file(target)&&fs::file_size(target)>0)
+                    return target;
+                checked(args,name.c_str());
+                if(cacheAvailable) {
+                    std::error_code linkError;
+                    fs::create_hard_link(local,target,linkError);
+                    if((!linkError||fs::is_regular_file(target))&&fs::file_size(target)>0)
+                        return target;
+                }
+                return local;
+            };
+            const auto runtimeObject=cached(localRuntime,"bootstrap-runtime",
+                {"clang","-std=c11","-O3","-DNDEBUG","-c",runtimeSource.u8string(),
+                 "-o",localRuntime.u8string()});
+            const auto machineObject=cached(localMachine,"stage0-machine",
+                {"clang++","-c",machineSource.u8string(),"-I"+asmRoot.u8string(),
+                 "-I"+(asmRoot/"common").u8string(),"-o",localMachine.u8string()});
+            profiler.mark("prepare-stage0-runtime");
+            std::vector<std::string> link={"clang++",programObject.u8string(),
+                runtimeObject.u8string(),machineObject.u8string()};
+            for(const char *name:{"native-aot","runtime-native","compiler","frontend","bytecode","core"}) {
+                const auto archive=libraries/"lib"/(std::string("libvpp-")+name+".a");
+                if(!fs::is_regular_file(archive))
+                    throw std::runtime_error("Native AOT: missing direct link archive: "+archive.u8string());
+                link.push_back(archive.u8string());
+            }
+#if defined(VPP_AOT_LINK_LEGACY_LIBFFI) && VPP_AOT_LINK_LEGACY_LIBFFI
+            link.push_back("-lffi");
+#endif
+            link.insert(link.end(),{"-framework","Security","-framework","CoreFoundation",
+                                    "-o",executable.u8string()});
+            checked(link,"Stage 0 executable link");
+            profiler.mark("link-stage0-executable");
+            if(std::getenv("VPP_AOT_KEEP_ASM"))
+                fs::copy_file(source,fs::path(absolute.u8string()+".S"),fs::copy_options::overwrite_existing);
+            fs::rename(executable,absolute);
+            return;
+        }
+    }
+#endif
     const auto cmakePath = [](const fs::path &path) {
         return path.generic_u8string();
     };
-    std::vector<std::string> configure={"cmake","-S",cmakePath(root/"scripts/quality/native_aot_link"),"-B",cmakePath(temporary.path/"build")};
+    // A fresh nested CMake configure and bootstrap object build per fixture
+    // made Linux integration spend most of its time outside the V++ compiler.
+    // Reuse the link project within this compiler process; every source still
+    // gets a fresh program object and executable. Workers have separate PIDs
+    // and therefore separate temporary projects.
+    fs::path linkerBuild=temporary.path/"build";
+    fs::path linkerSource=source;
+    fs::path linkerOutput=executable;
+    bool configureLinker=true;
+#if !defined(_WIN32)
+    struct CachedLinker {
+        std::unique_ptr<TemporaryDirectory> directory;
+        std::string configuration;
+    };
+    static thread_local CachedLinker cachedLinker;
+    const auto environment=[](const char *name) {
+        const char *value=std::getenv(name);
+        return value?std::string(value):std::string();
+    };
+    // The selected build cache controls instrumentation and linker flags.
+    // A batch can outlive a rebuild of the libraries or runtime object.
+    // CMakeCache alone cannot distinguish two different builds that used
+    // identical compiler flags. Use cheap file metadata rather than hashing
+    // the large static archives for every fixture in the same batch.
+    std::ifstream selectedBuildCache(libraries/"CMakeCache.txt",std::ios::binary);
+    const std::string selectedBuildConfiguration{
+        std::istreambuf_iterator<char>(selectedBuildCache),
+        std::istreambuf_iterator<char>()};
+    std::ostringstream linkInputs;
+    const auto trackLinkInput=[&](const fs::path &path) {
+        std::error_code ec;
+        const bool regular=fs::is_regular_file(path,ec);
+        linkInputs<<path.u8string()<<'\n';
+        if(ec||!regular) {
+            linkInputs<<"missing\n";
+            return;
+        }
+        const auto length=fs::file_size(path,ec);
+        if(ec) {linkInputs<<"unreadable\n";return;}
+        const auto modified=fs::last_write_time(path,ec);
+        if(ec) {linkInputs<<"unreadable\n";return;}
+        const auto modifiedMicros=
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                modified.time_since_epoch()).count();
+        linkInputs<<length<<':'<<modifiedMicros<<'\n';
+    };
+    // Track every supported library search location: an archive can be
+    // replaced or the linker can switch from lib/ to lib/Release mid-batch.
+    for(const char *directory:{"lib/Release","lib64/Release","lib","lib64"}) {
+        for(const char *module:{"native-aot","runtime-native","compiler",
+                                 "frontend","bytecode","core"}) {
+            const auto stem="libvpp-"+std::string(module);
+            for(const char *suffix:{".a",".so",".dylib"})
+                trackLinkInput(libraries/directory/(stem+suffix));
+        }
+    }
+    const auto linkerRuntime=environment("VPP_AOT_RUNTIME");
+    if(linkerRuntime=="vpp"||linkerRuntime=="vpp-freestanding") {
+        const auto chosen=environment("VPP_AOT_VPP_OBJECT");
+        trackLinkInput(chosen.empty()?root/"build/native-vpp-runtime/runtime.o":
+                       core::utf8Path(chosen));
+    }
+    const std::string configuration=root.u8string()+"\n"+libraries.u8string()+"\n"+
+        selectedBuildConfiguration+"\n"+
+        linkInputs.str()+"\n"+
+        environment("VPP_AOT_RUNTIME")+"\n"+environment("VPP_AOT_VPP_OBJECT")+"\n"+
+        environment("CMAKE_GENERATOR")+"\n"+environment("CC")+"\n"+
+        environment("CXX")+"\n"+environment("CFLAGS")+"\n"+
+        environment("CXXFLAGS")+"\n"+environment("LDFLAGS")+"\n"+
+        environment("CMAKE_TOOLCHAIN_FILE")+"\n"+
+        environment("SDKROOT")+"\n"+environment("MACOSX_DEPLOYMENT_TARGET")+"\n"+
+        environment("VPP_AOT_LINK_LEGACY_LIBFFI");
+    const bool reuseLinker=environment("VPP_AOT_LINKER_CACHE")!="0";
+    if(reuseLinker) {
+        if(!cachedLinker.directory||cachedLinker.configuration!=configuration) {
+            cachedLinker.directory=std::make_unique<TemporaryDirectory>(fs::temp_directory_path());
+            cachedLinker.configuration=configuration;
+        } else {
+            configureLinker=false;
+        }
+        linkerBuild=cachedLinker.directory->path/"build";
+        linkerSource=cachedLinker.directory->path/"program.S";
+        linkerOutput=cachedLinker.directory->path/"program";
+        fs::copy_file(source,linkerSource,fs::copy_options::overwrite_existing);
+        if(!configureLinker) {
+            // Force reassembly even on filesystems with coarse mtimes.
+            // Keep immutable bootstrap objects and the linker graph.
+            std::error_code ignored;
+            fs::remove(linkerBuild/"program.o",ignored);
+            fs::remove(linkerBuild/"bin/vpp-aot-program",ignored);
+            profiler.mark("reuse-native-linker");
+        }
+    }
+#endif
+    std::vector<std::string> configure={"cmake","-S",cmakePath(root/"scripts/quality/native_aot_link"),"-B",cmakePath(linkerBuild)};
 #if !defined(_WIN32)
     // Unix CI uses single-configuration generators. Visual Studio ignores
     // CMAKE_BUILD_TYPE and warns about it for each nested native link.
     configure.push_back("-DCMAKE_BUILD_TYPE=Release");
 #endif
     configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+cmakePath(root),
-        "-DVPP_AOT_LIB_ROOT="+cmakePath(libraries),"-DVPP_AOT_SOURCE="+cmakePath(source),
-        "-DVPP_AOT_OUTPUT="+cmakePath(executable)});
+        "-DVPP_AOT_LIB_ROOT="+cmakePath(libraries),"-DVPP_AOT_SOURCE="+cmakePath(linkerSource),
+        "-DVPP_AOT_OUTPUT="+cmakePath(linkerOutput)});
 #if !defined(_WIN32)
     // Windows links its platform libraries directly; its CMake link project
     // does not consume this POSIX-only flag. Passing it produces an unused-cli
@@ -391,12 +696,21 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
     configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=OFF");
 #endif
 #endif
-    auto configured=process(configure);
-    if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
-    profiler.mark("configure-native-linker");
-    auto linked=process({"cmake","--build",(temporary.path/"build").u8string(),"--config","Release","--parallel","2"});
-    if(linked.status||!fs::is_regular_file(executable))throw std::runtime_error("Native AOT: assembly/link failed\n"+linked.output);
+    if(configureLinker) {
+        auto configured=process(configure);
+        if(configured.status) {
+#if !defined(_WIN32)
+            if(reuseLinker)cachedLinker.directory.reset();
+#endif
+            throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
+        }
+        profiler.mark("configure-native-linker");
+    }
+    auto linked=process({"cmake","--build",linkerBuild.u8string(),"--config","Release","--parallel","2"});
+    if(linked.status||!fs::is_regular_file(linkerOutput))throw std::runtime_error("Native AOT: assembly/link failed\n"+linked.output);
     profiler.mark("assemble-and-link");
+    if(linkerOutput!=executable)
+        fs::copy_file(linkerOutput,executable,fs::copy_options::overwrite_existing);
     if(std::getenv("VPP_AOT_KEEP_ASM"))fs::copy_file(source,fs::path(absolute.u8string()+".S"),fs::copy_options::overwrite_existing);
     fs::rename(executable,absolute);
 }
@@ -469,9 +783,16 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             const auto file=temporary.path/"embedded.vi";
             {std::ofstream output(file,std::ios::binary|std::ios::trunc);
              if(!output||!(output<<source))throw std::runtime_error("Native AOT: cannot write embedded source");}
-            const auto result=process({executable.u8string(),"embed",file.u8string(),"--base",directory.u8string()});
+            // Embedded compilation errors are catchable language exceptions.
+            // Capture their diagnostics so a caught error cannot leak to the
+            // parent's stderr (or corrupt a golden test's combined output).
+            const auto diagnostics=temporary.path/"embedded.stderr";
+            const auto result=process({executable.u8string(),"embed",file.u8string(),"--base",directory.u8string()},false,diagnostics);
+            std::ifstream diagnosticFile(diagnostics,std::ios::binary);
+            const std::string errors{std::istreambuf_iterator<char>(diagnosticFile),std::istreambuf_iterator<char>()};
             if(result.status)
-                throw std::runtime_error("Native AOT: embedded script failed: "+std::to_string(result.status));
+                throw std::runtime_error("Native AOT: embedded script failed: "+std::to_string(result.status)+"\n"+errors);
+            std::cerr<<errors;
             return result.output;
         };
         auto result=program.run();

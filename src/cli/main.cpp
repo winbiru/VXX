@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <chrono>
 #include <iostream>
 #include <fstream>
 #include <limits>
@@ -149,6 +150,7 @@ enum class SnippetMode {
 };
 
 static void verifyLockedProjectForSource(const fs::path &sourcePath);
+static fs::path nativeVppCompiler(bool required);
 static int runSourceWithAvailableCompiler(const std::string &filename,
                                           bool captureErrors = false,
                                           bool requireNative = false);
@@ -337,15 +339,34 @@ static int runFile(const std::string &filename,
                       filePath);
 }
 
-// Internal regression-test worker. Chạy nhiều source file tuần tự trong cùng
-// process để compiler có thể tái sử dụng cache AST giữa các lượt, nhưng vẫn ghi
-// output/status riêng cho từng file để run_tests.sh giữ nguyên golden semantics.
+// Internal regression-test worker. Stage 0 can reuse its in-process AST cache;
+// native mode keeps one self-hosted compiler session per worker. Keep per-file
+// output/status/timing artifacts for golden comparisons and slow-case diagnosis.
 static int runBatchTestFiles(const fs::path &outputDir,
                              const std::vector<fs::path> &testFiles,
                              bool forceCpp = false,
                              bool forceNative = false) {
     fs::create_directories(outputDir);
+    if(forceNative) {
+        std::vector<std::string> arguments{nativeVppCompiler(true).u8string(),
+            "--batch-run-tests",fs::absolute(outputDir).u8string()};
+        for(const auto &source:testFiles) {
+            verifyLockedProjectForSource(source);
+            arguments.push_back(fs::absolute(source).u8string());
+        }
+        const auto result=vietvm::native::aot::runProcess(arguments);
+        std::cout<<result.output;
+        return result.status;
+    }
+    const char *failFastSetting=std::getenv("VPP_NATIVE_GOLDEN_FAIL_FAST");
+    const bool failFastGolden=forceNative&&failFastSetting&&
+        std::string(failFastSetting)=="1";
+    std::size_t testIndex = 0;
     for (const fs::path &testFile : testFiles) {
+        const auto started = std::chrono::steady_clock::now();
+        const char *backend = forceCpp ? "cpp" : forceNative ? "vpp" : "auto";
+        std::cerr << "[test " << ++testIndex << '/' << testFiles.size() << "] START "
+                  << backend << ' ' << testFile.u8string() << std::endl;
         std::ostringstream captured;
         std::streambuf *oldOut = std::cout.rdbuf(captured.rdbuf());
         std::streambuf *oldErr = std::cerr.rdbuf(captured.rdbuf());
@@ -373,7 +394,33 @@ static int runBatchTestFiles(const fs::path &outputDir,
         std::ofstream statusFile(outputDir / vietvm::core::utf8Path(base + ".status"),
                                  std::ios::trunc);
         statusFile << status << '\n';
-        if (!output || !statusFile) return EXIT_FAILURE;
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        std::ofstream timingFile(outputDir / vietvm::core::utf8Path(base + ".milliseconds"),
+                                 std::ios::trunc);
+        timingFile << elapsed << '\n';
+        output.close();
+        statusFile.close();
+        timingFile.close();
+        if (!output || !statusFile || !timingFile) return EXIT_FAILURE;
+        std::cerr << "[test " << testIndex << '/' << testFiles.size() << "] DONE "
+                  << backend << ' ' << testFile.u8string() << " exit=" << status
+                  << " elapsed_ms=" << elapsed << std::endl;
+        if(failFastGolden) {
+            const auto expectedPath=testFile.parent_path()/"expected"/
+                vietvm::core::utf8Path(base+".expected");
+            std::ifstream expectedFile(expectedPath,std::ios::binary);
+            std::ostringstream expectedText;
+            if(expectedFile)expectedText<<expectedFile.rdbuf();
+            if(status!=EXIT_SUCCESS||!expectedFile||
+               expectedText.str()!=captured.str()) {
+                std::cerr<<"[test "<<testIndex<<'/'<<testFiles.size()
+                         <<"] GOLDEN FAIL "<<testFile.u8string()
+                         <<" (exit="<<status<<", expected="<<expectedPath.u8string()
+                         <<"); saved .output/.status/.milliseconds for diagnosis\n";
+                return EXIT_FAILURE;
+            }
+        }
     }
     return EXIT_SUCCESS;
 }

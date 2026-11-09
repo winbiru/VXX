@@ -83,17 +83,16 @@ lớp công khai Tiện Ích Mã Máy {
 
     // C++ symbolNameSafe: chỉ chấp nhận ASCII [A-Za-z_][A-Za-z0-9_]*.
     hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
-        nếu (máy ảo lấy độ dài(tên) == 0) { trả về sai; };
-        chữ cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        chữ số = chữ cái + "0123456789";
-        lặp (i = 0; i < máy ảo lấy độ dài(tên); i++) {
-            bảng = chữ số;
-            nếu (i == 0) { bảng = chữ cái; };
-            có = sai;
-            lặp (j = 0; j < máy ảo lấy độ dài(bảng); j++) {
-                nếu (tên[i] == bảng[j]) { có = đúng; thoát; };
-            };
-            nếu (!có) { trả về sai; };
+        // Symbol ABI chỉ nhận ASCII. Kiểm tra khoảng byte một lần thay vì
+        // quét bảng 63 ký tự cho từng ký tự của mỗi relocation CALL.
+        // Byte UTF-8 ngoài ASCII cũng bị loại, cùng hợp đồng với C++.
+        các byte = chuỗi thành byte máy ảo(tên);
+        nếu (máy ảo lấy độ dài(các byte) == 0) { trả về sai; };
+        lặp (i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            b = các byte[i];
+            chữ = (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || b == 95;
+            số = i > 0 && b >= 48 && b <= 57;
+            nếu (!chữ && !số) { trả về sai; };
         };
         trả về đúng;
     };

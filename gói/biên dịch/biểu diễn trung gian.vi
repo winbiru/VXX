@@ -297,7 +297,10 @@ lớp công khai Bộ Hạ IR {
                 };
                 nếu (mã định danh < 0) { mã định danh = mình.biên dịch IR tìm ràng buộc(bảng, tên); };
                 nếu (mã định danh < 0) { mã định danh = mình.biên dịch IR tìm ràng buộc(bên ngoài, tên); };
-                nếu (mã định danh < 0) { mã định danh = mình.biên dịch IR tìm ràng buộc(toàn cục, tên); };
+                nếu (mã định danh < 0) {
+                    mã định danh = mình.biên dịch IR tìm ràng buộc(toàn cục, tên);
+                    nếu (mã định danh >= 0) { mục["symbol toàn cục"] = đúng; };
+                };
                 nếu (mã định danh >= 0) { mục["symbol"] = mã định danh; };
             };
             lệnh[i] = mục;

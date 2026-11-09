@@ -99,6 +99,31 @@ hàm chính() {
     in lấy từ điển(unicode[1], "vị trí ký tự", 0) == 2;
     in lấy từ điển(unicode[1], "cột ký tự", 0) == 3;
 
+    // Cắt token theo byte phải giữ nguyên UTF-8, dấu escape và cả hai loại span.
+    tên_dài = "nhánhViệtNam_côngNghệ_đổiMới123";
+    nguồn_dài = "  " + tên_dài + " = \"xin \\\"chào\\\" Việt Nam\";";
+    thô_dài = biên dịch từ tố hóa thô(nguồn_dài);
+    in độ dài(thô_dài) == 4;
+    in lấy từ điển(thô_dài[0], "giá trị", "") == tên_dài;
+    in lấy từ điển(thô_dài[0], "loại", "") == "định danh";
+    in lấy từ điển(thô_dài[0], "vị trí", -1) == 2;
+    in lấy từ điển(thô_dài[0], "kết thúc", -1) == 2 + máy ảo lấy độ dài(chuỗi thành byte máy ảo(tên_dài));
+    in lấy từ điển(thô_dài[0], "vị trí ký tự", -1) == 2;
+    in lấy từ điển(thô_dài[0], "kết thúc ký tự", -1) == 2 + độ dài(tên_dài);
+    in lấy từ điển(thô_dài[2], "giá trị", "") == "\"xin \\\"chào\\\" Việt Nam\"";
+    in lấy từ điển(thô_dài[2], "loại", "") == "chuỗi";
+
+    // Cột byte sau chú thích khối nhiều dòng phải giữ độ lệch UTF-8;
+    // bảng cột dư đã được bỏ khỏi pass tạo code point.
+    thô_cột = biên dịch từ tố hóa thô("/* Việt\n  dòng */ àbc;\n   kế();");
+    in lấy từ điển(thô_cột[0], "giá trị", "") == "àbc";
+    in lấy từ điển(thô_cột[0], "dòng", 0) == 2;
+    in lấy từ điển(thô_cột[0], "cột", 0) == 12;
+    in lấy từ điển(thô_cột[0], "cột ký tự", 0) == 11;
+    in lấy từ điển(thô_cột[2], "giá trị", "") == "kế";
+    in lấy từ điển(thô_cột[2], "dòng", 0) == 3;
+    in lấy từ điển(thô_cột[2], "cột", 0) == 4;
+
     // Lexer native phải giữ từ tố nhiều âm tiết và span UTF-8 sau khi
     // tối ưu bỏ phân loại lại từ tố thô và kiểm tra tiền tố.
     từ_khóa_đầy_đủ = biên dịch từ tố hóa("kiểm tra sau ngoại thư viện trả về bỏ qua mặc định trường hợp khởi tạo điều kiện cập nhật bắt lỗi giao diện kế thừa triển khai công khai riêng tư bảo vệ ký hiệu khả năng");

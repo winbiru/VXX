@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -u
+# Group each background worker with its children for reliable cancellation
+# even when process listing is restricted by the CI/sandbox environment.
+set -m
 
 ROOT_DIR="$(pwd)"
 if [ -n "${VPP_EXEC:-}" ]; then
@@ -31,10 +34,17 @@ fi
 # Do this before any fixture starts, including those that change VPP_HOME.
 export VPP_HOME="${VPP_HOME:-$ROOT_DIR}"
 export VPP_AOT_ROOT="${VPP_AOT_ROOT:-$ROOT_DIR}"
+# The macOS Stage 0 bootstrap can directly assemble/link V++ emitted ASM.
+# The opt-out retains the CMake parity path for debugging and CI bisects.
+if [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ]; then
+  export VPP_AOT_DIRECT_LINK_CPP="${VPP_AOT_DIRECT_LINK_CPP:-1}"
+fi
 # Ordinary integration tests run through the bootstrapped V++ compiler/ASM
 # backend. Keep an explicit Stage 0 lane for VM/JIT-specific contracts.
 NATIVE_COMMAND=("$EXEC_PATH" run --compiler=vpp)
 VM_COMMAND=("$EXEC_PATH" run --compiler=cpp)
+source "$ROOT_DIR/scripts/quality/native_test_workers.sh"
+NATIVE_BATCH_PIDS=()
 tmpdir=$(mktemp -d "src/tests/.tmp.XXXXXX")
 export VPP_PREFERENCES_HOME="$ROOT_DIR/$tmpdir/preferences"
 # Deterministic environment values for public System/FFI API regression tests.
@@ -57,12 +67,26 @@ if [[ ! "$HTTP_FIXTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] ||
 fi
 VPP_HOME_TEST_DIR=""
 cleanup() {
+  local exit_status=$?
+  local pid
+  if [ "${#NATIVE_BATCH_PIDS[@]}" -gt 0 ]; then
+    for pid in "${NATIVE_BATCH_PIDS[@]}"; do vpp_test_stop_tree "$pid"; done
+    for pid in "${NATIVE_BATCH_PIDS[@]}"; do wait "$pid" 2>/dev/null || true; done
+  fi
   if [ -n "$HTTP_FIXTURE_PID" ]; then
-    kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
+    vpp_test_stop_tree "$HTTP_FIXTURE_PID"
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
   if [ -n "$VPP_HOME_TEST_DIR" ] && [ -d "$VPP_HOME_TEST_DIR" ]; then
     rm -rf "$VPP_HOME_TEST_DIR"
+  fi
+  if [ "$exit_status" -ne 0 ] && [ -d "$tmpdir" ]; then
+    local evidence="${VPP_TEST_LOG_DIR:-$ROOT_DIR/build/integration-logs}/run-$(date +%Y%m%d-%H%M%S)-$$"
+    if mkdir -p "$evidence" && cp -R "$tmpdir/." "$evidence/"; then
+      echo "Integration failure evidence: $evidence" >&2
+    else
+      echo "ERROR: could not preserve integration evidence at $evidence" >&2
+    fi
   fi
   rm -f src/tests/.tmp_api_project.db src/tests/.tmp_api_project.db-journal \
         src/tests/.tmp_api_project.db-shm src/tests/.tmp_api_project.db-wal
@@ -71,7 +95,9 @@ cleanup() {
   rm -f src/tests/.tmp_oop_zip.txt src/tests/.tmp_oop_zip.zip src/tests/.tmp_oop_manifest.json
   rm -rf "$tmpdir"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 http_get() {
   local url="$1"
@@ -105,7 +131,7 @@ if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http
   if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
-  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013)|^Lỗi: ngoại lệ không bắt được: FFI: socket_listen OS=(1|13|10013)$)' "$tmpdir/http_fixture.log"; then
+  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013)|^(Lỗi: )?ngoại lệ không bắt được: FFI: socket_listen OS=(1|13|10013)$)' "$tmpdir/http_fixture.log"; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
     HTTP_FIXTURE_PID=""
@@ -406,10 +432,92 @@ for testfile in "${TESTS[@]}"; do
   fi
 done
 
+# Each native batch retains one self-hosted compiler and a bounded V++ memo
+# for identical lowered Machine IR bodies. Run independent batches in parallel.
+# Only shard fixtures that do not exercise external state; filesystem, network,
+# subprocess, concurrency and configuration checks keep their original order.
+# Run that ordered lane alongside independent fixtures: waiting for all
+# independent shards first needlessly added the entire ordered lane to the
+# critical path. The worker budget includes the ordered lane.
+VPP_NATIVE_TEST_WORKERS="${VPP_NATIVE_TEST_WORKERS:-3}"
+if [[ ! "$VPP_NATIVE_TEST_WORKERS" =~ ^[1-4]$ ]]; then
+  echo "ERROR: VPP_NATIVE_TEST_WORKERS must be an integer from 1 to 4" >&2
+  exit 2
+fi
+
+native_golden_is_independent() {
+  local name="${1##*/}"
+  # These fixtures only exercise in-memory data/AST processing. The broad
+  # keyword exclusions below also match their names (events, FFI syntax,
+  # network-format helpers, quantum math), unnecessarily serializing them.
+  case "$name" in
+    kiem_tra_su_kien.vi|kiem_tra_khai_bao_kieu_ffi_tu_chu.vi|\
+    kiem_tra_goi_mang.vi|kiem_tra_goi_luong_tu.vi)
+      return 0 ;;
+  esac
+  case "$name" in
+    *file*|*tep*|*thumuc*|*thu_muc*|*luu_tru*|*zip*|*json_file*|\
+    *http*|*socket*|*dns*|*tls*|*ffi*|*network*|*mang*|*o_cam*|\
+    *process*|*tien_trinh*|*worker*|*dong_thoi*|*su_kien*|\
+    *db*|*database*|*sqlite*|*api*|*nhat_ky*|*logger*|\
+    *cau_hinh*|*thoi_gian*|*goi_repl*|*cong_cu*|*dong_goi*|\
+    *goi_dung*|*preferences*|*goi_luong_tu*|*goi_ngau_nhien*|\
+    *stdlib_io*|*goi_kich_ban*|*goi_soan_thao*|*ngu*|*entropy*)
+      return 1 ;;
+  esac
+  return 0
+}
+
+run_native_golden_batches() {
+  local suite="$1"
+  shift
+  [ "$#" -gt 0 ] || return 0
+  local golden_fail_fast=0
+  if [ "$suite" = golden ]; then golden_fail_fast=1; fi
+  if [ "$VPP_NATIVE_TEST_WORKERS" -eq 1 ]; then
+    VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+      "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "$@"
+    return $?
+  fi
+
+  local source worker index failure=0
+  local -a independent=() ordered=() shard=() pids=()
+  for source in "$@"; do
+    if native_golden_is_independent "$source"; then
+      independent+=("$source")
+    else
+      ordered+=("$source")
+    fi
+  done
+  local independent_workers="$VPP_NATIVE_TEST_WORKERS"
+  if [ "${#ordered[@]}" -gt 0 ]; then
+    independent_workers=$((VPP_NATIVE_TEST_WORKERS - 1))
+    VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+      "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${ordered[@]}" &
+    pids+=("$!")
+  fi
+  echo "== Native $suite: ${#independent[@]} independent fixtures on ${independent_workers} workers, ${#ordered[@]} ordered fixtures on one worker =="
+  for ((worker=0; worker<independent_workers; worker++)); do
+    shard=()
+    for ((index=worker; index<${#independent[@]}; index+=independent_workers)); do
+      shard+=("${independent[index]}")
+    done
+    if [ "${#shard[@]}" -gt 0 ]; then
+      VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+        "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${shard[@]}" &
+      pids+=("$!")
+    fi
+  done
+  NATIVE_BATCH_PIDS=("${pids[@]}")
+  if ! vpp_test_wait_workers "${pids[@]}"; then failure=1; fi
+  NATIVE_BATCH_PIDS=()
+  [ "$failure" -eq 0 ]
+}
+
 # Both lanes produce identical per-file output/status artifacts for the
 # existing golden comparisons. Explicit --compiler=vpp forbids VM fallback.
 if [ "${#NATIVE_RUNNABLE_TESTS[@]}" -gt 0 ] &&
-   ! "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${NATIVE_RUNNABLE_TESTS[@]}"; then
+   ! run_native_golden_batches golden "${NATIVE_RUNNABLE_TESTS[@]}"; then
   echo "ERROR: V++ native batch test worker failed" >&2
   exit 2
 fi
@@ -562,6 +670,25 @@ case "$(uname -s)" in
       kiem_tra_ffi_tls
       kiem_tra_ffi_http_transport_bat_loi
     )
+    # Compile the native strict-FFI fixtures in one self-hosted session so
+    # identical imported Machine IR bodies can reuse the bounded ASM memo.
+    # Keep the interpreter/JIT checks and their independent oracle comparisons.
+    strict_native_dir="$tmpdir/strict-posix-native"
+    strict_native_sources=()
+    for strict_name in "${strict_posix_tests[@]}"; do
+      if [ "$strict_name" = kiem_tra_ffi_socket ] && [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
+        continue
+      fi
+      strict_native_sources+=("src/tests/${strict_name}.vi")
+    done
+    if [ "${#strict_native_sources[@]}" -gt 0 ]; then
+      VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT=0 VPP_NATIVE_GOLDEN_FAIL_FAST=0 \
+        "$EXEC_PATH" --batch-run-tests --compiler=vpp "$strict_native_dir" \
+        "${strict_native_sources[@]}" || {
+          echo "ERROR: native strict POSIX batch worker failed" >&2
+          exit 2
+        }
+    fi
     for strict_mode in interpreter jit; do
       strict_jit=0
       if [ "$strict_mode" = jit ]; then strict_jit=1; fi
@@ -570,16 +697,25 @@ case "$(uname -s)" in
           echo "SKIP: System FFI strict POSIX socket [$strict_mode] (localhost bind restricted)"
           continue
         fi
-        strict_out="$tmpdir/strict_posix_${strict_mode}_${strict_name}.output"
-        strict_command=("${NATIVE_COMMAND[@]}")
-        if [ "$strict_mode" = jit ]; then strict_command=("${VM_COMMAND[@]}"); fi
-        if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "${strict_command[@]}" \
-          "src/tests/${strict_name}.vi" >"$strict_out" 2>&1 &&
+        if [ "$strict_mode" = interpreter ]; then
+          strict_out="$strict_native_dir/${strict_name}.output"
+          strict_status_file="$strict_native_dir/${strict_name}.status"
+          strict_status=1
+          if [ -f "$strict_status_file" ]; then
+            strict_status=$(cat "$strict_status_file")
+          fi
+        else
+          strict_out="$tmpdir/strict_posix_${strict_mode}_${strict_name}.output"
+          VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" \
+            "${VM_COMMAND[@]}" "src/tests/${strict_name}.vi" >"$strict_out" 2>&1
+          strict_status=$?
+        fi
+        if [ "$strict_status" -eq 0 ] &&
           diff -u "src/tests/expected/${strict_name}.expected" "$strict_out"; then
           echo "PASS: System FFI strict POSIX $strict_name [$strict_mode]"; PASS=$((PASS+1))
         else
           echo "FAIL: System FFI strict POSIX $strict_name [$strict_mode]"; FAIL=$((FAIL+1))
-          cat "$strict_out" >&2
+          if [ -f "$strict_out" ]; then cat "$strict_out" >&2; fi
         fi
       done
       strict_old_out="$tmpdir/strict_posix_old_${strict_mode}.output"
@@ -643,7 +779,7 @@ while IFS=$'\t' read -r native_source native_diagnostic || [ -n "$native_source"
 done < "$NATIVE_FAILURE_MANIFEST"
 
 if [ "${#NATIVE_FAILURE_TESTS[@]}" -gt 0 ] &&
-   ! "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${NATIVE_FAILURE_TESTS[@]}"; then
+   ! run_native_golden_batches expected-failure "${NATIVE_FAILURE_TESTS[@]}"; then
   echo "ERROR: native expected-failure batch worker failed" >&2
   exit 2
 fi
@@ -858,6 +994,24 @@ else
 fi
 
 echo ""
+echo "== 15 slowest golden tests (elapsed milliseconds) =="
+for timing_file in "$tmpdir"/*.milliseconds; do
+  [ -f "$timing_file" ] || continue
+  milliseconds=$(cat "$timing_file")
+  case "$milliseconds" in
+    ''|*[!0-9]*) continue ;;
+  esac
+  printf '%s\t%s\n' "$milliseconds" "$(basename "${timing_file%.milliseconds}")"
+done | sort -nr > "$tmpdir/timings.tsv"
+head -n 15 "$tmpdir/timings.tsv"
+timing_dir="${VPP_TEST_LOG_DIR:-$ROOT_DIR/build/integration-logs}"
+if mkdir -p "$timing_dir"; then
+  timing_report="$timing_dir/timings-$(date +%Y%m%d-%H%M%S)-$$.tsv"
+  if cp "$tmpdir/timings.tsv" "$timing_report"; then
+    echo "Integration timings: $timing_report"
+  fi
+fi
+
 echo "=== PASS: $PASS, FAIL: $FAIL ==="
 
 if [ "$FAIL" -ne 0 ]; then

@@ -219,13 +219,13 @@ hàm công khai biên dịch nguồn đồ thị(điểm vào, thư viện) {
     trả về bộ nạp.đồ thị(điểm vào);
 };
 
-hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện) {
+hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện, số worker = rỗng) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     đồ thị = biên dịch nguồn đồ thị(điểm vào, thư viện);
     biên dịch hồ sơ ghi(đường hồ sơ, "source.graph", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-    sản phẩm = biên dịch liên kết đồ thị thuần(đồ thị);
+    sản phẩm = biên dịch liên kết đồ thị thuần(đồ thị, số worker);
     biên dịch hồ sơ ghi(đường hồ sơ, "source.link", bắt đầu);
     trả về sản phẩm;
 };
