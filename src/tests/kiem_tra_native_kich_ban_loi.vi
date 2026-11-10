@@ -1,7 +1,18 @@
 // The native embedded compiler must execute valid source and report parser
-// failures through V++ try/catch. Compare the native error directly so the
-// regression is independent of the V++ Unicode substring implementation.
+// failures through V++ try/catch. Parser diagnostics may be appended to the
+// exception; the status prefix must remain stable across compiler versions.
 nhập gói.lõi.kịch bản.kịch bản chạy;
+
+hàm có tiền tố(văn bản, tiền tố) {
+    n = máy ảo lấy độ dài(tiền tố);
+    m = máy ảo lấy độ dài(văn bản);
+    nếu (m < n) { trả về sai; };
+    lặp(i = 0; i < n; i++) {
+        nếu (văn bản[i] != tiền tố[i]) { trả về sai; };
+    };
+    nếu (m == n) { trả về đúng; };
+    trả về văn bản[n] == "\n";
+};
 
 hàm chính() {
     chạy_được = kịch bản chạy("in 42;") == "42\n";
@@ -10,7 +21,7 @@ hàm chính() {
     thử { kịch bản chạy("hàm {"); }
     bắt lỗi(e) {
         lỗi_nhận_được = e;
-        bắt_được = e == "kịch bản chạy: Native AOT: embedded script failed: 1";
+        bắt_được = có tiền tố(e, "kịch bản chạy: Native AOT: embedded script failed: 1");
     };
     nếu (!bắt_được) { in "Unexpected native embedded error: " + lỗi_nhận_được; };
     in chạy_được && bắt_được;
