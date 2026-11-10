@@ -20,14 +20,18 @@ hàm công khai biên dịch đồ thị chuẩn đường(đường) {
         ném "biên dịch đồ thị: cần đường dẫn tương đối không rỗng";
     };
     phần = [];
-    mục = "";
-    lặp(i = 0; i <= máy ảo lấy độ dài(đường); i++) {
+    // Tách theo vị trí thay vì nối từng ký tự. Đường import được chuẩn hóa
+    // nhiều lần trong một lần biên dịch, còn phép += tăng số lần cấp phát.
+    bắt đầu = 0;
+    dài = máy ảo lấy độ dài(đường);
+    lặp(i = 0; i <= dài; i++) {
         ký tự = "/";
-        nếu (i < máy ảo lấy độ dài(đường)) { ký tự = đường[i]; };
+        nếu (i < dài) { ký tự = đường[i]; };
         nếu (ký tự == "\\") {
             ném "biên dịch đồ thị: chưa hỗ trợ dấu phân cách Windows";
         };
         nếu (ký tự == "/") {
+            mục = máy ảo cắt chuỗi(đường, bắt đầu, i - bắt đầu);
             nếu (mục == "..") {
                 nếu (máy ảo lấy độ dài(phần) == 0) {
                     ném "biên dịch đồ thị: đường dẫn thoát khỏi gốc nguồn '" + đường + "'";
@@ -36,9 +40,7 @@ hàm công khai biên dịch đồ thị chuẩn đường(đường) {
             } hoặc {
                 nếu (mục != "" && mục != ".") { máy ảo thêm cuối danh sách(phần, mục); };
             };
-            mục = "";
-        } hoặc {
-            mục += ký tự;
+            bắt đầu = i + 1;
         };
     };
     nếu (máy ảo lấy độ dài(phần) == 0) {
@@ -52,14 +54,14 @@ hàm công khai biên dịch đồ thị chuẩn đường(đường) {
 hàm công khai biên dịch đồ thị đích nhập(nguồn nhập, đích) {
     // Import tương đối được giải từ thư mục CHỨA module importer.
     // Mỗi module được coi là tệp không đuôi .vi trong graph in-memory.
-    cha = "";
+    dấu cuối = -1;
     lặp(i = 0; i < máy ảo lấy độ dài(nguồn nhập); i++) {
         nếu (nguồn nhập[i] == "/") {
-            cha = "";
-            lặp(j = 0; j < i; j++) { cha += nguồn nhập[j]; };
+            dấu cuối = i;
         };
     };
-    nếu (cha == "") { trả về biên dịch đồ thị chuẩn đường(đích); };
+    nếu (dấu cuối <= 0) { trả về biên dịch đồ thị chuẩn đường(đích); };
+    cha = máy ảo cắt chuỗi(nguồn nhập, 0, dấu cuối);
     trả về biên dịch đồ thị chuẩn đường(cha + "/" + đích);
 };
 
@@ -67,6 +69,15 @@ hàm công khai biên dịch đồ thị đích nhập(nguồn nhập, đích) {
 // đúng identity đó, kể cả khi import được tìm ở thư mục tổ tiên/VPP_HOME.
 hàm công khai biên dịch đồ thị tìm đích(đồ thị, nguồn nhập, đích) {
     nếu (lấy từ điển(đồ thị, "nguồn tệp", sai)) {
+        chỉ mục = lấy từ điển(đồ thị, "đích theo yêu cầu", rỗng);
+        nếu (chỉ mục != rỗng) {
+            nếu (máy ảo có khóa từ điển(chỉ mục, nguồn nhập)) {
+                theo nguồn = chỉ mục[nguồn nhập];
+                nếu (máy ảo có khóa từ điển(theo nguồn, đích)) {
+                    trả về theo nguồn[đích];
+                };
+            };
+        };
         cạnh = đồ thị["cạnh"];
         lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
             nếu (cạnh[i]["nguồn"] == nguồn nhập && cạnh[i]["yêu cầu"] == đích) {

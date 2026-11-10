@@ -246,12 +246,22 @@ int compilerCommand(Program &program,std::vector<Value> arguments,bool captureEr
 }
 
 int compilerBatchTests(Program &program,int argc,char **argv) {
-    if(argc<4)throw std::runtime_error("Native AOT: batch requires output directory and sources");
+    // The public CLI consumes --compiler=vpp before forwarding batch requests.
+    // Accept the same explicit option in direct native invocations so it can
+    // never be mistaken for the output directory (and create a stray folder).
+    int outputArgument=2;
+    if(argc>2&&std::string(argv[2])=="--compiler=vpp")++outputArgument;
+    else if(argc>2&&std::string(argv[2]).rfind("--compiler=",0)==0)
+        throw std::runtime_error("Native AOT: batch supports only --compiler=vpp");
+    if(argc<outputArgument+2)
+        throw std::runtime_error("Native AOT: batch requires output directory and sources");
+    if(std::string(argv[outputArgument]).rfind("--",0)==0)
+        throw std::runtime_error("Native AOT: unknown batch option before output directory");
     const auto originalCwd=fs::current_path();
-    const auto outputDir=fs::absolute(core::utf8Path(argv[2]));
+    const auto outputDir=fs::absolute(core::utf8Path(argv[outputArgument]));
     fs::create_directories(outputDir);
     std::vector<fs::path> sources;
-    for(int i=3;i<argc;++i)
+    for(int i=outputArgument+1;i<argc;++i)
         sources.push_back(fs::weakly_canonical(fs::absolute(core::utf8Path(argv[i]))));
     const char *disabled=std::getenv("VPP_NATIVE_NO_CACHE");
     if(!disabled||std::string(disabled)!="1") {
@@ -584,7 +594,8 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
         return path.generic_u8string();
     };
     // A fresh nested CMake configure and bootstrap object build per fixture
-    // made Linux integration spend most of its time outside the V++ compiler.
+    // made integration spend most of its time outside the V++ compiler,
+    // especially with Visual Studio's compiler checks and bootstrap build.
     // Reuse the link project within this compiler process; every source still
     // gets a fresh program object and executable. Workers have separate PIDs
     // and therefore separate temporary projects.
@@ -592,7 +603,6 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
     fs::path linkerSource=source;
     fs::path linkerOutput=executable;
     bool configureLinker=true;
-#if !defined(_WIN32)
     struct CachedLinker {
         std::unique_ptr<TemporaryDirectory> directory;
         std::string configuration;
@@ -637,6 +647,10 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
             const auto stem="libvpp-"+std::string(module);
             for(const char *suffix:{".a",".so",".dylib"})
                 trackLinkInput(libraries/directory/(stem+suffix));
+#if defined(_WIN32)
+            trackLinkInput(libraries/directory/("vpp-"+std::string(module)+".lib"));
+            trackLinkInput(libraries/directory/(stem+".dll.a"));
+#endif
         }
     }
     const auto linkerRuntime=environment("VPP_AOT_RUNTIME");
@@ -650,6 +664,8 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
         linkInputs.str()+"\n"+
         environment("VPP_AOT_RUNTIME")+"\n"+environment("VPP_AOT_VPP_OBJECT")+"\n"+
         environment("CMAKE_GENERATOR")+"\n"+environment("CC")+"\n"+
+        environment("CMAKE_GENERATOR_PLATFORM")+"\n"+
+        environment("CMAKE_GENERATOR_TOOLSET")+"\n"+
         environment("CXX")+"\n"+environment("CFLAGS")+"\n"+
         environment("CXXFLAGS")+"\n"+environment("LDFLAGS")+"\n"+
         environment("CMAKE_TOOLCHAIN_FILE")+"\n"+
@@ -665,18 +681,21 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
         }
         linkerBuild=cachedLinker.directory->path/"build";
         linkerSource=cachedLinker.directory->path/"program.S";
-        linkerOutput=cachedLinker.directory->path/"program";
+        linkerOutput=cachedLinker.directory->path/executable.filename();
         fs::copy_file(source,linkerSource,fs::copy_options::overwrite_existing);
         if(!configureLinker) {
             // Force reassembly even on filesystems with coarse mtimes.
             // Keep immutable bootstrap objects and the linker graph.
             std::error_code ignored;
             fs::remove(linkerBuild/"program.o",ignored);
+            fs::remove(linkerBuild/"program.obj",ignored);
             fs::remove(linkerBuild/"bin/vpp-aot-program",ignored);
+            fs::remove(linkerBuild/"bin/vpp-aot-program.exe",ignored);
+            fs::remove(linkerBuild/"bin/Release/vpp-aot-program.exe",ignored);
+            fs::remove(linkerOutput,ignored);
             profiler.mark("reuse-native-linker");
         }
     }
-#endif
     std::vector<std::string> configure={"cmake","-S",cmakePath(root/"scripts/quality/native_aot_link"),"-B",cmakePath(linkerBuild)};
 #if !defined(_WIN32)
     // Unix CI uses single-configuration generators. Visual Studio ignores
@@ -699,9 +718,7 @@ void compileAssembly(const std::string &text,const fs::path &output,const fs::pa
     if(configureLinker) {
         auto configured=process(configure);
         if(configured.status) {
-#if !defined(_WIN32)
             if(reuseLinker)cachedLinker.directory.reset();
-#endif
             throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
         }
         profiler.mark("configure-native-linker");

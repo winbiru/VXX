@@ -147,9 +147,13 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
             chọn (mã) {
                 ca "PushConstant": {
                     nếu (d >= sâu nhất) { ném "x86 eval stack overflow"; };
-                    biên dịch mã máy trả về(mã phép toán["immediate"]);
+                    // Chỉ cần kiểm tra i32; kết quả {lo, hi} trước đây bị bỏ đi.
+                    hằng = mã phép toán["immediate"];
+                    nếu (hằng < -2147483647 - 1 || hằng > 2147483647) {
+                        ném "mã máy V++: hằng nằm ngoài i32";
+                    };
                     máy ảo thêm cuối danh sách(ra, 184);
-                    biên dịch mã máy thêm từ máy(ra, mã phép toán["immediate"], đúng);
+                    biên dịch mã máy thêm từ máy(ra, hằng, đúng);
                     mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d);
                 }
                 ca "LoadSlot": {

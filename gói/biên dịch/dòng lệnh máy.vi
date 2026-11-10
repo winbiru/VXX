@@ -260,7 +260,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
         trả về ["execute", biên dịch asm chương trình(dây, bộ ba, sai, bộ đệm)];
     };
     nếu (lệnh == "disassemble") {
-        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
+        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, rỗng, bộ đệm);
         dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
         trả về ["complete", biên dịch giải mã chương trình(dây)];
     };
@@ -279,7 +279,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     } hoặc nếu (kế hoạch[3]) {
         trả về ["complete", biên dịch dòng lệnh(đường, thư viện, "build", đầu ra)];
     } hoặc {
-        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
+        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, rỗng, bộ đệm);
     };
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);

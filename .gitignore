@@ -101,6 +101,7 @@ node_modules/
 !benchmark/BASELINE.md
 !benchmark/NATIVE.md
 !benchmark/UNICODE_JSON_AB.md
+!benchmark/languages/BULK_BENCHMARK.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
 !docs/vm-asm.md

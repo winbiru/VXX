@@ -7,8 +7,9 @@ endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 file(WRITE "${VPP_OUTPUT_DIR}/first.vi" "hàm chính() { in 11; };\n")
 file(WRITE "${VPP_OUTPUT_DIR}/second.vi" "hàm chính() { in 22; };\n")
-# Opt out of the macOS direct Stage 0 linker so the Unix CMake fallback is
-# exercised on macOS and Linux. Each mode runs two distinct native binaries
+# Opt out of the macOS direct Stage 0 linker so the CMake fallback is
+# exercised on every host, including Visual Studio on Windows. Each mode runs
+# two distinct native binaries
 # in one self-hosted compiler session; cached and uncached output must agree.
 foreach(mode IN ITEMS cached uncached)
     file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/${mode}")
@@ -36,6 +37,8 @@ foreach(mode IN ITEMS cached uncached)
         endif()
         file(READ "${VPP_OUTPUT_DIR}/${mode}/${name}.status" fixture_status)
         file(READ "${VPP_OUTPUT_DIR}/${mode}/${name}.output" fixture_output)
+        string(REPLACE "\r\n" "\n" fixture_status "${fixture_status}")
+        string(REPLACE "\r\n" "\n" fixture_output "${fixture_output}")
         string(REGEX REPLACE "VPP_NATIVE_PROFILE [^\n]*\n" "" actual "${fixture_output}")
         if(name STREQUAL "first")
             set(expected "11\n")

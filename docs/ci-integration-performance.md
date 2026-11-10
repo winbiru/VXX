@@ -36,13 +36,16 @@ tích/liên kết, hạ Machine IR, phát mã máy/ASM, assemble/link rồi ch�
 - macOS ARM64 có đường assemble/link trực tiếp và cache object bootstrap
   bất biến. `VPP_AOT_DIRECT_LINK_CPP=0` giữ đường CMake để đối chiếu.
   Coverage/sanitizer vẫn dùng CMake với đúng thư viện instrumented.
-- Đường CMake linker của Unix (đặc biệt Linux CI) giữ dự án đã configure
+- Đường CMake linker của Unix và Windows giữ dự án đã configure
   trong cùng tiến trình compiler V++; mỗi fixture vẫn ghi ASM, tạo object
   và executable riêng. Cache invalidated khi thay đổi root, thư viện,
   cấu hình build (gồm cờ coverage/sanitizer), toolchain hoặc runtime.
   Khóa cache còn theo dõi kích thước và mtime các archive/thư viện và
   runtime object để tránh reuse khi thư viện thay đổi giữa hai fixture.
   `VPP_AOT_LINKER_CACHE=0` tắt reuse để kiểm tra parity và bisect.
+  Windows theo dõi cả archive `.lib`, object chương trình `.obj` và executable
+  `bin/Release/vpp-aot-program.exe`; bootstrap object được giữ, còn object và
+  executable của fixture trước bị xóa trước khi build fixture tiếp theo.
 - Worker nền dùng process group riêng để có thể hủy cả tiến trình con,
   kể cả trong môi trường không cho phép `pgrep` hoặc `ps`.
 - CTest đặt `PROCESSORS=2` cho các suite native tốn CPU/khả năng tranh
@@ -120,6 +123,141 @@ batch và 198 phép thử ISA emit trong một batch nữa. Mỗi kết quả v�
 Các số trong hai cột đo ở nền tảng/tải đồng thời khác nhau; đây là dấu
 hiệu loại bỏ điểm nghẽn và timeout, **không phải** benchmark A/B cùng runner.
 
+## Điều tra Actions ngày 2026-11-10
+
+Lượt mới nhất [42742446279](https://github.com/winbiru/VXX/actions/runs/42742446279)
+chạy commit `dccb014`. Workflow benchmark riêng pass nhưng C/C++ CI thất bại:
+
+| Job | Thời gian integration | Kết quả |
+| --- | ---: | --- |
+| Linux ARM64 | 1798,90 s | 378 pass, 2 fail |
+| Linux x86-64 | 2252,62 s | 378 pass, 2 fail |
+| macOS | 1636,17 s | 378 pass, 2 fail |
+| Windows | Chưa hoàn tất | Bị hủy khi integration đang chạy |
+
+Cả hai lỗi trên ba nền tảng là cùng fixture lexer, ở interpreter và JIT:
+`kiem_tra_bien_dich_tu_vung_vi.expected` thiếu 16 dòng `1` tương ứng với các
+assertion đã có trong source. Bổ sung golden; đầu ra interpreter và JIT cục bộ
+đều khớp. Đây là lỗi dữ liệu kỳ vọng, không giải thích thời gian compile native.
+
+Đối chiếu cùng job Linux ARM64 với
+[run 42446806792](https://github.com/winbiru/VXX/actions/runs/42446806792/job/128627336398)
+ở commit `5fb5495`: integration cũ là 254,93 s và dùng `--compiler=cpp`.
+Commit `6e5c524` chuyển golden tests sang self-hosted V++; hai lượt có lượng
+công việc và số fixture khác nhau, nên tỷ lệ khoảng 7 lần này không phải phép
+đo A/B của cùng pipeline.
+
+Bản sửa mới giảm xử lý lặp khi chuẩn hóa và tra import: giữ chuỗi POSIX,
+cắt đoạn thay vì nối ký tự, thay dấu phân cách Windows bằng primitive chuỗi,
+và lập chỉ mục `(importer, specifier)` cho một lần dựng graph. Chỉ mục được
+reset mỗi request; nguồn/import thay đổi giữa hai request vẫn được đọc lại.
+
+Benchmark bốn fixture trên macOS ARM64, cùng batch native và direct linker:
+
+| Fixture | Trước (ms) | Sau (ms) |
+| --- | ---: | ---: |
+| `kiem_tra_stdlib` | 34556 | 33011 |
+| `kiem_tra_package_modules` | 32984 | 31141 |
+| `kiem_tra_su_kien` | 34829 | 33180 |
+| `kiem_tra_chuoi_nen_tang` | 36201 | 33191 |
+| Tổng thời gian fixture | 138570 | 130523 |
+
+Đầu ra và status giống từng byte; tổng giảm 5,81%. Đây là một lượt đo trước/
+sau cục bộ, chưa chứng minh độ ổn định thống kê hoặc cải thiện toàn CI. Phép
+đo này có trước thay đổi linker Windows và primitive thay dấu phân cách.
+
+Điểm nghẽn Windows còn thấy trực tiếp trong source: cache dự án linker bị
+loại bởi `#if !defined(_WIN32)`, khiến mỗi fixture configure CMake và dựng
+bootstrap lại. Bản sửa bật reuse cho Windows và mở
+`vpp-native-linker-cache-parity` trên mọi nền tảng, có chuẩn hóa CRLF khi
+đối chiếu bằng chứng. Cần chạy CI Windows để xác nhận mức giảm thời gian;
+kiểm chứng cục bộ chỉ bao phủ compiler macOS và CMake linker trên macOS.
+Workflow Windows giữ artifact cả khi thất bại lẫn bị hủy, để không mất log
+shard khi CTest chưa kịp in kết quả.
+
+Kiểm chứng cục bộ sau bản sửa trên macOS ARM64:
+
+- Build Release: PASS.
+- Bootstrap, batch parity, linker cache parity và native lint: CTest PASS 4/4
+  trong 64,83 s. Kiểm tra lại lint sau khi thêm đường dẫn Unicode/UNC: PASS.
+- Toàn bộ `vpp-integration`: **PASS 380/380, FAIL 0**, 894,64 s;
+  cùng bootstrap là 907,83 s. HTTP/socket đã chạy, không bị bỏ qua do bind.
+  TSV: `build/integration-logs/timings-20261110-121812-19089.tsv`.
+
+Đây là kiểm chứng integration cục bộ, không phải full CTest hay một lượt
+GitHub Actions mới. Không so sánh trực tiếp 894,64 s với runner macOS CI
+để kết luận phần trăm tăng tốc; Windows vẫn cần được xác minh trên CI.
+
+### Cân bằng thời gian các native golden test
+
+`run_tests.sh` dùng `scripts/quality/shard_native_golden.py` để xếp các
+fixture theo thời gian tham khảo đo trên macOS ARM64
+(`scripts/quality/native_golden_costs.tsv`). Test mới hoặc chưa có số đo
+được ước lượng 2 giây; cùng một đường dẫn fixture luôn được xếp chung worker
+để tránh ghi cùng tệp output song song. Test có trạng thái bên ngoài vẫn giữ
+nguyên thứ tự trong worker 0. Các test thuần dữ liệu được phép chạy trên cả
+worker 0 nếu lane tuần tự còn dư thời gian, đồng thời được giữ thứ tự gốc
+trong từng worker. Khi không có Python 3, bộ chạy dùng cách chia cũ với lane
+tuần tự riêng và round-robin cho hai worker còn lại.
+
+Mô phỏng trên 130 fixture độc lập với timing cục bộ ngày 10/11:
+
+| Cách chia | Worker 1 | Worker 2 | Đường chạy dài nhất |
+| --- | ---: | ---: | ---: |
+| Chia vòng cũ | 495,82 s | 638,54 s | 638,54 s |
+| Chia theo trọng số | 568,34 s | 566,03 s | 568,34 s |
+
+Giảm khoảng 70,2 giây **theo mô phỏng phân chia tải**; chưa cộng thời gian
+khởi động, hiệu ứng cache, tranh chấp CPU, và chưa phải số đo thực tế sau sửa.
+Unit test của bộ chia được chạy trong job `quality`.
+
+Điều chỉnh tiếp theo dùng số đo của lượt macOS ARM64 đạt 380/380 (12:18
+ngày 10/11) để bổ sung chi phí tham khảo cho toàn bộ 191 native fixtures,
+bao gồm các ca HTTP/socket. Sau khi rà soát source, 9 fixture chỉ xử lý dữ
+liệu, giao thức hoặc quoting trong bộ nhớ được chuyển khỏi danh sách bắt buộc
+tuần tự. Các ca đọc/ghi tệp, tạo process/socket và dùng trạng thái ngoài
+tiếp tục nằm trong lane tuần tự. Phân bổ mới có 52 fixture ghim thứ tự và
+139 fixture linh hoạt:
+
+| Mô phỏng cùng trọng số | Worker 0 | Worker 1 | Worker 2 | Critical path |
+| --- | ---: | ---: | ---: | ---: |
+| Lane tuần tự riêng + 2 shard | 506,81 s | 592,67 s | 593,12 s | 593,12 s |
+| Lane tuần tự được bổ sung việc độc lập | 564,20 s | 564,20 s | 564,19 s | 564,20 s |
+
+Giảm **28,92 giây theo mô phỏng**. Bản ghi timing là thời gian từng fixture
+trên một macOS ARM64; phép cộng không tính tranh chấp CPU, các hiệu ứng cache
+giữa fixtures hay thời gian khởi động. Chưa chứng minh được thời gian thực tế
+sau thay đổi; cần A/B trên cùng runner và đủ HTTP/socket trước khi kết luận
+về tốc độ CI.
+
+Hàm `biên dịch đồ thị đích nhập` đã bỏ vòng dựng lại toàn bộ prefix ở mỗi dấu
+`/`, nay tìm vị trí dấu phân cách cuối rồi cắt chuỗi một lần. Đây là tối ưu
+đường import, không đổi thuật toán chuẩn hóa và báo lỗi.
+
+Kiểm chứng sau chỉnh sửa (cùng máy macOS ARM64, 10/11):
+
+- Unit test sharding: **5/5 PASS**; `bash -n` và `git diff --check`: PASS.
+- CTest bootstrap/VM ASM/selective imports/batch/linker parity/worker:
+  **8/8 PASS**, 260,84 giây.
+- Full `vpp-integration`: **373/373 PASS, 0 FAIL**, 843,67 giây;
+  cùng bootstrap trong CTest: **857,69 giây**.
+- Log timing: `build/integration-logs/timings-20261110-141408-62161.tsv`.
+
+Lượt này không mở được socket localhost, nên bỏ qua các kiểm tra socket/HTTP
+tương ứng. Lượt trước trên cùng máy với số assertion tương ứng mất 911,31
+giây; chênh lệch **67,64 giây (7,42%)** theo hai lần chạy thực tế, nhưng
+chưa phải A/B kiểm soát tải máy, bộ nhớ đệm và biến động môi trường. Không
+được suy ra rằng riêng scheduler hoặc riêng xử lý import đã tạo mức giảm đó.
+Windows và toàn bộ GitHub Actions vẫn chưa được xác minh sau chỉnh sửa.
+
+Trên Linux x86-64, `vpp-vm-asm-selfhost` mất 2346,52 s ở run 42742446279,
+và `vpp-integration` mất 2252,62 s. Workflow giờ chạy phép kiểm tra selfhost
+ASM VM ở job `vm-asm-selfhost` riêng; CTest tự kích hoạt các fixture bootstrap
+và `vpp-vm-asm` cần thiết. Job build chính giữ tất cả test còn lại, không bỏ
+kiểm thử selfhost. Cách tách này tăng tổng thời gian máy runner do phải build
+và bootstrap riêng nhưng giảm thời gian đợi CI tổng thể khi GitHub cấp runner
+chạy hai job đồng thời. Chưa có số liệu CI mới để định lượng mức giảm.
+
 ## Kiểm chứng và lưu bằng chứng
 
 Sau bản sửa cache metadata và cấu hình processor (macOS ARM64, 2026-11-09),
@@ -168,3 +306,103 @@ phiên bản emitter cũ và chưa chứng minh mức tăng tốc của biểu d
 không profiler. Không bật `VPP_AOT_CPU_PROFILE`: nó đo các hàm AOT của chương
 trình đầu ra, không phân rã hàm của compiler, và làm thay đổi đáng kể thời
 gian các phase.
+
+## Tối ưu API từ điển và tạo Machine IR ngày 2026-11-10
+
+Các wrapper hàm `lấy/đặt/có/xóa/khóa từ điển` gọi primitive V++ trực tiếp,
+không khởi tạo `Tiện Ích Từ Điển` mỗi lần. Hai wrapper `biên dịch mã máy trả về`
+và `biên dịch mã máy lệnh` cũng tính trực tiếp, giữ cùng phép kiểm tra biên i32,
+trường Machine IR và giá trị trả về của method tương ứng. Lớp cũ vẫn giữ
+API hướng đối tượng; khi sửa nghiệp vụ cần cập nhật cả hai cách gọi.
+
+Đối chứng A/B của riêng thay đổi từ điển trên `kiem_tra_stdlib.vi`, một máy
+macOS ARM64, cùng cấu hình self-host, bật profiler và dùng hai lượt mỗi phía:
+
+| Trường hợp | Lượt 1 (ms) | Lượt 2 (ms) | Trung bình (ms) |
+| --- | ---: | ---: | ---: |
+| Wrapper cũ tạo instance | 34077 | 33376 | 33726,5 |
+| Wrapper trực tiếp | 33415 | 33348 | 33381,5 |
+
+Chênh lệch trung bình khoảng 345 ms (~1,02%). Đầu ra sau khi loại các dòng
+`VPP_NATIVE_PROFILE` và mã thoát giống nhau; đây là một mẫu nhỏ, chưa đủ
+chứng minh mức cải thiện ổn định trên toàn CI.
+
+Sau khi thêm hai wrapper Machine IR trực tiếp, một lượt `kiem_tra_stdlib.vi`
+đạt 33596 ms; `asm.functions` là 16851,46 ms, so với 16970,22 ms của lượt
+wrapper từ điển ở trên. Cùng batch, `kiem_tra_package_modules.vi` đạt 31208
+ms. Cả hai khớp golden sau khi bỏ dòng profiling. Chưa có A/B nhiều lượt
+cho riêng thay đổi Machine IR nên không quy chênh lệch cho tối ưu này.
+
+CTest được chạy với 8 nhóm parity/import/linker/integration hỗ trợ và các
+fixture bootstrap phụ thuộc: **11/11 PASS**, tổng thời gian **311,36 s**.
+Unit test chia shard **5/5 PASS**; `bash -n`, `git diff --check` và so
+golden của hai fixture tự biên dịch đều PASS. Đây là kiểm chứng cục bộ trên
+macOS, chưa có số liệu từ GitHub Actions cho revision đang sửa.
+
+Profiler trên `kiem_tra_stdlib.vi` vẫn cho thấy khoảng 14 s dành cho
+`source.graph` + `source.link` và 18 s cho `asm.total`, với 1402 cache miss
+trên 1470 thân hàm. Mức cải thiện lớn hơn cần hướng đến tái sử dụng AST/module
+đã phân tích giữa các fixture có cơ chế invalidation, hoặc giảm số hàm phải
+đưa qua emitter; phải bảo toàn import, reflection, initializer và tự biên dịch
+thuần V++ trước khi triển khai loại bỏ hàm không dùng.
+
+## Cache cây cú pháp trong phiên native compiler (2026-11-10)
+
+Compiler V++ lưu bản snapshot AST của các module đã phân tích trong cùng một
+phiên batch, kiểm tra **toàn bộ nội dung nguồn** ở lần dùng tiếp theo và sao
+chép map/list trước khi đưa cho linker (linker có thể sửa AST khi xử lý import).
+File thay đổi được phân tích lại; parse thất bại không được ghi vào cache.
+Cache giới hạn 128 module, 1 MiB **văn bản nguồn** tổng cộng và 192 KiB mỗi
+module. Đây chưa phải giới hạn chính xác cho bộ nhớ AST, vốn có thể lớn hơn.
+Các bộ đếm `source.ast.hits`, `source.ast.misses`, `source.ast.bytes` xuất hiện
+trong `VPP_COMPILER_PROFILE_FILE`.
+
+Đối chiếu trên cùng macOS ARM64, cùng thứ tự hai fixture, mỗi bản compiler
+chạy một phiên batch, có bật profiler; số liệu là một mẫu, chưa phải median:
+
+| Fixture | Trước cache AST (ms) | Có cache AST (ms) |
+| --- | ---: | ---: |
+| `kiem_tra_su_kien.vi` (cold) | 31582 | 33283 |
+| `kiem_tra_chuoi_nen_tang.vi` (warm) | 30765 | 27194 |
+| **Tổng** | **62347** | **60477** |
+
+Lượt warm có 93 cache hits, 1 cache miss; thời gian `source.graph` giảm từ
+5206,73 ms xuống 1176,29 ms. Tổng hai fixture giảm khoảng **3,0%**, trong khi
+lượt cold tăng khoảng **5,4%** do chi phí tạo snapshot. Hai fixture đều trả
+về exit 0 và stdout trùng khớp từng byte. Đây chưa phải số đo GitHub Actions
+hay bằng chứng tăng tốc trên mọi workload.
+
+`check_native_batch.cmake` bổ sung lượt `before_repeat.vi` để xác nhận cache
+AST thực sự có hit, đồng thời kiểm tra invalidation sau khi ghi lại import,
+batch có/không cache, lỗi parser/runtime và fail-fast. Bản đầu tiên dùng
+chung tên biến `mục` cho snapshot cache và vòng lặp xử lý `chính.vi`, khiến
+compile sai; đã tách thành `mục cache` để tránh ghi đè. Driver native cũng
+nhận trực tiếp `--batch-run-tests --compiler=vpp` mà không hiểu nhầm flag là
+thư mục đầu ra; `--compiler=cpp` bị từ chối khi gọi native trực tiếp.
+
+## Kiểm chứng tiếp theo trên macOS ARM64, 2026-11-10
+
+Sau khi áp dụng cache AST giới hạn, chia tải theo trọng số và các tối ưu
+native đã mô tả, lượt `vpp-integration` cục bộ gần nhất **PASS 373/373,
+FAIL 0** trong **682,04 giây**; gồm bước bootstrap, CTest mất **695,45
+giây**. Timing lưu tại
+`build/integration-logs/timings-20261110-160531-2704.tsv`. Một lượt
+373/373 trước đó mất 843,67 giây, tương ứng thời gian giảm 161,63 giây
+(19,2%) giữa hai lượt chạy. Đây là số quan sát trên cùng loại máy nhưng
+**chưa phải A/B kiểm soát tải và cache**, và vẫn bỏ qua một số bài HTTP/socket
+do sandbox không cho bind cổng. Lượt 380/380 trước đó là bằng chứng những
+bài HTTP/socket này từng được kiểm tra trong môi trường cho phép bind.
+
+Năm CTest chọn lọc liên quan đến bootstrap, linker, batch và worker **PASS
+5/5** trong **57,62 giây**. Bộ kiểm tra Python chia shard **PASS 7/7** và
+`git diff --check` PASS.
+
+Runner Windows mới thực hiện phân chia native golden thành các phiên compiler
+dài hạn, thay cho các batch tuần tự 12 fixture. Trước khi tạo tiến trình,
+runner kiểm tra source trùng, tên output trùng (không phân biệt hoa/thường),
+fixture lạ, thiếu hoặc được gán lặp trong shard; các trường hợp này kết thúc
+sớm với thông báo rõ ràng. Khi worker lỗi hoặc thiếu file timing, runner báo
+đúng lỗi và giữ log phục vụ phân tích. **Chưa xác minh runner Windows thực tế**
+do máy macOS không có PowerShell; cũng chưa có full CTest hoặc GitHub Actions
+trên tất cả nền tảng cho revision đang sửa. Cần một run CI mới để xác nhận
+thời gian Windows và so sánh trên cùng GitHub runner.

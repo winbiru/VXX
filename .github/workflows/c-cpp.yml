@@ -86,8 +86,9 @@ jobs:
         run: ctest --test-dir cmake-build-debug -R '^vpp-native-elf-x86-writer$' --output-on-failure --no-tests=error
 
       - name: Run full V++ regression suite
-        # Installed native smoke verifies the compiler Stage 1 -> Stage 2 -> Stage 3.
-        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        # The costly ASM VM self-host convergence runs in a parallel CI job.
+        # Keep the VM ASM fixture and all other tests in the normal suite.
+        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer|vpp-vm-asm-selfhost)$'
 
       - name: Preserve integration timings (x86-64)
         if: always()
@@ -230,8 +231,9 @@ jobs:
           diff -u src/tests/expected/kiem_tra_ffi_thu_muc.expected "$output"
 
       - name: Run Linux ARM64 regression suite
-        # Native AOT bootstrap is covered by installed smoke above.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        # The ASM VM self-host convergence runs in a parallel ARM64 job.
+        # Keep vpp-vm-asm itself and every other regression here.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer|vpp-vm-asm-selfhost)$'
 
       - name: Preserve integration timings (ARM64)
         if: always()
@@ -304,11 +306,75 @@ jobs:
             loongarch64-linux-gnu loongarch64-linux-gnu-gcc qemu-loongarch64 \
             build-native-cross/smoke-loongarch64
 
+  vm-asm-selfhost:
+    # Preserve the full self-host convergence on every Unix host where it ran
+    # previously, while allowing long native integration and VM suites to
+    # overlap on separate runners.
+    name: ASM VM selfhost (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86-64
+            os: ubuntu-latest
+            family: linux
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            family: linux
+          - name: macos
+            os: macos-latest
+            family: macos
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        if: matrix.family == 'linux'
+        run: |
+          sudo apt-get update
+          dependencies=(build-essential cmake curl sqlite3 libssl-dev zlib1g-dev libzstd-dev libffi-dev pkg-config)
+          # Keep the package sets already used by the x86-64 and ARM64 jobs.
+          if [[ "${{ matrix.name }}" == linux-x86-64 ]]; then
+            dependencies+=(libjitterentropy3-dev)
+          fi
+          sudo apt-get install -y "${dependencies[@]}"
+
+      - name: Install macOS POSIX FFI dependency
+        if: matrix.family == 'macos'
+        run: |
+          brew install libffi pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
+      - name: Build V++ for ASM VM convergence
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+
+      - name: Verify V++ ASM VM self-hosting
+        # CTest automatically includes the native-stage1, native-cli-compiler
+        # and vm-asm setup fixtures required by this test.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -R '^vpp-vm-asm-selfhost$'
+
+      - name: Preserve ASM VM convergence diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-asm-selfhost-diagnostics-${{ matrix.name }}
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+            build/vm-asm-selfhost/verification.json
+          if-no-files-found: ignore
+
   quality:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify native golden shard scheduling
+        run: python3 -m unittest discover -s scripts/quality -p test_shard_native_golden.py
 
       - name: Install quality tools
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 clang-tidy lcov libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
@@ -449,6 +515,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python for weighted native golden shards
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify native golden shard scheduling
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/quality -p test_shard_native_golden.py
+          if ($LASTEXITCODE -ne 0) { throw "Native golden shard regression failed" }
+
       - name: Verify Windows x64 native file, process and SHA ABI (COFF + Win32 + UCRT + CNG)
         shell: pwsh
         run: |
@@ -525,8 +602,17 @@ jobs:
           ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { throw "Windows V++ regression suite failed" }
 
-      - name: Preserve Windows CTest diagnostics on failure
-        if: failure()
+      - name: Preserve Windows integration timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-windows
+          path: build/integration-logs/timings-windows-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve Windows CTest diagnostics on failure or cancellation
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: ctest-windows-diagnostics
@@ -615,7 +701,8 @@ jobs:
 
       - name: Run macOS full V++ regression suite
         # Installed smoke verifies full-language native Stage 1 -> Stage 2 -> Stage 3.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^vpp-native-compiler-driver$'
+        # Full ASM VM self-host convergence runs in a parallel macOS job.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-vm-asm-selfhost)$'
 
       - name: Preserve integration timings (macOS)
         if: always()

@@ -1330,17 +1330,15 @@ if (BUILD_TESTS)
         set_tests_properties(vpp-native-batch-parity PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 300)
 
-        if (UNIX)
-            add_test(NAME vpp-native-linker-cache-parity
-                COMMAND ${CMAKE_COMMAND}
-                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
-                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-linker-cache"
-                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_linker_cache.cmake)
-            set_tests_properties(vpp-native-linker-cache-parity PROPERTIES
-                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
-        endif()
+        add_test(NAME vpp-native-linker-cache-parity
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-linker-cache"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_linker_cache.cmake)
+        set_tests_properties(vpp-native-linker-cache-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
 
         # Dedicated native-worker regression so CI can isolate concurrency,
         # cancellation and graph-transfer failures without the full suite.
@@ -1393,7 +1391,7 @@ if (BUILD_TESTS)
                              -LogDirectory ${CMAKE_CURRENT_BINARY_DIR}/integration-logs)
             set_tests_properties(vpp-integration PROPERTIES
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 14400)
+                FIXTURES_REQUIRED native-cli-compiler PROCESSORS 2 TIMEOUT 14400)
         else()
             message(WARNING "PowerShell 7 (pwsh) was not found; Windows integration tests are disabled")
         endif()

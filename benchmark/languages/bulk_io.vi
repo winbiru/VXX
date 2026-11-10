@@ -1,0 +1,193 @@
+// Bulk I/O and structured-data benchmark. Preparation/validation are outside
+// the measured section. The runner provides a deterministic fixture and oracle.
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.bộ đệm tệp.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.bộ sưu tập.danh sách.tìm chỉ số;
+nhập gói.bộ sưu tập.tập hợp.tập hợp;
+
+hàm feature_call(x) { trả về x * 3 + 7; };
+hàm feature_fib(x) {
+    nếu (x < 2) { trả về x; };
+    trả về feature_fib(x - 1) + feature_fib(x - 2);
+};
+
+hàm tải(case_name, path, n, ready, file_bytes) {
+    nếu (case_name == "filter_sum") {
+        values = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(values, i); };
+        tổng = 0;
+        lặp(i = 0; i < độ dài(values); i++) {
+            nếu (values[i] % 3 == 0) { tổng += values[i]; };
+        };
+        trả về tổng;
+    };
+    nếu (case_name == "seek_sample") {
+        tệp = Bộ Đệm Tệp(path, "đọc", 4096, "benchmark seek");
+        tổng = 0;
+        thử {
+            lặp(i = 0; i < 32; i++) {
+                tệp.dịch((i * 1009 + 17) % file_bytes, 0);
+                byte = tệp.đọc các byte(1);
+                nếu (độ dài(byte) != 1) { ném "seek read failed"; };
+                tổng += byte[0];
+            };
+        } bắt lỗi(e) { tệp.đóng(); ném e; };
+        tệp.đóng();
+        trả về tổng;
+    };
+    nếu (case_name == "write_bytes") {
+        ghi các byte tệp(path, ready);
+        trả về độ dài(ready);
+    };
+    nếu (case_name == "sort_numbers") {
+        values = [];
+        lặp(i = n - 1; i >= 0; i--) { máy ảo thêm cuối danh sách(values, i); };
+        sắp xếp(values);
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += (i + 1) * values[i]; };
+        trả về tổng;
+    };
+    nếu (case_name == "linear_search") {
+        values = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(values, i); };
+        trả về tìm chỉ số(values, n - 1);
+    };
+    nếu (case_name == "set_dedup") {
+        values = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(values, i % 16); };
+        distinct = tập hợp(values);
+        tổng = độ dài(distinct);
+        lặp(i = 0; i < độ dài(distinct); i++) { tổng += distinct[i]; };
+        trả về tổng;
+    };
+    nếu (case_name == "list_append") {
+        values = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(values, i); };
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += values[i]; };
+        trả về tổng;
+    };
+    nếu (case_name == "map_lookup") {
+        lookup = {};
+        lặp(i = 0; i < n; i++) { lookup["k" + thành chuỗi(i)] = i * 2; };
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += lookup["k" + thành chuỗi(i)]; };
+        trả về tổng;
+    };
+    nếu (case_name == "function_calls") {
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += feature_call(i); };
+        trả về tổng;
+    };
+    nếu (case_name == "string_concat") {
+        text = "";
+        lặp(i = 0; i < n; i++) { text += "V++"; };
+        trả về độ dài(text);
+    };
+    nếu (case_name == "alloc_objects") {
+        objects = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(objects, {"id": i, "n": i * 2}); };
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += objects[i]["n"]; };
+        trả về tổng;
+    };
+    nếu (case_name == "exceptions") {
+        bắt = 0;
+        lặp(i = 0; i < n; i++) {
+            thử {
+                nếu (i % 16 == 0) { ném "benchmark exception"; };
+            } bắt lỗi(e) { bắt += 1; };
+        };
+        trả về bắt;
+    };
+    nếu (case_name == "recursion") {
+        tổng = 0;
+        lặp(i = 0; i < n; i++) { tổng += feature_fib(12); };
+        trả về tổng;
+    };
+    nếu (case_name == "read_bytes") { trả về độ dài(đọc các byte tệp(path)); };
+    nếu (case_name == "bytes_sum") {
+        bytes = đọc các byte tệp(path);
+        tổng = 0;
+        lặp(i = 0; i < độ dài(bytes); i++) {
+            tổng += bytes[i];
+            nếu (i % 1024 == 1023) { tổng = tổng % 65521; };
+        };
+        trả về tổng % 65521;
+    };
+    nếu (case_name == "read_text") { trả về độ dài(đọc tệp(path)); };
+    nếu (case_name == "stream_64k") {
+        tệp = Bộ Đệm Tệp(path, "đọc", 65536, "benchmark bulk read");
+        tổng = 0;
+        thử {
+            khi (đúng) {
+                khối = tệp.đọc các byte(65536);
+                n = độ dài(khối);
+                nếu (n == 0) { thoát; };
+                tổng += n;
+            };
+        } bắt lỗi(e) { tệp.đóng(); ném e; };
+        tệp.đóng();
+        trả về tổng;
+    };
+    nếu (case_name == "csv_split") {
+        các dòng = tách hằng văn bản(đọc tệp(path), "\n");
+        tổng = 0;
+        lặp(i = 0; i < độ dài(các dòng); i++) {
+            nếu (các dòng[i] != "") {
+                các cột = tách hằng văn bản(các dòng[i], ",");
+                nếu (độ dài(các cột) != 3) { ném "invalid csv row"; };
+                tổng += thành số nguyên(các cột[0]) + thành số nguyên(các cột[2]);
+            };
+        };
+        trả về tổng;
+    };
+    nếu (case_name == "jsonl_parse") {
+        các dòng = tách hằng văn bản(đọc tệp(path), "\n");
+        tổng = 0;
+        lặp(i = 0; i < độ dài(các dòng); i++) {
+            nếu (các dòng[i] != "") {
+                record = json phân tích(các dòng[i]);
+                tổng += record["id"] + record["n"];
+            };
+        };
+        trả về tổng;
+    };
+    ném "unsupported bulk benchmark";
+};
+
+hàm chính() {
+    name = đọc biến môi trường("BENCH_CASE", "read_bytes");
+    path = đọc biến môi trường("BENCH_FILE", "");
+    rounds = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "1"));
+    n = thành số nguyên(đọc biến môi trường("BENCH_FEATURE_N", "32"));
+    file_bytes = thành số nguyên(đọc biến môi trường("BENCH_FILE_BYTES", "0"));
+    expected = thành số nguyên(đọc biến môi trường("BENCH_EXPECT_UNIT", "-1"));
+    destination = đọc biến môi trường("BENCH_OUTPUT", "");
+    ready = [];
+    nếu (name == "write_bytes") {
+        nếu (destination == "") { ném "missing BENCH_OUTPUT"; };
+        ready = đọc các byte tệp(path);
+        path = destination;
+    };
+    nếu (path == "" || rounds < 1 || rounds > 1000000 || expected < 0 || n < 1 || n > 1024 || file_bytes < 1) { ném "bulk benchmark arguments"; };
+    // Verify the entire operation before timing, including first-run correctness.
+    nếu (tải(name, path, n, ready, file_bytes) != expected) { ném "bulk benchmark oracle"; };
+    start = thời gian đơn điệu mili giây();
+    checksum = 0.0;
+    lặp(i = 0; i < rounds; i++) {
+        value = tải(name, path, n, ready, file_bytes);
+        nếu (value != expected) { ném "bulk benchmark wrong result"; };
+        checksum += value;
+    };
+    elapsed = thời gian đơn điệu mili giây() - start;
+    nếu (elapsed <= 0 || checksum != expected * 1.0 * rounds) { ném "bulk benchmark timing/checksum"; };
+    in json tạo({"case": name, "iterations": rounds, "unit": expected,
+        "checksum": checksum, "elapsed_ms": elapsed});
+};

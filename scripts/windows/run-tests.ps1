@@ -159,6 +159,134 @@ function Invoke-VppBatch {
     }
 }
 
+function Invoke-NativeGoldenShards {
+    param(
+        [string[]]$TestFiles,
+        [string]$OutputDirectory
+    )
+
+    if ($TestFiles.Count -eq 0) { return }
+    # Each worker keeps its V++ compiler, AST/ASM memo and CMake linker cache
+    # alive for a whole shard. The stateful fixtures use one ordered lane;
+    # in-memory fixtures fill spare capacity, like the Unix integration runner.
+    $workerSetting = if ($env:VPP_NATIVE_TEST_WORKERS) { $env:VPP_NATIVE_TEST_WORKERS } else { "2" }
+    if ($workerSetting -cnotmatch '^[1-3]$') {
+        throw "Windows VPP_NATIVE_TEST_WORKERS must be 1, 2 or 3"
+    }
+    $workerCount = [int]$workerSetting
+    $python = Get-Command python -CommandType Application -ErrorAction Stop
+    $sharder = Join-Path $repoRoot "scripts/quality/shard_native_golden.py"
+    $costs = Join-Path $repoRoot "scripts/quality/native_golden_costs.tsv"
+    # The batch driver writes results by filename stem. Distinct fixture paths
+    # with the same stem would overwrite each other's .status/.output files.
+    $uniqueSources = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    $uniqueStems = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($source in $TestFiles) {
+        if ([string]::IsNullOrWhiteSpace($source) -or -not $uniqueSources.Add($source)) {
+            throw "Duplicate or empty Windows native golden fixture: $source"
+        }
+        $stem = [System.IO.Path]::GetFileNameWithoutExtension($source)
+        if (-not $uniqueStems.Add($stem)) {
+            throw "Windows native golden fixture output collision: $stem"
+        }
+    }
+    New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+    $manifest = Join-Path $OutputDirectory "manifest.list"
+    [System.IO.File]::WriteAllLines($manifest, $TestFiles, [System.Text.UTF8Encoding]::new($false))
+    & $python.Source $sharder --costs $costs --workers $workerCount `
+        --output $OutputDirectory --sources-file $manifest --auto-classify
+    if ($LASTEXITCODE -ne 0) { throw "Could not partition Windows native golden fixtures" }
+
+    $sourceWorker = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    $workerJobs = [System.Collections.Generic.List[object]]::new()
+    $running = [System.Collections.Generic.List[object]]::new()
+    try {
+        for ($worker = 0; $worker -lt $workerCount; $worker++) {
+            $workerFiles = @(Get-Content -LiteralPath (Join-Path $OutputDirectory "$worker.list") -Encoding utf8)
+            if ($workerFiles.Count -eq 0) { continue }
+            $workerOutput = Join-Path $OutputDirectory "worker-$worker"
+            foreach ($source in $workerFiles) {
+                if (-not $uniqueSources.Contains($source)) {
+                    throw "Windows native golden shard contains unknown fixture: $source"
+                }
+                if ($sourceWorker.ContainsKey($source)) {
+                    throw "Windows native golden fixture assigned more than once: $source"
+                }
+                $sourceWorker.Add($source, $workerOutput)
+            }
+            $workerJobs.Add([pscustomobject]@{ Worker = $worker; Files = $workerFiles; Output = $workerOutput })
+        }
+
+        if ($sourceWorker.Count -ne $uniqueSources.Count) {
+            throw "Windows native golden shard assignment lost fixtures"
+        }
+
+        # All assignments are validated before starting an expensive compiler.
+        foreach ($job in $workerJobs) {
+            $worker = $job.Worker
+            $workerFiles = $job.Files
+            $workerOutput = $job.Output
+            New-Item -ItemType Directory -Path $workerOutput -Force | Out-Null
+            $arguments = @("--batch-run-tests", "--compiler=vpp", $workerOutput) + $workerFiles
+            $quoted = @($arguments | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } })
+            $stdout = Join-Path $workerOutput "worker.stdout"
+            $stderr = Join-Path $workerOutput "worker.stderr"
+            Write-Host "Starting Windows native golden worker $worker ($($workerFiles.Count) fixtures)"
+            $process = Start-Process -FilePath $script:Vpp -ArgumentList $quoted `
+                -WorkingDirectory $repoRoot -RedirectStandardOutput $stdout `
+                -RedirectStandardError $stderr -Environment @{ VPP_NATIVE_GOLDEN_FAIL_FAST = "1" } `
+                -PassThru -NoNewWindow
+            $running.Add([pscustomobject]@{ Process = $process; Worker = $worker; Completed = $false; ErrorLog = $stderr })
+        }
+        $remaining = $running.Count
+        while ($remaining -gt 0) {
+            foreach ($entry in $running) {
+                if ($entry.Completed -or -not $entry.Process.HasExited) { continue }
+                $entry.Process.WaitForExit()
+                $entry.Completed = $true
+                $remaining--
+                if ($entry.Process.ExitCode -ne 0) {
+                    $diagnostic = Get-NormalizedUtf8Text $entry.ErrorLog
+                    if ($null -eq $diagnostic) { $diagnostic = "[worker stderr log missing]" }
+                    if ($diagnostic.Length -gt 12000) { $diagnostic = $diagnostic.Substring($diagnostic.Length - 12000) }
+                    throw "Windows native golden worker $($entry.Worker) failed (exit $($entry.Process.ExitCode)). Diagnostics: $diagnostic"
+                }
+            }
+            if ($remaining -gt 0) { Start-Sleep -Milliseconds 200 }
+        }
+    } finally {
+        # Terminate only the descendants of workers launched above, including
+        # nested CMake/linker processes when an early golden mismatch occurs.
+        foreach ($entry in $running) {
+            try {
+                if (-not $entry.Process.HasExited) { $entry.Process.Kill($true) }
+                $entry.Process.WaitForExit()
+            } catch { Write-Warning "Could not stop native golden worker $($entry.Worker): $_" }
+        }
+    }
+
+    $timingRows = [System.Collections.Generic.List[string]]::new()
+    $timingRows.Add("fixture`tms`tworker")
+    foreach ($source in $TestFiles) {
+        if (-not $sourceWorker.ContainsKey($source)) { throw "Missing native golden worker for $source" }
+        $workerOutput = $sourceWorker[$source]
+        Invoke-ExpectedTest -TestFile $source -BatchDirectory $workerOutput
+        $stem = [System.IO.Path]::GetFileNameWithoutExtension($source)
+        $timing = Join-Path $workerOutput "$stem.milliseconds"
+        if (-not (Test-Path -LiteralPath $timing)) { throw "Missing native timing for $source" }
+        $timingText = Get-NormalizedUtf8Text $timing
+        if ($null -eq $timingText) { throw "Could not read native timing for $source" }
+        $elapsedMs = $timingText.Trim()
+        if ($elapsedMs -cnotmatch '^[0-9]+$') { throw "Invalid native timing for $source`: $elapsedMs" }
+        $timingRows.Add("$stem`t$elapsedMs`t$([System.IO.Path]::GetFileName($workerOutput))")
+    }
+    $timingDir = if ($LogDirectory) { $LogDirectory } else { Join-Path $repoRoot "build/integration-logs" }
+    New-Item -ItemType Directory -Path $timingDir -Force | Out-Null
+    $timingFile = Join-Path $timingDir ("timings-windows-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".tsv")
+    [System.IO.File]::WriteAllLines($timingFile, $timingRows, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "Windows native golden timings: $timingFile"
+}
+
 function Start-VppServer {
     param(
         [string]$Source,
@@ -458,23 +586,7 @@ try {
     }
     $nativeBatchDirectory = Join-Path $sessionDir "native-golden"
     $legacyBatchDirectory = Join-Path $sessionDir "vm-golden"
-    # Native AOT links each fixture separately. Verify small shards immediately
-    # so a systematic stdout regression (for example a CMake warning emitted
-    # by every program) fails within one shard instead of wasting four hours.
-    $nativeBatchSize = 12
-    $maxNativeGoldenFailures = 5
-    for ($start = 0; $start -lt $nativeGoldenTests.Count; $start += $nativeBatchSize) {
-        $count = [Math]::Min($nativeBatchSize, $nativeGoldenTests.Count - $start)
-        $chunk = $nativeGoldenTests.GetRange($start, $count).ToArray()
-        Invoke-VppBatch -TestFiles $chunk -OutputDirectory $nativeBatchDirectory `
-            -Backend Native -BatchName ("native-{0:D4}" -f $start)
-        foreach ($relativeTest in $chunk) {
-            Invoke-ExpectedTest -TestFile $relativeTest -BatchDirectory $nativeBatchDirectory
-        }
-        if ($script:FailCount -ge $maxNativeGoldenFailures) {
-            throw "Windows native golden tests: $($script:FailCount) failures after $($start + $count) fixtures; stopping early. See native-golden shard logs."
-        }
-    }
+    Invoke-NativeGoldenShards -TestFiles $nativeGoldenTests.ToArray() -OutputDirectory $nativeBatchDirectory
     Invoke-VppBatch -TestFiles $legacyGoldenTests.ToArray() -OutputDirectory $legacyBatchDirectory -Backend Vm
     foreach ($relativeTest in $legacyGoldenTests) {
         Invoke-ExpectedTest -TestFile $relativeTest -Backend Vm -BatchDirectory $legacyBatchDirectory

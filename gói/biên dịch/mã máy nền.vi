@@ -235,8 +235,24 @@ hàm công khai biên dịch mã máy ghép(cao, thấp) {
 };
 
 hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trước) {
-    bộ chuyển tiếp = Tiện Ích Mã Máy();
-    trả về bộ chuyển tiếp.biên dịch mã máy thêm từ máy(ra, từ máy, ít trước);
+    // Hot path: x86_64 ghi immediate/displacement cho từng từ 32-bit.
+    // Phân tách trực tiếp, không khởi tạo một đối tượng chuyển tiếp mỗi lần.
+    b0 = từ máy & 255;
+    b1 = (từ máy >> 8) & 255;
+    b2 = (từ máy >> 16) & 255;
+    b3 = (từ máy >> 24) & 255;
+    nếu (ít trước) {
+        máy ảo thêm cuối danh sách(ra, b0);
+        máy ảo thêm cuối danh sách(ra, b1);
+        máy ảo thêm cuối danh sách(ra, b2);
+        máy ảo thêm cuối danh sách(ra, b3);
+    } hoặc {
+        máy ảo thêm cuối danh sách(ra, b3);
+        máy ảo thêm cuối danh sách(ra, b2);
+        máy ảo thêm cuối danh sách(ra, b1);
+        máy ảo thêm cuối danh sách(ra, b0);
+    };
+    trả về ra;
 };
 
 hàm công khai biên dịch mã máy thêm thập lục phân(ra, từ máy thập lục phân, ít trước) {
@@ -245,19 +261,35 @@ hàm công khai biên dịch mã máy thêm thập lục phân(ra, từ máy th�
 };
 
 hàm công khai biên dịch mã máy trả về(hằng) {
-    bộ chuyển tiếp = Tiện Ích Mã Máy();
-    trả về bộ chuyển tiếp.biên dịch mã máy trả về(hằng);
+    // Hot path: cùng kết quả với method Tiện Ích Mã Máy, không cấp phát instance.
+    nếu (hằng < -2147483647 - 1 || hằng > 2147483647) {
+        ném "mã máy V++: hằng nằm ngoài i32";
+    };
+    lo = hằng % 65536;
+    nếu (lo < 0) { lo += 65536; };
+    hi = (hằng - lo) / 65536;
+    nếu (hi < 0) { hi += 65536; };
+    trả về {"lo": lo, "hi": hi};
 };
 
 hàm công khai biên dịch mã máy lệnh(mã thao tác, hằng tức thời = 0, toán hạng = 0,
                            độ sâu trước đó = 0, mục ký hiệu = "") {
-    bộ chuyển tiếp = Tiện Ích Mã Máy();
-    trả về bộ chuyển tiếp.biên dịch mã máy lệnh(mã thao tác, hằng tức thời, toán hạng, độ sâu trước đó, mục ký hiệu);
+    // Machine IR được tạo nhiều lần; map literal tương đương method cùng tên.
+    trả về {"opcode": mã thao tác, "immediate": hằng tức thời, "operand": toán hạng,
+            "depthBefore": độ sâu trước đó, "symbol": mục ký hiệu};
 };
 
 hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
-    bộ chuyển tiếp = Tiện Ích Mã Máy();
-    trả về bộ chuyển tiếp.biên dịch mã máy ký hiệu hợp lệ(tên);
+    // Kiểm tra nhiều lần khi xuất ASM/relocation; tránh cấp phát lớp bọc.
+    các byte = chuỗi thành byte máy ảo(tên);
+    nếu (máy ảo lấy độ dài(các byte) == 0) { trả về sai; };
+    lặp (i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        b = các byte[i];
+        chữ = (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || b == 95;
+        số = i > 0 && b >= 48 && b <= 57;
+        nếu (!chữ && !số) { trả về sai; };
+    };
+    trả về đúng;
 };
 
 hàm công khai biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian) {

@@ -432,13 +432,10 @@ for testfile in "${TESTS[@]}"; do
   fi
 done
 
-# Each native batch retains one self-hosted compiler and a bounded V++ memo
-# for identical lowered Machine IR bodies. Run independent batches in parallel.
-# Only shard fixtures that do not exercise external state; filesystem, network,
-# subprocess, concurrency and configuration checks keep their original order.
-# Run that ordered lane alongside independent fixtures: waiting for all
-# independent shards first needlessly added the entire ordered lane to the
-# critical path. The worker budget includes the ordered lane.
+# Each native batch retains one self-hosted compiler and a bounded V++ memo.
+# Filesystem, network, subprocess, concurrency and configuration tests share
+# an ordered lane. Fill that lane's idle capacity with independent fixtures
+# while preserving the relative order of every external-state fixture.
 VPP_NATIVE_TEST_WORKERS="${VPP_NATIVE_TEST_WORKERS:-3}"
 if [[ ! "$VPP_NATIVE_TEST_WORKERS" =~ ^[1-4]$ ]]; then
   echo "ERROR: VPP_NATIVE_TEST_WORKERS must be an integer from 1 to 4" >&2
@@ -452,7 +449,12 @@ native_golden_is_independent() {
   # network-format helpers, quantum math), unnecessarily serializing them.
   case "$name" in
     kiem_tra_su_kien.vi|kiem_tra_khai_bao_kieu_ffi_tu_chu.vi|\
-    kiem_tra_goi_mang.vi|kiem_tra_goi_luong_tu.vi)
+    kiem_tra_goi_mang.vi|kiem_tra_goi_luong_tu.vi|\
+    kiem_tra_mang_3_chieu.vi|kiem_tra_so_nguyen.vi|\
+    kiem_tra_http_thuan_vpp.vi|kiem_tra_http_response_vpp.vi|\
+    kiem_tra_http_may_chu_thuan_vpp.vi|kiem_tra_goi_may_chu_http.vi|\
+    kiem_tra_process_quote_windows.vi|kiem_tra_socket_ip.vi|\
+    kiem_tra_dns_goi_tin.vi)
       return 0 ;;
   esac
   case "$name" in
@@ -492,16 +494,50 @@ run_native_golden_batches() {
   local independent_workers="$VPP_NATIVE_TEST_WORKERS"
   if [ "${#ordered[@]}" -gt 0 ]; then
     independent_workers=$((VPP_NATIVE_TEST_WORKERS - 1))
+  fi
+  local shards_dir="$tmpdir/native-shards-$suite"
+  local weighted_shards=0
+  local shard_workers="$VPP_NATIVE_TEST_WORKERS"
+  if command -v python3 >/dev/null 2>&1; then
+    local ordered_file="$tmpdir/native-ordered-$suite.list"
+    : > "$ordered_file"
+    if [ "${#ordered[@]}" -gt 0 ]; then
+      printf '%s\n' "${ordered[@]}" > "$ordered_file"
+    fi
+    if ! python3 "$ROOT_DIR/scripts/quality/shard_native_golden.py" \
+      --costs "$ROOT_DIR/scripts/quality/native_golden_costs.tsv" \
+      --workers "$shard_workers" --output "$shards_dir" \
+      --ordered-file "$ordered_file" \
+      "${independent[@]}"; then
+      echo "ERROR: unable to split native golden tests" >&2
+      return 2
+    fi
+    weighted_shards=1
+  else
+    echo "INFO: python3 unavailable; using round-robin native shards" >&2
+  fi
+  if [ "$weighted_shards" -eq 1 ]; then
+    echo "== Native $suite: ${#independent[@]} independent fixtures balanced across ${shard_workers} workers, ${#ordered[@]} fixtures pinned in order =="
+  else
+    shard_workers="$independent_workers"
+    echo "== Native $suite: ${#independent[@]} independent fixtures on ${shard_workers} workers, ${#ordered[@]} ordered fixtures on one worker =="
+  fi
+  if [ "$weighted_shards" -eq 0 ] && [ "${#ordered[@]}" -gt 0 ]; then
     VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
       "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${ordered[@]}" &
     pids+=("$!")
   fi
-  echo "== Native $suite: ${#independent[@]} independent fixtures on ${independent_workers} workers, ${#ordered[@]} ordered fixtures on one worker =="
-  for ((worker=0; worker<independent_workers; worker++)); do
+  for ((worker=0; worker<shard_workers; worker++)); do
     shard=()
-    for ((index=worker; index<${#independent[@]}; index+=independent_workers)); do
-      shard+=("${independent[index]}")
-    done
+    if [ "$weighted_shards" -eq 1 ]; then
+      while IFS= read -r source || [ -n "$source" ]; do
+        shard+=("$source")
+      done < "$shards_dir/$worker.list"
+    else
+      for ((index=worker; index<${#independent[@]}; index+=independent_workers)); do
+        shard+=("${independent[index]}")
+      done
+    fi
     if [ "${#shard[@]}" -gt 0 ]; then
       VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
         "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${shard[@]}" &
