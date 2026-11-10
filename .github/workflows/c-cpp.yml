@@ -307,9 +307,9 @@ jobs:
             build-native-cross/smoke-loongarch64
 
   vm-asm-selfhost:
-    # Preserve the full self-host convergence on every Unix host where it ran
-    # previously, while allowing long native integration and VM suites to
-    # overlap on separate runners.
+    # The standalone ASM VM bootstrap currently supports Linux x86-64 and
+    # macOS ARM64. Linux ARM64 has native compiler coverage in other jobs,
+    # but does not register the vpp-vm-asm-selfhost CTest test yet.
     name: ASM VM selfhost (${{ matrix.name }})
     strategy:
       fail-fast: false
@@ -317,9 +317,6 @@ jobs:
         include:
           - name: linux-x86-64
             os: ubuntu-latest
-            family: linux
-          - name: linux-arm64
-            os: ubuntu-24.04-arm
             family: linux
           - name: macos
             os: macos-latest
@@ -334,10 +331,7 @@ jobs:
         run: |
           sudo apt-get update
           dependencies=(build-essential cmake curl sqlite3 libssl-dev zlib1g-dev libzstd-dev libffi-dev pkg-config)
-          # Keep the package sets already used by the x86-64 and ARM64 jobs.
-          if [[ "${{ matrix.name }}" == linux-x86-64 ]]; then
-            dependencies+=(libjitterentropy3-dev)
-          fi
+          dependencies+=(libjitterentropy3-dev)
           sudo apt-get install -y "${dependencies[@]}"
 
       - name: Install macOS POSIX FFI dependency
