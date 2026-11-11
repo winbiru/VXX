@@ -101,6 +101,22 @@ foreach(case IN ITEMS
     endif()
 endforeach()
 
+# An installed Linux compiler has no CMakeCache.txt. Verify the V++ driver
+# still preserves the static OpenSSL closure and archive link order.
+file(WRITE "${fake}/libraries/vpp-aot-link-flags.conf"
+    "VPP_OPENSSL_STATIC_DEPS:STRING=-lz;-lzstd;-ljitterentropy\n")
+file(REMOVE "${fake}/libraries/CMakeCache.txt")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+    "VPP_AOT_DRIVER_FIXTURE_ROOT=${fake}"
+    "VPP_AOT_DRIVER_FIXTURE_TARGET=x86_64-unknown-linux-gnu"
+    "VPP_AOT_DRIVER_FIXTURE_MODE=direct" "VPP_AOT_RUNTIME=cpp"
+    "VPP_AOT_DIRECT_LINK_CPP=1" "VPP_AOT_DIRECT_LINK=1"
+    "${probe}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if(NOT status STREQUAL "0" OR NOT output MATCHES "AOT_DRIVER_OK")
+    message(FATAL_ERROR "Installed V++ OpenSSL linker metadata: ${status}\n${output}\n${errors}")
+endif()
+
 # Compile the complete driver and compiler through V++ itself, then use the
 # resulting Stage 2 compiler to build and run an independent program.
 set(stage2 "${VPP_OUTPUT_DIR}/vpp-stage2${VPP_EXECUTABLE_SUFFIX}")

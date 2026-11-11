@@ -337,16 +337,25 @@ else()
         target_link_libraries(vpp-aot-program PRIVATE OpenSSL::SSL OpenSSL::Crypto)
         # The parent configure records the static OpenSSL dependency closure.
         # Match the V++ and bootstrap direct linkers when CMake is selected.
+        set(vpp_crypto_deps_cache)
         if (EXISTS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt")
             file(STRINGS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt" vpp_crypto_deps_cache
                 REGEX "^VPP_OPENSSL_STATIC_DEPS:STRING=")
-            foreach(entry IN LISTS vpp_crypto_deps_cache)
-                string(REGEX REPLACE "^VPP_OPENSSL_STATIC_DEPS:STRING=" "" deps "${entry}")
-                if (deps)
-                    target_link_libraries(vpp-aot-program PRIVATE ${deps})
-                endif()
-            endforeach()
         endif()
+        # Match the V++ and bootstrap drivers when the build cache is absent
+        # or predates the static closure key.
+        if ((NOT vpp_crypto_deps_cache OR
+             vpp_crypto_deps_cache STREQUAL "VPP_OPENSSL_STATIC_DEPS:STRING=") AND
+            EXISTS "${VPP_AOT_LIB_ROOT}/vpp-aot-link-flags.conf")
+            file(STRINGS "${VPP_AOT_LIB_ROOT}/vpp-aot-link-flags.conf" vpp_crypto_deps_cache
+                REGEX "^VPP_OPENSSL_STATIC_DEPS:STRING=")
+        endif()
+        foreach(entry IN LISTS vpp_crypto_deps_cache)
+            string(REGEX REPLACE "^VPP_OPENSSL_STATIC_DEPS:STRING=" "" deps "${entry}")
+            if (deps)
+                target_link_libraries(vpp-aot-program PRIVATE ${deps})
+            endif()
+        endforeach()
     endif()
 endif()
 add_custom_command(TARGET vpp-aot-program POST_BUILD

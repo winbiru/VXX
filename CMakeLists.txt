@@ -77,6 +77,11 @@ if (UNIX AND NOT APPLE)
     endif()
     set(VPP_OPENSSL_STATIC_DEPS "${vpp_crypto_static_deps}" CACHE STRING
         "Static libcrypto transitive linker flags for the direct Stage 0 linker" FORCE)
+    # The installed compiler cannot read the build tree's CMakeCache.txt.
+    # Ship only portable linker flags, never absolute OpenSSL archive paths.
+    # This file is also used by the bootstrap and CMake fallback linkers.
+    file(WRITE "${CMAKE_BINARY_DIR}/vpp-aot-link-flags.conf"
+        "VPP_OPENSSL_STATIC_DEPS:STRING=${VPP_OPENSSL_STATIC_DEPS}\n")
 endif()
 
 # Public include dir for headers
@@ -1533,6 +1538,9 @@ install(FILES
         ${CMAKE_BINARY_DIR}/vdk-release.json
         ${CMAKE_SOURCE_DIR}/vpp-libraries.json
         DESTINATION .)
+if (UNIX AND NOT APPLE)
+    install(FILES "${CMAKE_BINARY_DIR}/vpp-aot-link-flags.conf" DESTINATION .)
+endif()
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
         DESTINATION gói
         PATTERN ".DS_Store" EXCLUDE

@@ -679,6 +679,18 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
                 if(!flag.empty())cryptoStaticDeps.push_back(flag);
         }
     }
+    if(cryptoStaticDeps.empty()) {
+        // Installed builds retain only the static linker flags; the CMake
+        // cache (including machine-specific OpenSSL archive paths) is absent.
+        std::ifstream installedFlags(libraries/"vpp-aot-link-flags.conf");
+        constexpr const char *depsKey="VPP_OPENSSL_STATIC_DEPS:STRING=";
+        for(std::string line;std::getline(installedFlags,line);) {
+            if(line.find(depsKey)!=0)continue;
+            std::istringstream flags(line.substr(std::strlen(depsKey)));
+            for(std::string flag;std::getline(flags,flag,';');)
+                if(!flag.empty())cryptoStaticDeps.push_back(flag);
+        }
+    }
     if(sslArchive.extension()==".a"&&cryptoArchive.extension()==".a"&&
        fs::is_regular_file(sslArchive)&&fs::is_regular_file(cryptoArchive)) {
         link.push_back(sslArchive.u8string());

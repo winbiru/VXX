@@ -25,6 +25,14 @@ foreach(required_file IN ITEMS
         message(FATAL_ERROR "Installation or smoke fixture is missing: ${required_file}")
     endif()
 endforeach()
+if (VPP_TARGET MATCHES "-linux-gnu$")
+    if (NOT EXISTS "${VPP_INSTALL_ROOT}/vpp-aot-link-flags.conf")
+        message(FATAL_ERROR "Installed Linux V++ is missing static OpenSSL linker metadata")
+    endif()
+    if (EXISTS "${VPP_INSTALL_ROOT}/CMakeCache.txt")
+        message(FATAL_ERROR "Installed native smoke must run without the build-tree CMakeCache.txt")
+    endif()
+endif()
 
 enable_testing()
 # Keep the fixture outside the source checkout so package resolution must

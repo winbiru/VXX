@@ -152,6 +152,15 @@ hàm chính() {
                 ném "driver lost static OpenSSL transitive dependencies";
             };
             crypto = vị trí đối số(liên kết, gốc + "/libraries/libcrypto.a");
+            nếu (crypto < 0) {
+                // Installed toolchains use the linker search path because
+                // the build-tree CMakeCache.txt is intentionally absent.
+                crypto = vị trí đối số(liên kết, "-lcrypto");
+                nếu (!(vị trí đối số(liên kết, "-Wl,-Bstatic") >= 0 &&
+                    vị trí đối số(liên kết, "-Wl,-Bstatic") < crypto)) {
+                    ném "installed driver failed to link libcrypto statically";
+                };
+            };
             nếu (!(crypto >= 0 && crypto < vị trí đối số(liên kết, "-lz") &&
                 vị trí đối số(liên kết, "-lz") < vị trí đối số(liên kết, "-lzstd") &&
                 vị trí đối số(liên kết, "-lzstd") < vị trí đối số(liên kết, "-ljitterentropy") &&
