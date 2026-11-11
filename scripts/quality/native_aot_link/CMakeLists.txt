@@ -335,6 +335,18 @@ else()
         set(OPENSSL_USE_STATIC_LIBS TRUE)
         find_package(OpenSSL REQUIRED)
         target_link_libraries(vpp-aot-program PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+        # The parent configure records the static OpenSSL dependency closure.
+        # Match the V++ and bootstrap direct linkers when CMake is selected.
+        if (EXISTS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt")
+            file(STRINGS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt" vpp_crypto_deps_cache
+                REGEX "^VPP_OPENSSL_STATIC_DEPS:STRING=")
+            foreach(entry IN LISTS vpp_crypto_deps_cache)
+                string(REGEX REPLACE "^VPP_OPENSSL_STATIC_DEPS:STRING=" "" deps "${entry}")
+                if (deps)
+                    target_link_libraries(vpp-aot-program PRIVATE ${deps})
+                endif()
+            endforeach()
+        endif()
     endif()
 endif()
 add_custom_command(TARGET vpp-aot-program POST_BUILD

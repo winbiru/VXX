@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -31,6 +32,14 @@ int main() {
     const auto kind = [&](const std::string &path, int follow) {
         return std::get<int>(runtime::executePathMachinePrimitive(
             OP_VM_MACHINE_PATH_KIND, {path, follow}, cap));
+    };
+    const auto metadata = [&](const std::string &path) {
+        const auto value = runtime::executePathMachinePrimitive(
+            OP_VM_MACHINE_PATH_STAT, {path}, cap);
+        std::vector<std::string> fields;
+        for (const auto &item : std::get<ListHandle>(value)->elements)
+            fields.push_back(std::get<std::string>(item));
+        return fields;
     };
     const auto *descriptor = bytecode::intrinsicByOpcode(OP_VM_MACHINE_PATH_KIND);
     check(runtime::isPathMachinePrimitive(OP_VM_MACHINE_PATH_KIND) &&
@@ -74,6 +83,31 @@ int main() {
         const fs::path file = base / u8"tệp Việt.txt";
         const fs::path link = base / "link";
         { std::ofstream out(file); out << "data"; }
+        const auto existingMetadata = metadata(file.u8string());
+        check(existingMetadata.size() == 4 && existingMetadata[0] == "present" &&
+              existingMetadata[1] == "4", "existing file metadata incorrect");
+        check(metadata(base.u8string()) == std::vector<std::string>{"missing"},
+              "directory must not be reported as a regular file");
+        const auto absent = (base / "not-created").u8string();
+        const auto absentChild = (base / "not-created" / "leaf").u8string();
+#if !defined(_WIN32)
+        // Raw Linux syscalls do not set errno, unlike libc stat/lstat. Force
+        // a conflicting errno so a missing path cannot accidentally inherit it.
+        errno = EINVAL;
+#endif
+        check(metadata(absent) == std::vector<std::string>{"missing"},
+              "missing file inherited a stale OS error");
+#if !defined(_WIN32)
+        errno = EINVAL;
+#endif
+        check(metadata(absentChild) == std::vector<std::string>{"missing"},
+              "missing parent inherited a stale OS error");
+#if !defined(_WIN32)
+        const auto tooLong = (base / std::string(300, 'x')).u8string();
+        errno = ENOENT;
+        check(metadata(tooLong) == std::vector<std::string>{"error", std::to_string(ENAMETOOLONG)},
+              "overlong path must preserve actual OS error");
+#endif
         check(std::get<std::string>(query(OP_VM_MACHINE_PATH_ABSOLUTE, {"."})) == fs::absolute(".").u8string(),
               "absolute path mismatch");
         const auto missingSuffix = base / "not-created" / "leaf";

@@ -49,6 +49,12 @@ endif()
 # on all hosts without claiming that foreign executables have been run.
 set(fake "${VPP_OUTPUT_DIR}/argv spaces 🌿 $(literal)")
 file(MAKE_DIRECTORY "${fake}/libraries/lib" "${fake}/build/native-vpp-runtime")
+file(WRITE "${fake}/libraries/libssl.a" "static archive probe")
+file(WRITE "${fake}/libraries/libcrypto.a" "static archive probe")
+file(WRITE "${fake}/libraries/CMakeCache.txt"
+    "OPENSSL_SSL_LIBRARY:FILEPATH=${fake}/libraries/libssl.a\n"
+    "OPENSSL_CRYPTO_LIBRARY:FILEPATH=${fake}/libraries/libcrypto.a\n"
+    "VPP_OPENSSL_STATIC_DEPS:STRING=-lz;-lzstd;-ljitterentropy\n")
 file(WRITE "${fake}/build/native-vpp-runtime/runtime.o" "runtime probe")
 foreach(module IN ITEMS native-aot runtime-native compiler frontend bytecode core)
     file(WRITE "${fake}/libraries/lib/libvpp-${module}.a" "archive probe")

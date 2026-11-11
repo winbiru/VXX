@@ -1,6 +1,6 @@
 // Phân loại đường dẫn: (đường, struct stat *đích) trả kết quả syscall. Darwin gọi stat/lstat của
-// libSystem; Linux gọi newfstatat. Bộ chuyển đổi VM giải mã bố trí stat và coi kết quả khác 0 là
-// không tồn tại.
+// libSystem; Linux gọi newfstatat và trả -errno trực tiếp (không ghi libc errno).
+// Bộ chuyển đổi VM phải giải mã lỗi syscall trước khi phân biệt tệp vắng và lỗi OS.
 #if defined(__APPLE__)
 #define VPP_STAT _vpp_machine_path_stat
 #define VPP_LSTAT _vpp_machine_path_lstat

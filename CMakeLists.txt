@@ -54,6 +54,29 @@ if (UNIX AND NOT APPLE)
     # user's machine. Ubuntu's libssl-dev provides the static archive.
     set(OPENSSL_USE_STATIC_LIBS TRUE)
     find_package(OpenSSL REQUIRED)
+    # The direct Stage 0 linker does not get OpenSSL::Crypto's transitive
+    # dependencies from CMake. Resolve them at configure time so the V++
+    # driver can reuse the exact static link closure without spawning
+    # pkg-config for every integration fixture.
+    set(vpp_crypto_static_deps)
+    if (PkgConfig_FOUND)
+        execute_process(
+            COMMAND "${PKG_CONFIG_EXECUTABLE}" --static --libs openssl
+            RESULT_VARIABLE vpp_crypto_pkg_status
+            OUTPUT_VARIABLE vpp_crypto_pkg_flags
+            ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if (vpp_crypto_pkg_status EQUAL 0)
+            separate_arguments(vpp_crypto_pkg_flags UNIX_COMMAND "${vpp_crypto_pkg_flags}")
+            foreach(flag IN LISTS vpp_crypto_pkg_flags)
+                if (flag MATCHES "^-([lL].+|pthread)$" AND
+                    NOT flag MATCHES "^-l(ssl|crypto)$")
+                    list(APPEND vpp_crypto_static_deps "${flag}")
+                endif()
+            endforeach()
+        endif()
+    endif()
+    set(VPP_OPENSSL_STATIC_DEPS "${vpp_crypto_static_deps}" CACHE STRING
+        "Static libcrypto transitive linker flags for the direct Stage 0 linker" FORCE)
 endif()
 
 # Public include dir for headers

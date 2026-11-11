@@ -377,9 +377,19 @@ hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
                 } hoặc {
                     ssl = AOT giá trị cấu hình(cấu hình, "OPENSSL_SSL_LIBRARY:FILEPATH=");
                     crypto = AOT giá trị cấu hình(cấu hình, "OPENSSL_CRYPTO_LIBRARY:FILEPATH=");
+                    // The parent CMake configure asks pkg-config for libcrypto's
+                    // static transitive dependencies (zlib, zstd, jitterentropy
+                    // on newer Linux distributions). Keep them after libcrypto.
+                    phụ thuộc crypto = tách hằng văn bản(
+                        AOT giá trị cấu hình(cấu hình, "VPP_OPENSSL_STATIC_DEPS:STRING="), ";");
                     nếu (là tệp(ssl) && là tệp(crypto) && kết thúc bằng(ssl, ".a") && kết thúc bằng(crypto, ".a")) {
                         AOT thêm(liên kết, [ssl, crypto]);
-                    } hoặc { AOT thêm(liên kết, ["-Wl,-Bstatic", "-lssl", "-lcrypto", "-Wl,-Bdynamic"]); };
+                        máy ảo thêm cuối danh sách(liên kết, "-Wl,-Bstatic");
+                    } hoặc { AOT thêm(liên kết, ["-Wl,-Bstatic", "-lssl", "-lcrypto"]); };
+                    lặp(i = 0; i < độ dài(phụ thuộc crypto); i++) {
+                        nếu (phụ thuộc crypto[i] != "") { máy ảo thêm cuối danh sách(liên kết, phụ thuộc crypto[i]); };
+                    };
+                    máy ảo thêm cuối danh sách(liên kết, "-Wl,-Bdynamic");
                     AOT thêm(liên kết, ["-Wl,--strip-all", "-pthread", "-ldl"]);
                 };
                 AOT thêm(liên kết, ["-o", executable]);

@@ -174,7 +174,14 @@ StackValue executePathMachinePrimitive(Opcode opcode,
 #endif
     if (statFile) {
         if (rc != 0) {
+#if defined(VPP_FILE_MACHINE_ASM) && defined(__linux__)
+            // Linux ASM uses raw newfstatat: failures return -errno without
+            // updating libc errno. A stale errno must never turn ENOENT into
+            // a genuine OS failure (or hide ENAMETOOLONG as a cache miss).
+            const int error = rc < 0 ? -rc : errno;
+#else
             const int error = errno;
+#endif
             if (error == ENOENT || error == ENOTDIR) return missingFile();
             return fileStatError(static_cast<std::uint64_t>(error));
         }

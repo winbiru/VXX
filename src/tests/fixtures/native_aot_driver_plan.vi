@@ -22,6 +22,11 @@ hàm có đối số(lệnh, giá trị) {
     trả về sai;
 };
 
+hàm vị trí đối số(lệnh, giá trị) {
+    lặp(i = 0; i < độ dài(lệnh); i++) { nếu (lệnh[i] == giá trị) { trả về i; }; };
+    trả về -1;
+};
+
 hàm chính() {
     gốc = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_ROOT", "");
     chế độ = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_MODE", "");
@@ -139,6 +144,19 @@ hàm chính() {
         nếu (chế độ == "freestanding") {
             nếu (!có đối số(liên kết, "-nostdlib") || !có đối số(liên kết, "-static") || !kiểm tra ELF) {
                 ném "driver changed freestanding ELF contract";
+            };
+        };
+        nếu (chế độ == "direct" && đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_TARGET", "") == "x86_64-unknown-linux-gnu") {
+            nếu (!có đối số(liên kết, "-lz") || !có đối số(liên kết, "-lzstd") ||
+                !có đối số(liên kết, "-ljitterentropy")) {
+                ném "driver lost static OpenSSL transitive dependencies";
+            };
+            crypto = vị trí đối số(liên kết, gốc + "/libraries/libcrypto.a");
+            nếu (!(crypto >= 0 && crypto < vị trí đối số(liên kết, "-lz") &&
+                vị trí đối số(liên kết, "-lz") < vị trí đối số(liên kết, "-lzstd") &&
+                vị trí đối số(liên kết, "-lzstd") < vị trí đối số(liên kết, "-ljitterentropy") &&
+                vị trí đối số(liên kết, "-ljitterentropy") < vị trí đối số(liên kết, "-Wl,-Bdynamic"))) {
+                ném "driver changed static OpenSSL library link order";
             };
         };
         nếu (chế độ == "windows") {

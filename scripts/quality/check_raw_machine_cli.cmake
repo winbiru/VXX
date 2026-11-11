@@ -129,8 +129,14 @@ if (NOT result EQUAL 0)
     message(FATAL_ERROR "cannot emit ARM64 subtract assembly: ${error}")
 endif()
 file(READ "${asm_file}" listing)
-if (NOT listing MATCHES "sub w0, w0, w1" OR
-    NOT listing MATCHES "ret")
+# The CLI lowers source through Machine IR. It can preserve ABI inputs in
+# temporary registers before subtracting, whereas the restricted leaf oracle
+# emits the equivalent single instruction directly. Verify operand order and
+# that the result returns in w0 for both valid forms.
+string(FIND "${listing}" "sub w0, w0, w1\nret" direct_sub)
+string(FIND "${listing}"
+    "mov w2, w0\nmov w3, w1\nsub w2, w2, w3\nmov w0, w2\nret" lowered_sub)
+if (direct_sub EQUAL -1 AND lowered_sub EQUAL -1)
     message(FATAL_ERROR "ARM64 subtraction listing wrong: ${listing}")
 endif()
 

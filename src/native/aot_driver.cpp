@@ -665,20 +665,32 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
     // Respect a custom OpenSSL installation selected by the parent build.
     // The generic -l fallback works for standard multiarch system paths.
     fs::path sslArchive,cryptoArchive;
+    std::vector<std::string> cryptoStaticDeps;
     std::ifstream configuration(libraries/"CMakeCache.txt");
     for(std::string line;std::getline(configuration,line);) {
         constexpr const char *sslKey="OPENSSL_SSL_LIBRARY:FILEPATH=";
         constexpr const char *cryptoKey="OPENSSL_CRYPTO_LIBRARY:FILEPATH=";
+        constexpr const char *depsKey="VPP_OPENSSL_STATIC_DEPS:STRING=";
         if(line.find(sslKey)==0)sslArchive=core::utf8Path(line.substr(std::strlen(sslKey)));
         if(line.find(cryptoKey)==0)cryptoArchive=core::utf8Path(line.substr(std::strlen(cryptoKey)));
+        if(line.find(depsKey)==0) {
+            std::istringstream flags(line.substr(std::strlen(depsKey)));
+            for(std::string flag;std::getline(flags,flag,';');)
+                if(!flag.empty())cryptoStaticDeps.push_back(flag);
+        }
     }
     if(sslArchive.extension()==".a"&&cryptoArchive.extension()==".a"&&
        fs::is_regular_file(sslArchive)&&fs::is_regular_file(cryptoArchive)) {
         link.push_back(sslArchive.u8string());
         link.push_back(cryptoArchive.u8string());
+        link.push_back("-Wl,-Bstatic");
     } else {
-        link.insert(link.end(),{"-Wl,-Bstatic","-lssl","-lcrypto","-Wl,-Bdynamic"});
+        link.insert(link.end(),{"-Wl,-Bstatic","-lssl","-lcrypto"});
     }
+    // Static libcrypto has additional dependencies on recent Linux distros.
+    // Their ordered flags come from the parent CMake/pkg-config configure.
+    link.insert(link.end(),cryptoStaticDeps.begin(),cryptoStaticDeps.end());
+    link.push_back("-Wl,-Bdynamic");
     link.insert(link.end(),{"-pthread","-ldl","-o",executable.u8string()});
     checked(link,"executable link");
     profiler.mark("link-stage0-executable");
