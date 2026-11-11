@@ -50,6 +50,21 @@ int main() {
     check(rejects(OP_VM_MACHINE_PATH_KIND, {std::string("\xff", 1), 1}, cap),
           "invalid UTF-8 accepted");
     check(kind("", 1) == -1, "empty path should be absent");
+    check(rejects(OP_VM_MACHINE_PATH_CURRENT, {"unexpected"}, cap), "cwd arity bypass");
+    check(rejects(OP_VM_MACHINE_PATH_CANONICAL, {std::string("bad\0path", 8)}, cap),
+          "canonical path accepted NUL");
+    check(rejects(OP_VM_MACHINE_PATH_SET_CURRENT, {"."}, cap), "chdir capability bypass");
+    const auto query = [&](Opcode op, std::vector<StackValue> args) {
+        const auto value = runtime::executePathMachinePrimitive(op, args, cap);
+        const auto &fields = std::get<ListHandle>(value)->elements;
+        if (fields.size() != 2 || std::get<std::string>(fields[0]) != "ok")
+            throw std::runtime_error("unexpected path query error");
+        return fields[1];
+    };
+    check(fs::path(std::get<std::string>(query(OP_VM_MACHINE_PATH_CURRENT, {}))).is_absolute(),
+          "cwd must be absolute");
+    check(fs::is_directory(fs::u8path(std::get<std::string>(query(OP_VM_MACHINE_PATH_TEMP, {})))),
+          "temporary root must exist");
 
     const fs::path base = fs::temp_directory_path() /
         ("vpp-machine-path-" + std::to_string(
@@ -59,6 +74,36 @@ int main() {
         const fs::path file = base / u8"tệp Việt.txt";
         const fs::path link = base / "link";
         { std::ofstream out(file); out << "data"; }
+        check(std::get<std::string>(query(OP_VM_MACHINE_PATH_ABSOLUTE, {"."})) == fs::absolute(".").u8string(),
+              "absolute path mismatch");
+        const auto missingSuffix = base / "not-created" / "leaf";
+        check(std::get<std::string>(query(OP_VM_MACHINE_PATH_CANONICAL, {missingSuffix.u8string()})) ==
+                  fs::weakly_canonical(missingSuffix).u8string(), "canonical missing suffix mismatch");
+        const auto hardLink = base / "hard link";
+        fs::create_hard_link(file, hardLink);
+        check(std::get<int>(query(OP_VM_MACHINE_PATH_EQUIVALENT, {file.u8string(), hardLink.u8string()})) == 1,
+              "hard-link identity was lost");
+#if !defined(_WIN32)
+        fs::permissions(file, fs::perms::owner_read | fs::perms::owner_write);
+        check(std::get<int>(query(OP_VM_MACHINE_PATH_EXECUTABLE, {file.u8string()})) == 0,
+              "non-executable file accepted");
+        fs::permissions(file, fs::perms::owner_exec, fs::perm_options::add);
+#endif
+        check(std::get<int>(query(OP_VM_MACHINE_PATH_EXECUTABLE, {file.u8string()})) == 1,
+              "executable permission observation failed");
+        const auto original = fs::current_path();
+        auto changing = cap;
+        changing.insert("machine.path.chdir");
+        const auto moved = runtime::executePathMachinePrimitive(OP_VM_MACHINE_PATH_SET_CURRENT,
+            {base.u8string()}, changing);
+        const bool correctCwd = fs::equivalent(fs::current_path(), base);
+        fs::current_path(original);
+        check(std::get<std::string>(std::get<ListHandle>(moved)->elements[0]) == "ok" && correctCwd,
+              "chdir did not change cwd");
+        const auto missingCwd = runtime::executePathMachinePrimitive(OP_VM_MACHINE_PATH_SET_CURRENT,
+            {missingSuffix.u8string()}, changing);
+        check(std::get<std::string>(std::get<ListHandle>(missingCwd)->elements[0]) == "error" &&
+                  fs::current_path() == original, "failed chdir changed cwd or lost OS error");
         std::error_code linkError;
         fs::create_symlink(file, link, linkError);
         check(kind((base / "missing").u8string(), 1) == -1, "missing path not rejected");
@@ -85,6 +130,9 @@ int main() {
         native::aot::Program program;
         program.capabilities = cap;
         native::aot::Frame frame(program);
+        frame.intrinsic(OP_VM_MACHINE_PATH_TEMP);
+        check(std::get<std::string>(std::get<ListHandle>(frame.pop())->elements[0]) == "ok",
+              "Native AOT temporary path query failed");
         frame.push(base.u8string()); frame.push(1);
         frame.intrinsic(OP_VM_MACHINE_PATH_KIND);
         check(std::get<int>(frame.pop()) == directory, "Native AOT path kind wrong");

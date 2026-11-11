@@ -8,8 +8,11 @@
 
 #include "vpp/runtime/error.h"
 #include "vpp/runtime/file_runtime.h"
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <fcntl.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include "vpp/runtime/file_machine.h"
 #endif
@@ -26,7 +29,8 @@ void checkFiles(const std::filesystem::path &root) {
     constexpr auto seek = OP_VM_MACHINE_FILE_SEEK, tell = OP_VM_MACHINE_FILE_TELL;
     const std::unordered_set<std::string> grants = {
         "machine.file.open", "machine.file.read", "machine.file.write", "machine.file.close",
-        "machine.file.seek", "machine.file.tell", "machine.file.error", "machine.file.remove"};
+        "machine.file.seek", "machine.file.tell", "machine.file.error", "machine.file.remove",
+        "machine.file.lock"};
     FileMachineState owner, other;
     const auto call = [&](Opcode operation, const std::vector<StackValue> &args) {
         return executeFileMachinePrimitive(operation, args, grants, owner);
@@ -83,10 +87,31 @@ void checkFiles(const std::filesystem::path &root) {
     call(seek, {appender, 0, 0});
     expect(call(write, {appender, make_list_value({67}), 1}) == make_int_value(1), "append must succeed after seek");
     expect(std::get<AbiInteger>(call(tell, {appender})).signedValue == 5, "append must write at EOF");
+    bool lockDenied = false;
+    try { (void)executeFileMachinePrimitive(OP_VM_MACHINE_FILE_LOCK, {appender}, {}, owner); }
+    catch (const RuntimeError &) { lockDenied = true; }
+    expect(lockDenied && owner.files.size() == 1, "lock grant must be checked without closing the file");
+    expect(rejects(OP_VM_MACHINE_FILE_LOCK, {appender}, &other), "lock tokens must be VM-owned");
+    expect(rejects(OP_VM_MACHINE_FILE_LOCK, {}), "lock arity must be checked");
+    expect(call(OP_VM_MACHINE_FILE_LOCK, {appender}) == make_int_value(0), "file lock must succeed");
+    const auto probe = executeFileMachinePrimitive(open, {path, 2}, grants, other);
+    const auto probeFd = other.files.at(std::get<int>(probe)).descriptor;
+    const auto tryProbe = [&]() {
+#if defined(_WIN32)
+        OVERLAPPED position{};
+        return LockFileEx(reinterpret_cast<HANDLE>(probeFd),
+            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &position) != 0;
+#else
+        return ::flock(static_cast<int>(probeFd), LOCK_EX | LOCK_NB) == 0;
+#endif
+    };
+    expect(!tryProbe(), "separate handles must not acquire an already-held lock");
 #if !defined(_WIN32)
     const int appenderFd = static_cast<int>(owner.files.at(std::get<int>(appender)).descriptor);
 #endif
     owner.closeAll();
+    expect(tryProbe(), "closing VM files must release the kernel lock");
+    other.closeAll();
     expect(owner.files.empty() && rejects(tell, {appender}), "reset must invalidate raw tokens");
 #if !defined(_WIN32)
     errno = 0;

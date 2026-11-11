@@ -3585,6 +3585,9 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MACHINE_FILE_TELL:
             case OP_VM_MACHINE_FILE_ERROR:
             case OP_VM_MACHINE_FILE_REMOVE:
+            case OP_VM_MACHINE_FILE_RENAME:
+            case OP_VM_MACHINE_FILE_COPY:
+            case OP_VM_MACHINE_FILE_LINK:
             case OP_VM_MACHINE_PROCESS_PID:
             case OP_VM_MACHINE_PROCESS_PPID:
             case OP_VM_MACHINE_PROCESS_UID:
@@ -3603,6 +3606,15 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MACHINE_DIR_NEXT:
             case OP_VM_MACHINE_DIR_CLOSE:
             case OP_VM_MACHINE_PATH_KIND:
+            case OP_VM_MACHINE_PATH_STAT:
+            case OP_VM_MACHINE_PATH_ABSOLUTE:
+            case OP_VM_MACHINE_PATH_CANONICAL:
+            case OP_VM_MACHINE_PATH_EQUIVALENT:
+            case OP_VM_MACHINE_PATH_CURRENT:
+            case OP_VM_MACHINE_PATH_SET_CURRENT:
+            case OP_VM_MACHINE_PATH_TEMP:
+            case OP_VM_MACHINE_PATH_EXECUTABLE:
+            case OP_VM_MACHINE_FILE_LOCK:
             case OP_VM_MACHINE_SOCKET_KIND:
             case OP_VM_MACHINE_SOCKET_CLOSE:
             case OP_VM_MACHINE_SOCKET_TIMEOUT:

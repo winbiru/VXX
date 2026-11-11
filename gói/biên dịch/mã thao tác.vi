@@ -163,6 +163,18 @@ hàm công khai biên dịch mã thao tác(tên) {
         ca "OP_VM_MACHINE_FILE_TELL": { trả về 164; }
         ca "OP_VM_MACHINE_FILE_ERROR": { trả về 165; }
         ca "OP_VM_MACHINE_FILE_REMOVE": { trả về 166; }
+        ca "OP_VM_MACHINE_FILE_RENAME": { trả về 218; }
+        ca "OP_VM_MACHINE_FILE_COPY": { trả về 219; }
+        ca "OP_VM_MACHINE_FILE_LINK": { trả về 220; }
+        ca "OP_VM_MACHINE_PATH_STAT": { trả về 221; }
+        ca "OP_VM_MACHINE_PATH_ABSOLUTE": { trả về 222; }
+        ca "OP_VM_MACHINE_PATH_CANONICAL": { trả về 223; }
+        ca "OP_VM_MACHINE_PATH_EQUIVALENT": { trả về 224; }
+        ca "OP_VM_MACHINE_PATH_CURRENT": { trả về 225; }
+        ca "OP_VM_MACHINE_PATH_SET_CURRENT": { trả về 226; }
+        ca "OP_VM_MACHINE_PATH_TEMP": { trả về 227; }
+        ca "OP_VM_MACHINE_PATH_EXECUTABLE": { trả về 228; }
+        ca "OP_VM_MACHINE_FILE_LOCK": { trả về 229; }
         ca "OP_VM_MACHINE_PROCESS_PID": { trả về 167; }
         ca "OP_VM_MACHINE_PROCESS_PPID": { trả về 168; }
         ca "OP_VM_MACHINE_PROCESS_UID": { trả về 169; }
@@ -413,6 +425,18 @@ hàm công khai biên dịch có mã thao tác(mã) {
         ca 215: { trả về đúng; }
         ca 216: { trả về đúng; }
         ca 217: { trả về đúng; }
+        ca 218: { trả về đúng; }
+        ca 219: { trả về đúng; }
+        ca 220: { trả về đúng; }
+        ca 221: { trả về đúng; }
+        ca 222: { trả về đúng; }
+        ca 223: { trả về đúng; }
+        ca 224: { trả về đúng; }
+        ca 225: { trả về đúng; }
+        ca 226: { trả về đúng; }
+        ca 227: { trả về đúng; }
+        ca 228: { trả về đúng; }
+        ca 229: { trả về đúng; }
         mặc định: { trả về sai; }
     }
 };

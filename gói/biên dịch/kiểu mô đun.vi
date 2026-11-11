@@ -73,7 +73,7 @@ lớp công khai Bộ Đăng Ký Kiểu {
             lặp(j = 0; j < máy ảo lấy độ dài(cạnh); j++) {
                 e = cạnh[j];
                 nếu (e["nguồn"] != tên mô đun) { bỏ qua; };
-                phụ = biên dịch sổ tìm mô đun(mô đun, e["đích"]);
+                phụ = biên dịch sổ tìm mô đun(sổ, e["đích"]);
                 bề mặt = lấy từ điển(phụ, "kiểu xuất", []);
                 lặp(k = 0; k < máy ảo lấy độ dài(bề mặt); k++) {
                     tên = bề mặt[k]["tên"];
@@ -95,7 +95,7 @@ lớp công khai Bộ Đăng Ký Kiểu {
             e = cạnh[i];
             tên chọn = lấy từ điển(e, "tên nhập", "");
             nếu (tên chọn == "" || tên chọn == "*") { bỏ qua; };
-            phụ = biên dịch sổ tìm mô đun(mô đun, e["đích"]);
+            phụ = biên dịch sổ tìm mô đun(sổ, e["đích"]);
             nếu (biên dịch kiểu tìm(phụ["xuất"], tên chọn) < 0 &&
                 biên dịch kiểu tìm(phụ["kiểu xuất"], tên chọn) < 0) {
                 ném "biên dịch nhập: không có tên công khai '" + tên chọn + "' trong '" + e["đích"] + "'";
@@ -110,7 +110,7 @@ lớp công khai Bộ Đăng Ký Kiểu {
         // Quan hệ kế thừa được phân giải trong module khai báo kiểu.
         lặp(i = 0; i < máy ảo lấy độ dài(các kiểu); i++) {
             bản = các kiểu[i];
-            mục = biên dịch sổ tìm mô đun(mô đun, bản["mô đun"]);
+            mục = biên dịch sổ tìm mô đun(sổ, bản["mô đun"]);
             khai = biên dịch kiểu sao(bản["khai"], bản["chuẩn"]);
             cha = lấy từ điển(khai, "lớp cha", "");
             nếu (cha != "") {
@@ -150,7 +150,7 @@ lớp công khai Bộ Đăng Ký Kiểu {
         lặp(i = 0; i < máy ảo lấy độ dài(các kiểu); i++) {
             máy ảo thêm cuối danh sách(ngoài, các kiểu[i]["chuẩn hóa"]);
         };
-        mục = biên dịch sổ tìm mô đun(sổ["mô đun"], tên mô đun);
+        mục = biên dịch sổ tìm mô đun(sổ, tên mô đun);
         thấy = lấy từ điển(mục, "kiểu nhìn thấy", []);
         lặp(i = 0; i < máy ảo lấy độ dài(thấy); i++) {
             bản = các kiểu[thấy[i]["id"]];

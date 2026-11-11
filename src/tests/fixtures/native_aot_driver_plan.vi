@@ -1,0 +1,154 @@
+// Run the driver's V++ policy on synthetic targets without invoking a foreign
+// linker. Actual subprocess execution and self-hosting are checked separately.
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT kế hoạch;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chạy lệnh;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chọn gốc thư viện;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT tạo thư mục tạm;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dọn thư mục tạm;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT ghi nguồn nhúng;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đọc lỗi nhúng;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dùng chỉ mục nguồn;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chữ ký liên kết;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache tự quản;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị nhúng;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.văn bản.chuỗi.chứa chính xác;
+nhập gói.nhập xuất.đường dẫn.là thư mục;
+nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
+
+hàm có đối số(lệnh, giá trị) {
+    lặp(i = 0; i < độ dài(lệnh); i++) { nếu (lệnh[i] == giá trị) { trả về đúng; }; };
+    trả về sai;
+};
+
+hàm chính() {
+    gốc = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_ROOT", "");
+    chế độ = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_MODE", "");
+    nếu (chế độ == "launch-error") {
+        đã bắt = sai;
+        thử {
+            biên dịch AOT chạy lệnh([gốc + "/missing tool", "a b", "$(literal)", "🌿"], "launch probe");
+        } bắt lỗi(e) {
+            nếu (!chứa chính xác("" + e, "launch probe failed")) { ném e; };
+            đã bắt = đúng;
+        };
+        nếu (!đã bắt) { ném "driver ignored launch failure"; };
+        in "AOT_DRIVER_OK"; trả về;
+    };
+    nếu (chế độ == "os-file") {
+        nếu (biên dịch AOT chọn gốc thư viện(gốc, gốc + "/build/bin", gốc) != gốc + "/libraries") {
+            ném "driver ignored V++ library-root policy";
+        };
+        nếu (biên dịch AOT dùng chỉ mục nguồn()) { ném "driver ignored profiling source-index policy"; };
+        tạm = biên dịch AOT tạo thư mục tạm(gốc);
+        nếu (!là thư mục(tạm)) { ném "driver failed to allocate a temporary directory"; };
+        đường = tạm + "/embedded.vi";
+        biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿\";\n");
+        có tệp = đường dẫn thống kê tệp(đường);
+        nếu (có tệp[0] != "present" || độ dài(có tệp) != 4) {
+            ném "V++ file stat failed to return complete metadata";
+        };
+        dấu có = biên dịch AOT chữ ký liên kết([["F", đường], ["S", "unicode 🌿"]]);
+        biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿 và thế giới\";\n");
+        dấu thay = biên dịch AOT chữ ký liên kết([["F", đường], ["S", "unicode 🌿"]]);
+        nếu (dấu có == dấu thay) { ném "cache key ignored file size change"; };
+        vắng = tạm + "/does-not-exist 🌿.vi";
+        nếu (đường dẫn thống kê tệp(vắng)[0] != "missing") {
+            ném "V++ file stat failed to report missing path";
+        };
+        dấu vắng = biên dịch AOT chữ ký liên kết([["F", vắng], ["S", "unicode 🌿"]]);
+        biên dịch AOT ghi nguồn nhúng(vắng, "created");
+        dấu mới = biên dịch AOT chữ ký liên kết([["F", vắng], ["S", "unicode 🌿"]]);
+        nếu (dấu vắng == dấu mới) { ném "cache key ignored new dependency"; };
+        nếu (đường dẫn thống kê tệp(vắng)[0] != "present") {
+            ném "V++ file stat failed after file creation";
+        };
+        // A cache object is immutable: a later writer cannot replace it.
+        bản đầu = tạm + "/original-object";
+        bản khác = tạm + "/different-object";
+        đích cache = tạm + "/published-object";
+        biên dịch AOT ghi nguồn nhúng(bản đầu, "first writer 🌿");
+        biên dịch AOT ghi nguồn nhúng(bản khác, "second writer 🌿");
+        nếu (!biên dịch AOT công bố cache tự quản(bản đầu, đích cache)) {
+            ném "V++ cache publication failed";
+        };
+        nếu (đọc tệp(đích cache) != "first writer 🌿") {
+            ném "V++ published cache content mismatch";
+        };
+        nếu (!biên dịch AOT công bố cache tự quản(bản khác, đích cache) ||
+            đọc tệp(đích cache) != "first writer 🌿") {
+            ném "V++ cache publisher overwrote an existing entry";
+        };
+        nếu (biên dịch AOT công bố cache tự quản(tạm + "/missing-object", tạm + "/missing-cache")) {
+            ném "V++ published missing cache input";
+        };
+        // Error conditions such as ENAMETOOLONG are not cache misses.
+        quá dài = tạm + "/";
+        lặp(i = 0; i < 300; i++) { quá dài += "x"; };
+        có lỗi OS = sai;
+        thử { đường dẫn thống kê tệp(quá dài); }
+        bắt lỗi(e) { có lỗi OS = đúng; };
+        nếu (!có lỗi OS) { ném "V++ file metadata hid an OS error"; };
+        biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿\";\n");
+        nếu (biên dịch AOT đọc lỗi nhúng(đường) != "in \"Chào 🌿\";\n") {
+            ném "driver corrupted embedded UTF-8 source";
+        };
+        nếu (biên dịch AOT đọc lỗi nhúng(tạm + "/not-found.stderr") != "") {
+            ném "driver mishandled absent diagnostics";
+        };
+        nhúng = biên dịch AOT chuẩn bị nhúng(gốc, gốc + "/build/bin");
+        nếu (nhúng[0] != gốc || nhúng[1] != gốc + "/build/native-vpp-runtime/runtime.o") {
+            ném "driver ignored V++ embedded path selection";
+        };
+        base lỗi = sai;
+        thử { biên dịch AOT chuẩn bị nhúng(tạm + "/missing-base", gốc + "/build/bin"); }
+        bắt lỗi(e) { base lỗi = đúng; };
+        nếu (!base lỗi) { ném "driver accepted a missing embedded base"; };
+        biên dịch AOT dọn thư mục tạm(tạm);
+        nếu (là thư mục(tạm)) { ném "driver did not clean temporary directory"; };
+        in "AOT_DRIVER_OK"; trả về;
+    };
+    cảnh = [gốc, gốc + "/libraries", gốc + "/temp", gốc + "/result",
+        đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_TARGET", ""), "OFF", gốc + "/linker", "metadata"];
+    kế hoạch = rỗng;
+    thử { kế hoạch = biên dịch AOT kế hoạch("probe ASM", cảnh); }
+    bắt lỗi(e) {
+        nếu (chế độ == "reject" && chứa chính xác("" + e, "Native AOT:")) {
+            in "AOT_DRIVER_REJECT_OK"; trả về;
+        };
+        ném e;
+    };
+    nếu (chế độ == "reject") { ném "driver accepted an invalid runtime/target"; };
+    nguồn = kế hoạch[0]; cuối = kế hoạch[độ dài(kế hoạch) - 1];
+    nếu (nguồn[0] != "write" || nguồn[1] != gốc + "/temp/program.S" || nguồn[2] != "probe ASM" ||
+        cuối[0] != "publish" || cuối[2] != gốc + "/result") { ném "driver lost filesystem identity"; };
+    liên kết = rỗng; cấu hình = sai; kiểm tra ELF = sai;
+    lặp(i = 0; i < độ dài(kế hoạch); i++) {
+        bước = kế hoạch[i];
+        nếu (bước[0] == "run") {
+            nếu (bước[2] == "configure-native-linker") { cấu hình = đúng; };
+            nếu (bước[2] == "audit-linux-vpp-executable") { kiểm tra ELF = đúng; };
+            nếu (bước[2] == "link-stage0-executable" || bước[2] == "link-vpp-executable") { liên kết = bước[3]; };
+        };
+    };
+    nếu (chế độ == "cmake") {
+        nếu (!cấu hình || liên kết != rỗng) { ném "driver missed CMake oracle"; };
+    } hoặc {
+        nếu (cấu hình || liên kết == rỗng) { ném "driver missed direct linker"; };
+        nếu (chế độ == "freestanding") {
+            nếu (!có đối số(liên kết, "-nostdlib") || !có đối số(liên kết, "-static") || !kiểm tra ELF) {
+                ném "driver changed freestanding ELF contract";
+            };
+        };
+        nếu (chế độ == "windows") {
+            nếu (!có đối số(liên kết, "/MACHINE:X64") || !có đối số(liên kết, "kernel32.lib")) {
+                ném "driver changed Windows COFF contract";
+            };
+        };
+        nếu (chế độ == "vpp") {
+            nếu (!có đối số(liên kết, "-Wl,-dead_strip")) { ném "driver changed Mach-O V++ runtime contract"; };
+        };
+    };
+    in "AOT_DRIVER_OK";
+};

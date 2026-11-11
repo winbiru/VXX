@@ -78,14 +78,22 @@ hàm riêng tư biên dịch nguồn tên gói(đích) {
     trả về lấy từ điển(bí danh, đích, đích);
 };
 
-hàm riêng tư biên dịch nguồn tìm gói(gốc, đích) {
+hàm riêng tư biên dịch nguồn ghi đường vắng(tệp, bộ đệm) {
+    nếu (bộ đệm != rỗng) {
+        máy ảo thêm cuối danh sách(bộ đệm["đường nhập vắng"], tệp);
+    };
+};
+
+hàm riêng tư biên dịch nguồn tìm gói(gốc, đích, bộ đệm = rỗng) {
     tên = biên dịch nguồn tên gói(đích);
     nền = gốc + "/gói/" + tên;
     // Package chính.vi được ưu tiên trước module cùng tên, như Stage 0.
     tệp = biên dịch nguồn chuẩn đường(nền + "/chính.vi");
     nếu (là tệp(tệp)) { trả về tệp; };
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
     tệp = biên dịch nguồn chuẩn đường(nền + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
     // Stage 0 maps bare `nhập tùy chọn` to the persistent preferences API.
     // The optional-value helpers are still reachable explicitly as
     // `gói.lõi.tùy chọn`; preserve that distinction in the self-host compiler.
@@ -93,23 +101,25 @@ hàm riêng tư biên dịch nguồn tìm gói(gốc, đích) {
     nếu (tên == "tùy chọn") { tên lõi = "tùy chọn bền vững"; };
     tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên lõi + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
     trả về "";
 };
 
-hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện) {
+hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện, bộ đệm = rỗng) {
     // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
     // khi áp dụng bí danh và gói của toolchain.
     thư mục = đường dẫn cha(mô đun nhập);
     khi (đúng) {
         tệp = biên dịch nguồn chuẩn đường(thư mục + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
+        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
         thư mục = cha;
     };
     thư mục = đường dẫn cha(mô đun nhập);
     khi (đúng) {
-        tệp = biên dịch nguồn tìm gói(thư mục, đích);
+        tệp = biên dịch nguồn tìm gói(thư mục, đích, bộ đệm);
         nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
@@ -118,7 +128,8 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
     nếu (thư viện != "") {
         tệp = biên dịch nguồn chuẩn đường(thư viện + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
-        tệp = biên dịch nguồn tìm gói(thư viện, đích);
+        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+        tệp = biên dịch nguồn tìm gói(thư viện, đích, bộ đệm);
         nếu (tệp != "") { trả về tệp; };
     };
     ném "biên dịch nguồn: không tìm thấy import '" + đích + "' từ '" + mô đun nhập + "'";
@@ -148,7 +159,7 @@ lớp công khai Bộ Nạp Nguồn {
         nếu (máy ảo có khóa từ điển(theo nguồn, yêu cầu)) {
             đích = theo nguồn[yêu cầu];
         } hoặc {
-            đích = biên dịch nguồn đích(mô đun nhập, yêu cầu, trạng thái["thư viện"]);
+            đích = biên dịch nguồn đích(mô đun nhập, yêu cầu, trạng thái["thư viện"], mình.bộ đệm);
             theo nguồn[yêu cầu] = đích;
         };
         mức = lấy từ điển(trạng thái["đã thăm"], đích, 0);
@@ -309,6 +320,13 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     cache = biên dịch nguồn cache(bộ đệm);
+    // Giao cho host danh sách nguồn THỰC TẾ của lần dựng đồ thị hiện tại.
+    // Host chỉ dùng danh sách này để tái dùng executable khi toàn bộ nguồn
+    // vẫn giống hệt; import thay đổi trong cùng batch phải biên dịch lại.
+    nếu (bộ đệm != rỗng) {
+        bộ đệm["phụ thuộc thực tế"] = [];
+        bộ đệm["đường nhập vắng"] = [];
+    };
     cũ trúng = 0;
     cũ trượt = 0;
     nếu (cache != rỗng) {
@@ -316,6 +334,14 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
         cũ trượt = cache["trượt"];
     };
     đồ thị = biên dịch nguồn đồ thị(điểm vào, thư viện, bộ đệm);
+    nếu (bộ đệm != rỗng) {
+        các tệp = [đồ thị["điểm vào"]];
+        các mô đun = đồ thị["mô đun"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
+            máy ảo thêm cuối danh sách(các tệp, các mô đun[i]["định danh"]);
+        };
+        bộ đệm["phụ thuộc thực tế"] = các tệp;
+    };
     biên dịch hồ sơ ghi(đường hồ sơ, "source.graph", bắt đầu);
     nếu (cache != rỗng) {
         biên dịch hồ sơ ghi số(đường hồ sơ, "source.ast.hits", cache["trúng"] - cũ trúng);

@@ -28,35 +28,13 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã xor byte(a, b) {
-        x = a;
-        y = b;
-        trọng số = 1;
-        kết quả = 0;
-        lặp(i = 0; i < 8; i++) {
-            nếu ((x % 2) != (y % 2)) {
-                kết quả = kết quả + trọng số;
-            };
-            x = làm tròn xuống(x / 2);
-            y = làm tròn xuống(y / 2);
-            trọng số = trọng số * 2;
-        };
-        trả về kết quả;
+        // Toán tử bit có cùng ABI i32 trong VM và AOT. Chỉ giữ tám bit
+        // thấp như thuật toán từng bit, không chuyển phép băm về host.
+        trả về (a ^ b) & 255;
     };
 
     hàm công khai mật mã và byte(a, b) {
-        x = a;
-        y = b;
-        trọng số = 1;
-        kết quả = 0;
-        lặp(i = 0; i < 8; i++) {
-            nếu ((x % 2) == 1 && (y % 2) == 1) {
-                kết quả = kết quả + trọng số;
-            };
-            x = làm tròn xuống(x / 2);
-            y = làm tròn xuống(y / 2);
-            trọng số = trọng số * 2;
-        };
-        trả về kết quả;
+        trả về (a & b) & 255;
     };
 
     hàm công khai mật mã xor từ máy(a, b) {
@@ -241,72 +219,57 @@ lớp công khai Bộ Mật Mã {
             máy ảo thêm cuối danh sách(thông điệp, dài bit[i]);
         };
 
-        h = [
-            [106,9,230,103], [187,103,174,133], [60,110,243,114], [165,79,245,58],
-            [81,14,82,127], [155,5,104,140], [31,131,217,171], [91,224,205,25]
-        ];
-        k = mình.mật mã hằng số sha256();
-
+        // SHA-256 word arithmetic uses wrapping i32 operators shared by VM
+        // and AOT. Mask signed right shifts to obtain logical shifts. The
+        // public byte API and digest stay identical; no native hash callback.
+        h = [1779033703, -1150833019, 1013904242, -1521486534,
+             1359893119, -1694144372, 528734635, 1541459225];
+        byte k = mình.mật mã hằng số sha256();
+        k = [];
+        lặp(i = 0; i < 64; i++) {
+            q = byte k[i];
+            máy ảo thêm cuối danh sách(k, (q[0] << 24) | (q[1] << 16) | (q[2] << 8) | q[3]);
+        };
         lặp(bắt đầu = 0; bắt đầu < máy ảo lấy độ dài(thông điệp); bắt đầu += 64) {
             w = [];
             lặp(t = 0; t < 16; t++) {
                 p = bắt đầu + t * 4;
-                máy ảo thêm cuối danh sách(w, [thông điệp[p], thông điệp[p + 1], thông điệp[p + 2], thông điệp[p + 3]]);
+                máy ảo thêm cuối danh sách(w, (thông điệp[p] << 24) |
+                    (thông điệp[p + 1] << 16) | (thông điệp[p + 2] << 8) | thông điệp[p + 3]);
             };
-            lặp(t mở rộng = 16; t mở rộng < 64; t mở rộng++) {
-                giá trị = mình.mật mã cộng từ máy(
-                    mình.mật mã sigma nhỏ một(w[t mở rộng - 2]),
-                    w[t mở rộng - 7]
-                );
-                giá trị = mình.mật mã cộng từ máy(
-                    giá trị,
-                    mình.mật mã sigma nhỏ không(w[t mở rộng - 15])
-                );
-                giá trị = mình.mật mã cộng từ máy(giá trị, w[t mở rộng - 16]);
-                máy ảo thêm cuối danh sách(w, giá trị);
+            lặp(t = 16; t < 64; t++) {
+                x = w[t - 15]; y = w[t - 2];
+                s0 = (((x >> 7) & 33554431) | (x << 25)) ^
+                     (((x >> 18) & 16383) | (x << 14)) ^ ((x >> 3) & 536870911);
+                s1 = (((y >> 17) & 32767) | (y << 15)) ^
+                     (((y >> 19) & 8191) | (y << 13)) ^ ((y >> 10) & 4194303);
+                máy ảo thêm cuối danh sách(w, w[t - 16] + s0 + w[t - 7] + s1);
             };
-
-            a = h[0];
-            b = h[1];
-            c = h[2];
-            d = h[3];
-            e = h[4];
-            f = h[5];
-            g = h[6];
-            hh = h[7];
-
-            lặp(t vòng = 0; t vòng < 64; t vòng++) {
-                t1 = mình.mật mã cộng từ máy(hh, mình.mật mã sigma lớn một(e));
-                t1 = mình.mật mã cộng từ máy(t1, mình.mật mã lựa chọn(e, f, g));
-                t1 = mình.mật mã cộng từ máy(t1, k[t vòng]);
-                t1 = mình.mật mã cộng từ máy(t1, w[t vòng]);
-                t2 = mình.mật mã cộng từ máy(mình.mật mã sigma lớn không(a), mình.mật mã đa số(a, b, c));
-
-                hh = g;
-                g = f;
-                f = e;
-                e = mình.mật mã cộng từ máy(d, t1);
-                d = c;
-                c = b;
-                b = a;
-                a = mình.mật mã cộng từ máy(t1, t2);
+            a = h[0]; b = h[1]; c = h[2]; d = h[3];
+            e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+            lặp(t = 0; t < 64; t++) {
+                s1 = (((e >> 6) & 67108863) | (e << 26)) ^
+                     (((e >> 11) & 2097151) | (e << 21)) ^
+                     (((e >> 25) & 127) | (e << 7));
+                lựa = (e & f) ^ (~e & g);
+                t1 = hh + s1 + lựa + k[t] + w[t];
+                s0 = (((a >> 2) & 1073741823) | (a << 30)) ^
+                     (((a >> 13) & 524287) | (a << 19)) ^
+                     (((a >> 22) & 1023) | (a << 10));
+                đa số = (a & b) ^ (a & c) ^ (b & c);
+                t2 = s0 + đa số;
+                hh = g; g = f; f = e; e = d + t1;
+                d = c; c = b; b = a; a = t1 + t2;
             };
-
-            h[0] = mình.mật mã cộng từ máy(h[0], a);
-            h[1] = mình.mật mã cộng từ máy(h[1], b);
-            h[2] = mình.mật mã cộng từ máy(h[2], c);
-            h[3] = mình.mật mã cộng từ máy(h[3], d);
-            h[4] = mình.mật mã cộng từ máy(h[4], e);
-            h[5] = mình.mật mã cộng từ máy(h[5], f);
-            h[6] = mình.mật mã cộng từ máy(h[6], g);
-            h[7] = mình.mật mã cộng từ máy(h[7], hh);
+            h[0] = h[0] + a; h[1] = h[1] + b; h[2] = h[2] + c; h[3] = h[3] + d;
+            h[4] = h[4] + e; h[5] = h[5] + f; h[6] = h[6] + g; h[7] = h[7] + hh;
         };
-
         kết quả = [];
         lặp(i = 0; i < 8; i++) {
-            lặp(j = 0; j < 4; j++) {
-                máy ảo thêm cuối danh sách(kết quả, h[i][j]);
-            };
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 24) & 255);
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 16) & 255);
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 8) & 255);
+            máy ảo thêm cuối danh sách(kết quả, h[i] & 255);
         };
         trả về kết quả;
     };

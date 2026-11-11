@@ -60,6 +60,26 @@ if (NOT mapped_count EQUAL enum_count)
 endif()
 message(STATUS "V++ opcode ABI: all ${mapped_count} entries agree with active C++ enum")
 
+# The artifact validator has a separate numeric allowlist. Matching the name
+# lookup alone would miss an opcode that compiles but cannot be serialized.
+file(STRINGS "${VPP_ROOT}/gói/biên dịch/mã thao tác.vi" known_opcode_rows
+    REGEX "^[ \t]*ca [0-9]+:" ENCODING UTF-8)
+set(known_numbers)
+foreach(row IN LISTS known_opcode_rows)
+    if(row MATCHES "ca ([0-9]+):.*trả về đúng;")
+        list(APPEND known_numbers "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+list(LENGTH known_numbers known_count)
+if(NOT known_count EQUAL enum_count)
+    message(FATAL_ERROR "Artifact opcode allowlist count differs from C++ ABI")
+endif()
+foreach(opcode IN LISTS cpp_opcodes)
+    if(NOT "${cpp_${opcode}}" IN_LIST known_numbers)
+        message(FATAL_ERROR "Artifact validator does not recognize ${opcode}")
+    endif()
+endforeach()
+
 # Keep opcode, argument count and reservation status of every intrinsic in
 # gói/biên dịch/nội tại.vi aligned with intrinsic.h. The C++ alias table is
 # included because aliases are also recognized by the Stage 0 compiler.

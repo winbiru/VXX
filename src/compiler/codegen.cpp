@@ -2619,6 +2619,14 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
             ++support.unsupportedRegions;
             if (!instruction.declarationName.empty())
                 support.unsupportedNames.push_back(instruction.declarationName);
+            else if (instruction.opcode == IrOpcode::Import) {
+                std::string label = "import: " + instruction.importSpec.target +
+                    " form=" + std::to_string(static_cast<int>(instruction.importForm));
+                for (const auto &token : instruction.tokens) label += " " + token.lexeme;
+                support.unsupportedNames.push_back(std::move(label));
+            }
+            else
+                support.unsupportedNames.push_back(irOpcodeName(instruction.opcode));
         }
     }
     return support;

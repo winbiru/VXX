@@ -146,6 +146,18 @@ hàm công khai biên dịch tên mã thao tác(mã) {
         ca 215: { trả về "OP_GOI_LOI_BAN_DIA"; }
         ca 216: { trả về "OP_VM_STRING_REPLACE_EXACT"; }
         ca 217: { trả về "OP_VM_STRING_BYTE_SLICE"; }
+        ca 218: { trả về "OP_VM_MACHINE_FILE_RENAME"; }
+        ca 219: { trả về "OP_VM_MACHINE_FILE_COPY"; }
+        ca 220: { trả về "OP_VM_MACHINE_FILE_LINK"; }
+        ca 221: { trả về "OP_VM_MACHINE_PATH_STAT"; }
+        ca 222: { trả về "OP_VM_MACHINE_PATH_ABSOLUTE"; }
+        ca 223: { trả về "OP_VM_MACHINE_PATH_CANONICAL"; }
+        ca 224: { trả về "OP_VM_MACHINE_PATH_EQUIVALENT"; }
+        ca 225: { trả về "OP_VM_MACHINE_PATH_CURRENT"; }
+        ca 226: { trả về "OP_VM_MACHINE_PATH_SET_CURRENT"; }
+        ca 227: { trả về "OP_VM_MACHINE_PATH_TEMP"; }
+        ca 228: { trả về "OP_VM_MACHINE_PATH_EXECUTABLE"; }
+        ca 229: { trả về "OP_VM_MACHINE_FILE_LOCK"; }
         ca 154: { trả về "OP_VM_STRING_FROM_BYTES"; }
         ca 155: { trả về "OP_VM_FLOAT_FROM_BITS"; }
         ca 156: { trả về "OP_FFI_CALL"; }

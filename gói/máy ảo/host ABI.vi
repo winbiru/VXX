@@ -320,6 +320,57 @@ hàm vm_file_fd(token) {
     biến slot = thực thi tệp dữ liệu ô nhớ(token); nếu (slot < 0) { trả về -1; };
     trả về vm_get(2064 + slot * 16, 1);
 };
+// Native file primitives are small OS boundaries. The VM owns validation,
+// byte streaming, permission preservation and failure cleanup.
+hàm vm_file_rename(a, b) {
+    biến src = vm_path_handle(a); nếu (src < 0) { trả về vm_int(-1); };
+    biến dst = vm_path_handle(b); nếu (dst < 0) { byte hủy(src); trả về vm_int(-1); };
+    biến result = máy đổi tên(thực thi nội dung đệm(thực thi các byte ô nhớ(src)),
+                             thực thi nội dung đệm(thực thi các byte ô nhớ(dst)));
+    byte hủy(src); byte hủy(dst);
+    trả về vm_int(result);
+};
+hàm vm_file_copy(a, b) {
+    biến src = vm_path_handle(a); nếu (src < 0) { trả về vm_int(-1); };
+    biến dst = vm_path_handle(b); nếu (dst < 0) { byte hủy(src); trả về vm_int(-1); };
+    biến src_token = thực thi tệp dữ liệu mở(src, 0);
+    nếu (src_token < 0) { byte hủy(src); byte hủy(dst); trả về vm_int(-1); };
+    biến src_fd = vm_file_fd(src_token);
+    biến permissions = 420;
+    nếu (máy thông tin tệp mở(src_fd, 3376) == 0) {
+        biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
+        nếu (vm_get(4198464, 8) == 1) { mode = vm_get(3376, 6); };
+        permissions = mode & 4095;
+    };
+    biến dst_token = thực thi tệp dữ liệu mở(dst, 1537);
+    nếu (dst_token < 0) {
+        tệp đóng(src_token); byte hủy(src); byte hủy(dst); trả về vm_int(-1);
+    };
+    biến dst_fd = vm_file_fd(dst_token);
+    biến result = 0; biến buffer = vm_alloc(65536, 0);
+    nếu (buffer == 0) { result = -1; };
+    khi (result == 0) {
+        biến count = máy đọc(src_fd, buffer, 65536);
+        nếu (count == 0) { thoát; };
+        nếu (count < 0) {
+            nếu (máy lỗi() == 4) { bỏ qua; };
+            result = -1; thoát;
+        };
+        biến offset = 0;
+        khi (offset < count) {
+            biến written = máy ghi(dst_fd, buffer + offset, count - offset);
+            nếu (written < 0 && máy lỗi() == 4) { bỏ qua; };
+            nếu (written <= 0) { result = -1; thoát; };
+            offset += written;
+        };
+    };
+    nếu (result == 0 && máy đặt quyền tệp mở(dst_fd, permissions) != 0) { result = -1; };
+    nếu (tệp đóng(dst_token) != 0) { result = -1; };
+    nếu (tệp đóng(src_token) != 0) { result = -1; };
+    nếu (result != 0) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(dst))); };
+    byte hủy(src); byte hủy(dst);
+    trả về vm_int(result);
+};
 // Chuyển UTF-8 thành danh sách byte với dung lượng biết trước.
 hàm vm_byte_array(a) {
     nếu (vm_tag(a) != 3) { trả về vm_error(2); };
@@ -430,6 +481,11 @@ hàm vm_host(state, op, args) {
         biến trạng_thái_xóa = máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(đường_xóa))); byte hủy(đường_xóa);
         vm_set(state, 9, máy lỗi()); trả về vm_int(trạng_thái_xóa);
     };
+    nếu (op == 218) { trả về vm_file_rename(a, b); };
+    nếu (op == 219) { trả về vm_file_copy(a, b); };
+    // Hard-link creation is an optional optimization. Copy-and-rename uses
+    // the same immutable cache key when the OS boundary cannot link.
+    nếu (op == 220) { trả về vm_int(-1); };
     nếu (op >= 167 && op <= 172) {
         biến identity = máy tiến trình định danh thô(op - 167);
         // PID/PPID are signed i32; POSIX credentials are unsigned u32.
@@ -544,6 +600,9 @@ hàm vm_host_arity(op) {
     nếu (op == 164) { trả về 1; }; // OP_VM_MACHINE_FILE_TELL
     nếu (op == 165) { trả về 1; }; // OP_VM_MACHINE_FILE_ERROR
     nếu (op == 166) { trả về 1; }; // OP_VM_MACHINE_FILE_REMOVE
+    nếu (op == 218) { trả về 2; }; // OP_VM_MACHINE_FILE_RENAME
+    nếu (op == 219) { trả về 2; }; // OP_VM_MACHINE_FILE_COPY
+    nếu (op == 220) { trả về 2; }; // OP_VM_MACHINE_FILE_LINK
     nếu (op == 167) { trả về 0; }; // OP_VM_MACHINE_PROCESS_PID
     nếu (op == 168) { trả về 0; }; // OP_VM_MACHINE_PROCESS_PPID
     nếu (op == 169) { trả về 0; }; // OP_VM_MACHINE_PROCESS_UID
@@ -562,6 +621,15 @@ hàm vm_host_arity(op) {
     nếu (op == 182) { trả về 1; }; // OP_VM_MACHINE_DIR_NEXT
     nếu (op == 183) { trả về 1; }; // OP_VM_MACHINE_DIR_CLOSE
     nếu (op == 184) { trả về 2; }; // OP_VM_MACHINE_PATH_KIND
+    nếu (op == 221) { trả về 1; }; // OP_VM_MACHINE_PATH_STAT
+    nếu (op == 222) { trả về 1; }; // OP_VM_MACHINE_PATH_ABSOLUTE
+    nếu (op == 223) { trả về 1; }; // OP_VM_MACHINE_PATH_CANONICAL
+    nếu (op == 224) { trả về 2; }; // OP_VM_MACHINE_PATH_EQUIVALENT
+    nếu (op == 225) { trả về 0; }; // OP_VM_MACHINE_PATH_CURRENT
+    nếu (op == 226) { trả về 1; }; // OP_VM_MACHINE_PATH_SET_CURRENT
+    nếu (op == 227) { trả về 0; }; // OP_VM_MACHINE_PATH_TEMP
+    nếu (op == 228) { trả về 1; }; // OP_VM_MACHINE_PATH_EXECUTABLE
+    nếu (op == 229) { trả về 1; }; // OP_VM_MACHINE_FILE_LOCK
     nếu (op == 185) { trả về 1; }; // OP_VM_MACHINE_SOCKET_KIND
     nếu (op == 186) { trả về 1; }; // OP_VM_MACHINE_SOCKET_CLOSE
     nếu (op == 187) { trả về 2; }; // OP_VM_MACHINE_SOCKET_TIMEOUT
@@ -656,6 +724,9 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("máy_tệp_vị_trí")) == 1) { trả về 164; };
     nếu (vm_equal(name, vm_literal("máy_tệp_lỗi")) == 1) { trả về 165; };
     nếu (vm_equal(name, vm_literal("máy_tệp_xóa")) == 1) { trả về 166; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_đổi_tên")) == 1) { trả về 218; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_sao_chép")) == 1) { trả về 219; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_liên_kết_cứng")) == 1) { trả về 220; };
     nếu (vm_equal(name, vm_literal("máy_tiến_trình_pid")) == 1) { trả về 167; };
     nếu (vm_equal(name, vm_literal("máy_tiến_trình_ppid")) == 1) { trả về 168; };
     nếu (vm_equal(name, vm_literal("máy_tiến_trình_uid")) == 1) { trả về 169; };
@@ -674,6 +745,15 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("máy_thư_mục_kế")) == 1) { trả về 182; };
     nếu (vm_equal(name, vm_literal("máy_thư_mục_đóng")) == 1) { trả về 183; };
     nếu (vm_equal(name, vm_literal("máy_đường_loại")) == 1) { trả về 184; };
+    nếu (vm_equal(name, vm_literal("máy_đường_thống_kê")) == 1) { trả về 221; };
+    nếu (vm_equal(name, vm_literal("máy_đường_tuyệt_đối")) == 1) { trả về 222; };
+    nếu (vm_equal(name, vm_literal("máy_đường_chuẩn")) == 1) { trả về 223; };
+    nếu (vm_equal(name, vm_literal("máy_đường_cùng_tệp")) == 1) { trả về 224; };
+    nếu (vm_equal(name, vm_literal("máy_đường_hiện_tại")) == 1) { trả về 225; };
+    nếu (vm_equal(name, vm_literal("máy_đường_đặt_hiện_tại")) == 1) { trả về 226; };
+    nếu (vm_equal(name, vm_literal("máy_đường_tạm")) == 1) { trả về 227; };
+    nếu (vm_equal(name, vm_literal("máy_đường_thực_thi")) == 1) { trả về 228; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_khóa")) == 1) { trả về 229; };
     nếu (vm_equal(name, vm_literal("máy_socket_loại")) == 1) { trả về 185; };
     nếu (vm_equal(name, vm_literal("máy_socket_đóng")) == 1) { trả về 186; };
     nếu (vm_equal(name, vm_literal("máy_socket_timeout")) == 1) { trả về 187; };
@@ -779,6 +859,15 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("máy thư mục kế")) == 1) { trả về 182; };
     nếu (vm_equal(name, vm_literal("máy thư mục đóng")) == 1) { trả về 183; };
     nếu (vm_equal(name, vm_literal("máy đường loại")) == 1) { trả về 184; };
+    nếu (vm_equal(name, vm_literal("máy đường thống kê")) == 1) { trả về 221; };
+    nếu (vm_equal(name, vm_literal("máy đường tuyệt đối")) == 1) { trả về 222; };
+    nếu (vm_equal(name, vm_literal("máy đường chuẩn")) == 1) { trả về 223; };
+    nếu (vm_equal(name, vm_literal("máy đường cùng tệp")) == 1) { trả về 224; };
+    nếu (vm_equal(name, vm_literal("máy đường hiện tại")) == 1) { trả về 225; };
+    nếu (vm_equal(name, vm_literal("máy đường đặt hiện tại")) == 1) { trả về 226; };
+    nếu (vm_equal(name, vm_literal("máy đường tạm")) == 1) { trả về 227; };
+    nếu (vm_equal(name, vm_literal("máy đường thực thi")) == 1) { trả về 228; };
+    nếu (vm_equal(name, vm_literal("máy tệp khóa")) == 1) { trả về 229; };
     nếu (vm_equal(name, vm_literal("máy đầu nối loại")) == 1) { trả về 185; };
     nếu (vm_equal(name, vm_literal("máy đầu nối đóng")) == 1) { trả về 186; };
     nếu (vm_equal(name, vm_literal("máy đầu nối thời gian chờ")) == 1) { trả về 187; };
@@ -803,6 +892,9 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("máy tls nâng cấp")) == 1) { trả về 206; };
     nếu (vm_equal(name, vm_literal("máy tls gửi")) == 1) { trả về 207; };
     nếu (vm_equal(name, vm_literal("máy tls nhận")) == 1) { trả về 208; };
+    nếu (vm_equal(name, vm_literal("máy tệp đổi tên")) == 1) { trả về 218; };
+    nếu (vm_equal(name, vm_literal("máy tệp sao chép")) == 1) { trả về 219; };
+    nếu (vm_equal(name, vm_literal("máy tệp liên kết cứng")) == 1) { trả về 220; };
     nếu (vm_equal(name, vm_literal("loại của")) == 1) { trả về 145; };
     nếu (vm_equal(name, vm_literal("độ dài")) == 1) { trả về 147; };
     nếu (vm_equal(name, vm_literal("thêm")) == 1) { trả về 148; };

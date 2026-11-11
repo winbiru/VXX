@@ -741,8 +741,10 @@ lớp công khai Bộ Hạ IR {
 
     // Hạ AST đã được semantic kiểm tra. Module imports chỉ được bỏ qua ở
     // nhánh emitter đa mô-đun sau khi graph đã giải tất cả dependencies.
-    hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập) {
-        biên dịch kiểm tra ngữ nghĩa thuần(cây);
+    hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai) {
+        // Bộ chọn nhập đã kiểm tra toàn bộ AST, kể cả các khai báo sẽ bị loại.
+        // Chỉ linker được truyền chứng nhận này; các lời gọi độc lập vẫn kiểm tra.
+        nếu (!đã kiểm tra ngữ nghĩa) { biên dịch kiểm tra ngữ nghĩa thuần(cây); };
         câu lệnh = lấy từ điển(cây, "câu lệnh", []);
         đỉnh = [];
         các hàm = [];
@@ -848,9 +850,9 @@ hàm công khai biên dịch IR tách thành viên(tên) {
     trả về bộ chuyển tiếp.biên dịch IR tách thành viên(tên);
 };
 
-hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập) {
+hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai) {
     bộ chuyển tiếp = Bộ Hạ IR();
-    trả về bộ chuyển tiếp.biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập);
+    trả về bộ chuyển tiếp.biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa);
 };
 
 hàm công khai biên dịch hạ IR thuần(mã nguồn) {

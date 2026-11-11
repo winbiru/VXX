@@ -6,6 +6,8 @@ nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản đị
 nhập gói.biên dịch.chương trình.*;
 nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
 nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
 nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
@@ -433,6 +435,16 @@ lớp công khai Bộ Hạ Cây {
         trả về {"values": trạng thái["values"], "functions": các hàm};
     };
 
+    // CLI đã tạo IR để chọn backend; dùng lại graph và tên ABI cho cả CALL
+    // lẫn symbol xuất. Lowerer kiểm tra CFG một lần, assembler lo encoding.
+    hàm công khai sinh lắp ráp hàm(biểu diễn trung gian, tên hàm, kiến trúc, hệ điều hành) {
+        mình.chuẩn hóa ABI(biểu diễn trung gian);
+        tên = mình.mã hóa tên ABI(tên hàm);
+        máy = biên dịch máy hạ IR(biểu diễn trung gian, tên);
+        trả về biên dịch lắp ráp đầu(hệ điều hành, tên) +
+            biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, sai);
+    };
+
     // Pipeline độc lập: nguồn .vi -> AST -> IR -> Machine IR -> ISA bytes.
     hàm công khai sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
@@ -545,6 +557,11 @@ hàm công khai tạo IR(mã nguồn) {
 hàm công khai sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
     bộ chuyển tiếp = Bộ Hạ Cây();
     trả về bộ chuyển tiếp.sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
+};
+
+hàm công khai sinh lắp ráp hàm(IR, tên hàm, kiến trúc, hệ điều hành = "linux") {
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.sinh lắp ráp hàm(IR, tên hàm, kiến trúc, hệ điều hành);
 };
 
 hàm công khai tạo đối tượng hàm(mã nguồn, tên hàm, kiến trúc,

@@ -1,0 +1,31 @@
+// Published SHA-256/HMAC vectors and padding boundaries for VM/AOT parity.
+nhập gói.bảo mật.mật mã.*;
+hàm kiểm(đầu vào, kỳ vọng) {
+    nếu (băm sha256(đầu vào) != kỳ vọng) { ném "AOT SHA-256 vector mismatch"; };
+};
+hàm chính() {
+    kiểm("", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    kiểm("abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    kiểm("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+    kiểm("Việt Nam 🌿", "b3d5643ad509732832a9bbf4c8e1d7f3d71580ca2c9b8a8238e4459f6ea56536");
+    văn bản = "";
+    khi (độ dài(văn bản) < 55) { văn bản += "a"; };
+    kiểm(văn bản, "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318");
+    khi (độ dài(văn bản) < 56) { văn bản += "a"; };
+    kiểm(văn bản, "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a");
+    khi (độ dài(văn bản) < 63) { văn bản += "a"; };
+    kiểm(văn bản, "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34");
+    khi (độ dài(văn bản) < 64) { văn bản += "a"; };
+    kiểm(văn bản, "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb");
+    khi (độ dài(văn bản) < 65) { văn bản += "a"; };
+    kiểm(văn bản, "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0");
+    khi (độ dài(văn bản) < 1000) { văn bản += "a"; };
+    kiểm(văn bản, "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3");
+    khi (độ dài(văn bản) < 4096) { văn bản += "a"; };
+    kiểm(văn bản, "c93eee2d0db02f10acc7460d9576e122dcf8cd53c4bf8dfcae1b3e74ebcfff5a");
+    byte = []; lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(byte, i); };
+    nếu (mật mã thập lục phân(mật mã sha256 các byte(byte)) != "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880") { ném "AOT binary hash mismatch"; };
+    khóa = ""; khi (độ dài(khóa) < 131) { khóa += "a"; };
+    nếu (hmac sha256(khóa, "long key 🌿") != "da22f5c58a3f6f8b58cfde80198a41e60b338feaf8b61f5c65ab3069460b1566") { ném "AOT HMAC mismatch"; };
+    in "AOT_HASH_OK";
+};

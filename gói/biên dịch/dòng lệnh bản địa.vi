@@ -11,6 +11,135 @@ nhập gói.biên dịch.sản phẩm biên dịch.biên dịch sản phẩm bi�
 nhập gói.biên dịch.dòng lệnh máy.biên dịch phân tích dòng lệnh máy như phân tích lệnh máy;
 nhập gói.biên dịch.dòng lệnh máy.biên dịch chuẩn bị dòng lệnh máy như chuẩn bị lệnh máy;
 nhập gói.biên dịch.asm chương trình.biên dịch asm chương trình như sinh asm chương trình;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT kế hoạch như lập kế hoạch AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chạy lệnh như chạy lệnh AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT thực hiện bước như thực hiện bước AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đầu vào cache thực thi như đầu vào cache AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đường cache thực thi như đường cache AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT cache thực thi hợp lệ như kiểm tra cache AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT ghi theo dõi cache như theo dõi cache AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache như công bố cache AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache tự quản như công bố cache tự quản AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đọc cache nguồn như đọc cache nguồn AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache nguồn như công bố cache nguồn AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache nguồn tự quản như công bố cache nguồn tự quản AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT ghi kết quả batch như ghi batch AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT tạo thư mục tạm như tạo thư mục tạm AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dọn thư mục tạm như dọn thư mục tạm AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chuẩn bị thư mục batch như chuẩn bị thư mục batch AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đầu vào dấu liên kết như đầu vào liên kết AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chữ ký liên kết như chữ ký liên kết AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chọn gốc thư viện như lựa gốc thư viện AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT ghi nguồn nhúng như ghi nguồn nhúng AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT đọc lỗi nhúng như đọc lỗi nhúng AOT;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dùng chỉ mục nguồn như dùng chỉ mục nguồn AOT;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chọn gốc như phiên AOT chọn gốc;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT gốc gói như phiên AOT gốc gói;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn hóa yêu cầu như phiên AOT chuẩn hóa yêu cầu;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT lắp ráp như phiên AOT lắp ráp;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT tìm cache nguồn như phiên AOT tìm cache nguồn;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị chạy như phiên AOT chuẩn bị chạy;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị batch như phiên AOT chuẩn bị batch;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT đổi thư mục như phiên AOT đổi thư mục;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị nhúng như phiên AOT chuẩn bị nhúng;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+
+hàm biên dịch AOT chọn gốc(thư mục chương trình, bắt buộc) {
+    trả về phiên AOT chọn gốc(thư mục chương trình, bắt buộc);
+};
+hàm biên dịch AOT gốc gói(gốc) {
+    trả về phiên AOT gốc gói(gốc);
+};
+hàm biên dịch AOT chuẩn hóa yêu cầu(kế hoạch) {
+    trả về phiên AOT chuẩn hóa yêu cầu(kế hoạch);
+};
+hàm biên dịch AOT lắp ráp(asm, đích, gốc, phiên, bộ ba, ffi, thư mục chương trình) {
+    trả về phiên AOT lắp ráp(asm, đích, gốc, phiên, bộ ba, ffi, thư mục chương trình);
+};
+hàm biên dịch AOT tìm cache nguồn(nguồn, gói, gốc, thư mục chương trình) {
+    trả về phiên AOT tìm cache nguồn(nguồn, gói, gốc, thư mục chương trình);
+};
+hàm biên dịch AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba, ffi, thư mục chương trình, chỉ mục, bộ đệm) {
+    trả về phiên AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba, ffi, thư mục chương trình, chỉ mục, bộ đệm);
+};
+hàm biên dịch AOT chuẩn bị batch(đối số) {
+    trả về phiên AOT chuẩn bị batch(đối số);
+};
+hàm biên dịch AOT đổi thư mục(đường) {
+    trả về phiên AOT đổi thư mục(đường);
+};
+hàm biên dịch AOT chuẩn bị nhúng(gốc nhập, thư mục chương trình) {
+    trả về phiên AOT chuẩn bị nhúng(gốc nhập, thư mục chương trình);
+};
+
+// Stable host ABI: platform/runtime policy and subprocess error handling
+// are implemented by the V++ driver, including the CMake parity route.
+hàm biên dịch AOT kế hoạch(asm, bối cảnh) {
+    trả về lập kế hoạch AOT(asm, bối cảnh);
+};
+hàm biên dịch AOT chạy lệnh(lệnh, nhãn) {
+    trả về chạy lệnh AOT(lệnh, nhãn);
+};
+hàm biên dịch AOT thực hiện bước(bước) {
+    trả về thực hiện bước AOT(bước);
+};
+hàm biên dịch AOT đầu vào cache thực thi(asm, gốc, thư viện, hiện tại, công cụ) {
+    trả về đầu vào cache AOT(asm, gốc, thư viện, hiện tại, công cụ);
+};
+hàm biên dịch AOT đường cache thực thi(các trường, thư mục) {
+    trả về đường cache AOT(các trường, thư mục);
+};
+hàm biên dịch AOT cache thực thi hợp lệ(đường) {
+    trả về kiểm tra cache AOT(đường);
+};
+hàm biên dịch AOT ghi theo dõi cache(sự kiện, đường) {
+    trả về theo dõi cache AOT(sự kiện, đường);
+};
+hàm biên dịch AOT công bố cache(nguồn, đích, tạm) {
+    trả về công bố cache AOT(nguồn, đích, tạm);
+};
+hàm biên dịch AOT công bố cache tự quản(nguồn, đích) {
+    trả về công bố cache tự quản AOT(nguồn, đích);
+};
+hàm biên dịch AOT đọc cache nguồn(đường) {
+    trả về đọc cache nguồn AOT(đường);
+};
+hàm biên dịch AOT công bố cache nguồn(chỉ mục, executable, bộ đệm, tạm) {
+    trả về công bố cache nguồn AOT(chỉ mục, executable, bộ đệm, tạm);
+};
+hàm biên dịch AOT công bố cache nguồn tự quản(chỉ mục, executable, bộ đệm) {
+    trả về công bố cache nguồn tự quản AOT(chỉ mục, executable, bộ đệm);
+};
+hàm biên dịch AOT ghi kết quả batch(thư mục, tên, đầu ra, mã, mili, kiểm vàng, tệp kỳ vọng) {
+    trả về ghi batch AOT(thư mục, tên, đầu ra, mã, mili, kiểm vàng, tệp kỳ vọng);
+};
+hàm biên dịch AOT tạo thư mục tạm(cha) {
+    trả về tạo thư mục tạm AOT(cha);
+};
+hàm biên dịch AOT dọn thư mục tạm(đường) {
+    trả về dọn thư mục tạm AOT(đường);
+};
+hàm biên dịch AOT chuẩn bị thư mục batch(thư mục) {
+    trả về chuẩn bị thư mục batch AOT(thư mục);
+};
+hàm biên dịch AOT đầu vào dấu liên kết(gốc, thư viện) {
+    trả về đầu vào liên kết AOT(gốc, thư viện);
+};
+hàm biên dịch AOT chữ ký liên kết(các trường) {
+    trả về chữ ký liên kết AOT(các trường);
+};
+hàm biên dịch AOT chọn gốc thư viện(gốc, thư mục chương trình, hiện tại) {
+    trả về lựa gốc thư viện AOT(gốc, thư mục chương trình, hiện tại);
+};
+hàm biên dịch AOT ghi nguồn nhúng(đường, nguồn) {
+    trả về ghi nguồn nhúng AOT(đường, nguồn);
+};
+hàm biên dịch AOT đọc lỗi nhúng(đường) {
+    trả về đọc lỗi nhúng AOT(đường);
+};
+hàm biên dịch AOT dùng chỉ mục nguồn() {
+    trả về dùng chỉ mục nguồn AOT();
+};
 
 hàm biên dịch phân tích dòng lệnh máy(đối số) {
     trả về phân tích lệnh máy(đối số);
@@ -19,7 +148,10 @@ hàm biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ
     trả về chuẩn bị lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm);
 };
 hàm biên dịch asm chương trình(dây, bộ ba, compiler) {
-    trả về sinh asm chương trình(dây, bộ ba, compiler);
+    // executeArtifact của native host dùng entrypoint này. Đưa Machine IR
+    // thẳng xuống assembler; vẫn cho phép so sánh với byte encoder cũ.
+    trả về sinh asm chương trình(dây, bộ ba, compiler, rỗng,
+        đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0");
 };
 
 hàm biên dịch trước nguồn tệp(đường, thư viện) {

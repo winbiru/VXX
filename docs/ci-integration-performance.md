@@ -1,6 +1,6 @@
 # Thời gian chạy integration native
 
-`vpp-integration` dùng compiler V++ tự biên dịch cho 192 golden fixtures và
+`vpp-integration` dùng compiler V++ tự biên dịch cho 191 golden fixtures và
 giữ 22 fixture phụ thuộc VM trong lane C++ tường minh. Lượt CI cũ trước
 commit `6e5c524` chủ yếu chạy qua VM C++; thời gian hai lượt không còn đo
 cùng một lượng công việc. Mỗi fixture native phải đọc import graph, phân
@@ -14,14 +14,21 @@ tích/liên kết, hạ Machine IR, phát mã máy/ASM, assemble/link rồi ch�
 - Một batch nay giữ một tiến trình compiler V++. Bộ đệm do V++ quản lý
   tái sử dụng thân ASM khi toàn bộ Machine IR và target giống nhau. Key
   bao gồm frame, instructions, immediates, function/string IDs và symbols.
-  Chỉ header mang tên hàm được dựng lại; relocation và metadata giữ nguyên.
-- Memo chỉ sống trong phiên, giới hạn 64 MiB cho key và text. Không lưu
-  executable hoặc kết quả golden. Nguồn, import graph, liên kết và lowering
+  Với đường byte, chỉ header mang tên hàm được dựng lại. Đường ASM trực tiếp
+  đưa tên hàm vào key vì thân hàm chứa các nhãn riêng theo tên.
+- Memo thân ASM chỉ sống trong phiên, giới hạn 64 MiB cho key và text.
+  Khi executable cache chưa trúng, nguồn, import graph, liên kết và lowering
   vẫn được xử lý lại; chương trình của mỗi fixture chạy trong process riêng.
   `VPP_NATIVE_NO_CACHE=1` tắt memo để đối chiếu.
-- `run_tests.sh` chạy tối đa ba worker mặc định: hai lane độc lập và một
-  lane có thứ tự. `VPP_NATIVE_TEST_WORKERS=1..4` điều chỉnh ngân sách.
-  CTest đặt `PROCESSORS=3` để integration không bị coi là test một CPU.
+- Mỗi lượt integration chia sẻ một executable cache tạm. Khóa liên tiến trình
+  và xuất bản nguyên tử tránh assemble/link lại cùng một ASM trong các worker.
+  Source index kiểm tra nội dung nguồn, dependencies thực tế và các đường
+  import ưu tiên cao hơn từng vắng mặt; nguồn không đổi có thể bỏ qua cả
+  frontend và sinh ASM. Không cache stdout/status: mỗi lượt vẫn chạy chương
+  trình trong tiến trình mới với cwd/environment hiện tại.
+- `run_tests.sh` chạy bốn worker mặc định; các fixture có trạng thái ngoài
+  được giữ thứ tự trong một lane. `VPP_NATIVE_TEST_WORKERS=1..4` điều chỉnh
+  ngân sách. CTest đặt `PROCESSORS=4` cho integration.
 - Các fixture sự kiện, phân tích cú pháp khai báo FFI, tiện ích định dạng
   mạng và mô phỏng lượng tử chỉ xử lý dữ liệu trong bộ nhớ được xếp vào
   lane độc lập. Bộ lọc keyword vẫn giữ file/network/database và những
@@ -406,3 +413,144 @@ sớm với thông báo rõ ràng. Khi worker lỗi hoặc thiếu file timing, 
 do máy macOS không có PowerShell; cũng chưa có full CTest hoặc GitHub Actions
 trên tất cả nền tảng cho revision đang sửa. Cần một run CI mới để xác nhận
 thời gian Windows và so sánh trên cùng GitHub runner.
+
+## Phát ASM trực tiếp cho CLI AOT, 2026-11-10
+
+`build/run/artifact` mặc định in mnemonic thẳng từ Machine IR do
+`Bộ Hạ ASM Động` vừa tạo, rồi chuyển cho assembler/linker. Không chạy CFG
+validator và byte encoder thêm một lượt trên các thân động nội bộ này,
+không dựng danh sách byte và không chuyển byte ngược thành `.byte/.long`.
+Các hàm i32 chuyên biệt cùng bộ chọn `fast_i/fast_m/fast_s/ASCII` hiện cũng
+phát trực tiếp từ Machine IR, nhận đúng tham số theo ABI và xử lý chia/dư i32.
+Các API raw/object và phép đối chiếu object độc lập vẫn giữ byte encoder.
+`VPP_AOT_ASM_DIRECT=0` chọn lại đường cũ để bisect;
+cờ này nằm trong khóa executable cache để hai chế độ không dùng nhầm artifact.
+
+Bộ in chỉ phát nhãn ở đích nhảy. Nhóm đối số scalar liền nhau được đưa thẳng
+vào thanh ghi/stack ABI, không ghi rồi đọc lại eval stack. Chuỗi kiểm tra
+trạng thái `Call; BranchZero success; Jump error` dùng trực tiếp thanh ghi
+trả về; không ghép qua điểm vào của nhánh khác. ARM64 giữ các frame nhỏ trong
+W19..W28; frame lớn và đối số stack theo đúng ABI macOS/Linux/Win64.
+
+Một lượt A/B cục bộ trên macOS ARM64, cùng native compiler, cùng fixture
+`kiem_tra_package_modules.vi`, cache executable tắt, bật cả hai profiler:
+
+| Công đoạn | Qua byte encoder | ASM trực tiếp |
+| --- | ---: | ---: |
+| Frontend + sinh ASM | 32,809 giây | 22,841 giây |
+| Riêng sinh ASM (`asm.total`) | 18,384 giây | 8,806 giây |
+| Assembler | 0,234 giây | 1,758 giây |
+| Linker | 0,048 giây | 0,050 giây |
+| Tổng wall time biên dịch | **33,157 giây** | **24,727 giây** |
+
+Tổng giảm **25,4%** dù assembler cần nhiều thời gian hơn để đọc mnemonic.
+Hai executable đều exit 0 và stdout trùng golden. Đây là một lượt đo cục bộ,
+chưa phải median hoặc số liệu GitHub Actions. Phần `source.graph/source.link`
+vẫn còn khoảng 14 giây và chưa được tối ưu thêm bởi thay đổi này.
+
+`vpp-native-real-assembler-smoke` assemble ASM trực tiếp cho ARM64 macOS/Linux
+và x86_64 Linux/Windows, rồi chạy C harness trên host để kiểm chứng đối số
+vượt thanh ghi, CFG join, nhánh lỗi, frame lớn, hàm i32 có 9 tham số, phép
+chia/dư có dấu và lời gọi lồng nhau. Batch parity so đầu ra đường ASM trực
+tiếp với đường byte encoder; cache cold/warm được so riêng cho cả hai.
+
+### Mở rộng trực tiếp tới các bộ chọn và hàm chuyên biệt
+
+Lượt đo thêm trên `kiem_tra_native_control_flow.vi` với `--compiler=vpp`,
+`VPP_NATIVE_NO_CACHE=1`, cùng binary và host macOS ARM64. Hai chế độ cho
+stdout giống nhau và exit 0. Số liệu **một lần mỗi chế độ** (chưa phải median):
+
+| Công đoạn | Byte encoder | ASM trực tiếp toàn AOT |
+| --- | ---: | ---: |
+| `asm.fast_paths` | 58,514 ms | 16,395 ms |
+| `asm.body.machine_ms` | 90,668 ms | 0,236 ms |
+| `asm.functions` | 178,032 ms | 83,601 ms |
+| `asm.total` | **249,855 ms** | **113,375 ms** |
+| Wall time cả chạy và biên dịch | 1,70 s | 1,57 s |
+
+Riêng `asm.total` giảm khoảng **54,6%** trong mẫu này. Frontend vẫn mất
+`source.graph` khoảng 47 ms và `source.link` khoảng 29 ms; đây là giới hạn
+còn lại ngoài phần sinh mã. Khác biệt toàn bộ wall time nhỏ hơn vì còn
+assembler/linker/runtime startup và chịu nhiễu của một lượt đo.
+
+### ARM64 leaf functions: tính trực tiếp trên thanh ghi
+
+Với các hàm i32 không gọi ABI, có tối đa 8 tham số và tối đa 16 slot,
+backend ARM64 dùng W0–W8/W11–W17 và không tạo stack frame. W9/W10 giữ
+vai trò scratch; `Mod` với trên 9 slot chuyển về frame thông thường vì
+cần W11 cho thương số tạm. Trong nhánh leaf, `PushConstant`, `LoadSlot`,
+`StoreSlot`, `BranchZero`, `Return`, các phép toán và phép so sánh có thể
+đọc/ghi thẳng thanh ghi slot, bỏ các lượt `mov` qua W9/W10. `Div/Mod` vẫn
+giữ xử lý biên và chia cho 0 của backend cũ.
+
+Ví dụ Machine IR cộng 8 tham số, giữ đồng thời 8 giá trị eval (16 slot):
+ASM ARM64 giảm từ **46 xuống 17 lệnh** (giảm khoảng 63%) mà kết quả chạy
+giữ nguyên. `vpp-native-real-assembler-smoke` đã chạy C harness trên macOS
+ARM64 cho các trường hợp 16 slot, CFG branch, `StoreSlot`, tất cả phép số
+học/bitwise/shift/so sánh, chia dư và fallback. Clang cũng chấp nhận
+assembly ARM64 Linux và x86-64 Linux/Windows, nhưng đây không phải xác nhận
+runtime trên ba hệ điều hành đó. Bảy suite bootstrap/AOT/leaf/batch/cache
+parity đã PASS cục bộ sau tối ưu.
+
+Đo trên macOS ARM64 với `VPP_NATIVE_NO_CACHE=1`, xen kẽ hai chế độ,
+cùng compiler và cùng đầu vào; tất cả lượt chạy trả về 0 và stdout giống
+nhau. Các số dưới là **median wall time của toàn lượt biên dịch và chạy**:
+
+| Fixture | Số lượt mỗi chế độ | Byte encoder (`ASM_DIRECT=0`) | ASM trực tiếp (`ASM_DIRECT=1`) | Giảm wall time |
+| --- | ---: | ---: | ---: | ---: |
+| `kiem_tra_native_control_flow.vi` | 5 | 1,323 s | 1,236 s | 6,6% |
+| `kiem_tra_package_modules.vi` | 3 | 29,577 s | 22,412 s | 24,2% |
+
+Kết quả này đánh giá **toàn bộ backend ASM trực tiếp** so với byte encoder,
+không tách riêng đóng góp của tối ưu leaf. Lượt CI mới trên Linux/Windows
+và A/B cùng runner vẫn cần thiết để đánh giá tác động lên thời gian Actions.
+
+### Driver AOT được điều phối bằng V++
+
+Compiler tự chủ dùng `gói/biên dịch/trình điều khiển AOT.vi` để chọn runtime,
+ABI, archive, lệnh assembler/linker và đường CMake đối chiếu. V++ chạy các
+lệnh bằng thư viện tiến trình và xử lý lỗi khởi chạy/mã thoát. Trong đường
+này, C++ cung cấp thư mục tạm, quan sát hệ tệp, cache object và xuất bản
+executable nguyên tử; driver C++ cũ giữ vai trò bootstrap/oracle Stage 0.
+
+`VPP_NATIVE_PROFILE=1` in marker `driver-aot-vpp` trước các pha assemble/link.
+Việc đọc giá trị từ `CMakeCache.txt` quét byte một lượt, không tách lại toàn
+bộ văn bản cho từng dòng. Cache object tính cả nội dung nguồn/include, target,
+argv, môi trường toolchain và metadata của công cụ; project CMake được dựng
+lại khi chữ ký cấu hình thay đổi.
+
+`vpp-native-vpp-aot-driver` biên dịch driver và compiler thành Stage 2 bằng
+V++ rồi dùng Stage 2 tạo/chạy executable độc lập. Test còn kiểm tra kế hoạch
+macOS/Linux/Windows, lỗi công cụ, Unicode/space trong argv và bảo toàn đầu ra
+cũ khi thất bại. Kiểm tra kế hoạch trên host macOS không thay cho chạy ELF/PE
+trên Linux/Windows. Chi tiết: `docs/native-aot-direct-link.md`.
+
+### Source-index FAST-HIT: điều tra ngày 2026-11-11
+
+Khi chạy `kiem_tra_stdlib_tinh_toan.vi` với `VPP_AOT_EXECUTABLE_CACHE_DIR`
+và `VPP_AOT_CACHE_TIMING_FILE` trên macOS ARM64, đường FAST-HIT từng tốn
+**16,46 giây** mặc dù không gọi assembler/linker. Source-index v3 chứa
+352 bản ghi (94 tệp, 258 đường import vắng), dung lượng khoảng 26 KiB.
+Đo bên trong `biên dịch AOT đọc cache nguồn` cho thấy **15.757 ms** nằm
+trong `tách hằng văn bản`, chỉ **560 ms** nằm trong vòng kiểm tra dependency.
+
+`tách hằng văn bản` gọi `tìm chuỗi chính xác` cho mỗi dấu xuống dòng; hàm
+tìm lại dựng chỉ mục UTF-8 cho toàn bộ input ở mỗi lần gọi. Source-index
+được chuyển sang bộ tách dòng riêng viết bằng V++: quét danh sách byte UTF-8
+một lượt, kết thúc dòng tại byte LF, giữ cả dòng rỗng cuối cùng. Logic xác
+thực file fingerprint và negative import probes không đổi; runtime chỉ cung
+cấp các primitive chuyển chuỗi/byte và thêm phần tử danh sách.
+
+| Phép đo FAST-HIT | Trước | Sau |
+| --- | ---: | ---: |
+| Tách source-index | 15.757 ms | 12,5 ms |
+| Xác thực toàn source-index | 16.341 ms | 605 ms |
+| Thời gian chạy fixture (`elapsed_ms`) | 16.453 ms | 732 ms |
+| Wall time toàn lệnh batch | 16,46 giây | 1,36 giây |
+
+Các số liệu lấy từ hai binary bootstrap cùng source trước/sau, cùng fixture,
+executable cache và cấu hình direct ASM/link; trace của cả hai lượt là
+`FAST-HIT` cho cùng executable. stdout so từng byte là giống nhau.
+Đây là **một lần đo mỗi phiên bản**, chưa phải median, và chỉ đo đường
+cache đã trúng. Thời gian MISS và tổng integration cần được đo riêng:
+với fixture chỉ chạy một lần, thời gian frontend và assembler/linker vẫn còn.

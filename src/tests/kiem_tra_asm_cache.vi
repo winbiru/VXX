@@ -16,11 +16,20 @@ hàm chính() {
     lặp(i = 0; i < độ dài(nguồn); i++) {
         dây = biên dịch nạp sản phẩm biên dịch(biên dịch chương trình tự chủ(nguồn[i]));
         lặp(j = 0; j < độ dài(đích); j++) {
-            gốc = biên dịch asm chương trình(dây, đích[j]);
-            lạnh = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm);
-            ấm = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm);
+            gốc = biên dịch asm chương trình(dây, đích[j], sai, rỗng, sai);
+            lạnh = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, sai);
+            ấm = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, sai);
             nếu (gốc != lạnh || gốc != ấm) {
                 ném "ASM cache đổi byte/relocation/metadata tại " + i + "/" + đích[j];
+            };
+            gốc trực = biên dịch asm chương trình(dây, đích[j], sai, rỗng, đúng);
+            nếu (gốc trực != biên dịch asm chương trình(dây, đích[j])) {
+                ném "ASM mặc định chưa dùng backend trực tiếp";
+            };
+            lạnh trực = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, đúng);
+            ấm trực = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, đúng);
+            nếu (gốc trực != lạnh trực || gốc trực != ấm trực) {
+                ném "ASM trực tiếp đổi nhãn/thân khi cache tại " + i + "/" + đích[j];
             };
         };
     };

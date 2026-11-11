@@ -9,6 +9,52 @@ nhập gói.văn bản.chuỗi.chuỗi thường;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
 
+// OS observations use tagged results so filesystem errors remain catchable
+// in V++. Canonicalization and file identity require the platform filesystem.
+hàm riêng tư đường dẫn kết quả OS(kết quả) {
+    nếu (kết quả[0] == "error") { ném "đường dẫn: lỗi OS=" + kết quả[1]; };
+    trả về kết quả[1];
+};
+
+hàm riêng tư đường dẫn đầu vào OS(đường) {
+    byte = bảng mã unicode tám bit mã hóa(đường);
+    lặp(i = 0; i < độ dài(byte); i++) {
+        nếu (byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+    };
+    trả về đường;
+};
+
+hàm công khai đường dẫn tuyệt đối(đường) {
+    trả về đường dẫn kết quả OS(máy đường tuyệt đối(đường dẫn đầu vào OS(đường)));
+};
+hàm công khai đường dẫn chuẩn(đường) {
+    trả về đường dẫn kết quả OS(máy đường chuẩn(đường dẫn đầu vào OS(đường)));
+};
+hàm công khai đường dẫn cùng tệp(a, b) {
+    trả về đường dẫn kết quả OS(máy đường cùng tệp(đường dẫn đầu vào OS(a), đường dẫn đầu vào OS(b)));
+};
+hàm công khai thư mục hiện tại() {
+    trả về đường dẫn kết quả OS(máy đường hiện tại());
+};
+hàm công khai đặt thư mục hiện tại(đường) {
+    trả về đường dẫn kết quả OS(máy đường đặt hiện tại(đường dẫn đầu vào OS(đường)));
+};
+hàm công khai thư mục tạm hệ thống() {
+    trả về đường dẫn kết quả OS(máy đường tạm());
+};
+hàm công khai đường dẫn có thể thực thi(đường) {
+    trả về đường dẫn kết quả OS(máy đường thực thi(đường dẫn đầu vào OS(đường)));
+};
+
+hàm công khai đường dẫn thân(đường) {
+    tên = đường dẫn tên(đường);
+    nếu (tên == "." || tên == "..") { trả về tên; };
+    lặp(i = độ dài(tên) - 1; i > 0; i--) {
+        nếu (tên[i] == ".") { trả về cắt chuỗi(tên, 0, i); };
+    };
+    trả về tên;
+};
+
 // Machine kind: POSIX S_IFMT >> 12 hoặc Windows 0=khác, 1=tệp, 2=thư mục.
 // Trả -1 khi trạng thái đường dẫn không thể đọc; V++ tự chọn theo liên kết.
 
@@ -28,6 +74,18 @@ lớp công khai Tiện Ích Đường Dẫn {
         mình.đường dẫn kiểm tra byte(đường);
         nếu (theo liên kết) { trả về máy đường loại(đường, 1); };
         trả về máy đường loại(đường, 0);
+    };
+
+    // OS metadata ABI is intentionally small; cache policy is pure V++.
+    // ["present", bytes, mtime_seconds, mtime_nanoseconds] or ["missing"].
+    // Unreadable metadata produces a catchable V++ exception; never reuse cache.
+    hàm công khai đường dẫn thống kê tệp(đường) {
+        mình.đường dẫn kiểm tra byte(đường);
+        kết quả = máy đường thống kê(đường);
+        nếu (kết quả[0] == "error") {
+            ném "đường dẫn thống kê tệp: lỗi OS=" + kết quả[1];
+        };
+        trả về kết quả;
     };
 
     hàm riêng tư đường dẫn dấu phân cách() {
@@ -289,6 +347,11 @@ lớp công khai Tiện Ích Đường Dẫn {
 hàm công khai đường dẫn loại windows(đường, theo liên kết) {
     bộ chuyển tiếp = Tiện Ích Đường Dẫn();
     trả về bộ chuyển tiếp.đường dẫn loại windows(đường, theo liên kết);
+};
+
+hàm công khai đường dẫn thống kê tệp(đường) {
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn thống kê tệp(đường);
 };
 
 hàm công khai đường dẫn là phân cách(c) {

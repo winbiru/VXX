@@ -1268,6 +1268,7 @@ if (BUILD_TESTS)
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
                 "-DVPP_CLANG=${VPP_NATIVE_ASSEMBLER_CLANG}"
+                "-DVPP_HOST_PROCESSOR=${CMAKE_HOST_SYSTEM_PROCESSOR}"
                 "-DVPP_LEAF=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_leaf.vi"
                 "-DVPP_GENERAL=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_control_flow.vi"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/real-native-assembler-fixtures"
@@ -1340,6 +1341,16 @@ if (BUILD_TESTS)
         set_tests_properties(vpp-native-linker-cache-parity PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
 
+        add_test(NAME vpp-native-vpp-aot-driver
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-vpp-aot-driver"
+                "-DVPP_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_aot_driver.cmake)
+        set_tests_properties(vpp-native-vpp-aot-driver PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 300)
+
         # Dedicated native-worker regression so CI can isolate concurrency,
         # cancellation and graph-transfer failures without the full suite.
         # This explicitly uses the self-hosted V++ compiler; no VM fallback.
@@ -1375,7 +1386,7 @@ if (BUILD_TESTS)
                          ${CMAKE_SOURCE_DIR}/run_tests.sh)
         set_tests_properties(vpp-integration PROPERTIES
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            FIXTURES_REQUIRED native-cli-compiler PROCESSORS 3 TIMEOUT 14400)
+            FIXTURES_REQUIRED native-cli-compiler PROCESSORS 4 TIMEOUT 14400)
     elseif (VPP_NATIVE_CLI_COMPILER AND WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1)
         # The bundled module names are UTF-8 Vietnamese text.  PowerShell 7
         # reads UTF-8 scripts consistently, unlike legacy Windows PowerShell.
@@ -1518,6 +1529,8 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/ASM/
         PATTERN "README.md")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/quality/native_aot_link/
         DESTINATION scripts/quality/native_aot_link)
+install(PROGRAMS ${CMAKE_SOURCE_DIR}/scripts/quality/audit_linux_static_elf.sh
+        DESTINATION scripts/quality)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/docs/
         DESTINATION docs
         PATTERN ".DS_Store" EXCLUDE)

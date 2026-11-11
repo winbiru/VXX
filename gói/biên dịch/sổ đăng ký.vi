@@ -85,6 +85,17 @@ hàm công khai biên dịch sổ cấp hàm(sổ, mô đun, tên) {
 };
 
 hàm công khai biên dịch sổ tìm mô đun(các mô đun, định danh) {
+    // Chấp nhận cả sổ để tra cứu O(1); chữ ký nhận danh sách cũ vẫn hợp lệ.
+    nếu (loại của(các mô đun) == "từ điển") {
+        chỉ mục = lấy từ điển(các mô đun, "chỉ mục mô đun", rỗng);
+        nếu (chỉ mục != rỗng) {
+            nếu (máy ảo có khóa từ điển(chỉ mục, định danh)) {
+                trả về chỉ mục[định danh];
+            };
+            ném "biên dịch sổ: chưa đăng ký mô-đun phụ thuộc '" + định danh + "'";
+        };
+        các mô đun = các mô đun["mô đun"];
+    };
     lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
         nếu (các mô đun[i]["định danh"] == định danh) {
             trả về các mô đun[i];
@@ -97,12 +108,16 @@ hàm công khai biên dịch sổ cây mô đun(đồ thị, định danh) {
     nếu (định danh == đồ thị["điểm vào"]) {
         trả về đồ thị["cây điểm vào"];
     };
-    các mô đun = đồ thị["mô đun"];
-    lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
-        nếu (các mô đun[i]["định danh"] == định danh) {
-            trả về các mô đun[i]["cây"];
+    nếu (!máy ảo có khóa từ điển(đồ thị, "chỉ mục cây mô đun")) {
+        chỉ mục mới = {};
+        các mô đun = đồ thị["mô đun"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
+            chỉ mục mới[các mô đun[i]["định danh"]] = các mô đun[i]["cây"];
         };
+        đồ thị["chỉ mục cây mô đun"] = chỉ mục mới;
     };
+    chỉ mục = đồ thị["chỉ mục cây mô đun"];
+    nếu (máy ảo có khóa từ điển(chỉ mục, định danh)) { trả về chỉ mục[định danh]; };
     ném "biên dịch sổ: thiếu AST cho '" + định danh + "'";
 };
 
@@ -151,10 +166,8 @@ hàm riêng tư biên dịch sổ cấp lớp duyệt(sổ, định danh, câu l
 // thứ tự câu lệnh để method trước import được cấp ID trước hàm dependency.
 hàm công khai biên dịch sổ cấp hàm duyệt(sổ, đồ thị, định danh) {
     đã cấp = sổ["đã cấp"];
-    lặp(i = 0; i < máy ảo lấy độ dài(đã cấp); i++) {
-        nếu (đã cấp[i] == định danh) { trả về đúng; };
-    };
-    máy ảo thêm cuối danh sách(đã cấp, định danh);
+    nếu (máy ảo có khóa từ điển(đã cấp, định danh)) { trả về đúng; };
+    đã cấp[định danh] = đúng;
     cây = biên dịch sổ cây mô đun(đồ thị, định danh);
     câu lệnh = lấy từ điển(cây, "câu lệnh", []);
     lặp(i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
@@ -253,7 +266,7 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
     lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
         e = cạnh[i];
         nếu (e["nguồn"] == định danh) {
-            phụ thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], e["đích"]);
+            phụ thuộc = biên dịch sổ tìm mô đun(sổ, e["đích"]);
             tên tiền tố = lấy từ điển(e, "bí danh", "");
             các mục xuất = phụ thuộc["xuất"];
             lặp(j = 0; j < máy ảo lấy độ dài(các mục xuất); j++) {
@@ -283,8 +296,12 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             };
         };
     };
-    máy ảo thêm cuối danh sách(sổ["mô đun"], {"định danh": định danh, "trực tiếp": trực tiếp,
-                           "nhìn thấy": nhìn thấy, "xuất": xuất});
+    mục mới = {"định danh": định danh, "trực tiếp": trực tiếp,
+               "nhìn thấy": nhìn thấy, "xuất": xuất};
+    máy ảo thêm cuối danh sách(sổ["mô đun"], mục mới);
+    nếu (máy ảo có khóa từ điển(sổ, "chỉ mục mô đun")) {
+        sổ["chỉ mục mô đun"][định danh] = mục mới;
+    };
 };
 
 // Giữ hợp đồng hàm tự do để emitter/linker hiện có không phải thay đổi.
@@ -363,7 +380,8 @@ lớp công khai Bộ Đăng Ký Hàm {
         };
         mình.sổ = {"loại": "sổ hàm V++", "hàm": [], "chuỗi": [],
                     "chỉ mục hàm": {}, "chỉ mục tên duy nhất": {}, "chỉ mục chuỗi": {},
-                    "mô đun": [], "đã cấp": [], "hoãn chuỗi": mình.hoãn chuỗi};
+                    "mô đun": [], "chỉ mục mô đun": {},
+                    "đã cấp": {}, "hoãn chuỗi": mình.hoãn chuỗi};
         mình.các ô nhớ = [];
         mình.tên đã khai = [];
         thứ tự = đồ thị["thứ tự khởi tạo"];
@@ -385,7 +403,7 @@ lớp công khai Bộ Đăng Ký Hàm {
     };
 
     hàm công khai tìm mô đun(định danh) {
-        trả về biên dịch sổ tìm mô đun(mình.sổ["mô đun"], định danh);
+        trả về biên dịch sổ tìm mô đun(mình.sổ, định danh);
     };
 };
 

@@ -3,6 +3,7 @@
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp mã máy;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
@@ -31,17 +32,26 @@ hàm công khai biên dịch asm tên nội tại() {
         "OP_VM_MAP_REMOVE", "OP_VM_MAP_KEYS", "OP_VM_STRING_BYTES", "OP_VM_STRING_FROM_BYTES",
         "OP_VM_FLOAT_FROM_BITS", "OP_VM_MACHINE_FILE_OPEN", "OP_VM_MACHINE_FILE_READ", "OP_VM_MACHINE_FILE_WRITE",
         "OP_VM_MACHINE_FILE_CLOSE", "OP_VM_MACHINE_FILE_SEEK", "OP_VM_MACHINE_FILE_TELL", "OP_VM_MACHINE_FILE_ERROR",
-        "OP_VM_MACHINE_FILE_REMOVE", "OP_VM_MACHINE_PROCESS_PID", "OP_VM_MACHINE_PROCESS_PPID", "OP_VM_MACHINE_PROCESS_UID",
+        "OP_VM_MACHINE_FILE_REMOVE", "OP_VM_MACHINE_FILE_RENAME", "OP_VM_MACHINE_FILE_COPY",
+        "OP_VM_MACHINE_FILE_LINK", "OP_VM_MACHINE_PROCESS_PID", "OP_VM_MACHINE_PROCESS_PPID", "OP_VM_MACHINE_PROCESS_UID",
         "OP_VM_MACHINE_PROCESS_EUID", "OP_VM_MACHINE_PROCESS_GID", "OP_VM_MACHINE_PROCESS_EGID", "OP_VM_MACHINE_TIME_SLEEP",
         "OP_VM_MACHINE_TIME_MONOTONIC", "OP_VM_MACHINE_TIME_REALTIME", "OP_VM_MACHINE_ENTROPY_READ", "OP_VM_MACHINE_ENV_GET",
         "OP_VM_MACHINE_TIME_LOCAL", "OP_VM_MACHINE_DIR_MKDIR", "OP_VM_MACHINE_DIR_REMOVE", "OP_VM_MACHINE_DIR_OPEN",
-        "OP_VM_MACHINE_DIR_NEXT", "OP_VM_MACHINE_DIR_CLOSE", "OP_VM_MACHINE_PATH_KIND", "OP_VM_MACHINE_SOCKET_KIND",
+        "OP_VM_MACHINE_DIR_NEXT", "OP_VM_MACHINE_DIR_CLOSE", "OP_VM_MACHINE_PATH_KIND", "OP_VM_MACHINE_PATH_STAT", "OP_VM_MACHINE_SOCKET_KIND",
         "OP_VM_MACHINE_SOCKET_CLOSE", "OP_VM_MACHINE_SOCKET_TIMEOUT", "OP_VM_MACHINE_SOCKET_SEND", "OP_VM_MACHINE_SOCKET_RECV",
         "OP_VM_MACHINE_SOCKET_ACCEPT", "OP_VM_MACHINE_SOCKET_LISTEN", "OP_VM_MACHINE_SOCKET_CONNECT", "OP_VM_MACHINE_PROCESS_NEW",
         "OP_VM_MACHINE_PROCESS_ARG", "OP_VM_MACHINE_PROCESS_COMMAND_LINE", "OP_VM_MACHINE_PROCESS_ENV", "OP_VM_MACHINE_PROCESS_START",
         "OP_VM_MACHINE_PROCESS_POLL", "OP_VM_MACHINE_PROCESS_READ", "OP_VM_MACHINE_PROCESS_WAIT", "OP_VM_MACHINE_PROCESS_ERROR",
         "OP_VM_MACHINE_PROCESS_CLOSE", "OP_VM_MACHINE_RESOLVE_OPEN", "OP_VM_MACHINE_RESOLVE_NEXT", "OP_VM_MACHINE_RESOLVE_CLOSE",
         "OP_VM_MACHINE_TLS_UPGRADE", "OP_VM_MACHINE_TLS_SEND", "OP_VM_MACHINE_TLS_RECV",
+        "OP_VM_MACHINE_PATH_ABSOLUTE",
+        "OP_VM_MACHINE_PATH_CANONICAL",
+        "OP_VM_MACHINE_PATH_EQUIVALENT",
+        "OP_VM_MACHINE_PATH_CURRENT",
+        "OP_VM_MACHINE_PATH_SET_CURRENT",
+        "OP_VM_MACHINE_PATH_TEMP",
+        "OP_VM_MACHINE_PATH_EXECUTABLE",
+        "OP_VM_MACHINE_FILE_LOCK",
         "OP_VM_STRING_SLICE", "OP_VM_STRING_REPLACE_EXACT", "OP_VM_STRING_BYTE_SLICE"
     ];
     // END native intrinsic opcodes.
@@ -182,8 +192,13 @@ lớp công khai Bộ Hạ ASM Động {
         mình.id hàm = id hàm;
         mình.ô receiver = {};
         mình.ô nội tuyến = {};
+        // Tra opcode một lần theo vị trí bytecode. Các bộ nhận dạng mẫu
+        // nhìn trước nhiều lệnh sẽ dùng lại tên đã giải mã.
+        mình.tên mã = [];
         lặp(i = 0; i < độ dài(lệnh); i++) {
-            nếu (lấy từ điển(bảng, "" + lệnh[i][0], "") == "OP_PARAM" && lệnh[i][3] == -1 && lệnh[i][2] >= 0) {
+            tên mã = lấy từ điển(bảng, "" + lệnh[i][0], "");
+            máy ảo thêm cuối danh sách(mình.tên mã, tên mã);
+            nếu (tên mã == "OP_PARAM" && lệnh[i][3] == -1 && lệnh[i][2] >= 0) {
                 mình.ô receiver["" + lệnh[i][2]] = đúng;
             };
         };
@@ -194,7 +209,7 @@ lớp công khai Bộ Hạ ASM Động {
             có closure = sai;
             số lần khởi tạo = {};
             lặp(i = 0; i < độ dài(lệnh); i++) {
-                tên lệnh = lấy từ điển(bảng, "" + lệnh[i][0], "");
+                tên lệnh = mình.tên mã[i];
                 nếu (tên lệnh == "OP_TAO_DONG_BAO") { có closure = đúng; };
                 nếu (tên lệnh == "OP_KHOI_TAO" && lệnh[i][2] >= 0) {
                     khóa ô = "" + lệnh[i][2];
@@ -206,19 +221,19 @@ lớp công khai Bộ Hạ ASM Động {
                 lệch ô = [144, 152, 164, 180, 192, 204, 216, 228,
                     244, 256, 268, 280, 292, 304, 316, 328];
                 vị trí = 0;
-                nếu (độ dài(lệnh) > 0 && lấy từ điển(bảng, "" + lệnh[0][0], "") == "OP_MO_KHOI") {
+                nếu (độ dài(lệnh) > 0 && mình.tên mã[0] == "OP_MO_KHOI") {
                     vị trí = 1;
                 };
                 thứ tự = 0;
                 khi (vị trí < độ dài(lệnh) && thứ tự < 16) {
-                    nếu (lấy từ điển(bảng, "" + lệnh[vị trí][0], "") != "OP_KHOI_TAO") { thoát; };
+                    nếu (mình.tên mã[vị trí] != "OP_KHOI_TAO") { thoát; };
                     ô = lệnh[vị trí][2];
                     nếu (ô >= 0 && lấy từ điển(số lần khởi tạo, "" + ô, 0) == 1) {
                         mình.ô nội tuyến["" + ô] = [trường khóa[thứ tự], lệch ô[thứ tự]];
                     };
                     bước = 1;
                     nếu (vị trí + 1 < độ dài(lệnh) && lệnh[vị trí + 1][2] == ô) {
-                        tên sau = lấy từ điển(bảng, "" + lệnh[vị trí + 1][0], "");
+                        tên sau = mình.tên mã[vị trí + 1];
                         nếu (tên sau == "OP_PARAM" || tên sau == "OP_PARAM_MAC_DINH") { bước = 2; };
                     };
                     thứ tự += 1;
@@ -412,7 +427,7 @@ lớp công khai Bộ Hạ ASM Động {
         sâu = 0;
         nguồn = mình.nguồn;
         lặp(i = từ + 1; i < độ dài(nguồn); i++) {
-            tên = lấy từ điển(mình.bảng, "" + nguồn[i][0], "");
+            tên = mình.tên mã[i];
             nếu (tên == "OP_LAP") { sâu += 1; };
             nếu (tên == "OP_CAP_NHAT") {
                 nếu (sâu == 0) { trả về i; };
@@ -428,7 +443,7 @@ lớp công khai Bộ Hạ ASM Động {
         lặp(j = 0; j <= độ dài(nguồn); j++) { máy ảo thêm cuối danh sách(mình.đích nhánh, 0); };
         lặp(j = 0; j < độ dài(nguồn); j++) {
             v = nguồn[j];
-            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            tên = mình.tên mã[j];
             đích = -1;
             nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE" || tên == "OP_THOAT" ||
                 tên == "OP_THU" || tên == "OP_THU_KET_THUC" || tên == "OP_CHON") { đích = v[1]; }
@@ -515,7 +530,7 @@ lớp công khai Bộ Hạ ASM Động {
             "intrinsic", "OP_DONG_KHOI", "OP_CAP_NHAT",
             "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 16; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
             nếu (j == 10 && nguồn[từ + j][0] != biên dịch mã thao tác("OP_VM_LIST_APPEND")) { trả về [sai]; };
             nếu (j > 0 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
         };
@@ -541,7 +556,7 @@ lớp công khai Bộ Hạ ASM Động {
             "OP_DONG_KHOI", "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_TEN_BIEN_ID",
             "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 29; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
             // từ+24 là đích nội bộ của nhánh if sai.
             nếu (j > 0 && j != 24 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
         };
@@ -569,7 +584,7 @@ lớp công khai Bộ Hạ ASM Động {
         mẫu đầu = ["OP_LIST_LITERAL", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
             "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
         lặp(j = 0; j < 8; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[đầu + j][0], "") != mẫu đầu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[đầu + j] != mẫu đầu[j]) { trả về [sai]; };
             nếu (j > 0 && mình.đích nhánh[đầu + j] != 0) { trả về [sai]; };
         };
         nếu (nguồn[đầu][1] != 0 || nguồn[đầu + 1][2] != danh sách ||
@@ -581,7 +596,7 @@ lớp công khai Bộ Hạ ASM Động {
         mẫu giữa = ["OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
             "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
         lặp(j = 0; j < 8; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[giữa + j][0], "") != mẫu giữa[j]) { trả về [sai]; };
+            nếu (mình.tên mã[giữa + j] != mẫu giữa[j]) { trả về [sai]; };
             nếu (j > 0 && mình.đích nhánh[giữa + j] != 0) { trả về [sai]; };
         };
         tổng = nguồn[giữa + 1][2];
@@ -594,7 +609,7 @@ lớp công khai Bộ Hạ ASM Động {
             lọc[3] != danh sách || lọc[4] != tổng) { trả về [sai]; };
         đích = lọc[7];
         nếu (!mình.bỏ kết quả đếm(đích) ||
-            lấy từ điển(mình.bảng, "" + nguồn[đích][0], "") != "OP_TEN_BIEN_GIA_TRI" ||
+            mình.tên mã[đích] != "OP_TEN_BIEN_GIA_TRI" ||
             nguồn[đích][2] != tổng) { trả về [sai]; };
         trả về [đúng, cơ sở, tổng, giới hạn, lọc[5], lọc[6], đích];
     };
@@ -613,7 +628,7 @@ lớp công khai Bộ Hạ ASM Động {
             "OP_DONG_KHOI", "OP_DONG_KHOI", "OP_CAP_NHAT",
             "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 28; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
             nếu (j > 0 && j != 23 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
         };
         bộ đếm = nguồn[từ + 1][2];
@@ -638,7 +653,7 @@ lớp công khai Bộ Hạ ASM Động {
             "phép toán", "OP_TEN_BIEN_ID", "OP_GAN", "OP_DONG_KHOI",
             "OP_CAP_NHAT", "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 16; j++) {
-            tên = lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "");
+            tên = mình.tên mã[từ + j];
             nếu (j == 8) {
                 nếu (tên != "OP_CONG" && tên != "OP_TRU" && tên != "OP_NHAN") { trả về [sai]; };
             } hoặc nếu (tên != mẫu[j]) { trả về [sai]; };
@@ -662,7 +677,7 @@ lớp công khai Bộ Hạ ASM Động {
             "OP_TEN_BIEN_GIA_TRI", "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN",
             "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 16; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
             nếu (j > 0 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
         };
         bộ đếm = nguồn[từ + 1][2];
@@ -687,7 +702,7 @@ lớp công khai Bộ Hạ ASM Động {
             "OP_MODULO", "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN", "OP_DONG_KHOI", "OP_CAP_NHAT",
             "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
         lặp(j = 0; j < 25; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
             nếu (j > 0 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
         };
         bộ đếm = nguồn[từ + 1][2];
@@ -706,9 +721,9 @@ lớp công khai Bộ Hạ ASM Động {
             nguồn[từ + 22][2] != bộ đếm || nguồn[từ + 4][1] != đích ||
             nguồn[từ + 24][1] != từ) { trả về [sai]; };
         nếu (đích + 1 >= độ dài(nguồn) ||
-            lấy từ điển(mình.bảng, "" + nguồn[đích][0], "") != "OP_TEN_BIEN_GIA_TRI" ||
+            mình.tên mã[đích] != "OP_TEN_BIEN_GIA_TRI" ||
             nguồn[đích][2] != tổng ||
-            lấy từ điển(mình.bảng, "" + nguồn[đích + 1][0], "") != "OP_TRA_VE") {
+            mình.tên mã[đích + 1] != "OP_TRA_VE") {
             trả về [sai];
         };
         trả về [đúng, bộ đếm, giới hạn, tổng, ô gọi, dữ liệu, hạt, chu kỳ, chia, đích];
@@ -720,13 +735,13 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (đích < 0 || đích >= độ dài(nguồn)) { trả về sai; };
         i = đích;
         khi (i < độ dài(nguồn)) {
-            tên = lấy từ điển(mình.bảng, "" + nguồn[i][0], "");
+            tên = mình.tên mã[i];
             nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { thoát; };
             i += 1;
         };
         nếu (i + 1 >= độ dài(nguồn)) { trả về sai; };
-        tên = lấy từ điển(mình.bảng, "" + nguồn[i][0], "");
-        sau = lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "");
+        tên = mình.tên mã[i];
+        sau = mình.tên mã[i + 1];
         nếu ((tên != "OP_TEN_BIEN_GIA_TRI" && tên != "OP_BIEN_SO") ||
             sau != "OP_TRA_VE") { trả về sai; };
         lặp(j = đích + 1; j <= i + 1; j++) {
@@ -770,7 +785,7 @@ lớp công khai Bộ Hạ ASM Động {
         nguồn = mình.nguồn;
         lặp(j = từ; j < độ dài(nguồn) && j < từ + 64; j++) {
             nếu (j > từ && mình.đích nhánh[j] != 0) { thoát; };
-            tên = lấy từ điển(mình.bảng, "" + nguồn[j][0], "");
+            tên = mình.tên mã[j];
             nếu (tên == "OP_BIEN_SO" || tên == "OP_TEN_BIEN_GIA_TRI") {
                 nếu (tên == "OP_TEN_BIEN_GIA_TRI" && nguồn[j][2] < 0) { thoát; };
                 sâu += 1;
@@ -784,7 +799,7 @@ lớp công khai Bộ Hạ ASM Động {
     hàm riêng tư phát biểu thức i32(từ, cuối) {
         nguồn = mình.nguồn; biến ô = {}; biến các ô = [];
         lặp(j = từ; j < cuối; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[j][0], "") == "OP_TEN_BIEN_GIA_TRI") {
+            nếu (mình.tên mã[j] == "OP_TEN_BIEN_GIA_TRI") {
                 khóa = "" + nguồn[j][2];
                 nếu (lấy từ điển(ô, khóa, -1) < 0) {
                     ô[khóa] = độ dài(các ô) + 2;
@@ -804,7 +819,7 @@ lớp công khai Bộ Hạ ASM Động {
         // Chỉ kết quả cuối đi qua ABI; toán hạng trung gian là i32 máy.
         mình.phát("LoadSlot", 0, 0);
         lặp(j = từ; j < cuối; j++) {
-            tên = lấy từ điển(mình.bảng, "" + nguồn[j][0], "");
+            tên = mình.tên mã[j];
             nếu (tên == "OP_BIEN_SO") { mình.phát("PushConstant", nguồn[j][1]); }
             hoặc nếu (tên == "OP_TEN_BIEN_GIA_TRI") { mình.phát("LoadSlot", 0, ô["" + nguồn[j][2]]); }
             hoặc { mình.phát(mình.phép toán i32(tên)); };
@@ -823,21 +838,21 @@ lớp công khai Bộ Hạ ASM Động {
         nguồn = mình.nguồn;
         cuối = từ;
         khi (cuối < độ dài(nguồn) && cuối < từ + 4) {
-            tên = lấy từ điển(mình.bảng, "" + nguồn[cuối][0], "");
+            tên = mình.tên mã[cuối];
             nếu (tên != "OP_BIEN_SO" && tên != "OP_TEN_BIEN_GIA_TRI") { thoát; };
             nếu (cuối > từ && mình.đích nhánh[cuối] != 0) { trả về 0; };
             cuối += 1;
         };
         nếu (cuối >= độ dài(nguồn) || mình.đích nhánh[cuối] != 0 && cuối > từ) { trả về 0; };
         v = nguồn[cuối];
-        nếu (lấy từ điển(mình.bảng, "" + v[0], "") != "OP_GOI" || v[1] != cuối - từ) { trả về 0; };
+        nếu (mình.tên mã[cuối] != "OP_GOI" || v[1] != cuối - từ) { trả về 0; };
         dạng = lấy từ điển(mình.bảng i32, "" + v[2], rỗng);
         nếu (dạng == rỗng) { trả về 0; };
         nếu (độ dài(dạng["ô"]) != cuối - từ) { trả về 0; };
         dự phòng = [];
         đã kiểm = {};
         lặp(j = từ; j < cuối; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[j][0], "") == "OP_TEN_BIEN_GIA_TRI") {
+            nếu (mình.tên mã[j] == "OP_TEN_BIEN_GIA_TRI") {
                 nếu (nguồn[j][2] < 0) { trả về 0; };
                 khóa = "" + nguồn[j][2];
                 nếu (lấy từ điển(đã kiểm, khóa, 0) != 0) { bỏ qua; };
@@ -848,7 +863,7 @@ lớp công khai Bộ Hạ ASM Động {
             };
         };
         lặp(j = từ; j < cuối; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[j][0], "") == "OP_BIEN_SO") {
+            nếu (mình.tên mã[j] == "OP_BIEN_SO") {
                 mình.phát("PushConstant", nguồn[j][1]);
             } hoặc { mình.gọi thô("read_i32", [nguồn[j][2]]); };
         };
@@ -871,7 +886,7 @@ lớp công khai Bộ Hạ ASM Động {
             đối số = [0, 0, 0, 0];
             mặt nạ = 0;
             lặp(j = 0; j < số; j++) {
-                nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") == "OP_TEN_BIEN_GIA_TRI") {
+                nếu (mình.tên mã[từ + j] == "OP_TEN_BIEN_GIA_TRI") {
                     mặt nạ += 1 << j;
                     đối số[j] = nguồn[từ + j][2];
                 } hoặc { đối số[j] = nguồn[từ + j][1]; };
@@ -892,7 +907,7 @@ lớp công khai Bộ Hạ ASM Động {
     hàm riêng tư gọi i32 biểu thức(từ) {
         nguồn = mình.nguồn;
         nếu (từ >= độ dài(nguồn)) { trả về 0; };
-        tên đầu = lấy từ điển(mình.bảng, "" + nguồn[từ][0], "");
+        tên đầu = mình.tên mã[từ];
         nếu (tên đầu != "OP_BIEN_SO" && tên đầu != "OP_TEN_BIEN_GIA_TRI") {
             nếu (tên đầu != "OP_GOI" || nguồn[từ][1] != 0) { trả về 0; };
             đầu = lấy từ điển(mình.bảng i32, "" + nguồn[từ][2], rỗng);
@@ -905,7 +920,7 @@ lớp công khai Bộ Hạ ASM Động {
         khi (cuối < độ dài(nguồn) && cuối < từ + 24) {
             nếu (cuối > từ && mình.đích nhánh[cuối] != 0) { thoát; };
             v = nguồn[cuối];
-            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            tên = mình.tên mã[cuối];
             nếu (tên == "OP_BIEN_SO" || tên == "OP_TEN_BIEN_GIA_TRI") {
                 nếu (tên == "OP_TEN_BIEN_GIA_TRI" && v[2] < 0) { thoát; };
                 sâu += 1;
@@ -933,7 +948,7 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (độ dài(dạng["ô"]) != lời gọi[1]) { trả về 0; };
         biến các ô = []; biến ô = {};
         lặp(j = từ; j < cuối; j++) {
-            nếu (lấy từ điển(mình.bảng, "" + nguồn[j][0], "") == "OP_TEN_BIEN_GIA_TRI") {
+            nếu (mình.tên mã[j] == "OP_TEN_BIEN_GIA_TRI") {
                 khóa = "" + nguồn[j][2];
                 nếu (lấy từ điển(ô, khóa, -1) < 0) {
                     ô[khóa] = độ dài(các ô) + 2;
@@ -958,7 +973,7 @@ lớp công khai Bộ Hạ ASM Động {
         };
         lặp(j = từ; j < cuối; j++) {
             v = nguồn[j];
-            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            tên = mình.tên mã[j];
             nếu (tên == "OP_BIEN_SO") { mình.phát("PushConstant", v[1]); }
             hoặc nếu (tên == "OP_TEN_BIEN_GIA_TRI") { mình.phát("LoadSlot", 0, ô["" + v[2]]); }
             hoặc nếu (tên == "OP_GOI") { mình.phát("Call", 0, v[1], "vpp_aot_i32_" + v[2]); }
@@ -977,7 +992,7 @@ lớp công khai Bộ Hạ ASM Động {
         };
         lặp(j = từ; j < cuối; j++) {
             v = nguồn[j];
-            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            tên = mình.tên mã[j];
             nếu (tên == "OP_BIEN_SO") { mình.gọi("integer", [v[1]]); }
             hoặc nếu (tên == "OP_TEN_BIEN_GIA_TRI") { mình.gọi("load", [v[2]]); }
             hoặc nếu (tên == "OP_GOI") { mình.gọi("call", [v[2], v[1]]); }
@@ -996,13 +1011,20 @@ lớp công khai Bộ Hạ ASM Động {
         lặp(i = 0; i < độ dài(nguồn); i++) {
             máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
             v = nguồn[i];
-            tên = lấy từ điển(mình.bảng, "" + v[0], "");
-            đã gọi = mình.gọi phương thức riêng tư trực tiếp(i);
-            nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
-            đã gọi = mình.gọi i32 biểu thức(i);
-            nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
-            đã gọi = mình.gọi i32 trực tiếp(i);
-            nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
+            tên = mình.tên mã[i];
+            // Các matcher chỉ có thể bắt đầu bằng một lệnh nạp giá trị
+            // hoặc OP_GOI không đối số. Bỏ qua lời gọi hàm/mẫu cho opcode
+            // còn lại, vốn chiếm phần lớn các thân bytecode.
+            nếu (tên == "OP_TEN_BIEN_GIA_TRI" || tên == "OP_BIEN_SO" || tên == "OP_GOI") {
+                nếu (tên == "OP_TEN_BIEN_GIA_TRI") {
+                    đã gọi = mình.gọi phương thức riêng tư trực tiếp(i);
+                    nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
+                };
+                đã gọi = mình.gọi i32 biểu thức(i);
+                nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
+                đã gọi = mình.gọi i32 trực tiếp(i);
+                nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
+            };
             nếu (tên == "OP_TEN_BIEN_GIA_TRI") {
                 đã gọi = mình.gọi gián tiếp qua ô(i);
                 nếu (đã gọi > 0) { i += đã gọi - 1; bỏ qua; };
@@ -1549,7 +1571,7 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_BIEN_SO" || tên == "OP_TEN_BIEN_GIA_TRI") {
               nếu (i + 1 < độ dài(nguồn)) {
                 nếu (mình.đích nhánh[i + 1] == 0 &&
-                    lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "") == "OP_TRA_VE") {
+                    mình.tên mã[i + 1] == "OP_TRA_VE") {
                     nếu (tên == "OP_BIEN_SO") {
                         mình.gọi("return_integer", [v[1]]);
                     } hoặc {
@@ -1589,7 +1611,7 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_TEN_BIEN_ID") {
               nếu (i + 1 < độ dài(nguồn)) {
                 nếu (mình.đích nhánh[i + 1] == 0) {
-                    t2 = lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "");
+                    t2 = mình.tên mã[i + 1];
                     nếu (t2 == "OP_GAN") {
                         mình.gọi("assign_slot", [v[2]]);
                         máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
@@ -1818,7 +1840,7 @@ lớp công khai Bộ Hạ ASM Động {
                     bỏ khởi tạo = sai;
                     nếu (i + 1 < độ dài(nguồn)) {
                         nếu (mình.đích nhánh[i + 1] == 0 && nguồn[i + 1][2] == v[2]) {
-                            tên sau = lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "");
+                            tên sau = mình.tên mã[i + 1];
                             bỏ khởi tạo = tên sau == "OP_PARAM" || tên sau == "OP_PARAM_MAC_DINH";
                         };
                     };
@@ -1945,12 +1967,15 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
     máy = hạ.hạ();
+    trực tiếp = lấy từ điển(bảng i32, "ASM trực tiếp", sai);
     khóa = "";
     nếu (bộ đệm != rỗng) {
         // Machine IR do lowerer vừa tạo chỉ chứa i32 và symbol ASCII ABI.
         // Biểu diễn đầy đủ giữ cả function/string IDs, nhánh, frame, target
-        // và relocation; không dùng tên hàm hay đường nguồn làm cache key.
+        // và relocation; đường byte không dùng tên hàm/đường nguồn làm key.
         khóa = đích["kiến trúc"] + "/" + đích["hệ điều hành"] + "/" + thành chuỗi(máy);
+        // Mnemonic dùng nhãn cục bộ theo tên hàm; không trộn với thân byte.
+        nếu (trực tiếp) { khóa = "asm-direct-v1/" + tên + "/" + khóa; };
         thân cũ = lấy từ điển(bộ đệm["thân"], khóa, rỗng);
         nếu (thân cũ != rỗng) {
             bộ đệm["trúng"] = bộ đệm["trúng"] + 1;
@@ -1966,12 +1991,19 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
         thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
     };
-    phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]);
+    phát = rỗng;
+    nếu (!trực tiếp) { phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]); };
     nếu (thống kê != rỗng) {
         thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
         bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
     };
-    kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát, bảng byte, bảng hex, bộ đệm == rỗng);
+    kết quả = "";
+    nếu (trực tiếp) {
+        kết quả = biên dịch asm động trực tiếp(máy, tên, đích["kiến trúc"], đích["hệ điều hành"]);
+        nếu (bộ đệm == rỗng) { kết quả = biên dịch lắp ráp đầu(đích["hệ điều hành"], tên) + kết quả; };
+    } hoặc {
+        kết quả = biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát, bảng byte, bảng hex, bộ đệm == rỗng);
+    };
     nếu (bộ đệm != rỗng) {
         kích cỡ = độ dài(khóa) + độ dài(kết quả);
         // Giới hạn phiên batch ở 64 MiB; giải phóng cả map khi đầy.
@@ -1991,7 +2023,19 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
     trả về kết quả;
 };
 
-hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng) {
+// Fast i32 functions and selectors already produce Machine IR. Route their
+// mnemonics straight to the assembler just like normal AOT bodies.
+hàm riêng tư biên dịch asm i32 máy(máy, tên, đích, trực tiếp, bảng byte, bảng hex) {
+    nếu (trực tiếp) {
+        trả về biên dịch lắp ráp đầu(đích["hệ điều hành"], tên) +
+            biên dịch asm động trực tiếp(máy, tên, đích["kiến trúc"], đích["hệ điều hành"], sai);
+    };
+    phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]);
+    trả về biên dịch lắp ráp mã máy(đích["kiến trúc"],
+        đích["hệ điều hành"], tên, phát, bảng byte, bảng hex);
+};
+
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
@@ -2008,22 +2052,26 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     nếu (độ dài(dây) == 5) { ngoại = dây[4]; };
     // Dùng các phần thay vì nối lại toàn bộ assembly khi thêm từng hàm.
     phần = [];
-    // Chuỗi decimal cho các byte dùng lại ở mọi thân hàm trong một lần biên dịch.
+    // Chỉ chuẩn bị biểu diễn byte/hex khi đường raw encoder thực sự được dùng.
+    // AOT trực tiếp không đi qua danh sách byte ở bất kỳ thân/selector nào.
     bảng byte = [];
-    lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(bảng byte, "" + i); };
     bảng hex = rỗng;
-    nếu (đích["kiến trúc"] == "aarch64" && đích["hệ điều hành"] == "macos") {
-        bảng hex = [];
-        chữ hex = "0123456789abcdef";
-        lặp(i = 0; i < 256; i++) {
-            máy ảo thêm cuối danh sách(bảng hex, chữ hex[i / 16] + chữ hex[i % 16]);
+    nếu (!trực tiếp) {
+        lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(bảng byte, "" + i); };
+        nếu (đích["kiến trúc"] == "aarch64" && đích["hệ điều hành"] == "macos") {
+            bảng hex = [];
+            chữ hex = "0123456789abcdef";
+            lặp(i = 0; i < 256; i++) {
+                máy ảo thêm cuối danh sách(bảng hex, chữ hex[i / 16] + chữ hex[i % 16]);
+            };
         };
     };
     bảng i32 = {};
     // Runtime bootstrap của compiler không mang runtime VM AOT đầy đủ.
-    // Không để peephole AOT của chương trình tự áp dụng lên compiler và tạo
-    // phụ thuộc vòng vào các helper động chỉ tồn tại khi chạy chương trình.
+    // Tắt specialization phụ thuộc runtime của chương trình nhưng vẫn in
+    // Machine IR trực tiếp ra ASM: compiler và chương trình dùng cùng ABI.
     bảng i32["compiler"] = compiler;
+    bảng i32["ASM trực tiếp"] = trực tiếp;
     // Phân tích theo các lớp phụ thuộc; chu trình không có hàm lá sẽ
     // không bao giờ được chuyên biệt hóa, tránh đệ quy native không giới hạn.
     lặp(lượt = 0; lượt < độ dài(các hàm); lượt++) {
@@ -2056,9 +2104,8 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
                 dạng["dùng"] = dùng; dạng["ascii"] = sai;
             };
             dạng["ký hiệu"] = ký hiệu; nhanh["" + i] = dạng;
-            phát = biên dịch mã máy hàm(đích["kiến trúc"], dạng["máy"], đích["hệ điều hành"]);
-            máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                đích["hệ điều hành"], ký hiệu, phát, bảng byte, bảng hex));
+            máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(dạng["máy"], ký hiệu,
+                đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
         };
     };
     // Chỉ thử bộ chọn ở tên phương thức có ít nhất một thân hàm đã chứng minh.
@@ -2110,15 +2157,13 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             };
             lặp(chế độ = 0; chế độ < 2; chế độ++) {
                 máy chọn = biên dịch asm bộ chọn vô hộp(ids, nhanh, số, chế độ);
-                phát = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn, đích["hệ điều hành"]);
                 hậu tố = "i"; nếu (chế độ == 1) { hậu tố = "m"; };
-                máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                    đích["hệ điều hành"], "vpp_aot_fast_" + hậu tố + số, phát, bảng byte, bảng hex));
+                máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn,
+                    "vpp_aot_fast_" + hậu tố + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
             };
             máy chọn ô = biên dịch asm bộ chọn vô hộp(ids, nhanh, số, sai, đúng);
-            phát ô = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn ô, đích["hệ điều hành"]);
-            máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-                đích["hệ điều hành"], "vpp_aot_fast_s" + số, phát ô, bảng byte, bảng hex));
+            máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn ô,
+                "vpp_aot_fast_s" + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
         };
         ids ascii = [];
         lặp(i = 0; i < độ dài(các hàm); i++) {
@@ -2132,9 +2177,8 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             };
         };
         máy chọn ascii = biên dịch asm bộ chọn ascii chỉ số(ids ascii, nhanh);
-        phát ascii = biên dịch mã máy hàm(đích["kiến trúc"], máy chọn ascii, đích["hệ điều hành"]);
-        máy ảo thêm cuối danh sách(phần, biên dịch lắp ráp mã máy(đích["kiến trúc"],
-            đích["hệ điều hành"], "vpp_aot_fast_ascii_index_m1", phát ascii, bảng byte, bảng hex));
+        máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn ascii,
+            "vpp_aot_fast_ascii_index_m1", đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
     };
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.fast_paths", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);

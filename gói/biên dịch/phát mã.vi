@@ -1056,30 +1056,31 @@ lớp công khai Bộ Phát Bytecode {
         cạnh = đồ thị["cạnh"];
         dùng = phiên["cạnh dùng"];
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
-            e = cạnh[i];
+        cạnh nguồn = lấy từ điển(phiên["cạnh theo nguồn"], tên mô đun, []);
+        lặp(i = 0; i < máy ảo lấy độ dài(cạnh nguồn); i++) {
+            chỉ số cạnh = cạnh nguồn[i];
+            e = cạnh[chỉ số cạnh];
             nếu (e["nguồn"] == tên mô đun && e["đích"] == đích &&
                 e["bí danh"] == mục["bí danh"] &&
                     e["tái xuất"] == mục["tái xuất"] &&
                     lấy từ điển(e, "tên nhập", "") == lấy từ điển(mục, "tên nhập", "")) {
-                có = sai;
-                lặp(j = 0; j < máy ảo lấy độ dài(dùng); j++) {
-                    nếu (dùng[j] == i) { có = đúng; };
+                nếu (!máy ảo có khóa từ điển(dùng, chỉ số cạnh)) {
+                    vị trí = chỉ số cạnh;
+                    thoát;
                 };
-                nếu (!có && vị trí == -1) { vị trí = i; };
             };
         };
         nếu (vị trí == -1) {
             ném "biên dịch phát mã: không khớp cạnh nhập '" + tên mô đun + "' -> '" + đích + "'";
         };
-        máy ảo thêm cuối danh sách(dùng, vị trí);
+        dùng[vị trí] = đúng;
         e = cạnh[vị trí];
         nếu (e["hành động"] == "duplicate_no_op") { trả về đúng; };
         nếu (e["hành động"] != "load") {
             ném "biên dịch phát mã: hành động nhập không hỗ trợ";
         };
 
-        phụ thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], đích);
+        phụ thuộc = biên dịch sổ tìm mô đun(sổ, đích);
         nếu (máy ảo có khóa từ điển(phiên, "IR đã chuẩn bị")) {
             cache = phiên["IR đã chuẩn bị"];
             nếu (!máy ảo có khóa từ điển(cache, đích)) {
@@ -1088,10 +1089,12 @@ lớp công khai Bộ Phát Bytecode {
             biểu diễn trung gian = cache[đích];
         } hoặc {
             cây = biên dịch kiểu cây(sổ, đồ thị, đích);
-            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng);
+            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng,
+                lấy từ điển(phiên, "ngữ nghĩa đã kiểm tra", sai));
         };
         phần = mình.biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian, sổ, phụ thuộc, đồ thị, phiên);
         máy ảo thêm cuối danh sách(phiên["đã phát"], {"định danh": đích, "phần": phần});
+        phiên["đã phát theo tên"][đích] = phần;
 
         tên chọn = lấy từ điển(e, "tên nhập", "");
         nếu (tên chọn != "" && tên chọn != "*") {

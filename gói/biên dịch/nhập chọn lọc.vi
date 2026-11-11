@@ -6,6 +6,10 @@ nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thu�
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.có khóa;
 nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ đường;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ bắt đầu;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ ghi;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ ghi số;
 
 lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
     hàm công khai khởi tạo(sổ, đồ thị) {
@@ -69,14 +73,20 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
     };
 
     hàm công khai lọc() {
+        đường hồ sơ = biên dịch hồ sơ đường();
+        bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         cạnh = mình.đồ thị["cạnh"];
         có chọn = sai;
         lặp(i = 0; i < độ dài(cạnh); i++) {
             tên chọn = lấy từ điển(cạnh[i], "tên nhập", "");
             nếu (tên chọn != "" && tên chọn != "*") { có chọn = đúng; };
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.detect", bắt đầu bước);
         // Preserve the legacy compiler's exact function IDs and byte output.
         nếu (!có chọn) { trả về sai; };
+        bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        thời gian cây kiểu = 0;
+        thời gian ngữ nghĩa = 0;
         mô đun = mình.sổ["mô đun"];
         lặp(i = 0; i < độ dài(mô đun); i++) {
             mục = mô đun[i]; tên mô đun = mục["định danh"];
@@ -95,10 +105,26 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
                 };
             };
             // Do not hide errors inside unselected function bodies.
-            biên dịch kiểm tra ngữ nghĩa thuần(biên dịch kiểu cây(mình.sổ, mình.đồ thị, tên mô đun));
+            bắt đầu cây kiểu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+            cây kiểu = biên dịch kiểu cây(mình.sổ, mình.đồ thị, tên mô đun);
+            nếu (đường hồ sơ != "") {
+                thời gian cây kiểu += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu cây kiểu;
+            };
+            bắt đầu ngữ nghĩa = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+            biên dịch kiểm tra ngữ nghĩa thuần(cây kiểu);
+            nếu (đường hồ sơ != "") {
+                thời gian ngữ nghĩa += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu ngữ nghĩa;
+            };
+        };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.modules", bắt đầu bước);
+        nếu (đường hồ sơ != "") {
+            biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.typed_ast_ms", thời gian cây kiểu);
+            biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.semantic_ms", thời gian ngữ nghĩa);
+            biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.module_count", độ dài(mô đun));
         };
         // Every initializer remains a root, including assignments, I/O,
         // callbacks and registration performed by otherwise unused imports.
+        bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         lặp(i = 0; i < độ dài(mô đun); i++) {
             tên mô đun = mô đun[i]["định danh"];
             khai = mình.cây[tên mô đun]["câu lệnh"];
@@ -109,8 +135,10 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
                 };
             };
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.initializers", bắt đầu bước);
         // Old module imports and .* keep their complete surface. A selected
         // edge is the boundary after which references determine retention.
+        bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         đầy = [mình.đồ thị["điểm vào"]]; đã đầy = {};
         vị trí = 0;
         khi (vị trí < độ dài(đầy)) {
@@ -134,6 +162,8 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
             mục = mình.hàng[vị trí]; vị trí += 1;
             mình.thăm(mục[0], mục[1]);
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.closure", bắt đầu bước);
+        bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         lặp(i = 0; i < độ dài(mô đun); i++) {
             tên mô đun = mô đun[i]["định danh"];
             cây = mình.cây[tên mô đun]; khai = cây["câu lệnh"]; giữ = [];
@@ -151,6 +181,7 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
             };
             cây["câu lệnh"] = giữ;
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.prune", bắt đầu bước);
         trả về đúng;
     };
 };

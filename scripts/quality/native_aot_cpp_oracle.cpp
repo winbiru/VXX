@@ -159,7 +159,9 @@ int main(int argc,char **argv) {
           <<literal("c")<<','<<literal("ffi")<<"]]];\n";
         vi<<u8"ghi tệp("<<literal((directory/"vpp.S").u8string())
           <<u8", biên dịch asm chương trình(dây,"<<literal(canonicalTriple(hostTarget()))
-          <<u8", đúng)); };\n";
+          // This oracle compares encoder bytes, not mnemonic instruction
+          // selection. Select the raw backend explicitly as AOT defaults to ASM.
+          <<u8", đúng, rỗng, sai)); };\n";
         if(!cpp||!vi)throw std::runtime_error("native AOT oracle output failed");
         std::cout<<"Independent native AOT fixture: all helpers, intrinsics, CFG and ABI metadata\n";
         return 0;

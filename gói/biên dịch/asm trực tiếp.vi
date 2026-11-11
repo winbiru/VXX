@@ -1,0 +1,382 @@
+// Đường AOT nội bộ: IR vừa được Bộ Hạ ASM Động tạo được in thẳng thành
+// mnemonic. Assembler sở hữu encoding, nhãn nhánh và relocation; không tạo
+// danh sách byte rồi chuyển ngược thành .byte/.long. API raw/object vẫn dùng
+// encoder và CFG validator độc lập trong mã máy.vi.
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+
+lớp riêng tư Bộ In ASM Trực Tiếp {
+    hàm công khai khởi tạo(máy, tên, kiến trúc, hệ điều hành, động = đúng) {
+        mình.máy = máy; mình.tên = tên;
+        mình.động = động;
+        mình.số tham số = máy["parameterCount"];
+        mình.arm = kiến trúc == "aarch64";
+        mình.mac = hệ điều hành == "macos";
+        mình.win = hệ điều hành == "windows";
+        mình.ô = máy["slotCount"];
+        mình.tổng = mình.ô + máy["maxStackDepth"];
+        mình.lá = sai;
+        nếu (mình.arm && !mình.động && mình.tổng <= 16 && mình.số tham số <= 8) {
+            // AArch64 caller-saved W0..W8, W11..W17 đủ cho hàm lá;
+            // W9/W10 giữ vai trò scratch, W18 là platform register.
+            // Mod cần W11 làm thương số tạm trước khi tính số dư.
+            mình.lá = đúng;
+            lệnh = máy["instructions"];
+            lặp(i = 0; i < độ dài(lệnh); i++) {
+                mã = lệnh[i]["opcode"];
+                nếu (mã == "Call" || (mã == "Mod" && mình.tổng > 9)) {
+                    mình.lá = sai; thoát;
+                };
+            };
+        };
+        mình.nhãn = ".L" + tên + "_";
+        mình.tiền tố = "";
+        nếu (mình.mac) { mình.nhãn = "L" + tên + "_"; mình.tiền tố = "_"; };
+        mình.ghi = sai;
+        mình.khung = ((mình.tổng * 4 + 15) / 16) * 16;
+        mình.vị trí = [];
+        mình.tham số = ["edi", "esi", "edx", "ecx", "r8d", "r9d"];
+        nếu (mình.win) { mình.tham số = ["ecx", "edx", "r8d", "r9d"]; };
+        nếu (mình.arm) {
+            // Các thân động luôn gọi ABI runtime. Giữ các slot nhỏ trong
+            // W19..W28 như encoder, để lời gọi không làm mất eval stack.
+            mình.ghi = mình.lá || mình.tổng <= 10;
+            nếu (mình.lá) { mình.khung = 0; }
+            hoặc nếu (mình.ghi) { mình.khung = ((mình.tổng * 8 + 15) / 16) * 16; };
+            mình.tham số = ["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"];
+        };
+        lặp(i = 0; i < mình.tổng; i++) {
+            chỗ = "dword ptr [rbp - " + ((i + 1) * 4) + "]";
+            nếu (mình.arm) {
+                chỗ = "[sp, #" + (i * 4) + "]";
+                nếu (mình.lá) {
+                    chỗ = "w" + i;
+                    nếu (i >= 9) { chỗ = "w" + (i + 2); };
+                } hoặc nếu (mình.ghi) { chỗ = "w" + (19 + i); };
+            };
+            máy ảo thêm cuối danh sách(mình.vị trí, chỗ);
+        };
+    };
+
+    hàm riêng tư tải(ghi, ô) {
+        chỗ = mình.vị trí[ô];
+        nếu (!mình.arm || mình.ghi) { trả về "mov " + ghi + ", " + chỗ + "\n"; };
+        nếu (ô < 4096) { trả về "ldr " + ghi + ", " + chỗ + "\n"; };
+        trả về mình.địa chỉ(ô * 4) + "ldr " + ghi + ", [x11]\n";
+    };
+
+    hàm riêng tư lưu(ghi, ô) {
+        chỗ = mình.vị trí[ô];
+        nếu (mình.lá && chỗ == ghi) { trả về ""; };
+        nếu (!mình.arm || mình.ghi) { trả về "mov " + chỗ + ", " + ghi + "\n"; };
+        nếu (ô < 4096) { trả về "str " + ghi + ", " + chỗ + "\n"; };
+        trả về mình.địa chỉ(ô * 4) + "str " + ghi + ", [x11]\n";
+    };
+
+    hàm riêng tư địa chỉ(lệch) {
+        ra = "mov x11, sp\n";
+        khi (lệch > 0) {
+            bước = lệch; nếu (bước > 4095) { bước = 4095; };
+            ra += "add x11, x11, #" + bước + "\n"; lệch -= bước;
+        };
+        trả về ra;
+    };
+
+    // Tham số thứ 9+ trên ARM64 nằm phía trên FP; Darwin xếp i32
+    // theo bước 4 byte, AAPCS64/Linux theo bước 8 byte.
+    hàm riêng tư tham số ngăn xếp arm(ô, lệch) {
+        ra = "mov x11, x29\n";
+        khi (lệch > 0) {
+            bước = lệch; nếu (bước > 4095) { bước = 4095; };
+            ra += "add x11, x11, #" + bước + "\n"; lệch -= bước;
+        };
+        trả về ra + "ldr w9, [x11]\n" + mình.lưu("w9", ô);
+    };
+
+    hàm riêng tư nhận tham số() {
+        nếu (mình.động) { trả về mình.lưu(mình.tham số[0], 0); };
+        ra = ""; thanh = độ dài(mình.tham số);
+        lặp(j = 0; j < mình.số tham số; j++) {
+            nếu (j < thanh) { ra += mình.lưu(mình.tham số[j], j); }
+            hoặc nếu (mình.arm) {
+                bước = 8; nếu (mình.mac) { bước = 4; };
+                ra += mình.tham số ngăn xếp arm(j, 16 + (j - thanh) * bước);
+            } hoặc {
+                lệch = 16 + (j - thanh) * 8;
+                nếu (mình.win) { lệch += 32; };
+                ra += "mov eax, dword ptr [rbp + " + lệch + "]\n" + mình.lưu("eax", j);
+            };
+        };
+        trả về ra;
+    };
+
+    hàm riêng tư ngăn xếp(byte, trừ) {
+        nếu (byte == 0) { trả về ""; };
+        lệnh = "add"; nếu (trừ) { lệnh = "sub"; };
+        nếu (!mình.arm) {
+            // Win64's guard page must be touched before skipping a page in
+            // a large frame. A small inline probe keeps this path CRT-free.
+            nếu (mình.win && trừ && byte >= 4096) {
+                ra = "";
+                khi (byte > 0) {
+                    bước = byte; nếu (bước > 4096) { bước = 4096; };
+                    ra += "sub rsp, " + bước + "\ntest dword ptr [rsp], eax\n";
+                    byte -= bước;
+                };
+                trả về ra;
+            };
+            trả về lệnh + " rsp, " + byte + "\n";
+        };
+        ra = "";
+        khi (byte > 0) {
+            bước = byte; nếu (bước > 4080) { bước = 4080; };
+            ra += lệnh + " sp, sp, #" + bước + "\n"; byte -= bước;
+        };
+        trả về ra;
+    };
+
+    hàm riêng tư hằng ghi(giá trị, ghi) {
+        nếu (!mình.arm) { trả về "mov " + ghi + ", " + giá trị + "\n"; };
+        ra = "movz " + ghi + ", #" + (giá trị & 65535) + "\n";
+        cao = (giá trị >> 16) & 65535;
+        nếu (cao != 0) { ra += "movk " + ghi + ", #" + cao + ", lsl #16\n"; };
+        trả về ra;
+    };
+
+    hàm riêng tư tải đối số(ghi, j, đối số, từ, byte = 0) {
+        ô = từ + j;
+        nếu (đối số != rỗng) {
+            v = đối số[j];
+            nếu (v["opcode"] == "PushConstant") { trả về mình.hằng ghi(v["immediate"], ghi); };
+            ô = v["operand"];
+        };
+        nếu (mình.arm && !mình.ghi && byte > 0) {
+            trả về mình.địa chỉ(byte + ô * 4) + "ldr " + ghi + ", [x11]\n";
+        };
+        trả về mình.tải(ghi, ô);
+    };
+
+    hàm riêng tư gọi(lệnh, đối số = rỗng, lỗi = "") {
+        số = lệnh["operand"];
+        từ = mình.ô + lệnh["depthBefore"] - số;
+        thanh = độ dài(mình.tham số);
+        trực = số; nếu (trực > thanh) { trực = thanh; };
+        bước = 8; bóng = 0;
+        nếu (mình.arm && mình.mac) { bước = 4; };
+        nếu (mình.win) { bóng = 32; };
+        vượt = số - trực;
+        byte = ((vượt * bước + bóng + 15) / 16) * 16;
+        ra = "";
+        // ARM loads register arguments before moving SP. x86 locals use RBP.
+        lặp(j = 0; j < trực; j++) { ra += mình.tải đối số(mình.tham số[j], j, đối số, từ); };
+        ra += mình.ngăn xếp(byte, đúng);
+        lặp(j = trực; j < số; j++) {
+            lệch = (j - thanh) * bước + bóng;
+            nếu (!mình.arm) {
+                ra += mình.tải đối số("eax", j, đối số, từ) + "mov dword ptr [rsp + " + lệch + "], eax\n";
+            } hoặc {
+                ra += mình.tải đối số("w9", j, đối số, từ, byte);
+                ra += mình.địa chỉ(lệch) + "str w9, [x11]\n";
+            };
+        };
+        tên gọi = "call "; ghi = "eax";
+        nếu (mình.arm) { tên gọi = "bl "; ghi = "w0"; };
+        ra += tên gọi + mình.tiền tố + lệnh["symbol"] + "\n";
+        ra += mình.ngăn xếp(byte, sai);
+        nếu (lỗi != "") {
+            nếu (mình.arm) { trả về ra + "cbnz w0, " + lỗi + "\n"; };
+            trả về ra + "test eax, eax\njne " + lỗi + "\n";
+        };
+        trả về ra + mình.lưu(ghi, từ);
+    };
+
+    hàm công khai xuất() {
+        phần = [];
+        mở = ".intel_syntax noprefix\npush rbp\nmov rbp, rsp\n";
+        nếu (mình.arm) { mở = "stp x29, x30, [sp, #-16]!\nmov x29, sp\n"; };
+        mở += mình.ngăn xếp(mình.khung, đúng);
+        đóng = "leave\nret\n";
+        nếu (mình.arm) {
+            đóng = "";
+            nếu (mình.lá) {
+                mở = ""; đóng = "ret\n";
+            } hoặc nếu (mình.ghi) {
+                lặp(i = 0; i < mình.tổng; i++) {
+                    mở += "str x" + (19 + i) + ", [sp, #" + (i * 8) + "]\n";
+                    đóng += "ldr x" + (19 + i) + ", [sp, #" + (i * 8) + "]\n";
+                };
+            };
+            nếu (!mình.lá) { đóng += mình.ngăn xếp(mình.khung, sai) + "ldp x29, x30, [sp], #16\nret\n"; };
+        };
+        // Thân động nhận frame ID; thân chuyên biệt nhận parameterCount i32.
+        mở += mình.nhận tham số();
+        máy ảo thêm cuối danh sách(phần, mở);
+        phép arm = {"Add": "add", "Sub": "sub", "Mul": "mul", "BitAnd": "and",
+            "BitOr": "orr", "BitXor": "eor", "ShiftLeft": "lsl", "ShiftRight": "asr"};
+        phép x86 = {"Add": "add", "Sub": "sub", "Mul": "imul", "BitAnd": "and",
+            "BitOr": "or", "BitXor": "xor", "ShiftLeft": "shl", "ShiftRight": "sar"};
+        so arm = {"Equal": "eq", "NotEqual": "ne", "Less": "lt", "LessEqual": "le",
+            "Greater": "gt", "GreaterEqual": "ge"};
+        so x86 = {"Equal": "e", "NotEqual": "ne", "Less": "l", "LessEqual": "le",
+            "Greater": "g", "GreaterEqual": "ge"};
+        lệnh = mình.máy["instructions"];
+        nhãn = {}; số cạnh = {};
+        lặp(i = 0; i < độ dài(lệnh); i++) {
+            v = lệnh[i];
+            nếu (v["opcode"] == "Jump" || v["opcode"] == "BranchZero") {
+                nhãn[v["operand"]] = mình.nhãn + v["operand"];
+                số = 0;
+                nếu (máy ảo có khóa từ điển(số cạnh, v["operand"])) { số = số cạnh[v["operand"]]; };
+                số cạnh[v["operand"]] = số + 1;
+            };
+        };
+        // `Call; BranchZero success; Jump error; success:` is the lowering
+        // contract for ABI status checks. Test the return register directly;
+        // the consumed status never needs an eval slot or a success label.
+        gộp lỗi = {};
+        lặp(i = 0; i + 3 < độ dài(lệnh); i++) {
+            nếu (lệnh[i]["opcode"] != "Call") { bỏ qua; };
+            điều kiện = lệnh[i + 1]; nhảy = lệnh[i + 2];
+            nếu (điều kiện["opcode"] == "BranchZero" && điều kiện["operand"] == i + 3 &&
+                nhảy["opcode"] == "Jump" && !máy ảo có khóa từ điển(nhãn, i + 1) &&
+                !máy ảo có khóa từ điển(nhãn, i + 2)) {
+                gộp lỗi[i] = mình.nhãn + nhảy["operand"];
+                số cạnh[i + 3] = số cạnh[i + 3] - 1;
+            };
+        };
+        các nhãn = máy ảo liệt kê khóa từ điển(nhãn);
+        lặp(i = 0; i < độ dài(các nhãn); i++) {
+            nếu (số cạnh[các nhãn[i]] == 0) { máy ảo xóa khóa từ điển(nhãn, các nhãn[i]); };
+        };
+        i = 0;
+        khi (i < độ dài(lệnh)) {
+            v = lệnh[i]; mã = v["opcode"]; ô = v["operand"];
+            sâu = mình.ô + v["depthBefore"];
+            ra = "";
+            nếu (máy ảo có khóa từ điển(nhãn, i)) { ra = nhãn[i] + ":\n"; };
+            // ABI calls dominate dynamic bodies. Feed a consecutive group of
+            // scalar arguments straight to ABI registers/stack, instead of
+            // storing each in eval slots and loading it again. Never cross a
+            // branch target: every entry into the group must keep its meaning.
+            nếu (mã == "LoadSlot" || mã == "PushConstant") {
+                đối số = []; j = i;
+                khi (j < độ dài(lệnh)) {
+                    nếu (j > i && máy ảo có khóa từ điển(nhãn, j)) { thoát; };
+                    mục = lệnh[j];
+                    nếu (mục["opcode"] != "LoadSlot" && mục["opcode"] != "PushConstant") { thoát; };
+                    máy ảo thêm cuối danh sách(đối số, mục); j += 1;
+                };
+                nếu (j < độ dài(lệnh)) {
+                    mục = lệnh[j];
+                    nếu (mục["opcode"] == "Call" && mục["operand"] == độ dài(đối số) &&
+                        !máy ảo có khóa từ điển(nhãn, j)) {
+                        lỗi = ""; bước = 1;
+                        nếu (máy ảo có khóa từ điển(gộp lỗi, j)) { lỗi = gộp lỗi[j]; bước = 3; };
+                        máy ảo thêm cuối danh sách(phần, ra + mình.gọi(mục, đối số, lỗi));
+                        i = j + bước; bỏ qua;
+                    };
+                };
+            };
+            a = "eax"; b = "ecx";
+            nếu (mình.arm) { a = "w9"; b = "w10"; };
+            bước = 1;
+            chọn(mã) {
+                ca "PushConstant": {
+                    nếu (mình.lá) { ra += mình.hằng ghi(v["immediate"], mình.vị trí[sâu]); }
+                    hoặc { ra += mình.hằng ghi(v["immediate"], a) + mình.lưu(a, sâu); };
+                }
+                ca "LoadSlot": {
+                    nếu (mình.lá) {
+                        nguồn = mình.vị trí[ô]; đích = mình.vị trí[sâu];
+                        nếu (nguồn != đích) { ra += "mov " + đích + ", " + nguồn + "\n"; };
+                    } hoặc { ra += mình.tải(a, ô) + mình.lưu(a, sâu); };
+                }
+                ca "StoreSlot": {
+                    nếu (mình.lá) {
+                        nguồn = mình.vị trí[sâu - 1]; đích = mình.vị trí[ô];
+                        nếu (nguồn != đích) { ra += "mov " + đích + ", " + nguồn + "\n"; };
+                    } hoặc { ra += mình.tải(a, sâu - 1) + mình.lưu(a, ô); };
+                }
+                ca "Drop": {}
+                ca "Jump": {
+                    nhảy = "jmp "; nếu (mình.arm) { nhảy = "b "; };
+                    ra += nhảy + mình.nhãn + ô + "\n";
+                }
+                ca "BranchZero": {
+                    nếu (mình.lá) { ra += "cbz " + mình.vị trí[sâu - 1] + ", " + mình.nhãn + ô + "\n"; }
+                    hoặc {
+                        ra += mình.tải(a, sâu - 1);
+                        nếu (mình.arm) { ra += "cbz w9, " + mình.nhãn + ô + "\n"; }
+                        hoặc { ra += "test eax, eax\nje " + mình.nhãn + ô + "\n"; };
+                    };
+                }
+                ca "Call": {
+                    lỗi = "";
+                    nếu (máy ảo có khóa từ điển(gộp lỗi, i)) { lỗi = gộp lỗi[i]; bước = 3; };
+                    ra += mình.gọi(v, rỗng, lỗi);
+                }
+                ca "Return": {
+                    nếu (mình.lá) {
+                        nguồn = mình.vị trí[sâu - 1];
+                        nếu (nguồn != "w0") { ra += "mov w0, " + nguồn + "\n"; };
+                    } hoặc {
+                        nếu (mình.arm) { a = "w0"; };
+                        ra += mình.tải(a, sâu - 1);
+                    };
+                    ra += đóng;
+                }
+                ca "Trap": {
+                    nếu (mình.arm) { ra += "brk #0\n"; } hoặc { ra += "ud2\n"; };
+                }
+                mặc định: {
+                    nếu (mình.lá && mã != "Div" && mã != "Mod") {
+                        // Leaf operands already live in caller-saved registers.
+                        // Write into the left eval slot instead of shuttling
+                        // both operands through W9/W10 and then copying back.
+                        a = mình.vị trí[sâu - 2]; b = mình.vị trí[sâu - 1];
+                    } hoặc { ra += mình.tải(a, sâu - 2) + mình.tải(b, sâu - 1); };
+                    nếu (mã == "Div" || mã == "Mod") {
+                        tính = mình.nhãn + "divide_" + i;
+                        xong = mình.nhãn + "divide_done_" + i;
+                        nếu (mình.arm) {
+                            ra += "cbnz w10, " + tính + "\nmovn w9, #0\nb " + xong + "\n" + tính + ":\n";
+                            nếu (mã == "Mod") { ra += "sdiv w11, w9, w10\nmsub w9, w11, w10, w9\n"; }
+                            hoặc { ra += "sdiv w9, w9, w10\n"; };
+                        } hoặc {
+                            ra += "test ecx, ecx\njne " + tính + "\nmov eax, -1\njmp " + xong + "\n" + tính + ":\n";
+                            ra += "movsxd rax, eax\ncqo\nmovsxd rcx, ecx\nidiv rcx\n";
+                            nếu (mã == "Mod") { ra += "mov eax, edx\n"; };
+                        };
+                        ra += xong + ":\n";
+                    } hoặc nếu (máy ảo có khóa từ điển(phép arm, mã)) {
+                        nếu (mình.arm) { ra += phép arm[mã] + " " + a + ", " + a + ", " + b + "\n"; }
+                        hoặc {
+                            toán hạng = "ecx";
+                            nếu (mã == "ShiftLeft" || mã == "ShiftRight") { toán hạng = "cl"; };
+                            ra += phép x86[mã] + " eax, " + toán hạng + "\n";
+                        };
+                    } hoặc nếu (máy ảo có khóa từ điển(so arm, mã)) {
+                        nếu (mình.arm) { ra += "cmp " + a + ", " + b + "\ncset " + a + ", " + so arm[mã] + "\n"; }
+                        hoặc { ra += "cmp eax, ecx\nset" + so x86[mã] + " al\nmovzx eax, al\n"; };
+                    } hoặc {
+                        ném "ASM trực tiếp: opcode ngoài hợp đồng Bộ Hạ ASM Động: " + mã;
+                    };
+                    ra += mình.lưu(a, sâu - 2);
+                }
+            };
+            máy ảo thêm cuối danh sách(phần, ra);
+            i += bước;
+        };
+        nếu (!mình.arm) { máy ảo thêm cuối danh sách(phần, ".att_syntax prefix\n"); };
+        trả về biên dịch lắp ráp nối các phần(phần);
+    };
+};
+
+hàm công khai biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, động = đúng) {
+    nếu ((kiến trúc != "aarch64" && kiến trúc != "x86_64") ||
+        (hệ điều hành != "linux" && hệ điều hành != "macos" && hệ điều hành != "windows") ||
+        (kiến trúc == "aarch64" && hệ điều hành == "windows")) {
+        ném "ASM trực tiếp: target chưa hỗ trợ: " + kiến trúc + "/" + hệ điều hành;
+    };
+    bộ in = Bộ In ASM Trực Tiếp(máy, tên, kiến trúc, hệ điều hành, động);
+    trả về bộ in.xuất();
+};

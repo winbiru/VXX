@@ -16,7 +16,7 @@ struct IntrinsicDescriptor {
     bool reserved = true;
 };
 
-inline constexpr std::array<IntrinsicDescriptor, 106> kVmIntrinsics{{
+inline constexpr std::array<IntrinsicDescriptor, 118> kVmIntrinsics{{
     {"bien_dich_phan_tich_vm", OP_VM_BIEN_DICH_PHAN_TICH, 2},
     {"bytecode_chay_vm", OP_VM_BYTECODE_CHAY, 4},
     {"bytecode_chay_native", OP_NATIVE_ARTIFACT_CHAY, 5},
@@ -81,6 +81,9 @@ inline constexpr std::array<IntrinsicDescriptor, 106> kVmIntrinsics{{
     {"máy_tệp_vị_trí", OP_VM_MACHINE_FILE_TELL, 1, true},
     {"máy_tệp_lỗi", OP_VM_MACHINE_FILE_ERROR, 1, true},
     {"máy_tệp_xóa", OP_VM_MACHINE_FILE_REMOVE, 1, true},
+    {"máy_tệp_đổi_tên", OP_VM_MACHINE_FILE_RENAME, 2, true},
+    {"máy_tệp_sao_chép", OP_VM_MACHINE_FILE_COPY, 2, true},
+    {"máy_tệp_liên_kết_cứng", OP_VM_MACHINE_FILE_LINK, 2, true},
     {"máy_tiến_trình_pid", OP_VM_MACHINE_PROCESS_PID, 0, true},
     {"máy_tiến_trình_ppid", OP_VM_MACHINE_PROCESS_PPID, 0, true},
     {"máy_tiến_trình_uid", OP_VM_MACHINE_PROCESS_UID, 0, true},
@@ -99,6 +102,15 @@ inline constexpr std::array<IntrinsicDescriptor, 106> kVmIntrinsics{{
     {"máy_thư_mục_kế", OP_VM_MACHINE_DIR_NEXT, 1, true},
     {"máy_thư_mục_đóng", OP_VM_MACHINE_DIR_CLOSE, 1, true},
     {"máy_đường_loại", OP_VM_MACHINE_PATH_KIND, 2, true},
+    {"máy_đường_thống_kê", OP_VM_MACHINE_PATH_STAT, 1, true},
+    {"máy_đường_tuyệt_đối", OP_VM_MACHINE_PATH_ABSOLUTE, 1, true},
+    {"máy_đường_chuẩn", OP_VM_MACHINE_PATH_CANONICAL, 1, true},
+    {"máy_đường_cùng_tệp", OP_VM_MACHINE_PATH_EQUIVALENT, 2, true},
+    {"máy_đường_hiện_tại", OP_VM_MACHINE_PATH_CURRENT, 0, true},
+    {"máy_đường_đặt_hiện_tại", OP_VM_MACHINE_PATH_SET_CURRENT, 1, true},
+    {"máy_đường_tạm", OP_VM_MACHINE_PATH_TEMP, 0, true},
+    {"máy_đường_thực_thi", OP_VM_MACHINE_PATH_EXECUTABLE, 1, true},
+    {"máy_tệp_khóa", OP_VM_MACHINE_FILE_LOCK, 1, true},
     {"máy_socket_loại", OP_VM_MACHINE_SOCKET_KIND, 1, true},
     {"máy_socket_đóng", OP_VM_MACHINE_SOCKET_CLOSE, 1, true},
     {"máy_socket_timeout", OP_VM_MACHINE_SOCKET_TIMEOUT, 2, true},
@@ -196,6 +208,9 @@ inline constexpr const IntrinsicDescriptor *intrinsicByName(std::string_view nam
         {"máy tệp vị trí", OP_VM_MACHINE_FILE_TELL},
         {"máy tệp lỗi", OP_VM_MACHINE_FILE_ERROR},
         {"máy tệp xóa", OP_VM_MACHINE_FILE_REMOVE},
+        {"máy tệp đổi tên", OP_VM_MACHINE_FILE_RENAME},
+        {"máy tệp sao chép", OP_VM_MACHINE_FILE_COPY},
+        {"máy tệp liên kết cứng", OP_VM_MACHINE_FILE_LINK},
         {"máy tiến trình mã tiến trình", OP_VM_MACHINE_PROCESS_PID},
         {"máy tiến trình mã tiến trình cha", OP_VM_MACHINE_PROCESS_PPID},
         {"máy tiến trình mã người dùng", OP_VM_MACHINE_PROCESS_UID},
@@ -214,6 +229,15 @@ inline constexpr const IntrinsicDescriptor *intrinsicByName(std::string_view nam
         {"máy thư mục kế", OP_VM_MACHINE_DIR_NEXT},
         {"máy thư mục đóng", OP_VM_MACHINE_DIR_CLOSE},
         {"máy đường loại", OP_VM_MACHINE_PATH_KIND},
+        {"máy đường thống kê", OP_VM_MACHINE_PATH_STAT},
+        {"máy đường tuyệt đối", OP_VM_MACHINE_PATH_ABSOLUTE},
+        {"máy đường chuẩn", OP_VM_MACHINE_PATH_CANONICAL},
+        {"máy đường cùng tệp", OP_VM_MACHINE_PATH_EQUIVALENT},
+        {"máy đường hiện tại", OP_VM_MACHINE_PATH_CURRENT},
+        {"máy đường đặt hiện tại", OP_VM_MACHINE_PATH_SET_CURRENT},
+        {"máy đường tạm", OP_VM_MACHINE_PATH_TEMP},
+        {"máy đường thực thi", OP_VM_MACHINE_PATH_EXECUTABLE},
+        {"máy tệp khóa", OP_VM_MACHINE_FILE_LOCK},
         {"máy đầu nối loại", OP_VM_MACHINE_SOCKET_KIND},
         {"máy đầu nối đóng", OP_VM_MACHINE_SOCKET_CLOSE},
         {"máy đầu nối thời gian chờ", OP_VM_MACHINE_SOCKET_TIMEOUT},
@@ -259,7 +283,7 @@ inline constexpr const IntrinsicDescriptor *intrinsicByOpcode(int opcode) noexce
     // Ordinary VM opcodes are below this range. Avoid scanning the intrinsic
     // registry for every numeric literal, arithmetic instruction and branch.
     if (opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
-        opcode > OP_VM_STRING_BYTE_SLICE) {
+        opcode > OP_VM_MACHINE_FILE_LOCK) {
         return nullptr;
     }
     for (const auto &intrinsic : kVmIntrinsics) {
@@ -271,7 +295,7 @@ inline constexpr const IntrinsicDescriptor *intrinsicByOpcode(int opcode) noexce
 static_assert([] {
     for (const auto &intrinsic : kVmIntrinsics) {
         if (intrinsic.opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
-            intrinsic.opcode > OP_VM_STRING_BYTE_SLICE) return false;
+            intrinsic.opcode > OP_VM_MACHINE_FILE_LOCK) return false;
     }
     return true;
 }(), "Intrinsic opcode fast-path range must cover the full registry");

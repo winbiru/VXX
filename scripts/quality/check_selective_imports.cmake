@@ -131,4 +131,23 @@ check_rejected(dotted_bad_star "nhập folder.level.*.dùng;" "nhập|mô đun")
 check_rejected(extension "nhập lib.vi;" "đuôi .vi")
 file(WRITE "${VPP_OUTPUT_DIR}/invalid.vi" "hàm dùng() { trả về 1; }; hàm thừa(a, a) {};\n")
 check_rejected(unused_semantic_error "nhập invalid.dùng;" "trùng tham số")
+
+# A full semantic pass is performed before selective pruning. Rechecking the
+# pruned AST is a diagnostic fallback; it must produce identical bytecode.
+foreach(name IN ITEMS selected alias reexport transitive_main type_alias inheritance_main mixed)
+    set(reference "${VPP_OUTPUT_DIR}/${name}.vmb")
+    set(revalidated "${VPP_OUTPUT_DIR}/${name}.revalidated.vmb")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_SELECTIVE_REVALIDATE=1"
+        "${VPP_VM}" "${compiler}" build "${VPP_OUTPUT_DIR}/${name}.vi" -o "${revalidated}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "${name}: revalidation failed (${status})\n${output}\n${errors}")
+    endif()
+    file(SHA256 "${reference}" reference_hash)
+    file(SHA256 "${revalidated}" revalidated_hash)
+    if(NOT reference_hash STREQUAL revalidated_hash)
+        message(FATAL_ERROR "${name}: selective semantic reuse changed bytecode")
+    endif()
+endforeach()
+message(STATUS "V++ selective imports: semantic reuse/revalidation bytecode parity PASS")
 message(STATUS "V++ selective imports: visibility, transitive closure, aliases, reexports, closures, types and initialization PASS")

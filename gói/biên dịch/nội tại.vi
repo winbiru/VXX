@@ -6,7 +6,7 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 // 131..134) và OP_FFI_CALL (156) không nằm trong bảng intrinsic.
 // Chỉ gọi kiểm tra này khi lệnh có immediate khác 0, như verifier C++.
 hàm công khai biên dịch là mã nội tại(mã) {
-    nếu (mã == 214 || mã == 216 || mã == 217) { trả về đúng; };
+    nếu (mã == 214 || mã == 216 || mã == 217 || (mã >= 218 && mã <= 229)) { trả về đúng; };
     nếu (mã < 98 || mã > 208) { trả về sai; };
     trả về mã != 110 && mã != 115 && mã != 119 &&
         (mã < 131 || mã > 134) && mã != 156;
@@ -80,6 +80,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy_tệp_vị_trí": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_TELL"), 1, đúng]; }
         ca "máy_tệp_lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_ERROR"), 1, đúng]; }
         ca "máy_tệp_xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_REMOVE"), 1, đúng]; }
+        ca "máy_tệp_đổi_tên": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_RENAME"), 2, đúng]; }
+        ca "máy_tệp_sao_chép": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_COPY"), 2, đúng]; }
+        ca "máy_tệp_liên_kết_cứng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LINK"), 2, đúng]; }
         ca "máy_tiến_trình_pid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PID"), 0, đúng]; }
         ca "máy_tiến_trình_ppid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PPID"), 0, đúng]; }
         ca "máy_tiến_trình_uid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_UID"), 0, đúng]; }
@@ -98,6 +101,15 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy_thư_mục_kế": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_NEXT"), 1, đúng]; }
         ca "máy_thư_mục_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_CLOSE"), 1, đúng]; }
         ca "máy_đường_loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_KIND"), 2, đúng]; }
+        ca "máy_đường_thống_kê": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_STAT"), 1, đúng]; }
+        ca "máy_đường_tuyệt_đối": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_ABSOLUTE"), 1, đúng]; }
+        ca "máy_đường_chuẩn": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_CANONICAL"), 1, đúng]; }
+        ca "máy_đường_cùng_tệp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EQUIVALENT"), 2, đúng]; }
+        ca "máy_đường_hiện_tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_CURRENT"), 0, đúng]; }
+        ca "máy_đường_đặt_hiện_tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_SET_CURRENT"), 1, đúng]; }
+        ca "máy_đường_tạm": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_TEMP"), 0, đúng]; }
+        ca "máy_đường_thực_thi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EXECUTABLE"), 1, đúng]; }
+        ca "máy_tệp_khóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LOCK"), 1, đúng]; }
         ca "máy_socket_loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
         ca "máy_socket_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
         ca "máy_socket_timeout": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_TIMEOUT"), 2, đúng]; }
@@ -185,6 +197,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy tệp vị trí": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_TELL"), 1, đúng]; }
         ca "máy tệp lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_ERROR"), 1, đúng]; }
         ca "máy tệp xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_REMOVE"), 1, đúng]; }
+        ca "máy tệp đổi tên": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_RENAME"), 2, đúng]; }
+        ca "máy tệp sao chép": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_COPY"), 2, đúng]; }
+        ca "máy tệp liên kết cứng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LINK"), 2, đúng]; }
         ca "máy tiến trình mã tiến trình": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PID"), 0, đúng]; }
         ca "máy tiến trình mã tiến trình cha": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PPID"), 0, đúng]; }
         ca "máy tiến trình mã người dùng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_UID"), 0, đúng]; }
@@ -203,6 +218,15 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy thư mục kế": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_NEXT"), 1, đúng]; }
         ca "máy thư mục đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_CLOSE"), 1, đúng]; }
         ca "máy đường loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_KIND"), 2, đúng]; }
+        ca "máy đường thống kê": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_STAT"), 1, đúng]; }
+        ca "máy đường tuyệt đối": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_ABSOLUTE"), 1, đúng]; }
+        ca "máy đường chuẩn": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_CANONICAL"), 1, đúng]; }
+        ca "máy đường cùng tệp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EQUIVALENT"), 2, đúng]; }
+        ca "máy đường hiện tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_CURRENT"), 0, đúng]; }
+        ca "máy đường đặt hiện tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_SET_CURRENT"), 1, đúng]; }
+        ca "máy đường tạm": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_TEMP"), 0, đúng]; }
+        ca "máy đường thực thi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EXECUTABLE"), 1, đúng]; }
+        ca "máy tệp khóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LOCK"), 1, đúng]; }
         ca "máy đầu nối loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
         ca "máy đầu nối đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
         ca "máy đầu nối thời gian chờ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_TIMEOUT"), 2, đúng]; }

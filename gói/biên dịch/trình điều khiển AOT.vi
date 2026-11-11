@@ -1,0 +1,992 @@
+// Driver AOT của compiler V++: chọn ABI/runtime, dựng argv và xử lý lỗi toolchain.
+// Mọi bước hệ tệp do V++ điều phối; host chỉ giữ syscall nguyên tử.
+nhập gói.biên dịch.đích.biên dịch phân tích đích;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+nhập gói.hệ thống.tiến trình.mã tiến trình;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.tệp.ghi nối tệp;
+nhập gói.nhập xuất.tệp.sao chép tệp;
+nhập gói.nhập xuất.tệp.đổi tên tệp;
+nhập gói.nhập xuất.tệp.thử liên kết cứng;
+nhập gói.nhập xuất.tệp.đọc các byte tệp;
+nhập gói.nhập xuất.thư mục.tạo thư mục;
+nhập gói.nhập xuất.thư mục.liệt kê thư mục;
+nhập gói.nhập xuất.thư mục.xóa đường dẫn;
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn nối;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tên;
+nhập gói.nhập xuất.đường dẫn.đường dẫn là tuyệt đối;
+nhập gói.nhập xuất.đường dẫn.là tệp;
+nhập gói.nhập xuất.đường dẫn.là thư mục;
+nhập gói.nhập xuất.đường dẫn.đường dẫn loại posix;
+nhập gói.nhập xuất.đường dẫn.đường dẫn loại windows;
+nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
+nhập gói.nhập xuất.đường dẫn.thư mục tạm hệ thống;
+nhập gói.nhập xuất.đường dẫn.đường dẫn có thể thực thi;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
+nhập gói.bảo mật.mật mã.mật mã thập lục phân;
+nhập gói.bảo mật.mật mã.băm sha256;
+nhập gói.văn bản.chuỗi.kết thúc bằng;
+nhập gói.văn bản.chuỗi.bắt đầu bằng;
+nhập gói.văn bản.chuỗi.tách hằng văn bản;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
+
+hàm riêng tư AOT công cụ(tên, mặc định) {
+    giá trị = đọc biến môi trường(tên, "");
+    nếu (giá trị == "") { trả về mặc định; };
+    trả về giá trị;
+};
+
+hàm riêng tư AOT thêm(đích, nguồn) {
+    lặp(i = 0; i < độ dài(nguồn); i++) { máy ảo thêm cuối danh sách(đích, nguồn[i]); };
+};
+
+hàm riêng tư AOT chạy(bước, nhãn, pha, lệnh) {
+    máy ảo thêm cuối danh sách(bước, ["run", nhãn, pha, lệnh]);
+};
+
+hàm riêng tư AOT đối tượng(bước, nhãn, lệnh, đầu ra, cache, phụ thuộc, đích máy) {
+    nếu (đọc biến môi trường("VPP_NATIVE_NO_CACHE", "") == "1") { cache = ""; };
+    máy ảo thêm cuối danh sách(bước, ["object", nhãn, lệnh, đầu ra, cache, phụ thuộc, đích máy]);
+};
+
+hàm riêng tư AOT đọc nếu có(đường) {
+    nếu (là tệp(đường)) { trả về đọc tệp(đường); };
+    trả về "";
+};
+
+// C++ holds the lifetime guard, but V++ chooses the name, requests the OS
+// single-directory primitive and recursively removes its private workspace.
+// mkdir is exclusive: a pre-existing directory is never reused or removed.
+hàm công khai biên dịch AOT tạo thư mục tạm(cha) {
+    nếu (cha == "") { cha = thư mục tạm hệ thống(); };
+    nếu (!là thư mục(cha)) { ném "Native AOT: temporary parent directory missing"; };
+    tiền tố = ".vpp-aot-" + mã tiến trình() + "-";
+    lặp(i = 0; i < 16384; i++) {
+        đường = đường dẫn nối(cha, tiền tố + i);
+        kết quả = máy thư mục tạo(đường);
+        nếu (kết quả[0] == 0) { trả về đường; };
+        nếu (kết quả[1] != 1) {
+            ném "Native AOT: cannot create temporary directory, errno=" + kết quả[2];
+        };
+    };
+    ném "Native AOT: exhausted temporary directory candidates";
+};
+
+hàm công khai biên dịch AOT dọn thư mục tạm(đường) {
+    nếu (!bắt đầu bằng(đường dẫn tên(đường), ".vpp-aot-")) {
+        ném "Native AOT: invalid temporary directory";
+    };
+    trả về xóa đường dẫn(đường);
+};
+
+// Batch output directories are prepared by V++; native code supplies only
+// the absolute requested path and captures test process output.
+hàm công khai biên dịch AOT chuẩn bị thư mục batch(thư mục) {
+    tạo thư mục(thư mục);
+    nếu (!là thư mục(thư mục)) {
+        ném "Native AOT: cannot prepare batch output directory: " + thư mục;
+    };
+    trả về 0;
+};
+
+// The host supplies the executable location and working directory as OS
+// observations; V++ selects the libraries for every self-hosted AOT build.
+hàm công khai biên dịch AOT chọn gốc thư viện(gốc, thư mục chương trình, hiện tại) {
+    cấu hình = đọc biến môi trường("VPP_AOT_LIB_ROOT", "");
+    nếu (cấu hình != "") {
+        nếu (!đường dẫn là tuyệt đối(cấu hình)) {
+            cấu hình = đường dẫn nối(hiện tại, cấu hình);
+        };
+        trả về cấu hình;
+    };
+    nếu (là thư mục(đường dẫn nối(gốc, "lib")) ||
+        là thư mục(đường dẫn nối(gốc, "lib64"))) { trả về gốc; };
+    nếu (thư mục chương trình != "") {
+        dựng = đường dẫn cha(thư mục chương trình);
+        tên = đường dẫn tên(thư mục chương trình);
+        nếu (tên == "Release" || tên == "Debug" ||
+            tên == "RelWithDebInfo" || tên == "MinSizeRel") {
+            dựng = đường dẫn cha(dựng);
+        };
+        nếu (là thư mục(đường dẫn nối(dựng, "lib/Release")) ||
+            là thư mục(đường dẫn nối(dựng, "lib"))) { trả về dựng; };
+    };
+    ứng viên = ["build", "cmake-build-debug", "cmake-build-release", "cmake-build-sanitized"];
+    lặp(i = 0; i < độ dài(ứng viên); i++) {
+        dựng = đường dẫn nối(gốc, ứng viên[i]);
+        nếu (là thư mục(đường dẫn nối(dựng, "lib"))) { trả về dựng; };
+    };
+    trả về gốc;
+};
+
+// Embedded input and diagnostics use the same UTF-8 file API as ordinary
+// compiled programs. The native process ABI only launches the child.
+hàm công khai biên dịch AOT ghi nguồn nhúng(đường, nguồn) {
+    ghi tệp(đường, nguồn);
+    trả về 1;
+};
+
+hàm công khai biên dịch AOT đọc lỗi nhúng(đường) {
+    trả về AOT đọc nếu có(đường);
+};
+
+// Profiling must invalidate the fast source-index shortcut, including an
+// explicitly configured profiling output file.
+hàm công khai biên dịch AOT dùng chỉ mục nguồn() {
+    trả về đọc biến môi trường("VPP_COMPILER_PROFILE_FILE", "") == "";
+};
+
+hàm riêng tư AOT giá trị cấu hình(cấu hình, khóa) {
+    // Scan bytes once; splitting at every newline repeatedly indexes the
+    // entire Unicode string and dominates short compilations on large caches.
+    byte nguồn = chuỗi thành byte máy ảo(cấu hình);
+    byte khóa = chuỗi thành byte máy ảo(khóa);
+    n = độ dài(byte nguồn); m = độ dài(byte khóa); i = 0;
+    khi (i < n) {
+        khớp = i + m <= n;
+        j = 0;
+        khi (khớp && j < m) {
+            nếu (byte nguồn[i + j] != byte khóa[j]) { khớp = sai; };
+            j += 1;
+        };
+        nếu (khớp) {
+            đầu = i + m; cuối = đầu;
+            khi (cuối < n) {
+                nếu (byte nguồn[cuối] == 10 || byte nguồn[cuối] == 13) { thoát; };
+                cuối += 1;
+            };
+            trả về máy ảo cắt chuỗi theo byte(cấu hình, đầu, cuối - đầu);
+        };
+        khi (i < n) {
+            b = byte nguồn[i]; i += 1;
+            nếu (b == 10) { thoát; };
+        };
+    };
+    trả về "";
+};
+
+hàm riêng tư AOT thư viện(tập thư viện, windows) {
+    kết quả = [];
+    tên = ["native-aot", "runtime-native", "compiler", "frontend", "bytecode", "core"];
+    thư mục = ["lib/Release", "lib64/Release", "lib", "lib64"];
+    lặp(i = 0; i < độ dài(tên); i++) {
+        tệp = "";
+        lặp(j = 0; j < độ dài(thư mục); j++) {
+            tên tệp = "libvpp-" + tên[i] + ".a";
+            nếu (windows) { tên tệp = "vpp-" + tên[i] + ".lib"; };
+            ứng viên = đường dẫn nối(đường dẫn nối(tập thư viện, thư mục[j]), tên tệp);
+            nếu (là tệp(ứng viên)) { tệp = ứng viên; thoát; };
+        };
+        nếu (tệp == "") { trả về []; };
+        máy ảo thêm cuối danh sách(kết quả, tệp);
+    };
+    trả về kết quả;
+};
+
+hàm riêng tư AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, executable) {
+    gốc = cảnh[0]; thư viện = cảnh[1]; thư mục = cảnh[6];
+    nếu (đọc biến môi trường("VPP_AOT_LINKER_CACHE", "1") == "0") {
+        thư mục = đường dẫn nối(cảnh[2], "linker");
+        máy ảo thêm cuối danh sách(bước, ["mkdir", thư mục]);
+    };
+    dựng = đường dẫn nối(thư mục, "build");
+    nguồn liên kết = đường dẫn nối(thư mục, "program.S");
+    đầu ra = đường dẫn nối(thư mục, "program");
+    nếu (windows) { đầu ra += ".exe"; };
+    dấu = đường dẫn nối(thư mục, "configuration.stamp");
+    // Length-delimited fields keep paths/environment values unambiguous.
+    trường = ["vpp-aot-cmake-1", gốc, thư viện, cảnh[4], cấu hình, cảnh[7]];
+    các tên môi trường = ["VPP_AOT_RUNTIME", "VPP_AOT_VPP_OBJECT", "CMAKE_GENERATOR", "CC", "CXX",
+        "CMAKE_GENERATOR_PLATFORM", "CMAKE_GENERATOR_TOOLSET", "CFLAGS", "CXXFLAGS", "LDFLAGS",
+        "CMAKE_TOOLCHAIN_FILE", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET"];
+    lặp(i = 0; i < độ dài(các tên môi trường); i++) {
+        máy ảo thêm cuối danh sách(trường, đọc biến môi trường(các tên môi trường[i], ""));
+    };
+    máy ảo thêm cuối danh sách(trường, ffi);
+    chữ ký = "";
+    lặp(i = 0; i < độ dài(trường); i++) { chữ ký += "" + độ dài(trường[i]) + ":" + trường[i]; };
+    dùng lại = đọc biến môi trường("VPP_AOT_LINKER_CACHE", "1") != "0" &&
+        AOT đọc nếu có(dấu) == chữ ký;
+    máy ảo thêm cuối danh sách(bước, ["copy", nguồn, nguồn liên kết]);
+    // Every source needs a fresh object, even after reconfiguration or on a
+    // filesystem whose timestamps cannot distinguish two quick requests.
+    xóa = ["program.o", "program.obj", "bin/vpp-aot-program", "bin/vpp-aot-program.exe",
+        "bin/Release/vpp-aot-program.exe"];
+    lặp(i = 0; i < độ dài(xóa); i++) {
+        máy ảo thêm cuối danh sách(bước, ["remove", đường dẫn nối(dựng, xóa[i])]);
+    };
+    máy ảo thêm cuối danh sách(bước, ["remove", đầu ra]);
+    nếu (dùng lại) {
+        máy ảo thêm cuối danh sách(bước, ["mark", "reuse-native-linker"]);
+    } hoặc {
+        // CMake cannot switch generator, toolchain or cached find_library
+        // results in place. A different signature needs a fresh build tree.
+        máy ảo thêm cuối danh sách(bước, ["remove-tree", dựng]);
+        lệnh = ["cmake", "-S", đường dẫn nối(gốc, "scripts/quality/native_aot_link"), "-B", dựng];
+        nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DCMAKE_BUILD_TYPE=Release"); };
+        AOT thêm(lệnh, ["-DVPP_AOT_CONFIGURATION=Release", "-DVPP_AOT_ROOT=" + gốc,
+            "-DVPP_AOT_LIB_ROOT=" + thư viện, "-DVPP_AOT_SOURCE=" + nguồn liên kết,
+            "-DVPP_AOT_OUTPUT=" + đầu ra]);
+        nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DVPP_AOT_LINK_LEGACY_LIBFFI=" + ffi); };
+        AOT chạy(bước, "linker configuration", "configure-native-linker", lệnh);
+        // Publish the signature only after a successful configuration.
+        máy ảo thêm cuối danh sách(bước, ["write", dấu, chữ ký]);
+    };
+    AOT chạy(bước, "assembly/link", "assemble-and-link",
+        ["cmake", "--build", dựng, "--config", "Release", "--parallel", "2"]);
+    máy ảo thêm cuối danh sách(bước, ["copy", đầu ra, executable]);
+};
+
+// Context v1: toolchain root, library root, temporary directory, destination,
+// host triple, legacy libffi ON/OFF, reusable linker directory, input metadata.
+hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
+    nếu (độ dài(cảnh) != 8) { ném "Native AOT: invalid driver context"; };
+    gốc = cảnh[0]; thư viện = cảnh[1]; tạm = cảnh[2]; ffi = cảnh[5];
+    đích = biên dịch phân tích đích(cảnh[4]);
+    hệ = đích["hệ điều hành"]; kiến trúc = đích["kiến trúc"];
+    windows = hệ == "windows";
+    nguồn = đường dẫn nối(tạm, "program.S");
+    executable = đường dẫn nối(tạm, "program");
+    đuôi = ".o";
+    nếu (windows) { executable += ".exe"; đuôi = ".obj"; };
+    đối tượng = đường dẫn nối(tạm, "program" + đuôi);
+    asm gốc = đường dẫn nối(gốc, "scripts/ASM");
+    bao gồm = ["-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common")];
+    phụ thuộc asm = [[asm gốc, [".S", ".s", ".inc", ".h"]]];
+    runtime = AOT công cụ("VPP_AOT_RUNTIME", "cpp");
+    nếu (runtime != "cpp" && runtime != "vpp" && runtime != "vpp-freestanding") {
+        ném "Native AOT: VPP_AOT_RUNTIME must be vpp, vpp-freestanding or cpp";
+    };
+    nếu (runtime == "vpp" && (hệ != "macos" || kiến trúc != "aarch64")) {
+        ném "Native AOT: V++ dynamic runtime requires macOS ARM64";
+    };
+    nếu (runtime == "vpp-freestanding" && (hệ != "linux" || kiến trúc != "x86_64")) {
+        ném "Native AOT: V++ freestanding runtime requires Linux x86-64";
+    };
+    bước = [["write", nguồn, asm], ["mark", "write-native-assembly"]];
+    cấu hình = AOT đọc nếu có(đường dẫn nối(thư viện, "CMakeCache.txt"));
+    công cụ = AOT công cụ("VPP_AOT_ASSEMBLER", "clang");
+    nếu (runtime != "cpp" && đọc biến môi trường("VPP_AOT_DIRECT_LINK", "1") != "0") {
+        runtime object = AOT công cụ("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"));
+        nếu (!đường dẫn là tuyệt đối(runtime object) || !là tệp(runtime object)) {
+            ném "Native AOT: V++ runtime object missing: " + runtime object;
+        };
+        lệnh = [công cụ];
+        nếu (hệ == "linux") { AOT thêm(lệnh, ["-target", "x86_64-unknown-linux-gnu"]); };
+        AOT thêm(lệnh, ["-c", nguồn, "-DVPP_AOT_VPP_RUNTIME=1"]);
+        AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", đối tượng]);
+        AOT chạy(bước, "V++ program assembly", "assemble-vpp-program", lệnh);
+        cache = đường dẫn nối(đường dẫn cha(runtime object), ".vpp-aot-link-cache");
+        liên kết = [công cụ, đối tượng];
+        nếu (hệ == "macos") {
+            primitives = đường dẫn nối(tạm, "primitives.o");
+            AOT đối tượng(bước, "V++ platform primitives assembly",
+                [công cụ, "-c", đường dẫn nối(asm gốc, "macos/vpp_aot_primitives_aarch64.S"),
+                 "-DVPP_NATIVE_RUNTIME_STACK_ABI=1", "-o", "%VPP_OBJECT%"],
+                primitives, cache, phụ thuộc asm, cảnh[4]);
+            AOT thêm(liên kết, [primitives, runtime object, "-Wl,-dead_strip", "-o", executable]);
+        } hoặc {
+            liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
+                "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
+                "-Wl,-z,noexecstack", đối tượng];
+            thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+            lặp(i = 0; i < độ dài(thành phần); i++) {
+                phần = đường dẫn nối(tạm, thành phần[i] + ".o");
+                lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+                    đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S")];
+                AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", "%VPP_OBJECT%"]);
+                AOT đối tượng(bước, "Linux " + thành phần[i] + " assembly", lệnh, phần, cache, phụ thuộc asm, cảnh[4]);
+                máy ảo thêm cuối danh sách(liên kết, phần);
+            };
+            AOT thêm(liên kết, [runtime object, "-o", executable]);
+        };
+        máy ảo thêm cuối danh sách(bước, ["mark", "prepare-vpp-runtime"]);
+        AOT chạy(bước, "V++ executable link", "link-vpp-executable", liên kết);
+        nếu (hệ == "linux") {
+            AOT chạy(bước, "freestanding ELF audit", "audit-linux-vpp-executable",
+                ["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable]);
+        };
+    } hoặc {
+        archives = AOT thư viện(thư viện, windows);
+        có instrumentation = máy ảo thay chuỗi chính xác(cấu hình, "VPP_ENABLE_COVERAGE:BOOL=ON", "") != cấu hình ||
+            máy ảo thay chuỗi chính xác(cấu hình, "-fsanitize=", "") != cấu hình;
+        trực tiếp = runtime == "cpp" && !có instrumentation && độ dài(archives) == 6 &&
+            đọc biến môi trường("VPP_AOT_DIRECT_LINK_CPP", "1") != "0";
+        nếu (windows) { trực tiếp = trực tiếp && đọc biến môi trường("VPP_AOT_WINDOWS_DIRECT_LINK", "0") == "1"; };
+        nếu (hệ == "macos" && kiến trúc != "aarch64") { trực tiếp = sai; };
+        nếu (!trực tiếp) {
+            AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, executable);
+        } hoặc {
+            cxx = AOT công cụ("CXX", "c++"); cc = AOT công cụ("VPP_AOT_C_COMPILER", "cc");
+            nếu (hệ == "macos") { cxx = AOT công cụ("CXX", "clang++"); cc = AOT công cụ("VPP_AOT_C_COMPILER", "clang"); };
+            công cụ = AOT công cụ("VPP_AOT_ASSEMBLER", cxx);
+            lệnh = [công cụ];
+            nếu (windows) { lệnh = [AOT công cụ("VPP_AOT_ASSEMBLER", "clang"), "-target", "x86_64-pc-windows-msvc"]; };
+            AOT thêm(lệnh, ["-c", nguồn]); AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", đối tượng]);
+            AOT chạy(bước, "Stage 0 program assembly", "assemble-stage0-program", lệnh);
+            runtime source = đường dẫn nối(gốc, "src/runtime/native/vpp_aot_runtime.c");
+            runtime object = đường dẫn nối(tạm, "bootstrap-runtime" + đuôi);
+            machine object = đường dẫn nối(tạm, "stage0-machine" + đuôi);
+            cache = đường dẫn nối(thư viện, "native-stage0-vpp-cache");
+            AOT đối tượng(bước, "bootstrap runtime compilation",
+                [cc, "-std=c11", "-O3", "-DNDEBUG", "-c", runtime source, "-o", "%VPP_OBJECT%"],
+                runtime object, cache, [[runtime source, []]], cảnh[4]);
+            machine source = "linux/vpp_aot_stage0_machine_" + kiến trúc + ".S";
+            nếu (hệ == "macos") { machine source = "macos/vpp_aot_stage0_machine_aarch64.S"; };
+            nếu (windows) {
+                // Replace the bootstrap step with the matching MSVC /MT CRT.
+                máy ảo xóa vị trí danh sách(bước, độ dài(bước) - 1);
+                AOT đối tượng(bước, "bootstrap runtime compilation",
+                    [AOT công cụ("VPP_AOT_MSVC_CL", "cl"), "/nologo", "/std:c11", "/O2", "/DNDEBUG", "/MT", "/c",
+                     runtime source, "/Fo%VPP_OBJECT%"], runtime object, cache, [[runtime source, []]], cảnh[4]);
+                machine source = "windows/vpp_aot_primitives_windows_x86_64.S";
+            };
+            lệnh = [cc, "-c", đường dẫn nối(asm gốc, machine source)];
+            nếu (windows) {
+                lệnh = [AOT công cụ("VPP_AOT_ASSEMBLER", "clang"), "-target", "x86_64-pc-windows-msvc", "-c",
+                    "-DVPP_WINDOWS_STAGE0=1", "-DVPP_NATIVE_RUNTIME_STACK_ABI=0", đường dẫn nối(asm gốc, machine source)];
+            };
+            AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", "%VPP_OBJECT%"]);
+            AOT đối tượng(bước, "machine primitives assembly", lệnh, machine object, cache, phụ thuộc asm, cảnh[4]);
+            máy ảo thêm cuối danh sách(bước, ["mark", "prepare-stage0-runtime"]);
+            liên kết = [cxx, đối tượng, runtime object, machine object];
+            nếu (windows) {
+                liên kết = [AOT công cụ("VPP_AOT_MSVC_LINK", "link"), "/NOLOGO", "/MACHINE:X64", "/SUBSYSTEM:CONSOLE",
+                    "/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF", "/OUT:" + executable, đối tượng, runtime object, machine object];
+            };
+            AOT thêm(liên kết, archives);
+            nếu (windows) {
+                AOT thêm(liên kết, ["ws2_32.lib", "bcrypt.lib", "secur32.lib", "crypt32.lib", "shell32.lib", "kernel32.lib",
+                    "user32.lib", "gdi32.lib", "winspool.lib", "ole32.lib", "oleaut32.lib", "uuid.lib", "comdlg32.lib", "advapi32.lib"]);
+            } hoặc {
+                nếu (ffi == "ON") {
+                    ffi archive = AOT giá trị cấu hình(cấu hình, "VPP_LIBFFI_STATIC_ARCHIVE:FILEPATH=");
+                    nếu (là tệp(ffi archive) && kết thúc bằng(ffi archive, ".a")) {
+                        máy ảo thêm cuối danh sách(liên kết, ffi archive);
+                    } hoặc { máy ảo thêm cuối danh sách(liên kết, "-lffi"); };
+                };
+                nếu (hệ == "macos") {
+                    AOT thêm(liên kết, ["-framework", "Security", "-framework", "CoreFoundation"]);
+                } hoặc {
+                    ssl = AOT giá trị cấu hình(cấu hình, "OPENSSL_SSL_LIBRARY:FILEPATH=");
+                    crypto = AOT giá trị cấu hình(cấu hình, "OPENSSL_CRYPTO_LIBRARY:FILEPATH=");
+                    nếu (là tệp(ssl) && là tệp(crypto) && kết thúc bằng(ssl, ".a") && kết thúc bằng(crypto, ".a")) {
+                        AOT thêm(liên kết, [ssl, crypto]);
+                    } hoặc { AOT thêm(liên kết, ["-Wl,-Bstatic", "-lssl", "-lcrypto", "-Wl,-Bdynamic"]); };
+                    AOT thêm(liên kết, ["-Wl,--strip-all", "-pthread", "-ldl"]);
+                };
+                AOT thêm(liên kết, ["-o", executable]);
+            };
+            AOT chạy(bước, "Stage 0 executable link", "link-stage0-executable", liên kết);
+        };
+    };
+    nếu (đọc biến môi trường("VPP_AOT_KEEP_ASM", "") != "") {
+        máy ảo thêm cuối danh sách(bước, ["copy", nguồn, cảnh[3] + ".S"]);
+    };
+    máy ảo thêm cuối danh sách(bước, ["publish", executable, cảnh[3]]);
+    trả về bước;
+};
+
+// argv is passed directly through the V++ process API, never through a shell.
+// Error policy stays here, including launch failures and captured diagnostics.
+hàm công khai biên dịch AOT chạy lệnh(lệnh, nhãn) {
+    nếu (độ dài(lệnh) == 0) { ném "Native AOT: empty tool command"; };
+    đối số = [];
+    lặp(i = 1; i < độ dài(lệnh); i++) { máy ảo thêm cuối danh sách(đối số, lệnh[i]); };
+    kết quả = chạy tiến trình(lệnh[0], đối số);
+    nếu (!kết quả["khởi chạy"] || kết quả["mã thoát"] != 0) {
+        ném "Native AOT: " + nhãn + " failed (" + kết quả["mã thoát"] + ")\n" +
+            kết quả["đầu ra"] + kết quả["lỗi"];
+    };
+    trả về 0;
+};
+
+// Only a completed, nonempty object is eligible for cache reuse/publication.
+hàm riêng tư AOT tệp hợp lệ(đường) {
+    thử {
+        trạng thái = đường dẫn thống kê tệp(đường);
+        // Máy trả ["missing"] cho đường dẫn không tồn tại. Tránh đọc
+        // trường kích thước nếu chưa xác nhận metadata đủ bốn trường.
+        nếu (độ dài(trạng thái) != 4) { trả về sai; };
+        nếu (trạng thái[0] != "present") { trả về sai; };
+        trả về trạng thái[1] != "0";
+    } bắt lỗi(e) {
+        trả về sai;
+    };
+};
+
+// Eligibility includes the OS executable permission, queried as a primitive.
+hàm công khai biên dịch AOT cache thực thi hợp lệ(đường) {
+    nếu (!AOT tệp hợp lệ(đường)) { trả về sai; };
+    trả về đường dẫn có thể thực thi(đường);
+};
+
+hàm công khai biên dịch AOT ghi theo dõi cache(sự kiện, đường) {
+    nhật ký = đọc biến môi trường("VPP_AOT_EXECUTABLE_CACHE_TRACE", "");
+    nếu (nhật ký != "") {
+        ghi nối tệp(nhật ký, sự kiện + " " + đường dẫn tên(đường) + "\n");
+    };
+};
+
+// Both executable and linker caches derive their signatures in V++.
+// Each typed input is ["S", value] or ["F", path]. Only the single-file
+// metadata syscall is native; dependency selection and framing live here.
+hàm riêng tư AOT mã quan sát(các trường, phiên bản) {
+    đầu vào = phiên bản;
+    nếu (độ dài(các trường) == 0) { ném "Native AOT: empty executable cache observations"; };
+    lặp(vị trí = 0; vị trí < độ dài(các trường); vị trí++) {
+        cặp = các trường[vị trí];
+        nếu (độ dài(cặp) != 2) { ném "Native AOT: invalid cache input pair"; };
+        loại = cặp[0]; giá trị = cặp[1];
+        hàng = [loại, giá trị];
+        nếu (loại == "F") {
+            trạng thái = đường dẫn thống kê tệp(giá trị);
+            nếu (độ dài(trạng thái) != 1 && độ dài(trạng thái) != 4) {
+                ném "Native AOT: invalid file metadata";
+            };
+            nếu (trạng thái[0] == "present" && độ dài(trạng thái) != 4) {
+                ném "Native AOT: missing file metadata";
+            };
+            nếu (trạng thái[0] == "missing" && độ dài(trạng thái) != 1) {
+                ném "Native AOT: invalid missing-file metadata";
+            };
+            nếu (trạng thái[0] != "present" && trạng thái[0] != "missing") {
+                ném "Native AOT: unknown file state";
+            };
+            AOT thêm(hàng, trạng thái);
+        } hoặc {
+            nếu (loại != "S") { ném "Native AOT: unknown executable cache field type"; };
+        };
+        đầu vào += "" + độ dài(hàng) + ";";
+        lặp(i = 0; i < độ dài(hàng); i++) {
+            trường = hàng[i];
+            đầu vào += "" + độ dài(chuỗi thành byte máy ảo(trường)) + ":" + trường;
+        };
+    };
+    trả về đầu vào;
+};
+
+// V++ owns metadata observation, cache directory and signature generation.
+hàm công khai biên dịch AOT đường cache thực thi(các trường, thư mục hiện tại) {
+    thư mục = đọc biến môi trường("VPP_AOT_EXECUTABLE_CACHE_DIR", "");
+    nếu (thư mục == "" || đọc biến môi trường("VPP_NATIVE_NO_CACHE", "") == "1" ||
+        đọc biến môi trường("VPP_AOT_KEEP_ASM", "") != "" ||
+        đọc biến môi trường("VPP_NATIVE_PROFILE", "") == "1") { trả về ""; };
+    nếu (!đường dẫn là tuyệt đối(thư mục)) {
+        thư mục = đường dẫn nối(thư mục hiện tại, thư mục);
+    };
+    thử { tạo thư mục(thư mục); } bắt lỗi(e) { trả về ""; };
+    nếu (!là thư mục(thư mục)) { trả về ""; };
+    chữ ký = băm sha256(AOT mã quan sát(các trường, "vpp-aot-executable-v5"));
+    đuôi = "";
+    nếu (tên nền tảng() == "windows") { đuôi = ".exe"; };
+    trả về đường dẫn nối(thư mục, "aot-" + chữ ký + đuôi);
+};
+
+// V++ discovers and observes all linker dependencies.
+hàm công khai biên dịch AOT đầu vào dấu liên kết(gốc, thư viện) {
+    tệp = [];
+    thư mục = [đường dẫn nối(thư viện, "lib"), đường dẫn nối(thư viện, "lib64")];
+    lặp(i = 0; i < độ dài(thư mục); i++) {
+        nếu (là thư mục(thư mục[i])) {
+            AOT thêm(tệp, AOT tệp phụ thuộc([[thư mục[i], [""]]]));
+        };
+    };
+    AOT thêm(tệp, [đường dẫn nối(gốc, "scripts/quality/native_aot_link/CMakeLists.txt"),
+        đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o")]);
+    đối tượng = đọc biến môi trường("VPP_AOT_VPP_OBJECT", "");
+    nếu (đối tượng != "") { máy ảo thêm cuối danh sách(tệp, đối tượng); };
+    kết quả = [];
+    lặp(i = 0; i < độ dài(tệp); i++) { máy ảo thêm cuối danh sách(kết quả, ["F", tệp[i]]); };
+    trả về kết quả;
+};
+
+hàm công khai biên dịch AOT chữ ký liên kết(các trường) {
+    trả về băm sha256(AOT mã quan sát(các trường, "vpp-aot-linker-dependencies-v4"));
+};
+
+// A completed cache entry is immutable. Never rename over a competing writer:
+// hard links are no-replace even if the native lock is unavailable. A copy to
+// the target volume handles EXDEV before attempting the atomic hard link.
+hàm công khai biên dịch AOT công bố cache(nguồn, đích, tạm) {
+    nếu (!AOT tệp hợp lệ(nguồn)) { trả về sai; };
+    nếu (AOT tệp hợp lệ(đích)) { trả về đúng; };
+    thử {
+        nếu (thử liên kết cứng(nguồn, đích)) { trả về AOT tệp hợp lệ(đích); };
+        // The cache can reside on another volume. Copy to a unique file on
+        // the destination volume, then link the complete file without replace.
+        sao chép tệp(nguồn, tạm);
+        nếu (!AOT tệp hợp lệ(tạm)) {
+            thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+            trả về sai;
+        };
+        // A hard link from the complete staging file is an atomic,
+        // non-overwriting publication even when concurrent writers exist.
+        nếu (thử liên kết cứng(tạm, đích)) {
+            kết quả = AOT tệp hợp lệ(đích);
+            thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+            trả về kết quả;
+        };
+        nếu (AOT tệp hợp lệ(đích)) {
+            thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+            trả về đúng;
+        };
+        // A rename would silently overwrite an entry another process just
+        // published. Without hard-link support, safely skip cache insertion.
+        thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+        trả về sai;
+    } bắt lỗi(e) {
+        thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+        trả về sai;
+    };
+};
+
+// V++ exclusively allocates, names and removes the staging workspace. The
+// host only supplies filesystem primitives and an optional per-key OS lock.
+hàm công khai biên dịch AOT công bố cache tự quản(nguồn, đích) {
+    tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(đích));
+    thử {
+        kết quả = biên dịch AOT công bố cache(nguồn, đích, đường dẫn nối(tạm, "object"));
+        biên dịch AOT dọn thư mục tạm(tạm);
+        trả về kết quả;
+    } bắt lỗi(e) {
+        thử { biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+};
+
+// Batch evidence is generated by V++ using the same filesystem abstraction
+// as the compiler. The host captures child output and elapsed milliseconds.
+hàm công khai biên dịch AOT ghi kết quả batch(thư mục, tên, đầu ra, mã, mili, kiểm vàng, tệp kỳ vọng) {
+    ghi tệp(đường dẫn nối(thư mục, tên + ".output"), đầu ra);
+    ghi tệp(đường dẫn nối(thư mục, tên + ".status"), "" + mã + "\n");
+    ghi tệp(đường dẫn nối(thư mục, tên + ".milliseconds"), "" + mili + "\n");
+    nếu (kiểm vàng) {
+        nếu (mã != 0) { trả về sai; };
+        nếu (!là tệp(tệp kỳ vọng)) { trả về sai; };
+        nếu (đọc tệp(tệp kỳ vọng) != đầu ra) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+// A symlink to a directory is a dependency leaf, never a recursive traversal.
+hàm riêng tư AOT thư mục thực(đường) {
+    nếu (tên nền tảng() == "windows") { trả về đường dẫn loại windows(đường, sai) == 2; };
+    trả về đường dẫn loại posix(đường, sai) == 4;
+};
+
+hàm riêng tư AOT tệp phụ thuộc(các yêu cầu) {
+    kết quả = [];
+    đã gặp = {};
+    lặp(i = 0; i < độ dài(các yêu cầu); i++) {
+        đường = các yêu cầu[i][0];
+        phần mở rộng = các yêu cầu[i][1];
+        nếu (!là thư mục(đường)) {
+            nếu (!là tệp(đường)) { ném "Native AOT: unreadable driver dependency: " + đường; };
+            nếu (!máy ảo có khóa từ điển(đã gặp, đường)) {
+                đã gặp[đường] = đúng;
+                máy ảo thêm cuối danh sách(kết quả, đường);
+            };
+        } hoặc {
+            chờ = [đường];
+            khi (độ dài(chờ) > 0) {
+                mục = máy ảo xóa vị trí danh sách(chờ, độ dài(chờ) - 1);
+                con = liệt kê thư mục(mục);
+                lặp(j = 0; j < độ dài(con); j++) {
+                    tệp = đường dẫn nối(mục, con[j]);
+                    nếu (AOT thư mục thực(tệp)) {
+                        máy ảo thêm cuối danh sách(chờ, tệp);
+                    } hoặc {
+                        nếu (là tệp(tệp)) {
+                            khớp đuôi = sai;
+                            lặp(k = 0; k < độ dài(phần mở rộng); k++) {
+                                nếu (kết thúc bằng(tệp, phần mở rộng[k])) { khớp đuôi = đúng; thoát; };
+                            };
+                            nếu (khớp đuôi && !máy ảo có khóa từ điển(đã gặp, tệp)) {
+                                đã gặp[tệp] = đúng;
+                                máy ảo thêm cuối danh sách(kết quả, tệp);
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    sắp xếp(kết quả);
+    trả về kết quả;
+};
+
+// V++ decides which link/runtime/toolchain inputs affect executable reuse.
+// C++ is restricted to stat(path) and supplies length-framed size/mtime data
+// for each F entry. Directory discovery, environment and ordering live here.
+hàm công khai biên dịch AOT đầu vào cache thực thi(assembly, gốc, thư viện, hiện tại, thư mục công cụ) {
+    nếu (đọc biến môi trường("VPP_AOT_EXECUTABLE_CACHE_DIR", "") == "" ||
+        đọc biến môi trường("VPP_NATIVE_NO_CACHE", "") == "1" ||
+        đọc biến môi trường("VPP_AOT_KEEP_ASM", "") != "" ||
+        đọc biến môi trường("VPP_NATIVE_PROFILE", "") == "1") { trả về []; };
+    kết quả = [["S", assembly], ["S", gốc], ["S", thư viện], ["S", hiện tại]];
+    môi trường = ["VPP_HOME", "VPP_AOT_ROOT", "VPP_COMPILER_WORKERS", "VPP_AOT_RUNTIME",
+        "VPP_AOT_VPP_OBJECT", "VPP_AOT_DIRECT_LINK", "VPP_AOT_ASM_DIRECT", "VPP_AOT_DIRECT_LINK_CPP",
+        "VPP_AOT_LINKER_CACHE", "VPP_AOT_LIB_ROOT", "VPP_AOT_WINDOWS_DIRECT_LINK",
+        "VPP_AOT_MSVC_CL", "VPP_AOT_MSVC_LINK", "VPP_AOT_ASSEMBLER", "VPP_AOT_C_COMPILER",
+        "VPP_AOT_FFI", "VPP_AOT_LIBRARY_DIRS", "VPP_AOT_LINK_LEGACY_LIBFFI",
+        "VPP_AOT_VPP_RUNTIME", "VPP_AOT_CONFIGURATION", "VPP_ENABLE_COVERAGE",
+        "VPP_LINUX_HOST_NO_CRT", "VPP_MACOS_DIRECT_LD", "VPP_MACOS_SDKROOT",
+        "VPP_NATIVE_CC", "VPP_NATIVE_DYNAMIC_RUNTIME", "VPP_NATIVE_ELF_LINK",
+        "VPP_NATIVE_MACHO_EXE_LINK", "VPP_NATIVE_MACHO_REL_LINK", "VPP_NATIVE_TARGET",
+        "VPP_NATIVE_VPP_RUNTIME", "VPP_NATIVE_RUNTIME_STACK_ABI", "PATH", "CC", "CXX",
+        "CFLAGS", "CXXFLAGS", "LDFLAGS", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET",
+        "CMAKE_GENERATOR", "CMAKE_TOOLCHAIN_FILE", "CMAKE_GENERATOR_PLATFORM", "CMAKE_GENERATOR_TOOLSET"];
+    lặp(i = 0; i < độ dài(môi trường); i++) {
+        tên = môi trường[i];
+        máy ảo thêm cuối danh sách(kết quả, ["S", tên]);
+        máy ảo thêm cuối danh sách(kết quả, ["S", đọc biến môi trường(tên, "")]);
+    };
+    tệp = [đường dẫn nối(thư viện, "CMakeCache.txt"),
+        đường dẫn nối(gốc, "src/runtime/native/vpp_aot_runtime.c"),
+        đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o")];
+    đối tượng = đọc biến môi trường("VPP_AOT_VPP_OBJECT", "");
+    nếu (đối tượng != "") {
+        nếu (!đường dẫn là tuyệt đối(đối tượng)) { đối tượng = đường dẫn nối(hiện tại, đối tượng); };
+        máy ảo thêm cuối danh sách(tệp, đối tượng);
+    };
+    công cụ = ["vpp-native", "vpp-native.exe", "vpp-cli", "vpp-cli.exe"];
+    lặp(i = 0; i < độ dài(công cụ); i++) {
+        máy ảo thêm cuối danh sách(tệp, đường dẫn nối(thư mục công cụ, công cụ[i]));
+    };
+    thư mục = [đường dẫn nối(thư viện, "lib"), đường dẫn nối(thư viện, "lib64"),
+        đường dẫn nối(gốc, "scripts/ASM"),
+        đường dẫn nối(gốc, "scripts/quality/native_aot_link")];
+    lặp(i = 0; i < độ dài(thư mục); i++) {
+        nếu (là thư mục(thư mục[i])) {
+            đuôi = [".a", ".so", ".dylib", ".lib", ".dll"];
+            nếu (i >= 2) { đuôi = [".S", ".s", ".inc", ".h", "CMakeLists.txt"]; };
+            AOT thêm(tệp, AOT tệp phụ thuộc([[thư mục[i], đuôi]]));
+        };
+    };
+    // Keep the original order for explicit probes, and sort directory leaves
+    // in the V++ collector, independently of platform directory ordering.
+    lặp(i = 0; i < độ dài(tệp); i++) {
+        máy ảo thêm cuối danh sách(kết quả, ["F", tệp[i]]);
+    };
+    trả về kết quả;
+};
+
+hàm riêng tư AOT đường công cụ(tên) {
+    nếu (là tệp(tên)) { trả về tên; };
+    phân cách = ":";
+    nếu (tên nền tảng() == "windows") { phân cách = ";"; };
+    các đường = tách hằng văn bản(đọc biến môi trường("PATH", ""), phân cách);
+    lặp(i = 0; i < độ dài(các đường); i++) {
+        // The empty PATH entry means the current working directory.
+        thư mục = các đường[i];
+        nếu (thư mục == "") { thư mục = "."; };
+        ứng viên = đường dẫn nối(thư mục, tên);
+        nếu (là tệp(ứng viên)) { trả về ứng viên; };
+        nếu (tên nền tảng() == "windows" && !kết thúc bằng(ứng viên, ".exe")) {
+            nếu (là tệp(ứng viên + ".exe")) { trả về ứng viên + ".exe"; };
+        };
+    };
+    trả về "";
+};
+
+// Object-cache fingerprints are deliberately streaming and inexpensive in
+// the bytecode bootstrap. SHA-256 implemented in V++ is correct but hashing
+// an entire compiler executable through its per-round VM calls takes minutes.
+// The pair of independent modular hashes covers every byte (including NUL)
+// and keeps cache invalidation independent of filesystem timestamp precision.
+// These hashes identify build inputs; they are not security digests.
+hàm riêng tư AOT dấu vân tay tệp(đường) {
+    bộ đọc = Bộ Đệm Tệp(đường, "đọc");
+    a = 1; b = 7; tổng = 0;
+    thử {
+        khi (đúng) {
+            khối = bộ đọc.đọc các byte(8192);
+            n = độ dài(khối);
+            nếu (n == 0) { thoát; };
+            lặp(i = 0; i < n; i++) {
+                byte = khối[i] + 1;
+                a = (a * 31 + byte) % 1000000007;
+                b = (b * 37 + byte) % 1000000009;
+            };
+            tổng += n;
+        };
+        bộ đọc.đóng();
+    } bắt lỗi(e) {
+        thử { bộ đọc.đóng(); } bắt lỗi(lỗi đóng) {};
+        ném e;
+    };
+    trả về "" + tổng + ":" + a + ":" + b;
+};
+
+// Source-index v3: all dependency discovery, content validation and cache
+// format decisions belong to V++. The native host only protects publication
+// with its cross-process lock; V++ allocates and removes its staging pathname.
+hàm riêng tư AOT đường chỉ mục hợp lệ(đường) {
+    trả về đường != "" && đường dẫn là tuyệt đối(đường) &&
+        máy ảo thay chuỗi chính xác(đường, "\n", "") == đường &&
+        máy ảo thay chuỗi chính xác(đường, "\r", "") == đường;
+};
+
+hàm riêng tư AOT dấu nguồn(loại, đường) {
+    nếu (!AOT đường chỉ mục hợp lệ(đường)) { trả về ""; };
+    nếu (loại == "F") {
+        nếu (!là tệp(đường)) { trả về ""; };
+        trả về AOT dấu vân tay tệp(đường);
+    };
+    nếu (loại == "N") {
+        // Retain negative import probes. A newly created shadowing module
+        // invalidates the index even if all previously loaded files match.
+        nếu (là tệp(đường)) { trả về "present"; };
+        trả về "absent";
+    };
+    trả về "";
+};
+
+// Source-index records are UTF-8 lines separated by the single ASCII LF
+// byte. Split them in one pass, preserving empty fields and the trailing
+// empty line, without rebuilding Unicode search tables for every newline.
+// Both the scan and the decision to accept a record remain in V++.
+hàm riêng tư AOT tách dòng chỉ mục(văn bản) {
+    các byte = chuỗi thành byte máy ảo(văn bản);
+    dòng = []; hàng = [];
+    lặp(i = 0; i < độ dài(các byte); i++) {
+        byte = các byte[i];
+        nếu (byte == 10) {
+            máy ảo thêm cuối danh sách(dòng, chuỗi từ byte máy ảo(hàng));
+            hàng = [];
+        } hoặc {
+            máy ảo thêm cuối danh sách(hàng, byte);
+        };
+    };
+    máy ảo thêm cuối danh sách(dòng, chuỗi từ byte máy ảo(hàng));
+    trả về dòng;
+};
+
+hàm công khai biên dịch AOT đọc cache nguồn(chỉ mục) {
+    nếu (!là tệp(chỉ mục)) { trả về ""; };
+    thử {
+        đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+        tổng F = 0; tổng N = 0; mili F = 0; mili N = 0;
+        bắt đầu đo = 0; sau đọc = 0; sau tách = 0; sau tiêu đề = 0;
+        nếu (đường đo != "") { bắt đầu đo = thời gian đơn điệu mili giây(); };
+        nội dung = đọc tệp(chỉ mục);
+        nếu (đường đo != "") { sau đọc = thời gian đơn điệu mili giây(); };
+        dòng = AOT tách dòng chỉ mục(nội dung);
+        nếu (đường đo != "") { sau tách = thời gian đơn điệu mili giây(); };
+        nếu (độ dài(dòng) < 7 || dòng[0] != "vpp-source-index-v3" ||
+            !AOT đường chỉ mục hợp lệ(dòng[1]) || !AOT tệp hợp lệ(dòng[1])) { trả về ""; };
+        số = thành số nguyên(dòng[2]);
+        nếu (số < 1 || số > 4096 || độ dài(dòng) != 4 + số * 3 ||
+            dòng[độ dài(dòng) - 1] != "") { trả về ""; };
+        nếu (đường đo != "") { sau tiêu đề = thời gian đơn điệu mili giây(); };
+        lặp(i = 0; i < số; i++) {
+            vị trí = 3 + i * 3;
+            loại = dòng[vị trí]; đường = dòng[vị trí + 1]; dấu = dòng[vị trí + 2];
+            nếu ((loại != "F" && loại != "N") || dấu == "") { trả về ""; };
+            trước = 0;
+            nếu (đường đo != "") { trước = thời gian đơn điệu mili giây(); };
+            hiện = AOT dấu nguồn(loại, đường);
+            nếu (đường đo != "") {
+                mili = thời gian đơn điệu mili giây() - trước;
+                nếu (loại == "F") { tổng F += 1; mili F += mili; }
+                hoặc { tổng N += 1; mili N += mili; };
+            };
+            nếu (hiện != dấu) { trả về ""; };
+        };
+        nếu (đường đo != "") {
+            thử {
+                kết thúc đo = thời gian đơn điệu mili giây();
+                ghi nối tệp(đường đo, "VPP_AOT_CACHE_PHASE read_ms=" + (sau đọc - bắt đầu đo) +
+                    " split_ms=" + (sau tách - sau đọc) +
+                    " header_ms=" + (sau tiêu đề - sau tách) +
+                    " loop_ms=" + (kết thúc đo - sau tiêu đề) + "\n");
+                ghi nối tệp(đường đo, "VPP_AOT_CACHE_DETAIL files=" + tổng F +
+                    " file_ms=" + mili F + " absent=" + tổng N +
+                    " absent_ms=" + mili N + "\n");
+            } bắt lỗi(lỗi đo) {};
+        };
+        trả về dòng[1];
+    } bắt lỗi(e) { trả về ""; };
+};
+
+hàm riêng tư AOT đầu vào cache nguồn(bộ đệm) {
+    nếu (!máy ảo có khóa từ điển(bộ đệm, "phụ thuộc thực tế") ||
+        !máy ảo có khóa từ điển(bộ đệm, "đường nhập vắng")) { trả về []; };
+    các tệp = bộ đệm["phụ thuộc thực tế"];
+    các vắng = bộ đệm["đường nhập vắng"];
+    nếu (độ dài(các tệp) == 0) { trả về []; };
+    đã gặp = {}; phụ thuộc = []; vắng = [];
+    lặp(i = 0; i < độ dài(các tệp); i++) {
+        đường = các tệp[i];
+        nếu (!AOT đường chỉ mục hợp lệ(đường)) { trả về []; };
+        nếu (!máy ảo có khóa từ điển(đã gặp, đường)) {
+            đã gặp[đường] = "F";
+            máy ảo thêm cuối danh sách(phụ thuộc, đường);
+        };
+    };
+    lặp(i = 0; i < độ dài(các vắng); i++) {
+        đường = các vắng[i];
+        nếu (!AOT đường chỉ mục hợp lệ(đường)) { trả về []; };
+        nếu (máy ảo có khóa từ điển(đã gặp, đường)) {
+            nếu (đã gặp[đường] == "F") { trả về []; };
+        } hoặc {
+            đã gặp[đường] = "N";
+            máy ảo thêm cuối danh sách(vắng, đường);
+        };
+    };
+    sắp xếp(phụ thuộc); sắp xếp(vắng);
+    đầu vào = [];
+    lặp(i = 0; i < độ dài(phụ thuộc); i++) {
+        đường = phụ thuộc[i]; dấu = AOT dấu nguồn("F", đường);
+        nếu (dấu == "") { trả về []; };
+        máy ảo thêm cuối danh sách(đầu vào, ["F", đường, dấu]);
+    };
+    lặp(i = 0; i < độ dài(vắng); i++) {
+        đường = vắng[i];
+        nếu (AOT dấu nguồn("N", đường) != "absent") { trả về []; };
+        máy ảo thêm cuối danh sách(đầu vào, ["N", đường, "absent"]);
+    };
+    nếu (độ dài(đầu vào) > 4096) { trả về []; };
+    trả về đầu vào;
+};
+
+hàm công khai biên dịch AOT công bố cache nguồn(chỉ mục, executable, bộ đệm, tạm) {
+    nếu (!AOT đường chỉ mục hợp lệ(executable) || !AOT tệp hợp lệ(executable)) {
+        trả về sai;
+    };
+    thử {
+        đầu vào = AOT đầu vào cache nguồn(bộ đệm);
+        nếu (độ dài(đầu vào) == 0) { trả về sai; };
+        dữ liệu = "vpp-source-index-v3\n" + executable + "\n" + độ dài(đầu vào) + "\n";
+        lặp(i = 0; i < độ dài(đầu vào); i++) {
+            hàng = đầu vào[i];
+            dữ liệu += hàng[0] + "\n" + hàng[1] + "\n" + hàng[2] + "\n";
+        };
+        ghi tệp(tạm, dữ liệu);
+        // The OS rename primitive atomically replaces existing indices on
+        // both POSIX and Windows; never unlink the old index first.
+        đổi tên tệp(tạm, chỉ mục);
+        trả về đúng;
+    } bắt lỗi(e) {
+        thử { xóa đường dẫn(tạm); } bắt lỗi(lỗi dọn) {};
+        trả về sai;
+    };
+};
+
+// This wrapper owns source-index staging even if the index is invalid or the
+// OS rename fails. The native caller only holds the cross-process lock.
+hàm công khai biên dịch AOT công bố cache nguồn tự quản(chỉ mục, executable, bộ đệm) {
+    tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(chỉ mục));
+    thử {
+        kết quả = biên dịch AOT công bố cache nguồn(chỉ mục, executable, bộ đệm,
+            đường dẫn nối(tạm, "source-index"));
+        biên dịch AOT dọn thư mục tạm(tạm);
+        trả về kết quả;
+    } bắt lỗi(e) {
+        thử { biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+};
+
+hàm riêng tư AOT chữ ký đối tượng(bước) {
+    // Length-delimited fields rule out ambiguous argv/environment boundaries.
+    văn bản = "vpp-driver-object-v4";
+    văn bản += "" + độ dài(chuỗi thành byte máy ảo(bước[6])) + ":" + bước[6];
+    lệnh = bước[2];
+    lặp(i = 0; i < độ dài(lệnh); i++) {
+        trường = lệnh[i];
+        văn bản += "" + độ dài(chuỗi thành byte máy ảo(trường)) + ":" + trường;
+    };
+    môi trường = ["PATH", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET", "INCLUDE", "LIB"];
+    lặp(i = 0; i < độ dài(môi trường); i++) {
+        trường = đọc biến môi trường(môi trường[i], "");
+        văn bản += "" + độ dài(chuỗi thành byte máy ảo(trường)) + ":" + trường;
+    };
+    // Resolved dependencies come from the V++ plan. Hash the contents, not
+    // mtimes, so fast edits invalidate even on coarse timestamp filesystems.
+    phụ thuộc = AOT tệp phụ thuộc(bước[5]);
+    lặp(i = 0; i < độ dài(phụ thuộc); i++) {
+        tệp = phụ thuộc[i];
+        băm = AOT dấu vân tay tệp(tệp);
+        văn bản += "" + độ dài(chuỗi thành byte máy ảo(tệp)) + ":" + tệp + băm;
+    };
+    // Detect an in-place compiler update, including tools resolved via PATH.
+    nếu (độ dài(lệnh) == 0) { ném "Native AOT: empty cached tool command"; };
+    công cụ = AOT đường công cụ(lệnh[0]);
+    nếu (công cụ != "") {
+        văn bản += "" + độ dài(chuỗi thành byte máy ảo(công cụ)) + ":" + công cụ;
+        văn bản += AOT dấu vân tay tệp(công cụ);
+    };
+    trả về băm sha256(văn bản);
+};
+
+hàm riêng tư AOT xây đối tượng(bước) {
+    đích = bước[3]; cache = bước[4];
+    có cache = cache != "";
+    nếu (có cache) {
+        thử { tạo thư mục(cache); } bắt lỗi(e) { có cache = sai; };
+    };
+    tệp cache = "";
+    nếu (có cache) {
+        thử {
+            khóa = AOT chữ ký đối tượng(bước);
+            đuôi = ".o";
+            nếu (kết thúc bằng(đích, ".obj")) { đuôi = ".obj"; };
+            tệp cache = đường dẫn nối(cache, khóa + đuôi);
+        } bắt lỗi(e) { có cache = sai; };
+    };
+    nếu (có cache && AOT tệp hợp lệ(tệp cache)) {
+        thử {
+            sao chép tệp(tệp cache, đích);
+            nếu (AOT tệp hợp lệ(đích)) { trả về 2; };
+        } bắt lỗi(e) {};
+    };
+    // A failed subprocess must never publish an object. The object is built
+    // in this request's private temporary directory before link() commits it.
+    lệnh = [];
+    lặp(i = 0; i < độ dài(bước[2]); i++) {
+        máy ảo thêm cuối danh sách(lệnh,
+            máy ảo thay chuỗi chính xác(bước[2][i], "%VPP_OBJECT%", đích));
+    };
+    biên dịch AOT chạy lệnh(lệnh, bước[1]);
+    nếu (!AOT tệp hợp lệ(đích)) { ném "Native AOT: driver did not produce an object"; };
+    nếu (có cache) {
+        // The V++ allocator chooses a private staging directory per process,
+        // including simultaneous compiles targeting the same output pathname.
+        thử { biên dịch AOT công bố cache tự quản(đích, tệp cache); } bắt lỗi(e) {};
+    };
+    trả về 1;
+};
+
+// Called by the native bootstrap while keeping the plan rooted across GC.
+// Filesystem/error policy stays here and is shared by self-hosted Stage 2.
+hàm công khai biên dịch AOT thực hiện bước(bước) {
+    nếu (độ dài(bước) == 0) { ném "Native AOT: empty driver step"; };
+    thao tác = bước[0];
+    nếu (thao tác == "run") {
+        biên dịch AOT chạy lệnh(bước[3], bước[1]);
+        trả về 1;
+    };
+    nếu (thao tác == "object") { trả về AOT xây đối tượng(bước); };
+    nếu (thao tác == "write") { ghi tệp(bước[1], bước[2]); trả về 1; };
+    nếu (thao tác == "copy") { sao chép tệp(bước[1], bước[2]); trả về 1; };
+    nếu (thao tác == "remove" || thao tác == "remove-tree") {
+        xóa đường dẫn(bước[1]);
+        trả về 1;
+    };
+    nếu (thao tác == "mkdir") { tạo thư mục(bước[1]); trả về 1; };
+    nếu (thao tác == "publish") {
+        nếu (!AOT tệp hợp lệ(bước[1])) { ném "Native AOT: driver did not produce an executable"; };
+        đổi tên tệp(bước[1], bước[2]);
+        trả về 1;
+    };
+    ném "Native AOT: unknown filesystem driver step: " + thao tác;
+};
