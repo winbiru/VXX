@@ -16,6 +16,7 @@ nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
 nhập gói.văn bản.chuỗi.chứa chính xác;
 nhập gói.nhập xuất.đường dẫn.là thư mục;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cùng tệp;
 nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
 
 hàm có đối số(lệnh, giá trị) {
@@ -110,7 +111,10 @@ hàm chính() {
             ném "driver mishandled absent diagnostics";
         };
         nhúng = biên dịch AOT chuẩn bị nhúng(gốc, gốc + "/build/bin");
-        nếu (nhúng[0] != gốc || nhúng[1] != gốc + "/build/native-vpp-runtime/runtime.o") {
+        // The driver returns absolute, platform-native paths. CMake's fixture
+        // root uses forward slashes even on Windows, so compare file identity.
+        nếu (!đường dẫn cùng tệp(nhúng[0], gốc) ||
+            !đường dẫn cùng tệp(nhúng[1], gốc + "/build/native-vpp-runtime/runtime.o")) {
             ném "driver ignored V++ embedded path selection";
         };
         base lỗi = sai;
