@@ -1,5 +1,6 @@
 # Verify the Stage 0 C++ and self-hosted V++ opcode and intrinsic ABI in both
 # directions. A new C++ entry must never silently lack a V++ implementation.
+cmake_policy(SET CMP0057 NEW)
 if (NOT DEFINED VPP_ROOT)
     message(FATAL_ERROR "VPP_ROOT is required")
 endif()

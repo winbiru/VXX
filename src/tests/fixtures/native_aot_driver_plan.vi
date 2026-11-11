@@ -13,6 +13,7 @@ nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố 
 nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị nhúng;
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
 nhập gói.văn bản.chuỗi.chứa chính xác;
 nhập gói.nhập xuất.đường dẫn.là thư mục;
 nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
@@ -88,11 +89,17 @@ hàm chính() {
         nếu (biên dịch AOT công bố cache tự quản(tạm + "/missing-object", tạm + "/missing-cache")) {
             ném "V++ published missing cache input";
         };
-        // Error conditions such as ENAMETOOLONG are not cache misses.
-        quá dài = tạm + "/";
-        lặp(i = 0; i < 300; i++) { quá dài += "x"; };
+        // Windows may report PATH_NOT_FOUND for an overlong component. A
+        // forbidden filename character instead reliably exercises Win32's
+        // invalid-name error; POSIX exercises ENAMETOOLONG.
+        đường lỗi OS = tạm + "/";
+        nếu (tên nền tảng() == "windows") {
+            đường lỗi OS += "bad?name";
+        } hoặc {
+            lặp(i = 0; i < 300; i++) { đường lỗi OS += "x"; };
+        };
         có lỗi OS = sai;
-        thử { đường dẫn thống kê tệp(quá dài); }
+        thử { đường dẫn thống kê tệp(đường lỗi OS); }
         bắt lỗi(e) { có lỗi OS = đúng; };
         nếu (!có lỗi OS) { ném "V++ file metadata hid an OS error"; };
         biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿\";\n");

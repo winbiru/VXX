@@ -63,7 +63,7 @@ def main():
     if args.runs < 3 or args.target_ms < 10:
         parser.error("Cần ít nhất 3 mẫu và target >= 10 ms")
     requested = args.runtimes.split(",")
-    valid = {AOT_NAME, "vpp-vm", "vpp-i32", "c", "rust", "cpp", "node", "java", "python", "ruby"}
+    valid = {AOT_NAME, "vpp-aot", "vpp-vm", "vpp-i32", "c", "rust", "cpp", "node", "java", "python", "ruby"}
     if not requested or len(set(requested)) != len(requested) or any(name not in valid for name in requested):
         parser.error("Danh sách --runtimes không hợp lệ hoặc bị trùng")
     manifest = json.loads(args.manifest.read_text())
@@ -72,11 +72,9 @@ def main():
                                      ("vpp-i32", args.typed, NUMERIC, "typed"),
                                      ("c", args.c, NUMERIC, "c"),
                                      ("rust", args.rust, NUMERIC, "rust")):
-        # A manifest entry is authoritative for portable builds. AOT/i32 are
-        # explicitly supplied native artifacts, while --c/--rust only override
-        # manifest entries if their path differs from the CLI default.
-        override = (name not in selected or name in (AOT_NAME, "vpp-i32") or
-                    path != parser.get_default(option))
+        # Prefer the manifest's freshly built executable. Only override it
+        # when the runner is missing or a non-default path was requested.
+        override = name not in selected or path != parser.get_default(option)
         if name in requested and override:
             selected[name] = dict(name=name, executable=str(path.resolve()), arguments=[],
                                   environment={}, cases=list(cases))
@@ -133,7 +131,7 @@ def main():
     counts = {}
     for runner, case in tasks:
         key = f"{runner['name']}/{case}"
-        n = 1024 if case in NUMERIC and runner["name"] != AOT_NAME else 16
+        n = 1024 if case in NUMERIC and runner["name"] not in (AOT_NAME, "vpp-aot") else 16
         for attempt in range(7):
             result = run(runner, case, n)
             if result["elapsed_ms"] >= args.target_ms * 0.7 or n >= MAX_ITERATIONS:

@@ -102,7 +102,13 @@ int main() {
 #endif
         check(metadata(absentChild) == std::vector<std::string>{"missing"},
               "missing parent inherited a stale OS error");
-#if !defined(_WIN32)
+#if defined(_WIN32)
+        // Win32 rejects '?' in a filename with an OS error. Excessive path
+        // lengths can instead surface as PATH_NOT_FOUND under Win32.
+        const auto invalidName = metadata((base / "bad?name").u8string());
+        check(invalidName.size() == 2 && invalidName[0] == "error",
+              "invalid Windows filename must preserve actual OS error");
+#else
         const auto tooLong = (base / std::string(300, 'x')).u8string();
         errno = ENOENT;
         check(metadata(tooLong) == std::vector<std::string>{"error", std::to_string(ENAMETOOLONG)},
