@@ -114,6 +114,11 @@ hàm chính() {
         nếu (là thư mục(tạm)) { ném "driver did not clean temporary directory"; };
         in "AOT_DRIVER_OK"; trả về;
     };
+    nếu (chế độ == "cmake-windows-path") {
+        // A Windows installed toolchain can be rooted under D:\a\_temp. The
+        // entire CMake argv must use forward slashes, including the build dir.
+        gốc = "D:\\a\\_temp\\vpp-installed";
+    };
     cảnh = [gốc, gốc + "/libraries", gốc + "/temp", gốc + "/result",
         đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_TARGET", ""), "OFF", gốc + "/linker", "metadata"];
     kế hoạch = rỗng;
@@ -128,17 +133,36 @@ hàm chính() {
     nguồn = kế hoạch[0]; cuối = kế hoạch[độ dài(kế hoạch) - 1];
     nếu (nguồn[0] != "write" || nguồn[1] != gốc + "/temp/program.S" || nguồn[2] != "probe ASM" ||
         cuối[0] != "publish" || cuối[2] != gốc + "/result") { ném "driver lost filesystem identity"; };
-    liên kết = rỗng; cấu hình = sai; kiểm tra ELF = sai;
+    liên kết = rỗng; cấu hình = sai; kiểm tra ELF = sai; lệnh cấu hình = rỗng; lệnh dựng = rỗng;
     lặp(i = 0; i < độ dài(kế hoạch); i++) {
         bước = kế hoạch[i];
         nếu (bước[0] == "run") {
-            nếu (bước[2] == "configure-native-linker") { cấu hình = đúng; };
+            nếu (bước[2] == "configure-native-linker") {
+                cấu hình = đúng; lệnh cấu hình = bước[3];
+            };
+            nếu (bước[2] == "assemble-and-link") { lệnh dựng = bước[3]; };
             nếu (bước[2] == "audit-linux-vpp-executable") { kiểm tra ELF = đúng; };
             nếu (bước[2] == "link-stage0-executable" || bước[2] == "link-vpp-executable") { liên kết = bước[3]; };
         };
     };
-    nếu (chế độ == "cmake") {
+    nếu (chế độ == "cmake" || chế độ == "cmake-windows-path") {
         nếu (!cấu hình || liên kết != rỗng) { ném "driver missed CMake oracle"; };
+        nếu (chế độ == "cmake-windows-path") {
+            nếu (!có đối số(lệnh cấu hình, "D:/a/_temp/vpp-installed/scripts/quality/native_aot_link") ||
+                !có đối số(lệnh cấu hình, "-DVPP_AOT_ROOT=D:/a/_temp/vpp-installed") ||
+                !có đối số(lệnh cấu hình, "-DVPP_AOT_LIB_ROOT=D:/a/_temp/vpp-installed/libraries") ||
+                !có đối số(lệnh cấu hình, "-DVPP_AOT_SOURCE=D:/a/_temp/vpp-installed/temp/linker/program.S") ||
+                !có đối số(lệnh cấu hình, "-DVPP_AOT_OUTPUT=D:/a/_temp/vpp-installed/temp/linker/program.exe") ||
+                !có đối số(lệnh cấu hình, "D:/a/_temp/vpp-installed/temp/linker/build") ||
+                !có đối số(lệnh dựng, "D:/a/_temp/vpp-installed/temp/linker/build")) {
+                ném "driver sent Win32 backslashes into CMake";
+            };
+            lặp(i = 0; i < độ dài(lệnh cấu hình); i++) {
+                nếu (chứa chính xác(lệnh cấu hình[i], "\\")) {
+                    ném "CMake configure argv still contains a Windows escape";
+                };
+            };
+        };
     } hoặc {
         nếu (cấu hình || liên kết == rỗng) { ném "driver missed direct linker"; };
         nếu (chế độ == "freestanding") {

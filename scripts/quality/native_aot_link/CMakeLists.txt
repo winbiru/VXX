@@ -16,6 +16,15 @@ foreach(required IN ITEMS VPP_AOT_ROOT VPP_AOT_SOURCE VPP_AOT_OUTPUT)
         message(FATAL_ERROR "Missing ${required}")
     endif()
 endforeach()
+# Older installed V++ drivers may pass Win32 backslashes through -D. CMake's
+# generated VerifyGlobs.cmake does not escape them, so a path such as D:\a\...
+# fails during Visual Studio's ZERO_CHECK with "Invalid character escape \a".
+# Normalize the received values before any CONFIGURE_DEPENDS glob is emitted.
+foreach(path_var IN ITEMS VPP_AOT_ROOT VPP_AOT_LIB_ROOT VPP_AOT_SOURCE VPP_AOT_OUTPUT)
+    if (DEFINED ${path_var})
+        string(REPLACE "\\" "/" ${path_var} "${${path_var}}")
+    endif()
+endforeach()
 # Already bootstrapped native compilers may still emit the former flat
 # include name. Search common/ in addition to ASM/ while those seeds are
 # upgraded; all actual runtime sources stay in platform/common directories.

@@ -80,13 +80,14 @@ foreach(case IN ITEMS
     "aarch64-unknown-linux-gnu#vpp-freestanding#reject"
     "aarch64-apple-darwin#unknown#reject"
     "aarch64-apple-darwin#cpp#cmake"
+    "x86_64-pc-windows-msvc#cpp#cmake-windows-path"
     "x86_64-pc-windows-msvc#cpp#launch-error")
     string(REPLACE "#" ";" parts "${case}")
     list(GET parts 0 target)
     list(GET parts 1 runtime)
     list(GET parts 2 mode)
     set(direct 1)
-    if(mode STREQUAL "cmake")
+    if(mode STREQUAL "cmake" OR mode STREQUAL "cmake-windows-path")
         set(direct 0)
     endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env

@@ -190,6 +190,14 @@ hàm riêng tư AOT thư viện(tập thư viện, windows) {
     trả về kết quả;
 };
 
+// CMake writes CONFIGURE_DEPENDS paths into VerifyGlobs.cmake verbatim.
+// Win32 backslashes in -D values (D:\a\...) become invalid CMake escapes
+// such as \a on the next build. Keep native paths for OS operations, but
+// pass forward slashes to the CMake CLI on every host.
+hàm riêng tư AOT đường CMake(đường) {
+    trả về máy ảo thay chuỗi chính xác(đường, "\\", "/");
+};
+
 hàm riêng tư AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, executable) {
     gốc = cảnh[0]; thư viện = cảnh[1]; thư mục = cảnh[6];
     nếu (đọc biến môi trường("VPP_AOT_LINKER_CACHE", "1") == "0") {
@@ -229,18 +237,20 @@ hàm riêng tư AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, e
         // CMake cannot switch generator, toolchain or cached find_library
         // results in place. A different signature needs a fresh build tree.
         máy ảo thêm cuối danh sách(bước, ["remove-tree", dựng]);
-        lệnh = ["cmake", "-S", đường dẫn nối(gốc, "scripts/quality/native_aot_link"), "-B", dựng];
+        lệnh = ["cmake", "-S", AOT đường CMake(đường dẫn nối(gốc, "scripts/quality/native_aot_link")),
+            "-B", AOT đường CMake(dựng)];
         nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DCMAKE_BUILD_TYPE=Release"); };
-        AOT thêm(lệnh, ["-DVPP_AOT_CONFIGURATION=Release", "-DVPP_AOT_ROOT=" + gốc,
-            "-DVPP_AOT_LIB_ROOT=" + thư viện, "-DVPP_AOT_SOURCE=" + nguồn liên kết,
-            "-DVPP_AOT_OUTPUT=" + đầu ra]);
+        AOT thêm(lệnh, ["-DVPP_AOT_CONFIGURATION=Release", "-DVPP_AOT_ROOT=" + AOT đường CMake(gốc),
+            "-DVPP_AOT_LIB_ROOT=" + AOT đường CMake(thư viện),
+            "-DVPP_AOT_SOURCE=" + AOT đường CMake(nguồn liên kết),
+            "-DVPP_AOT_OUTPUT=" + AOT đường CMake(đầu ra)]);
         nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DVPP_AOT_LINK_LEGACY_LIBFFI=" + ffi); };
         AOT chạy(bước, "linker configuration", "configure-native-linker", lệnh);
         // Publish the signature only after a successful configuration.
         máy ảo thêm cuối danh sách(bước, ["write", dấu, chữ ký]);
     };
     AOT chạy(bước, "assembly/link", "assemble-and-link",
-        ["cmake", "--build", dựng, "--config", "Release", "--parallel", "2"]);
+        ["cmake", "--build", AOT đường CMake(dựng), "--config", "Release", "--parallel", "2"]);
     máy ảo thêm cuối danh sách(bước, ["copy", đầu ra, executable]);
 };
 
