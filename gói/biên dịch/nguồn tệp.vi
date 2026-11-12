@@ -221,25 +221,32 @@ lớp công khai Bộ Nạp Nguồn {
 // AST là một đồ thị map/list có thể bị linker sửa (nhập chọn lọc, type
 // registry). Không chuyển tham chiếu của bản cache sang lần biên dịch khác.
 // Parser chỉ tạo map/list/scalar; sao chép từng nút, không giữ metadata phiên.
-hàm riêng tư biên dịch nguồn sao cây(nút) {
-    loại = loại của(nút);
+hàm riêng tư biên dịch nguồn sao cây(nút, loại = "từ điển") {
+    // Scalar là giá trị immutable. Chỉ đệ quy cho container, giữ snapshot
+    // độc lập nhưng tránh tạo frame hàm cho mọi tên, literal và vị trí.
     nếu (loại == "danh sách") {
         kết quả = [];
-        lặp(i = 0; i < máy ảo lấy độ dài(nút); i++) {
-            máy ảo thêm cuối danh sách(kết quả, biên dịch nguồn sao cây(nút[i]));
+        n = máy ảo lấy độ dài(nút);
+        lặp(i = 0; i < n; i++) {
+            con = nút[i]; kiểu con = loại của(con);
+            nếu (kiểu con == "danh sách" || kiểu con == "từ điển") {
+                con = biên dịch nguồn sao cây(con, kiểu con);
+            };
+            máy ảo thêm cuối danh sách(kết quả, con);
         };
         trả về kết quả;
     };
-    nếu (loại == "từ điển") {
-        kết quả = {};
-        khóa = máy ảo liệt kê khóa từ điển(nút);
-        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
-            tên = khóa[i];
-            kết quả[tên] = biên dịch nguồn sao cây(nút[tên]);
+    kết quả = {};
+    khóa = máy ảo liệt kê khóa từ điển(nút);
+    n = máy ảo lấy độ dài(khóa);
+    lặp(i = 0; i < n; i++) {
+        tên = khóa[i]; con = nút[tên]; kiểu con = loại của(con);
+        nếu (kiểu con == "danh sách" || kiểu con == "từ điển") {
+            con = biên dịch nguồn sao cây(con, kiểu con);
         };
-        trả về kết quả;
+        kết quả[tên] = con;
     };
-    trả về nút;
+    trả về kết quả;
 };
 
 // Cache thuộc phiên compiler, theo đường tuyệt đối và TOÀN BỘ nội dung nguồn.

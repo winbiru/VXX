@@ -135,4 +135,32 @@ hàm chính() {
     in lấy từ điển(từ_khóa_đầy_đủ[0], "vị trí", -1) == 0;
     in lấy từ điển(từ_khóa_đầy_đủ[0], "kết thúc", -1) == 14;
     in lấy từ điển(từ_khóa_đầy_đủ[0], "kết thúc ký tự", -1) == 12;
+
+    // Kiểm tra đủ các byte ASCII phân cách, khoảng trắng và byte thường.
+    // Dấu nháy được kiểm riêng vì chúng bắt đầu literal.
+    ngăn = [33, 37, 38, 40, 41, 42, 43, 44, 45, 47, 58, 59, 60, 61,
+        62, 91, 93, 94, 123, 124, 125, 126];
+    lặp(i = 1; i < 128; i++) {
+        nếu (i == 34 || i == 39) { bỏ qua; };
+        dự kiến = 1;
+        nếu (i == 32 || (i >= 9 && i <= 13)) { dự kiến = 2; };
+        lặp(j = 0; j < độ dài(ngăn); j++) {
+            nếu (ngăn[j] == i) { dự kiến = 3; };
+        };
+        thô = biên dịch từ tố hóa thô("a" + ký tự unicode(i) + "b");
+        nếu (độ dài(thô) != dự kiến) { ném "Sai phân loại byte ASCII"; };
+    };
+    dịch = biên dịch từ tố hóa thô("à<<=b >>= c.1");
+    nếu (độ dài(dịch) != 5) { ném "Sai phân loại toán tử dịch"; };
+    nếu (lấy từ điển(dịch[1], "giá trị", "") != "<<=" ||
+        lấy từ điển(dịch[3], "giá trị", "") != ">>=" ||
+        lấy từ điển(dịch[4], "giá trị", "") != "c.1") {
+        ném "Sai giá trị toán tử hoặc định danh có dấu chấm";
+    };
+    nếu (lấy từ điển(dịch[1], "vị trí", -1) != 2 ||
+        lấy từ điển(dịch[1], "kết thúc", -1) != 5 ||
+        lấy từ điển(dịch[1], "vị trí ký tự", -1) != 1 ||
+        lấy từ điển(dịch[1], "kết thúc ký tự", -1) != 4) {
+        ném "Sai span toán tử sau UTF-8";
+    };
 };

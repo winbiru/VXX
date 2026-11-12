@@ -1,6 +1,7 @@
 // Driver AOT của compiler V++: chọn ABI/runtime, dựng argv và xử lý lỗi toolchain.
 // Mọi bước hệ tệp do V++ điều phối; host chỉ giữ syscall nguyên tử.
 nhập gói.biên dịch.đích.biên dịch phân tích đích;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.hệ thống.tiến trình.chạy tiến trình;
 nhập gói.hệ thống.tiến trình.mã tiến trình;
@@ -27,8 +28,7 @@ nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
 nhập gói.nhập xuất.đường dẫn.thư mục tạm hệ thống;
 nhập gói.nhập xuất.đường dẫn.đường dẫn có thể thực thi;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
-nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
-nhập gói.bảo mật.mật mã.mật mã thập lục phân;
+nhập gói.bảo mật.mật mã.mật mã băm chuỗi máy ảo;
 nhập gói.lõi.toán học.làm tròn xuống;
 nhập gói.văn bản.chuỗi.kết thúc bằng;
 nhập gói.văn bản.chuỗi.bắt đầu bằng;
@@ -51,7 +51,7 @@ hàm riêng tư AOT thêm(đích, nguồn) {
 // bytes directly with the same V++ SHA-256 implementation; re-validating
 // every UTF-8 codepoint in multi-megabyte assembly adds a redundant V++ pass.
 hàm riêng tư AOT băm quan sát(văn bản) {
-    trả về mật mã thập lục phân(mật mã sha256 các byte(chuỗi thành byte máy ảo(văn bản)));
+    trả về mật mã băm chuỗi máy ảo(văn bản);
 };
 
 hàm riêng tư AOT chạy(bước, nhãn, pha, lệnh) {
@@ -471,7 +471,7 @@ hàm công khai biên dịch AOT ghi theo dõi cache(sự kiện, đường) {
 // Each typed input is ["S", value] or ["F", path]. Only the single-file
 // metadata syscall is native; dependency selection and framing live here.
 hàm riêng tư AOT mã quan sát(các trường, phiên bản) {
-    đầu vào = phiên bản;
+    các phần = [phiên bản];
     nếu (độ dài(các trường) == 0) { ném "Native AOT: empty executable cache observations"; };
     lặp(vị trí = 0; vị trí < độ dài(các trường); vị trí++) {
         cặp = các trường[vị trí];
@@ -496,13 +496,33 @@ hàm riêng tư AOT mã quan sát(các trường, phiên bản) {
         } hoặc {
             nếu (loại != "S") { ném "Native AOT: unknown executable cache field type"; };
         };
-        đầu vào += "" + độ dài(hàng) + ";";
+        máy ảo thêm cuối danh sách(các phần, "" + độ dài(hàng) + ";");
         lặp(i = 0; i < độ dài(hàng); i++) {
             trường = hàng[i];
-            đầu vào += "" + độ dài(chuỗi thành byte máy ảo(trường)) + ":" + trường;
+            máy ảo thêm cuối danh sách(các phần, "" + độ dài(chuỗi thành byte máy ảo(trường)) + ":");
+            máy ảo thêm cuối danh sách(các phần, trường);
         };
     };
-    trả về đầu vào;
+    // The first executable observation may contain megabytes of assembly.
+    // Balanced concatenation avoids copying that prefix for every file field.
+    trả về biên dịch lắp ráp nối các phần(các phần);
+};
+
+hàm riêng tư AOT chữ ký quan sát(các trường, phiên bản) {
+    đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+    nếu (đường đo == "") { trả về AOT băm quan sát(AOT mã quan sát(các trường, phiên bản)); };
+    trước = thời gian đơn điệu mili giây();
+    văn bản = AOT mã quan sát(các trường, phiên bản);
+    sau khung = thời gian đơn điệu mili giây();
+    chữ ký = AOT băm quan sát(văn bản);
+    sau băm = thời gian đơn điệu mili giây();
+    thử {
+        ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING observation.frame " + phiên bản + " " +
+            làm tròn xuống(sau khung - trước) + " ms\n");
+        ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING observation.hash " + phiên bản + " " +
+            làm tròn xuống(sau băm - sau khung) + " ms\n");
+    } bắt lỗi(e) {};
+    trả về chữ ký;
 };
 
 // V++ owns metadata observation, cache directory and signature generation.
@@ -516,7 +536,7 @@ hàm công khai biên dịch AOT đường cache thực thi(các trường, thư
     };
     thử { tạo thư mục(thư mục); } bắt lỗi(e) { trả về ""; };
     nếu (!là thư mục(thư mục)) { trả về ""; };
-    chữ ký = AOT băm quan sát(AOT mã quan sát(các trường, "vpp-aot-executable-v5"));
+    chữ ký = AOT chữ ký quan sát(các trường, "vpp-aot-executable-v5");
     đuôi = "";
     nếu (tên nền tảng() == "windows") { đuôi = ".exe"; };
     trả về đường dẫn nối(thư mục, "aot-" + chữ ký + đuôi);
@@ -542,7 +562,7 @@ hàm công khai biên dịch AOT đầu vào dấu liên kết(gốc, thư việ
 };
 
 hàm công khai biên dịch AOT chữ ký liên kết(các trường) {
-    trả về AOT băm quan sát(AOT mã quan sát(các trường, "vpp-aot-linker-dependencies-v4"));
+    trả về AOT chữ ký quan sát(các trường, "vpp-aot-linker-dependencies-v4");
 };
 
 // A completed cache entry is immutable. Never rename over a competing writer:

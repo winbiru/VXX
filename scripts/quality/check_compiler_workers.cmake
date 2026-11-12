@@ -10,8 +10,18 @@ if (NOT EXISTS "${VPP_NATIVE_COMPILER}")
 endif()
 
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/lib")
+# A graph large enough for several grouped workers and a partial final group.
+# Ten independent dependencies plus root, feature and math exercise 13 modules.
+set(worker_imports "")
+set(worker_sum "0")
+foreach(i RANGE 0 9)
+    file(WRITE "${VPP_OUTPUT_DIR}/lib/worker${i}.vi"
+        "hàm giá trị() { trả về ${i}; };\n")
+    string(APPEND worker_imports "nhập lib.worker${i}.* như w${i}; ")
+    string(APPEND worker_sum " + w${i}.giá trị()")
+endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/main.vi"
-    "nhập lib.feature.* như f; nhập lib.math.* như m; hàm chính() { in f.tính(); in m.cộng(2, 3); };\n")
+    "nhập lib.feature.* như f; nhập lib.math.* như m; ${worker_imports} hàm chính() { in f.tính(); in m.cộng(2, 3); in ${worker_sum}; };\n")
 file(WRITE "${VPP_OUTPUT_DIR}/lib/feature.vi"
     "nhập math như m; hàm tính() { trả về m.cộng(19, 23); };\n")
 file(WRITE "${VPP_OUTPUT_DIR}/lib/math.vi"
@@ -94,7 +104,7 @@ execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_EXEC}" run --artifact "${VPP_OUTPUT_DIR}/workers-2.vbc"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
-if (NOT status STREQUAL "0" OR NOT output STREQUAL "42\n5\n")
+if (NOT status STREQUAL "0" OR NOT output STREQUAL "42\n5\n45\n")
     message(FATAL_ERROR "Compiler worker artifact failed (${status}): ${errors}\n${output}")
 endif()
 message(STATUS "Compiler workers parity (0/1/2/4/8 and single import) PASS")

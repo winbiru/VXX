@@ -1,0 +1,181 @@
+nhập gói.biên dịch.từ vựng.*;
+nhập gói.biên dịch.chương trình.*;
+nhập gói.biên dịch.biểu thức.*;
+nhập gói.biên dịch.phiên tự chủ.*;
+nhập gói.dữ liệu.json.json.json tạo;
+
+hàm kiểm tra(điều kiện đúng, thông báo) {
+    nếu (!điều kiện đúng) { ném thông báo; };
+};
+
+hàm chính() {
+    nguồn = "hàm chính() { biến tiếng Việt = 12; tiếng Việt += 1; in tiếng Việt; trả về \"🌿\"; };";
+    khóa = ["loại", "giá trị", "dòng", "cột", "vị trí", "kết thúc", "cột ký tự", "vị trí ký tự", "kết thúc ký tự"];
+    cũ = biên dịch từ tố hóa(nguồn);
+    gọn = biên dịch từ tố hóa gọn(nguồn);
+    token = gọn["token"];
+    pool = gọn["ký hiệu"];
+    kiểm tra(độ dài(cũ) == độ dài(token), "số token");
+    mã tiếng = -1;
+    số lần = 0;
+    lặp(i = 0; i < độ dài(token); i++) {
+        lặp(j = 0; j < độ dài(khóa); j++) {
+            kiểm tra(cũ[i][khóa[j]] == token[i][j], "trường token");
+        };
+        nếu (token[i][0] == "định danh" || token[i][0] == "từ khóa") {
+            kiểm tra(pool[token[i][9]] == token[i][1], "pool ký hiệu");
+        } hoặc { kiểm tra(token[i][9] == -1, "literal không intern"); };
+        nếu (token[i][1] == "tiếng") {
+            nếu (mã tiếng == -1) { mã tiếng = token[i][9]; };
+            kiểm tra(mã tiếng == token[i][9], "ID ổn định");
+            số lần += 1;
+        };
+    };
+    kiểm tra(số lần == 3, "định danh lặp");
+    bộ = Bộ Tách Từ Vựng();
+    a = bộ.biên dịch từ tố hóa gọn("Việt Việt");
+    b = bộ.biên dịch từ tố hóa gọn("🌿");
+    kiểm tra(a["ký hiệu"][0] == "Việt", "pool trước giữ nguyên");
+    kiểm tra(b["ký hiệu"][0] == "🌿", "pool độc lập");
+    parser cũ = Bộ Phân Tích Cú Pháp(nguồn, cũ);
+    parser gọn = Bộ Phân Tích Cú Pháp(nguồn, token);
+    kiểm tra(json tạo(parser cũ.phân tích()) == json tạo(parser gọn.phân tích()), "AST tương thích");
+    phiên = Bộ Biên Dịch Tự Chủ("in 1;");
+    t = phiên.từ tố();
+    t[1]["giá trị"] = "2";
+    parser sửa = Bộ Phân Tích Cú Pháp("in 1;", t);
+    kiểm tra(json tạo(phiên.cây cú pháp()) == json tạo(parser sửa.phân tích()), "token map công khai");
+    // Mã loại ổn định, giữ nguyên các trường công khai trước đây.
+    mẫu = biên dịch từ tố hóa gọn("Việt trả về 1 1.5 \"x\" += ;")["token"];
+    mã kỳ vọng = [1, 2, 3, 4, 5, 6, 7];
+    kiểm tra(độ dài(mẫu) == độ dài(mã kỳ vọng), "số loại mẫu");
+    lặp(i = 0; i < độ dài(mẫu); i++) {
+        kiểm tra(mẫu[i][10] == mã kỳ vọng[i], "mã loại lexer");
+        kiểm tra(biên dịch mã loại từ tố(mẫu[i]) == mã kỳ vọng[i], "mã loại gọn");
+    };
+    kiểm tra(biên dịch mã loại từ tố({"loại": "hết"}) == 8, "mã EOF");
+    kiểm tra(biên dịch mã loại từ tố({}) == 0, "mã không biết");
+    danh sách cũ = [];
+    lặp(i = 0; i < độ dài(token); i++) {
+        bản ghi = [];
+        lặp(j = 0; j < 10; j++) { máy ảo thêm cuối danh sách(bản ghi, token[i][j]); };
+        kiểm tra(biên dịch mã loại từ tố(bản ghi) == token[i][10], "mã record cũ");
+        kiểm tra(biên dịch mã loại từ tố(cũ[i]) == token[i][10], "mã map cũ");
+        máy ảo thêm cuối danh sách(danh sách cũ, bản ghi);
+    };
+    parser mười = Bộ Phân Tích Cú Pháp(nguồn, danh sách cũ);
+    kiểm tra(json tạo(parser cũ.phân tích()) == json tạo(parser mười.phân tích()), "AST record mười trường");
+    bảng = biên dịch bảng ưu tiên toán tử();
+    phép toán = ["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "||", "&&", "|", "^", "&", "==", "!=", "<", ">", "<=", ">=", "<<", ">>", "+", "-", "*", "/", "%"];
+    lặp(i = 0; i < độ dài(phép toán); i++) {
+        phép = phép toán[i];
+        kiểm tra(bảng[phép] == biên dịch biểu thức ưu tiên(phép), "mức ưu tiên " + phép);
+        cây = biên dịch phân tích biểu thức("a " + phép + " b " + phép + " c");
+        nếu (bảng[phép] == 1) {
+            kiểm tra(cây["phải"]["toán tử"] == phép, "gán kết hợp phải");
+        } hoặc {
+            kiểm tra(cây["trái"]["toán tử"] == phép, "nhị phân kết hợp trái");
+        };
+    };
+    từ khóa = ["nếu", "hoặc", "lặp", "khi", "hàm", "gọi", "biến", "in", "dừng", "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử", "nhập", "lớp", "chuyển", "mặc định", "trả về", "bỏ qua", "khởi tạo", "điều kiện", "cập nhật", "kiểm tra sau", "bắt lỗi", "trường hợp", "giao diện", "kế thừa", "triển khai", "công khai", "riêng tư", "bảo vệ", "ngoại thư viện", "ngoại hàm", "ký hiệu", "khả năng"];
+    lặp(i = 0; i < độ dài(từ khóa); i++) {
+        tên = từ khóa[i];
+        mẫu mới = biên dịch từ tố hóa gọn(tên)["token"];
+        kiểm tra(độ dài(mẫu mới) == 1, "ghép từ khóa " + tên);
+        kiểm tra(mẫu mới[0][11] == 320 + i, "ID từ khóa " + tên);
+        kiểm tra(biên dịch mã cú pháp từ tố({"giá trị": tên, "loại": "định danh"}) == 320 + i, "ID map theo giá trị");
+        đổi pool = biên dịch từ tố hóa gọn("Việt 🌿 " + tên)["token"];
+        kiểm tra(đổi pool[2][11] == mẫu mới[0][11], "ID độc lập pool");
+    };
+    mã phép = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 32, 48, 64, 80, 96, 112, 113, 128, 129, 130, 131, 144, 145, 160, 161, 176, 177, 178];
+    lặp(i = 0; i < độ dài(phép toán); i++) {
+        t = biên dịch từ tố hóa gọn(phép toán[i])["token"][0];
+        kiểm tra(t[11] == mã phép[i], "ID toán tử");
+        kiểm tra((t[11] >> 4) == bảng[phép toán[i]], "ưu tiên từ ID");
+        kiểm tra(biên dịch mã cú pháp từ tố({"giá trị": phép toán[i]}) == t[11], "ID toán tử map");
+    };
+    dấu = ["!", "~", "++", "--", "(", ")", "[", "]", "{", "}", ",", ":", ";"];
+    mã dấu = [1, 2, 3, 4, 200, 201, 202, 203, 204, 205, 206, 207, 208];
+    lặp(i = 0; i < độ dài(dấu); i++) {
+        t = biên dịch từ tố hóa gọn(dấu[i])["token"][0];
+        kiểm tra(t[11] == mã dấu[i], "ID dấu");
+        kiểm tra(biên dịch mã cú pháp từ tố({"giá trị": dấu[i]}) == mã dấu[i], "ID dấu map");
+    };
+    kiểm tra(biên dịch mã cú pháp từ tố({"loại": "hết"}) == 0, "ID EOF");
+    kiểm tra(biên dịch mã cú pháp từ tố({"giá trị": "Việt"}) == 0, "ID tên");
+    chấm = biên dịch từ tố hóa gọn(". .member .5")["token"];
+    lặp(i = 0; i < độ dài(chấm); i++) {
+        kiểm tra(chấm[i][11] == 300, "ID bắt đầu chấm");
+        kiểm tra(biên dịch mã cú pháp từ tố({"giá trị": chấm[i][1]}) == 300, "ID chấm map");
+    };
+    mười một = [];
+    lặp(i = 0; i < độ dài(token); i++) {
+        bản ghi = [];
+        lặp(j = 0; j < 11; j++) { máy ảo thêm cuối danh sách(bản ghi, token[i][j]); };
+        kiểm tra(biên dịch mã cú pháp từ tố(bản ghi) == token[i][11], "ID record mười một");
+        kiểm tra(biên dịch mã cú pháp từ tố(danh sách cũ[i]) == token[i][11], "ID record mười");
+        máy ảo thêm cuối danh sách(mười một, bản ghi);
+    };
+    parser mười một = Bộ Phân Tích Cú Pháp(nguồn, mười một);
+    kiểm tra(json tạo(parser mười một.phân tích()) == json tạo(parser gọn.phân tích()), "AST record mười một");
+    cụm nguồn = "ngoại /* a */ thư viện ngoại hàm kiểm tra sau kiểm tra khác trả khác trả\n về";
+    cụm cũ = biên dịch từ tố hóa(cụm nguồn);
+    cụm gọn = biên dịch từ tố hóa gọn(cụm nguồn)["token"];
+    kiểm tra(độ dài(cụm gọn) == 9, "số cụm và tiền tố sai");
+    kiểm tra(cụm gọn[0][11] == 355 && cụm gọn[1][11] == 356 && cụm gọn[2][11] == 346, "cụm dài trước");
+    kiểm tra(cụm gọn[8][11] == 341, "cụm qua dòng");
+    lặp(i = 0; i < độ dài(cụm gọn); i++) {
+        lặp(j = 0; j < độ dài(khóa); j++) {
+            kiểm tra(cụm gọn[i][j] == cụm cũ[i][khóa[j]], "span cụm");
+        };
+    };
+    // Hợp nhất tại chỗ: đầu/đuôi, cụm kề nhau, không ghép, và pool thô.
+    nguồn ghép = "trả về ngoại thư viện trả về Việt kiểm tra sau";
+    bộ ghép = Bộ Tách Từ Vựng(nguồn ghép);
+    thô trước = json tạo(bộ ghép.từ tố thô());
+    map ghép = bộ ghép.từ tố();
+    kiểm tra(json tạo(bộ ghép.từ tố thô()) == thô trước, "cache thô công khai");
+    gọn ghép = bộ ghép.biên dịch từ tố hóa gọn(nguồn ghép);
+    token ghép = gọn ghép["token"];
+    kiểm tra(json tạo(bộ ghép.từ tố thô()) == thô trước, "compact không đổi cache thô");
+    kiểm tra(độ dài(token ghép) == 5, "cụm liền nhau đầu cuối");
+    pool ghép = ["trả", "về", "ngoại", "thư", "viện", "Việt", "kiểm", "tra", "sau", "trả về", "ngoại thư viện", "kiểm tra sau"];
+    kiểm tra(json tạo(gọn ghép["ký hiệu"]) == json tạo(pool ghép), "thứ tự intern thô rồi ghép");
+    lặp(i = 0; i < độ dài(token ghép); i++) {
+        lặp(j = 0; j < độ dài(khóa); j++) {
+            kiểm tra(token ghép[i][j] == map ghép[i][khóa[j]], "span sau dồn");
+        };
+    };
+    kiểm tra(token ghép[0][9] == token ghép[2][9], "intern cụm lặp");
+    không ghép = biên dịch từ tố hóa gọn("Việt 1 + 2")["token"];
+    kiểm tra(độ dài(không ghép) == 4 && không ghép[3][1] == "2", "không cần dồn");
+    kiểm tra(độ dài(biên dịch từ tố hóa gọn("")["token"]) == 0, "nguồn rỗng");
+    tùy chỉnh = biên dịch biểu thức tạo phân tích cú pháp(biên dịch từ tố hóa gọn("a + b * c")["token"]);
+    tùy chỉnh["bảng ưu tiên"]["+"] = 11;
+    tùy chỉnh["bảng ưu tiên"]["*"] = 10;
+    cây tùy chỉnh = biên dịch biểu thức đọc(tùy chỉnh, 1);
+    kiểm tra(cây tùy chỉnh["toán tử"] == "*", "ưu tiên tùy chỉnh");
+    // Byte span classification must preserve historical numeric grammar.
+    mẫu số = biên dịch từ tố hóa gọn("0 012 12. .5 . 1.2.3 1Việt 9🌿 1e3 ٠")[ "token" ];
+    loại số = [3, 3, 4, 4, 4, 1, 1, 1, 1, 1];
+    kiểm tra(độ dài(mẫu số) == độ dài(loại số), "số token numeric span");
+    lặp(i = 0; i < độ dài(loại số); i++) {
+        kiểm tra(mẫu số[i][10] == loại số[i], "numeric span");
+    };
+    tên thường = biên dịch biểu thức receiver("mô.đun", 7);
+    kiểm tra(tên thường["loại"] == "tên" && tên thường["giá trị"] == "mô.đun", "tên mô đun");
+    tên thường = biên dịch biểu thức receiver("mìnhkhác.tên", 0);
+    kiểm tra(tên thường["loại"] == "tên", "tiền tố không trùng");
+    thành viên = biên dịch biểu thức receiver("mình.dữ liệu.🌿", 7);
+    kiểm tra(thành viên["tên"] == "🌿", "thành viên UTF-8");
+    kiểm tra(thành viên["đối tượng"]["tên"] == "dữ liệu", "span tên nhiều từ");
+    kiểm tra(thành viên["đối tượng"]["đối tượng"]["giá trị"] == "mình", "gốc receiver");
+    thành viên = biên dịch biểu thức receiver("gốc.đọc", 3);
+    kiểm tra(thành viên["tên"] == "đọc", "receiver gốc");
+    lỗi tên = sai;
+    thử { biên dịch biểu thức receiver("mình..x", 0); } bắt lỗi (e) {
+        lỗi tên = e == "biên dịch biểu thức: tên thành viên rỗng";
+    };
+    kiểm tra(lỗi tên, "giữ lỗi thành viên rỗng");
+    in "lexer token gọn: đạt";
+};

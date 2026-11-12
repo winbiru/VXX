@@ -71,10 +71,13 @@ hàm riêng tư biên dịch asm bảng mã() {
         "OP_IN", "OP_TRA_VE", "OP_DUNG_CHUONG_TRINH", "OP_JUMP", "OP_JUMP_IF_FALSE", "OP_BO_QUA",
         "OP_THOAT", "OP_CHON", "OP_CA", "OP_MAC_DINH", "OP_KET_THUC_CHUYEN", "OP_THU",
         "OP_THU_KET_THUC", "OP_BAT_LOI", "OP_NEM", "OP_FFI_CALL"];
-    bảng = {};
-    lặp(i = 0; i < độ dài(tên); i++) { bảng["" + biên dịch mã thao tác(tên[i])] = tên[i]; };
+    // Opcode ABI đã được kiểm tra ở đầu biên dịch chương trình. Dùng
+    // chỉ mục số nguyên thay vì tạo khóa chuỗi và tra cây từ điển mỗi lệnh.
+    bảng = [];
+    lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(bảng, ""); };
+    lặp(i = 0; i < độ dài(tên); i++) { bảng[biên dịch mã thao tác(tên[i])] = tên[i]; };
     nội tại = biên dịch asm tên nội tại();
-    lặp(i = 0; i < độ dài(nội tại); i++) { bảng["" + biên dịch mã thao tác(nội tại[i])] = "intrinsic"; };
+    lặp(i = 0; i < độ dài(nội tại); i++) { bảng[biên dịch mã thao tác(nội tại[i])] = "intrinsic"; };
     trả về bảng;
 };
 
@@ -83,20 +86,20 @@ hàm riêng tư biên dịch asm bảng mã() {
 // lời gọi đệ quy và lời gọi có kiểu động giữ nguyên đường runtime.
 hàm riêng tư biên dịch asm hàm i32(mã, bảng, đã chứng minh) {
     nếu (độ dài(mã) == 0) { trả về rỗng; };
-    nếu (lấy từ điển(bảng, "" + mã[0][0], "") != "OP_MO_KHOI") { trả về rỗng; };
+    nếu (bảng[mã[0][0]] != "OP_MO_KHOI") { trả về rỗng; };
     ô tham số = [];
     i = 1;
     // Các khai báo cục bộ có thể xuất hiện trước phần khai báo tham số.
     khi (i < độ dài(mã)) {
-        nếu (lấy từ điển(bảng, "" + mã[i][0], "") != "OP_KHOI_TAO") { thoát; };
+        nếu (bảng[mã[i][0]] != "OP_KHOI_TAO") { thoát; };
         nếu (i + 1 < độ dài(mã)) {
-            nếu (lấy từ điển(bảng, "" + mã[i + 1][0], "") == "OP_PARAM") { thoát; };
+            nếu (bảng[mã[i + 1][0]] == "OP_PARAM") { thoát; };
         };
         i += 1;
     };
     khi (i + 1 < độ dài(mã)) {
-        nếu (lấy từ điển(bảng, "" + mã[i][0], "") != "OP_KHOI_TAO" ||
-            lấy từ điển(bảng, "" + mã[i + 1][0], "") != "OP_PARAM") { thoát; };
+        nếu (bảng[mã[i][0]] != "OP_KHOI_TAO" ||
+            bảng[mã[i + 1][0]] != "OP_PARAM") { thoát; };
         ô = mã[i][2];
         nếu (ô < 0 || mã[i + 1][2] != ô ||
             mã[i + 1][3] != độ dài(ô tham số) || độ dài(ô tham số) >= 4) { trả về rỗng; };
@@ -112,7 +115,7 @@ hàm riêng tư biên dịch asm hàm i32(mã, bảng, đã chứng minh) {
     đã trả = sai;
     // Biến đếm mới giữ đúng vị trí sau danh sách tham số khi hạ vòng lặp.
     lặp(vị trí = i; vị trí < độ dài(mã); vị trí++) {
-        tên = lấy từ điển(bảng, "" + mã[vị trí][0], "");
+        tên = bảng[mã[vị trí][0]];
         nếu (đã trả) {
             nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { trả về rỗng; };
             bỏ qua;
@@ -196,7 +199,7 @@ lớp công khai Bộ Hạ ASM Động {
         // nhìn trước nhiều lệnh sẽ dùng lại tên đã giải mã.
         mình.tên mã = [];
         lặp(i = 0; i < độ dài(lệnh); i++) {
-            tên mã = lấy từ điển(bảng, "" + lệnh[i][0], "");
+            tên mã = bảng[lệnh[i][0]];
             máy ảo thêm cuối danh sách(mình.tên mã, tên mã);
             nếu (tên mã == "OP_PARAM" && lệnh[i][3] == -1 && lệnh[i][2] >= 0) {
                 mình.ô receiver["" + lệnh[i][2]] = đúng;
@@ -326,7 +329,7 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (từ + 1 >= độ dài(mình.nguồn)) { trả về 0; };
         nếu (lấy từ điển(mình.bảng i32, "compiler", sai)) { trả về 0; };
         lệnh gọi = mình.nguồn[từ + 1];
-        nếu (lấy từ điển(mình.bảng, "" + lệnh gọi[0], "") != "OP_GOI_GIAN_TIEP" ||
+        nếu (mình.bảng[lệnh gọi[0]] != "OP_GOI_GIAN_TIEP" ||
             mình.đích nhánh[từ + 1] != 0) { trả về 0; };
         số = lệnh gọi[1]; ô = mình.nguồn[từ][2];
         nếu (số >= 0 && số <= 4) {
@@ -356,7 +359,7 @@ lớp công khai Bộ Hạ ASM Động {
         chủ = lấy từ điển(mình.bảng i32, "owner:" + mình.id hàm, -1);
         nếu (chủ < 0) { trả về 0; };
         nhận = mình.nguồn[từ];
-        nếu (lấy từ điển(mình.bảng, "" + nhận[0], "") != "OP_TEN_BIEN_GIA_TRI") { trả về 0; };
+        nếu (mình.bảng[nhận[0]] != "OP_TEN_BIEN_GIA_TRI") { trả về 0; };
         nếu (!lấy từ điển(mình.ô receiver, "" + nhận[2], sai)) { trả về 0; };
         lặp(số = 0; số <= 2; số++) {
             vị trí gọi = từ + 1 + số;
@@ -367,7 +370,7 @@ lớp công khai Bộ Hạ ASM Động {
             };
             nếu (!liền mạch) { bỏ qua; };
             lệnh gọi = mình.nguồn[vị trí gọi];
-            nếu (lấy từ điển(mình.bảng, "" + lệnh gọi[0], "") != "OP_GOI_PHUONG_THUC" ||
+            nếu (mình.bảng[lệnh gọi[0]] != "OP_GOI_PHUONG_THUC" ||
                 lệnh gọi[1] != số || lệnh gọi[3] != 0) { bỏ qua; };
             tên_phương_thức = lệnh gọi[2];
             bị_che = sai;
@@ -395,7 +398,7 @@ lớp công khai Bộ Hạ ASM Động {
             đơn giản = đúng;
             lặp(j = 0; j < số; j++) {
                 tham số = mình.nguồn[từ + 1 + j];
-                tên = lấy từ điển(mình.bảng, "" + tham số[0], "");
+                tên = mình.bảng[tham số[0]];
                 kiểu = 0;
                 nếu (tên == "OP_BIEN_SO") { đối số[j] = tham số[1]; }
                 hoặc nếu (tên == "OP_TEN_BIEN_GIA_TRI") { kiểu = 1; đối số[j] = tham số[2]; }
@@ -498,25 +501,25 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (mình.đích nhánh[j] != 0) { trả về rỗng; };
         };
         đầu = mình.nguồn[từ];
-        nếu (lấy từ điển(mình.bảng, "" + đầu[0], "") != "OP_TEN_BIEN_GIA_TRI") { trả về rỗng; };
+        nếu (mình.bảng[đầu[0]] != "OP_TEN_BIEN_GIA_TRI") { trả về rỗng; };
         ô = đầu[2];
         giá trị = [0, 0, 0, 0];
         v1 = mình.nguồn[từ + 1]; v2 = mình.nguồn[từ + 2];
-        nếu (lấy từ điển(mình.bảng, "" + v1[0], "") != "OP_BIEN_SO" ||
-            lấy từ điển(mình.bảng, "" + v2[0], "") != "OP_SO_SANH_BANG") { trả về rỗng; };
+        nếu (mình.bảng[v1[0]] != "OP_BIEN_SO" ||
+            mình.bảng[v2[0]] != "OP_SO_SANH_BANG") { trả về rỗng; };
         giá trị[0] = v1[1];
         lặp(k = 1; k < số; k++) {
             gốc = từ + 4 * k - 1;
             a = mình.nguồn[gốc]; b = mình.nguồn[gốc + 1];
             c = mình.nguồn[gốc + 2]; d = mình.nguồn[gốc + 3];
-            nếu (lấy từ điển(mình.bảng, "" + a[0], "") != "OP_TEN_BIEN_GIA_TRI" || a[2] != ô ||
-                lấy từ điển(mình.bảng, "" + b[0], "") != "OP_BIEN_SO" ||
-                lấy từ điển(mình.bảng, "" + c[0], "") != "OP_SO_SANH_BANG" ||
-                lấy từ điển(mình.bảng, "" + d[0], "") != "OP_Logic_HOAC") { trả về rỗng; };
+            nếu (mình.bảng[a[0]] != "OP_TEN_BIEN_GIA_TRI" || a[2] != ô ||
+                mình.bảng[b[0]] != "OP_BIEN_SO" ||
+                mình.bảng[c[0]] != "OP_SO_SANH_BANG" ||
+                mình.bảng[d[0]] != "OP_Logic_HOAC") { trả về rỗng; };
             giá trị[k] = b[1];
         };
         lệnh nhảy = mình.nguồn[cuối];
-        nếu (lấy từ điển(mình.bảng, "" + lệnh nhảy[0], "") != "OP_JUMP_IF_FALSE") { trả về rỗng; };
+        nếu (mình.bảng[lệnh nhảy[0]] != "OP_JUMP_IF_FALSE") { trả về rỗng; };
         trả về [số, ô, giá trị[0], giá trị[1], giá trị[2], giá trị[3], lệnh nhảy[1], cuối - từ];
     };
     // Vòng tạo danh sách: list thêm (base + i). Giữ bytecode gốc làm
@@ -941,7 +944,7 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (ứng viên < 0) { trả về 0; };
         cuối = ứng viên;
         lời gọi = nguồn[cuối];
-        nếu (lấy từ điển(mình.bảng, "" + lời gọi[0], "") != "OP_GOI" ||
+        nếu (mình.bảng[lời gọi[0]] != "OP_GOI" ||
             lời gọi[1] < 0 || lời gọi[1] > 4) { trả về 0; };
         dạng = lấy từ điển(mình.bảng i32, "" + lời gọi[2], rỗng);
         nếu (dạng == rỗng) { trả về 0; };
@@ -1034,8 +1037,8 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 2 < độ dài(nguồn)) {
                 đích gán = nguồn[i + 1]; phép gán = nguồn[i + 2];
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
-                    lấy từ điển(mình.bảng, "" + đích gán[0], "") == "OP_TEN_BIEN_ID" &&
-                    lấy từ điển(mình.bảng, "" + phép gán[0], "") == "OP_GAN") {
+                    mình.bảng[đích gán[0]] == "OP_TEN_BIEN_ID" &&
+                    mình.bảng[phép gán[0]] == "OP_GAN") {
                     mình.gọi("copy_slot", [v[2], đích gán[2]]);
                     máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                     máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
@@ -1049,13 +1052,13 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (liền mạch) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                     v5 = nguồn[i + 4]; v6 = nguồn[i + 5]; v7 = nguồn[i + 6];
-                    phép = lấy từ điển(mình.bảng, "" + v5[0], "");
-                    nếu (lấy từ điển(mình.bảng, "" + v2[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + v3[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + v4[0], "") == "OP_DOC_CHI_SO" &&
+                    phép = mình.bảng[v5[0]];
+                    nếu (mình.bảng[v2[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[v3[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[v4[0]] == "OP_DOC_CHI_SO" &&
                         (phép == "OP_CONG" || phép == "OP_TRU" || phép == "OP_NHAN") &&
-                        lấy từ điển(mình.bảng, "" + v6[0], "") == "OP_TEN_BIEN_ID" && v6[2] == v[2] &&
-                        lấy từ điển(mình.bảng, "" + v7[0], "") == "OP_GAN") {
+                        mình.bảng[v6[0]] == "OP_TEN_BIEN_ID" && v6[2] == v[2] &&
+                        mình.bảng[v7[0]] == "OP_GAN") {
                         mình.gọi("index_update", [v[2], v2[2], v3[2], v5[0]]);
                         lặp(j = 0; j < 6; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 6; bỏ qua;
@@ -1069,9 +1072,9 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3]; v5 = nguồn[i + 4];
-                    t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                    t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                    t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
+                    t2 = mình.bảng[v2[0]];
+                    t3 = mình.bảng[v3[0]];
+                    t4 = mình.bảng[v4[0]];
                     nếu (v[2] >= 0 && t2 == "OP_TEN_BIEN_GIA_TRI" &&
                         t3 == "OP_TEN_BIEN_GIA_TRI" && t4 == "OP_CONG" &&
                         v2[2] >= 0 && v3[2] >= 0 &&
@@ -1095,10 +1098,10 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (liền mạch) {
                     nguồn chữ = nguồn[i + 1]; chỉ số chữ = nguồn[i + 2];
                     đọc chữ = nguồn[i + 3]; lệnh phương thức = nguồn[i + 4];
-                    nếu (lấy từ điển(mình.bảng, "" + nguồn chữ[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + chỉ số chữ[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + đọc chữ[0], "") == "OP_DOC_CHI_SO" &&
-                        lấy từ điển(mình.bảng, "" + lệnh phương thức[0], "") == "OP_GOI_PHUONG_THUC" &&
+                    nếu (mình.bảng[nguồn chữ[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[chỉ số chữ[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[đọc chữ[0]] == "OP_DOC_CHI_SO" &&
+                        mình.bảng[lệnh phương thức[0]] == "OP_GOI_PHUONG_THUC" &&
                         lệnh phương thức[1] == 1 &&
                         lấy từ điển(mình.bảng i32, "method_ascii:" + lệnh phương thức[2], sai)) {
                         // Đánh giá receiver trước source/index đúng thứ tự bytecode gốc.
@@ -1138,22 +1141,22 @@ lớp công khai Bộ Hạ ASM Động {
                     mở = nguồn[i + 8]; đích = nguồn[i + 9]; nguồn lại = nguồn[i + 10];
                     chỉ số lại = nguồn[i + 11]; đọc lại = nguồn[i + 12]; cộng = nguồn[i + 13];
                     id đích = nguồn[i + 14]; gán = nguồn[i + 15]; đóng = nguồn[i + 16];
-                    nếu (lấy từ điển(mình.bảng, "" + chỉ số[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + đọc[0], "") == "OP_DOC_CHI_SO" &&
-                        lấy từ điển(mình.bảng, "" + chia[0], "") == "OP_BIEN_SO" &&
-                        lấy từ điển(mình.bảng, "" + modulo[0], "") == "OP_MODULO" &&
-                        lấy từ điển(mình.bảng, "" + phải[0], "") == "OP_BIEN_SO" &&
-                        lấy từ điển(mình.bảng, "" + so[0], "") == "OP_SO_SANH_BANG" &&
-                        lấy từ điển(mình.bảng, "" + lệnh rẽ[0], "") == "OP_JUMP_IF_FALSE" && lệnh rẽ[1] == i + 17 &&
-                        lấy từ điển(mình.bảng, "" + mở[0], "") == "OP_MO_KHOI" &&
-                        lấy từ điển(mình.bảng, "" + đích[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                        lấy từ điển(mình.bảng, "" + nguồn lại[0], "") == "OP_TEN_BIEN_GIA_TRI" && nguồn lại[2] == v[2] &&
-                        lấy từ điển(mình.bảng, "" + chỉ số lại[0], "") == "OP_TEN_BIEN_GIA_TRI" && chỉ số lại[2] == chỉ số[2] &&
-                        lấy từ điển(mình.bảng, "" + đọc lại[0], "") == "OP_DOC_CHI_SO" &&
-                        lấy từ điển(mình.bảng, "" + cộng[0], "") == "OP_CONG" &&
-                        lấy từ điển(mình.bảng, "" + id đích[0], "") == "OP_TEN_BIEN_ID" && id đích[2] == đích[2] &&
-                        lấy từ điển(mình.bảng, "" + gán[0], "") == "OP_GAN" &&
-                        lấy từ điển(mình.bảng, "" + đóng[0], "") == "OP_DONG_KHOI") {
+                    nếu (mình.bảng[chỉ số[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[đọc[0]] == "OP_DOC_CHI_SO" &&
+                        mình.bảng[chia[0]] == "OP_BIEN_SO" &&
+                        mình.bảng[modulo[0]] == "OP_MODULO" &&
+                        mình.bảng[phải[0]] == "OP_BIEN_SO" &&
+                        mình.bảng[so[0]] == "OP_SO_SANH_BANG" &&
+                        mình.bảng[lệnh rẽ[0]] == "OP_JUMP_IF_FALSE" && lệnh rẽ[1] == i + 17 &&
+                        mình.bảng[mở[0]] == "OP_MO_KHOI" &&
+                        mình.bảng[đích[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[nguồn lại[0]] == "OP_TEN_BIEN_GIA_TRI" && nguồn lại[2] == v[2] &&
+                        mình.bảng[chỉ số lại[0]] == "OP_TEN_BIEN_GIA_TRI" && chỉ số lại[2] == chỉ số[2] &&
+                        mình.bảng[đọc lại[0]] == "OP_DOC_CHI_SO" &&
+                        mình.bảng[cộng[0]] == "OP_CONG" &&
+                        mình.bảng[id đích[0]] == "OP_TEN_BIEN_ID" && id đích[2] == đích[2] &&
+                        mình.bảng[gán[0]] == "OP_GAN" &&
+                        mình.bảng[đóng[0]] == "OP_DONG_KHOI") {
                         mình.gọi("index_mod_add_if_equal", [v[2], chỉ số[2], đích[2], chia[1], phải[1]]);
                         lặp(j = 0; j < 16; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 16; bỏ qua;
@@ -1168,12 +1171,12 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; chia = nguồn[i + 3];
                     modulo = nguồn[i + 4]; phải = nguồn[i + 5]; so = nguồn[i + 6];
-                    tên chỉ số = lấy từ điển(mình.bảng, "" + chỉ số[0], "");
-                    tên đọc = lấy từ điển(mình.bảng, "" + đọc[0], "");
-                    tên chia = lấy từ điển(mình.bảng, "" + chia[0], "");
-                    tên modulo = lấy từ điển(mình.bảng, "" + modulo[0], "");
-                    tên phải = lấy từ điển(mình.bảng, "" + phải[0], "");
-                    tên so = lấy từ điển(mình.bảng, "" + so[0], "");
+                    tên chỉ số = mình.bảng[chỉ số[0]];
+                    tên đọc = mình.bảng[đọc[0]];
+                    tên chia = mình.bảng[chia[0]];
+                    tên modulo = mình.bảng[modulo[0]];
+                    tên phải = mình.bảng[phải[0]];
+                    tên so = mình.bảng[so[0]];
                     nếu (tên đọc == "OP_DOC_CHI_SO" &&
                         (tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO") &&
                         tên chia == "OP_BIEN_SO" && tên modulo == "OP_MODULO" &&
@@ -1196,10 +1199,10 @@ lớp công khai Bộ Hạ ASM Động {
                 lặp(j = 1; j <= 4; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; đích = nguồn[i + 3]; gán = nguồn[i + 4];
-                    tên chỉ số = lấy từ điển(mình.bảng, "" + chỉ số[0], "");
-                    tên đọc = lấy từ điển(mình.bảng, "" + đọc[0], "");
-                    tên đích = lấy từ điển(mình.bảng, "" + đích[0], "");
-                    tên gán = lấy từ điển(mình.bảng, "" + gán[0], "");
+                    tên chỉ số = mình.bảng[chỉ số[0]];
+                    tên đọc = mình.bảng[đọc[0]];
+                    tên đích = mình.bảng[đích[0]];
+                    tên gán = mình.bảng[gán[0]];
                     nếu ((tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO") &&
                         tên đọc == "OP_DOC_CHI_SO" && tên đích == "OP_TEN_BIEN_ID" && tên gán == "OP_GAN") {
                         số = chỉ số[1]; là ô = 0;
@@ -1218,11 +1221,11 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (liền mạch) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                     v5 = nguồn[i + 4]; v6 = nguồn[i + 5];
-                    t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                    t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                    t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                    t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
-                    t6 = lấy từ điển(mình.bảng, "" + v6[0], "");
+                    t2 = mình.bảng[v2[0]];
+                    t3 = mình.bảng[v3[0]];
+                    t4 = mình.bảng[v4[0]];
+                    t5 = mình.bảng[v5[0]];
+                    t6 = mình.bảng[v6[0]];
                     nếu (t2 == "OP_BIEN_SO" && t3 == "OP_TEN_BIEN_GIA_TRI" &&
                         t4 == "OP_BIEN_SO" && mình.phép toán gộp(t5) &&
                         t6 == "OP_GAN_CHI_SO") {
@@ -1240,17 +1243,17 @@ lớp công khai Bộ Hạ ASM Động {
                     a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                     a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
                     a9 = nguồn[i + 9]; a10 = nguồn[i + 10]; a11 = nguồn[i + 11];
-                    t1 = lấy từ điển(mình.bảng, "" + a1[0], "");
-                    t2 = lấy từ điển(mình.bảng, "" + a2[0], "");
-                    t3 = lấy từ điển(mình.bảng, "" + a3[0], "");
-                    t4 = lấy từ điển(mình.bảng, "" + a4[0], "");
-                    t5 = lấy từ điển(mình.bảng, "" + a5[0], "");
-                    t6 = lấy từ điển(mình.bảng, "" + a6[0], "");
-                    t7 = lấy từ điển(mình.bảng, "" + a7[0], "");
-                    t8 = lấy từ điển(mình.bảng, "" + a8[0], "");
-                    t9 = lấy từ điển(mình.bảng, "" + a9[0], "");
-                    t10 = lấy từ điển(mình.bảng, "" + a10[0], "");
-                    t11 = lấy từ điển(mình.bảng, "" + a11[0], "");
+                    t1 = mình.bảng[a1[0]];
+                    t2 = mình.bảng[a2[0]];
+                    t3 = mình.bảng[a3[0]];
+                    t4 = mình.bảng[a4[0]];
+                    t5 = mình.bảng[a5[0]];
+                    t6 = mình.bảng[a6[0]];
+                    t7 = mình.bảng[a7[0]];
+                    t8 = mình.bảng[a8[0]];
+                    t9 = mình.bảng[a9[0]];
+                    t10 = mình.bảng[a10[0]];
+                    t11 = mình.bảng[a11[0]];
                     cùng chỉ số = sai;
                     nếu (t1 == "OP_BIEN_SO" && t6 == "OP_BIEN_SO" && a1[1] == a6[1]) { cùng chỉ số = đúng; };
                     nếu (t1 == "OP_TEN_BIEN_GIA_TRI" && t6 == "OP_TEN_BIEN_GIA_TRI" && a1[2] == a6[2]) { cùng chỉ số = đúng; };
@@ -1276,17 +1279,17 @@ lớp công khai Bộ Hạ ASM Động {
                     a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                     a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
                     a9 = nguồn[i + 9]; a10 = nguồn[i + 10]; a11 = nguồn[i + 11];
-                    t1 = lấy từ điển(mình.bảng, "" + a1[0], "");
-                    t2 = lấy từ điển(mình.bảng, "" + a2[0], "");
-                    t3 = lấy từ điển(mình.bảng, "" + a3[0], "");
-                    t4 = lấy từ điển(mình.bảng, "" + a4[0], "");
-                    t5 = lấy từ điển(mình.bảng, "" + a5[0], "");
-                    t6 = lấy từ điển(mình.bảng, "" + a6[0], "");
-                    t7 = lấy từ điển(mình.bảng, "" + a7[0], "");
-                    t8 = lấy từ điển(mình.bảng, "" + a8[0], "");
-                    t9 = lấy từ điển(mình.bảng, "" + a9[0], "");
-                    t10 = lấy từ điển(mình.bảng, "" + a10[0], "");
-                    t11 = lấy từ điển(mình.bảng, "" + a11[0], "");
+                    t1 = mình.bảng[a1[0]];
+                    t2 = mình.bảng[a2[0]];
+                    t3 = mình.bảng[a3[0]];
+                    t4 = mình.bảng[a4[0]];
+                    t5 = mình.bảng[a5[0]];
+                    t6 = mình.bảng[a6[0]];
+                    t7 = mình.bảng[a7[0]];
+                    t8 = mình.bảng[a8[0]];
+                    t9 = mình.bảng[a9[0]];
+                    t10 = mình.bảng[a10[0]];
+                    t11 = mình.bảng[a11[0]];
                     cùng chỉ số = sai;
                     nếu (t1 == "OP_BIEN_SO" && t6 == "OP_BIEN_SO" && a1[1] == a6[1]) { cùng chỉ số = đúng; };
                     nếu (t1 == "OP_TEN_BIEN_GIA_TRI" && t6 == "OP_TEN_BIEN_GIA_TRI" && a1[2] == a6[2]) { cùng chỉ số = đúng; };
@@ -1308,10 +1311,10 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; phải = nguồn[i + 3]; so = nguồn[i + 4];
-                    tên chỉ số = lấy từ điển(mình.bảng, "" + chỉ số[0], "");
-                    tên phải = lấy từ điển(mình.bảng, "" + phải[0], "");
-                    tên so = lấy từ điển(mình.bảng, "" + so[0], "");
-                    nếu (lấy từ điển(mình.bảng, "" + đọc[0], "") == "OP_DOC_CHI_SO" &&
+                    tên chỉ số = mình.bảng[chỉ số[0]];
+                    tên phải = mình.bảng[phải[0]];
+                    tên so = mình.bảng[so[0]];
+                    nếu (mình.bảng[đọc[0]] == "OP_DOC_CHI_SO" &&
                         (tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO") &&
                         (tên phải == "OP_TEN_BIEN_GIA_TRI" || tên phải == "OP_CHUOI") &&
                         (tên so == "OP_SO_SANH_BANG" || tên so == "OP_KHAC_BANG")) {
@@ -1333,11 +1336,11 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; phải = nguồn[i + 3];
                     so = nguồn[i + 4]; lệnh nhảy = nguồn[i + 5];
-                    tên chỉ số = lấy từ điển(mình.bảng, "" + chỉ số[0], "");
-                    tên đọc = lấy từ điển(mình.bảng, "" + đọc[0], "");
-                    tên phải = lấy từ điển(mình.bảng, "" + phải[0], "");
-                    tên so = lấy từ điển(mình.bảng, "" + so[0], "");
-                    tên nhảy = lấy từ điển(mình.bảng, "" + lệnh nhảy[0], "");
+                    tên chỉ số = mình.bảng[chỉ số[0]];
+                    tên đọc = mình.bảng[đọc[0]];
+                    tên phải = mình.bảng[phải[0]];
+                    tên so = mình.bảng[so[0]];
+                    tên nhảy = mình.bảng[lệnh nhảy[0]];
                     nếu ((tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO") &&
                         tên đọc == "OP_DOC_CHI_SO" && tên phải == "OP_BIEN_SO" &&
                         mình.phép so sánh gộp(tên so) && tên nhảy == "OP_JUMP_IF_FALSE") {
@@ -1353,8 +1356,8 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 2 < độ dài(nguồn)) {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2];
-                    tên chỉ số = lấy từ điển(mình.bảng, "" + chỉ số[0], "");
-                    tên đọc = lấy từ điển(mình.bảng, "" + đọc[0], "");
+                    tên chỉ số = mình.bảng[chỉ số[0]];
+                    tên đọc = mình.bảng[đọc[0]];
                     nếu (tên đọc == "OP_DOC_CHI_SO") {
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") {
                             mình.gọi("index_slot", [v[2], chỉ số[2], 1]);
@@ -1408,7 +1411,7 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (tên == "OP_TEN_BIEN_GIA_TRI") { đầu = v[2]; mặt nạ = 1; };
                 nếu (i + 1 < độ dài(nguồn)) {
                     sau = nguồn[i + 1];
-                    tên sau = lấy từ điển(mình.bảng, "" + sau[0], "");
+                    tên sau = mình.bảng[sau[0]];
                     nếu (mình.đích nhánh[i + 1] == 0 && tên sau == "OP_GOI" && sau[1] == 1) {
                         mình.gọi("call_small", [sau[2], 1, đầu, 0, mặt nạ]);
                         máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
@@ -1417,8 +1420,8 @@ lớp công khai Bộ Hạ ASM Động {
                 };
                 nếu (i + 2 < độ dài(nguồn)) {
                     giữa = nguồn[i + 1]; sau = nguồn[i + 2];
-                    tên giữa = lấy từ điển(mình.bảng, "" + giữa[0], "");
-                    tên sau = lấy từ điển(mình.bảng, "" + sau[0], "");
+                    tên giữa = mình.bảng[giữa[0]];
+                    tên sau = mình.bảng[sau[0]];
                     nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                         (tên giữa == "OP_BIEN_SO" || tên giữa == "OP_TEN_BIEN_GIA_TRI") &&
                         tên sau == "OP_GOI" && sau[1] == 2) {
@@ -1525,8 +1528,8 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_BIEN_SO" && i + 2 < độ dài(nguồn)) {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2];
-                    t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                    t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
+                    t2 = mình.bảng[v2[0]];
+                    t3 = mình.bảng[v3[0]];
                     nếu (t2 == "OP_BIEN_SO") {
                         kết quả = mình.gập hằng i32(t3, v[1], v2[1]);
                         nếu (kết quả[0]) {
@@ -1543,8 +1546,8 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (tên == "OP_BIEN_SO" && i + 2 < độ dài(nguồn)) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2];
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
-                    lấy từ điển(mình.bảng, "" + v2[0], "") == "OP_TEN_BIEN_ID" &&
-                    lấy từ điển(mình.bảng, "" + v3[0], "") == "OP_GAN") {
+                    mình.bảng[v2[0]] == "OP_TEN_BIEN_ID" &&
+                    mình.bảng[v3[0]] == "OP_GAN") {
                     mình.gọi("store_integer", [v2[2], v[1]]);
                     máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                     máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
@@ -1556,9 +1559,9 @@ lớp công khai Bộ Hạ ASM Động {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.đích nhánh[i + 3] == 0 &&
-                    lấy từ điển(mình.bảng, "" + v2[0], "") == "OP_TEN_BIEN_GIA_TRI" &&
-                    lấy từ điển(mình.bảng, "" + v3[0], "") == "OP_TRU" &&
-                    lấy từ điển(mình.bảng, "" + v4[0], "") == "OP_TRA_VE") {
+                    mình.bảng[v2[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                    mình.bảng[v3[0]] == "OP_TRU" &&
+                    mình.bảng[v4[0]] == "OP_TRA_VE") {
                     mình.gọi("return_negated_slot", [v2[2]]);
                     máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
                     mình.phát("Jump");
@@ -1589,10 +1592,10 @@ lớp công khai Bộ Hạ ASM Động {
             // vẫn kiểm tra kiểu động và dùng đường dự phòng khi cần.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 4 < độ dài(nguồn)) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3]; v5 = nguồn[i + 4];
-                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
+                t2 = mình.bảng[v2[0]];
+                t3 = mình.bảng[v3[0]];
+                t4 = mình.bảng[v4[0]];
+                t5 = mình.bảng[v5[0]];
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0 &&
                     mình.phép toán gộp(t3) && t4 == "OP_TEN_BIEN_ID" && t5 == "OP_GAN") {
@@ -1637,13 +1640,13 @@ lớp công khai Bộ Hạ ASM Động {
               nếu (hợp lệ) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                 v5 = nguồn[i + 4]; v6 = nguồn[i + 5]; v7 = nguồn[i + 6]; v8 = nguồn[i + 7];
-                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
-                t6 = lấy từ điển(mình.bảng, "" + v6[0], "");
-                t7 = lấy từ điển(mình.bảng, "" + v7[0], "");
-                t8 = lấy từ điển(mình.bảng, "" + v8[0], "");
+                t2 = mình.bảng[v2[0]];
+                t3 = mình.bảng[v3[0]];
+                t4 = mình.bảng[v4[0]];
+                t5 = mình.bảng[v5[0]];
+                t6 = mình.bảng[v6[0]];
+                t7 = mình.bảng[v7[0]];
+                t8 = mình.bảng[v8[0]];
                 nếu (t2 == "OP_BIEN_SO" && t3 == "OP_LON_HON_HOAC_BANG" &&
                     t4 == "OP_TEN_BIEN_GIA_TRI" && v4[2] == v[2] &&
                     t5 == "OP_BIEN_SO" && t6 == "OP_NHO_HON_HOAC_BANG" &&
@@ -1662,13 +1665,13 @@ lớp công khai Bộ Hạ ASM Động {
               nếu (liền mạch) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                 v5 = nguồn[i + 4]; v6 = nguồn[i + 5]; v7 = nguồn[i + 6]; v8 = nguồn[i + 7];
-                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
-                t6 = lấy từ điển(mình.bảng, "" + v6[0], "");
-                t7 = lấy từ điển(mình.bảng, "" + v7[0], "");
-                t8 = lấy từ điển(mình.bảng, "" + v8[0], "");
+                t2 = mình.bảng[v2[0]];
+                t3 = mình.bảng[v3[0]];
+                t4 = mình.bảng[v4[0]];
+                t5 = mình.bảng[v5[0]];
+                t6 = mình.bảng[v6[0]];
+                t7 = mình.bảng[v7[0]];
+                t8 = mình.bảng[v8[0]];
                 nếu (t2 == "OP_BIEN_SO" && t3 == "OP_NHO_HON" &&
                     t4 == "OP_TEN_BIEN_GIA_TRI" && v4[2] == v[2] &&
                     t5 == "OP_BIEN_SO" && t6 == "OP_LON_HON" &&
@@ -1688,17 +1691,17 @@ lớp công khai Bộ Hạ ASM Động {
                 a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                 a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
                 a9 = nguồn[i + 9]; a10 = nguồn[i + 10]; lệnh nhảy = nguồn[i + 11];
-                t1 = lấy từ điển(mình.bảng, "" + a1[0], "");
-                t2 = lấy từ điển(mình.bảng, "" + a2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + a3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + a4[0], "");
-                t5 = lấy từ điển(mình.bảng, "" + a5[0], "");
-                t6 = lấy từ điển(mình.bảng, "" + a6[0], "");
-                t7 = lấy từ điển(mình.bảng, "" + a7[0], "");
-                t8 = lấy từ điển(mình.bảng, "" + a8[0], "");
-                t9 = lấy từ điển(mình.bảng, "" + a9[0], "");
-                t10 = lấy từ điển(mình.bảng, "" + a10[0], "");
-                t11 = lấy từ điển(mình.bảng, "" + lệnh nhảy[0], "");
+                t1 = mình.bảng[a1[0]];
+                t2 = mình.bảng[a2[0]];
+                t3 = mình.bảng[a3[0]];
+                t4 = mình.bảng[a4[0]];
+                t5 = mình.bảng[a5[0]];
+                t6 = mình.bảng[a6[0]];
+                t7 = mình.bảng[a7[0]];
+                t8 = mình.bảng[a8[0]];
+                t9 = mình.bảng[a9[0]];
+                t10 = mình.bảng[a10[0]];
+                t11 = mình.bảng[lệnh nhảy[0]];
                 nếu (t1 == "OP_BIEN_SO" && t2 == "OP_SO_SANH_BANG" &&
                     t3 == "OP_TEN_BIEN_GIA_TRI" && a3[2] == v[2] &&
                     t4 == "OP_BIEN_SO" && t5 == "OP_LON_HON_HOAC_BANG" &&
@@ -1720,17 +1723,17 @@ lớp công khai Bộ Hạ ASM Động {
                 a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                 a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
                 a9 = nguồn[i + 9]; a10 = nguồn[i + 10]; lệnh nhảy = nguồn[i + 11];
-                t1 = lấy từ điển(mình.bảng, "" + a1[0], "");
-                t2 = lấy từ điển(mình.bảng, "" + a2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + a3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + a4[0], "");
-                t5 = lấy từ điển(mình.bảng, "" + a5[0], "");
-                t6 = lấy từ điển(mình.bảng, "" + a6[0], "");
-                t7 = lấy từ điển(mình.bảng, "" + a7[0], "");
-                t8 = lấy từ điển(mình.bảng, "" + a8[0], "");
-                t9 = lấy từ điển(mình.bảng, "" + a9[0], "");
-                t10 = lấy từ điển(mình.bảng, "" + a10[0], "");
-                t11 = lấy từ điển(mình.bảng, "" + lệnh nhảy[0], "");
+                t1 = mình.bảng[a1[0]];
+                t2 = mình.bảng[a2[0]];
+                t3 = mình.bảng[a3[0]];
+                t4 = mình.bảng[a4[0]];
+                t5 = mình.bảng[a5[0]];
+                t6 = mình.bảng[a6[0]];
+                t7 = mình.bảng[a7[0]];
+                t8 = mình.bảng[a8[0]];
+                t9 = mình.bảng[a9[0]];
+                t10 = mình.bảng[a10[0]];
+                t11 = mình.bảng[lệnh nhảy[0]];
                 nếu (t1 == "OP_BIEN_SO" && mình.phép so sánh gộp(t2) &&
                     t3 == "OP_TEN_BIEN_GIA_TRI" && a3[2] == v[2] &&
                     t4 == "OP_BIEN_SO" && a4[1] == a1[1] && t5 == "OP_SO_SANH_BANG" &&
@@ -1760,10 +1763,10 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0) {
                   v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3]; v5 = nguồn[i + 4];
-                  t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                  t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                  t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                  t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
+                  t2 = mình.bảng[v2[0]];
+                  t3 = mình.bảng[v3[0]];
+                  t4 = mình.bảng[v4[0]];
+                  t5 = mình.bảng[v5[0]];
                   nếu (t2 == "OP_PHU_DINH" && t3 == "OP_TEN_BIEN_GIA_TRI" &&
                       t4 == "OP_Logic_VA" && t5 == "OP_JUMP_IF_FALSE") {
                       // Helper vẫn đánh giá cả hai vế theo đúng thứ tự của V++.
@@ -1781,11 +1784,11 @@ lớp công khai Bộ Hạ ASM Động {
                     mình.đích nhánh[i + 5] == 0) {
                   v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                   v5 = nguồn[i + 4]; v6 = nguồn[i + 5];
-                  t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                  t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                  t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
-                  t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
-                  t6 = lấy từ điển(mình.bảng, "" + v6[0], "");
+                  t2 = mình.bảng[v2[0]];
+                  t3 = mình.bảng[v3[0]];
+                  t4 = mình.bảng[v4[0]];
+                  t5 = mình.bảng[v5[0]];
+                  t6 = mình.bảng[v6[0]];
                   nếu (t2 == "OP_TEN_BIEN_GIA_TRI" && mình.phép so sánh gộp(t3) &&
                       t4 == "OP_TEN_BIEN_GIA_TRI" && t5 == "OP_Logic_VA" &&
                       t6 == "OP_JUMP_IF_FALSE") {
@@ -1798,9 +1801,9 @@ lớp công khai Bộ Hạ ASM Động {
               nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                   mình.đích nhánh[i + 3] == 0) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
-                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
-                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
-                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
+                t2 = mình.bảng[v2[0]];
+                t3 = mình.bảng[v3[0]];
+                t4 = mình.bảng[v4[0]];
                 nếu (mình.phép so sánh gộp(t3) && t4 == "OP_JUMP_IF_FALSE") {
                     nếu (t2 == "OP_BIEN_SO") {
                         mình.so sánh rồi nhảy("compare_integer_slot", [v[2], v2[1], v3[0]], v4[1]);
@@ -2116,7 +2119,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     lặp(i = 0; i < độ dài(mã đăng ký); i++) {
         mã = mã đăng ký[i];
         lặp(j = 0; j < độ dài(mã); j++) {
-            tên_đăng_ký = lấy từ điển(bảng, "" + mã[j][0], "");
+            tên_đăng_ký = bảng[mã[j][0]];
             nếu (tên_đăng_ký == "OP_TAO_LOP") {
                 lớp_id = mã[j][2];
                 nếu (!lấy từ điển(bảng i32, "lớp_đã_gặp:" + lớp_id, sai)) {
@@ -2238,7 +2241,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
         cần = 0; tối đa = 0;
         mã = các hàm[i][2];
         lặp(j = 0; j < độ dài(mã); j++) {
-            tên = lấy từ điển(bảng, "" + mã[j][0], "");
+            tên = bảng[mã[j][0]];
             nếu ((tên == "OP_PARAM" || tên == "OP_PARAM_MAC_DINH") && mã[j][3] >= 0) {
                 nếu (tối đa < mã[j][3] + 1) { tối đa = mã[j][3] + 1; };
                 nếu (tên == "OP_PARAM" && cần < mã[j][3] + 1) { cần = mã[j][3] + 1; };

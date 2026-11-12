@@ -264,6 +264,8 @@ TESTS=(
   src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi
   src/tests/kiem_tra_bo_dang_ky_ham.vi
   src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
+  src/tests/kiem_tra_lexer_bang_byte.vi
+  src/tests/kiem_tra_lexer_token_gon.vi
   src/tests/kiem_tra_bien_dich_bieu_thuc_vi.vi
   src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi
   src/tests/kiem_tra_bien_dich_chuong_trinh_vm.vi
@@ -993,6 +995,8 @@ JIT_CASES=(
   kiem_tra_chi_muc_ast_bo_kiem_thu \
   kiem_tra_bo_dang_ky_ham \
   kiem_tra_bien_dich_tu_vung_vi \
+  kiem_tra_lexer_bang_byte \
+  kiem_tra_lexer_token_gon \
   kiem_tra_bien_dich_bieu_thuc_vi \
   kiem_tra_bien_dich_chuong_trinh_vi \
   kiem_tra_khai_bao_kieu_ffi_tu_chu \

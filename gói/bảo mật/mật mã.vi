@@ -201,12 +201,29 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sha256 các byte(các byte) {
-        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        độ dài gốc = máy ảo lấy độ dài(các byte);
+        lặp(i = 0; i < độ dài gốc; i++) {
             byte = các byte[i];
-            nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            // Guard the type before ordering comparisons; native logical
+            // operators may evaluate both operands.
+            nếu (loại của(byte) != "số nguyên") {
+                ném "băm sha256: dữ liệu byte không hợp lệ";
+            };
+            nếu (byte < 0 || byte > 255) {
                 ném "băm sha256: dữ liệu byte không hợp lệ";
             };
         };
+        trả về mình.mật mã sha256 lõi(các byte);
+    };
+
+    // The runtime creates the byte list from a string; arbitrary callers
+    // cannot supply an invalid element through this entrypoint.
+    hàm công khai mật mã băm chuỗi máy ảo(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi") { ném "băm sha256: văn bản phải là chuỗi"; };
+        trả về mình.mật mã thập lục phân(mình.mật mã sha256 lõi(chuỗi thành byte máy ảo(văn bản)));
+    };
+
+    hàm riêng tư mật mã sha256 lõi(các byte) {
         độ dài gốc = máy ảo lấy độ dài(các byte);
         // Full blocks are read directly from the caller's immutable input.
         // Only the final 64/128 padding bytes need a separate allocation.
@@ -238,6 +255,10 @@ lớp công khai Bộ Mật Mã {
             máy ảo thêm cuối danh sách(k, (q[0] << 24) | (q[1] << 16) | (q[2] << 8) | q[3]);
         };
         tổng byte = cuối khối đầy + máy ảo lấy độ dài(đuôi);
+        // Reuse the fixed-size message schedule for every block. All 64
+        // words are overwritten before use, including the padded blocks.
+        w = [];
+        lặp(t = 0; t < 64; t++) { máy ảo thêm cuối danh sách(w, 0); };
         lặp(bắt đầu = 0; bắt đầu < tổng byte; bắt đầu += 64) {
             thông điệp = các byte;
             vị trí khối = bắt đầu;
@@ -245,11 +266,10 @@ lớp công khai Bộ Mật Mã {
                 thông điệp = đuôi;
                 vị trí khối = bắt đầu - cuối khối đầy;
             };
-            w = [];
             lặp(t = 0; t < 16; t++) {
                 p = vị trí khối + t * 4;
-                máy ảo thêm cuối danh sách(w, (thông điệp[p] << 24) |
-                    (thông điệp[p + 1] << 16) | (thông điệp[p + 2] << 8) | thông điệp[p + 3]);
+                w[t] = (thông điệp[p] << 24) |
+                    (thông điệp[p + 1] << 16) | (thông điệp[p + 2] << 8) | thông điệp[p + 3];
             };
             lặp(t = 16; t < 64; t++) {
                 x = w[t - 15]; y = w[t - 2];
@@ -257,23 +277,101 @@ lớp công khai Bộ Mật Mã {
                      (((x >> 18) & 16383) | (x << 14)) ^ ((x >> 3) & 536870911);
                 s1 = (((y >> 17) & 32767) | (y << 15)) ^
                      (((y >> 19) & 8191) | (y << 13)) ^ ((y >> 10) & 4194303);
-                máy ảo thêm cuối danh sách(w, w[t - 16] + s0 + w[t - 7] + s1);
+                w[t] = w[t - 16] + s0 + w[t - 7] + s1;
             };
             a = h[0]; b = h[1]; c = h[2]; d = h[3];
             e = h[4]; f = h[5]; g = h[6]; hh = h[7];
-            lặp(t = 0; t < 64; t++) {
+            // Eight rounds restore the original register ordering. Rotate names
+            // at compile time rather than copying all eight boxed values per round.
+            lặp(t = 0; t < 64; t += 8) {
+                // Round 1
                 s1 = (((e >> 6) & 67108863) | (e << 26)) ^
                      (((e >> 11) & 2097151) | (e << 21)) ^
                      (((e >> 25) & 127) | (e << 7));
-                lựa = (e & f) ^ (~e & g);
+                lựa = g ^ (e & (f ^ g));
                 t1 = hh + s1 + lựa + k[t] + w[t];
                 s0 = (((a >> 2) & 1073741823) | (a << 30)) ^
                      (((a >> 13) & 524287) | (a << 19)) ^
                      (((a >> 22) & 1023) | (a << 10));
-                đa số = (a & b) ^ (a & c) ^ (b & c);
-                t2 = s0 + đa số;
-                hh = g; g = f; f = e; e = d + t1;
-                d = c; c = b; b = a; a = t1 + t2;
+                đa số = (a & b) | (c & (a | b));
+                d = d + t1; hh = s0 + đa số + t1;
+                // Round 2
+                s1 = (((d >> 6) & 67108863) | (d << 26)) ^
+                     (((d >> 11) & 2097151) | (d << 21)) ^
+                     (((d >> 25) & 127) | (d << 7));
+                lựa = f ^ (d & (e ^ f));
+                t1 = g + s1 + lựa + k[t + 1] + w[t + 1];
+                s0 = (((hh >> 2) & 1073741823) | (hh << 30)) ^
+                     (((hh >> 13) & 524287) | (hh << 19)) ^
+                     (((hh >> 22) & 1023) | (hh << 10));
+                đa số = (hh & a) | (b & (hh | a));
+                c = c + t1; g = s0 + đa số + t1;
+                // Round 3
+                s1 = (((c >> 6) & 67108863) | (c << 26)) ^
+                     (((c >> 11) & 2097151) | (c << 21)) ^
+                     (((c >> 25) & 127) | (c << 7));
+                lựa = e ^ (c & (d ^ e));
+                t1 = f + s1 + lựa + k[t + 2] + w[t + 2];
+                s0 = (((g >> 2) & 1073741823) | (g << 30)) ^
+                     (((g >> 13) & 524287) | (g << 19)) ^
+                     (((g >> 22) & 1023) | (g << 10));
+                đa số = (g & hh) | (a & (g | hh));
+                b = b + t1; f = s0 + đa số + t1;
+                // Round 4
+                s1 = (((b >> 6) & 67108863) | (b << 26)) ^
+                     (((b >> 11) & 2097151) | (b << 21)) ^
+                     (((b >> 25) & 127) | (b << 7));
+                lựa = d ^ (b & (c ^ d));
+                t1 = e + s1 + lựa + k[t + 3] + w[t + 3];
+                s0 = (((f >> 2) & 1073741823) | (f << 30)) ^
+                     (((f >> 13) & 524287) | (f << 19)) ^
+                     (((f >> 22) & 1023) | (f << 10));
+                đa số = (f & g) | (hh & (f | g));
+                a = a + t1; e = s0 + đa số + t1;
+                // Round 5
+                s1 = (((a >> 6) & 67108863) | (a << 26)) ^
+                     (((a >> 11) & 2097151) | (a << 21)) ^
+                     (((a >> 25) & 127) | (a << 7));
+                lựa = c ^ (a & (b ^ c));
+                t1 = d + s1 + lựa + k[t + 4] + w[t + 4];
+                s0 = (((e >> 2) & 1073741823) | (e << 30)) ^
+                     (((e >> 13) & 524287) | (e << 19)) ^
+                     (((e >> 22) & 1023) | (e << 10));
+                đa số = (e & f) | (g & (e | f));
+                hh = hh + t1; d = s0 + đa số + t1;
+                // Round 6
+                s1 = (((hh >> 6) & 67108863) | (hh << 26)) ^
+                     (((hh >> 11) & 2097151) | (hh << 21)) ^
+                     (((hh >> 25) & 127) | (hh << 7));
+                lựa = b ^ (hh & (a ^ b));
+                t1 = c + s1 + lựa + k[t + 5] + w[t + 5];
+                s0 = (((d >> 2) & 1073741823) | (d << 30)) ^
+                     (((d >> 13) & 524287) | (d << 19)) ^
+                     (((d >> 22) & 1023) | (d << 10));
+                đa số = (d & e) | (f & (d | e));
+                g = g + t1; c = s0 + đa số + t1;
+                // Round 7
+                s1 = (((g >> 6) & 67108863) | (g << 26)) ^
+                     (((g >> 11) & 2097151) | (g << 21)) ^
+                     (((g >> 25) & 127) | (g << 7));
+                lựa = a ^ (g & (hh ^ a));
+                t1 = b + s1 + lựa + k[t + 6] + w[t + 6];
+                s0 = (((c >> 2) & 1073741823) | (c << 30)) ^
+                     (((c >> 13) & 524287) | (c << 19)) ^
+                     (((c >> 22) & 1023) | (c << 10));
+                đa số = (c & d) | (e & (c | d));
+                f = f + t1; b = s0 + đa số + t1;
+                // Round 8
+                s1 = (((f >> 6) & 67108863) | (f << 26)) ^
+                     (((f >> 11) & 2097151) | (f << 21)) ^
+                     (((f >> 25) & 127) | (f << 7));
+                lựa = hh ^ (f & (g ^ hh));
+                t1 = a + s1 + lựa + k[t + 7] + w[t + 7];
+                s0 = (((b >> 2) & 1073741823) | (b << 30)) ^
+                     (((b >> 13) & 524287) | (b << 19)) ^
+                     (((b >> 22) & 1023) | (b << 10));
+                đa số = (b & c) | (d & (b | c));
+                e = e + t1; a = s0 + đa số + t1;
             };
             h[0] = h[0] + a; h[1] = h[1] + b; h[2] = h[2] + c; h[3] = h[3] + d;
             h[4] = h[4] + e; h[5] = h[5] + f; h[6] = h[6] + g; h[7] = h[7] + hh;
@@ -445,6 +543,11 @@ hàm công khai mật mã độ dài bit các byte(số byte) {
 hàm công khai mật mã sha256 các byte(các byte) {
     bộ chuyển tiếp = Bộ Mật Mã();
     trả về bộ chuyển tiếp.mật mã sha256 các byte(các byte);
+};
+
+hàm công khai mật mã băm chuỗi máy ảo(văn bản) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã băm chuỗi máy ảo(văn bản);
 };
 
 hàm công khai mật mã thập lục phân(các byte) {

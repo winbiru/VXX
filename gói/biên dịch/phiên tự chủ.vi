@@ -27,7 +27,7 @@ lớp công khai Bộ Biên Dịch Tự Chủ {
 
     hàm công khai cây cú pháp() {
         nếu (mình.cây == rỗng) {
-            bộ = Bộ Phân Tích Cú Pháp(mình.nguồn, mình.từ tố());
+            bộ = Bộ Phân Tích Cú Pháp(mình.nguồn, mình.các từ tố);
             mình.cây = bộ.phân tích();
         };
         trả về mình.cây;

@@ -2,6 +2,12 @@
 nhập gói.bảo mật.mật mã.*;
 hàm kiểm(đầu vào, kỳ vọng) {
     nếu (băm sha256(đầu vào) != kỳ vọng) { ném "AOT SHA-256 vector mismatch"; };
+    nếu (mật mã băm chuỗi máy ảo(đầu vào) != kỳ vọng) { ném "AOT SHA-256 runtime string mismatch"; };
+};
+hàm kiểm byte lỗi(invalid) {
+    rejected = sai;
+    thử { mật mã sha256 các byte(invalid); } bắt lỗi(e) { rejected = đúng; };
+    nếu (!rejected) { ném "SHA-256 accepted invalid byte"; };
 };
 hàm chính() {
     kiểm("", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
@@ -23,6 +29,15 @@ hàm chính() {
     kiểm(văn bản, "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3");
     khi (độ dài(văn bản) < 4096) { văn bản += "a"; };
     kiểm(văn bản, "c93eee2d0db02f10acc7460d9576e122dcf8cd53c4bf8dfcae1b3e74ebcfff5a");
+    kiểm("a" + chuỗi từ byte máy ảo([0]) + "b", "59b271ae1bbcb1d31d41929817f4b16fb439eb4f31520b5ad1d5ce98920a7138");
+    // The public list API must still reject invalid bytes; the fast string
+    // entrypoint cannot accept a caller-supplied list.
+    kiểm byte lỗi([-1]);
+    kiểm byte lỗi([256]);
+    kiểm byte lỗi(["a"]);
+    rejected = sai;
+    thử { mật mã băm chuỗi máy ảo([97]); } bắt lỗi(e) { rejected = đúng; };
+    nếu (!rejected) { ném "SHA-256 accepted non-string fast input"; };
     byte = []; lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(byte, i); };
     nếu (mật mã thập lục phân(mật mã sha256 các byte(byte)) != "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880") { ném "AOT binary hash mismatch"; };
     nếu (độ dài(byte) != 256 || byte[0] != 0 || byte[255] != 255) { ném "SHA-256 mutated its input"; };

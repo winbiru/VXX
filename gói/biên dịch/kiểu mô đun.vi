@@ -30,6 +30,13 @@ hàm công khai biên dịch kiểu cây(sổ, đồ thị, tên mô đun) {
     trả về bộ.cây(tên mô đun);
 };
 
+// IR chỉ đọc danh sách câu lệnh khi semantic đã xác nhận toàn đồ thị.
+// Giữ API cây đầy đủ cho semantic và các lời gọi cần kiểm tra lại.
+hàm công khai biên dịch kiểu cây hạ IR(sổ, đồ thị, tên mô đun, đã kiểm tra) {
+    bộ = Bộ Đăng Ký Kiểu(sổ, đồ thị);
+    trả về bộ.cây hạ IR(tên mô đun, đã kiểm tra);
+};
+
 hàm công khai biên dịch kiểu lớp chạy(sổ, mô đun) {
     bộ = Bộ Đăng Ký Kiểu(sổ, rỗng);
     trả về bộ.lớp chạy(mô đun);
@@ -139,6 +146,13 @@ lớp công khai Bộ Đăng Ký Kiểu {
 
     hàm công khai tất cả() {
         trả về lấy từ điển(mình.sổ, "kiểu", []);
+    };
+
+    hàm công khai cây hạ IR(tên mô đun, đã kiểm tra) {
+        nếu (!đã kiểm tra) { trả về mình.cây(tên mô đun); };
+        cây mô đun = biên dịch sổ cây mô đun(mình.đồ thị, tên mô đun);
+        // Root riêng; không đưa AST kiểu ngoài của toàn graph vào snapshot.
+        trả về {"câu lệnh": cây mô đun["câu lệnh"]};
     };
 
     hàm công khai cây(tên mô đun) {

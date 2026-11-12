@@ -5,5 +5,5 @@ Dấu vết lỗi:
   ở Bộ Đệm Tệp.báo lỗi (gói/nhập xuất/bộ đệm tệp.vi:57:9) [mô đun=gói/nhập xuất/bộ đệm tệp.vi]
   ở Hệ Tệp.tệp đọc các byte posix (gói/nhập xuất/tệp.vi:66:17) [mô đun=gói/nhập xuất/tệp.vi]
   ở Hệ Tệp.đọc tệp (gói/nhập xuất/tệp.vi:114:48) [mô đun=gói/nhập xuất/tệp.vi]
-  ở đọc tệp (gói/nhập xuất/tệp.vi:212:16) [mô đun=gói/nhập xuất/tệp.vi]
+  ở đọc tệp (gói/nhập xuất/tệp.vi:224:16) [mô đun=gói/nhập xuất/tệp.vi]
   ở chính (src/tests/kiem_tra_loi_doc_tep_that_bai.vi:5:8) [mô đun=src/tests/kiem_tra_loi_doc_tep_that_bai.vi]

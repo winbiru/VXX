@@ -8,7 +8,7 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.biên dịch.nội tại.*;
 nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
 nhập gói.biên dịch.sổ đăng ký.*;
-nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu cây;
+nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu cây hạ IR;
 nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu lớp chạy;
 nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị tìm đích;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
@@ -1088,9 +1088,9 @@ lớp công khai Bộ Phát Bytecode {
             };
             biểu diễn trung gian = cache[đích];
         } hoặc {
-            cây = biên dịch kiểu cây(sổ, đồ thị, đích);
-            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng,
-                lấy từ điển(phiên, "ngữ nghĩa đã kiểm tra", sai));
+            đã kiểm tra = lấy từ điển(phiên, "ngữ nghĩa đã kiểm tra", sai);
+            cây = biên dịch kiểu cây hạ IR(sổ, đồ thị, đích, đã kiểm tra);
+            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng, đã kiểm tra);
         };
         phần = mình.biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian, sổ, phụ thuộc, đồ thị, phiên);
         máy ảo thêm cuối danh sách(phiên["đã phát"], {"định danh": đích, "phần": phần});

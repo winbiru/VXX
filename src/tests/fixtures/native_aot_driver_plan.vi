@@ -11,6 +11,7 @@ nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dùng chỉ
 nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chữ ký liên kết;
 nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache tự quản;
 nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị nhúng;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn đồ thị;
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
@@ -29,6 +30,37 @@ hàm vị trí đối số(lệnh, giá trị) {
     trả về -1;
 };
 
+hàm kiểm snapshot AST(tạm) {
+    điểm vào = tạm + "/snapshot-entry.vi";
+    biên dịch AOT ghi nguồn nhúng(điểm vào, "nhập snapshot_shared.*; in 42;\n");
+    biên dịch AOT ghi nguồn nhúng(tạm + "/snapshot_shared.vi", "hàm giá trị() { trả về 7; };\n");
+    bộ đệm = {"đường nhập vắng": []};
+    đồ thị = biên dịch nguồn đồ thị(điểm vào, tạm, bộ đệm);
+    câu gốc = đồ thị["cây điểm vào"]["câu lệnh"];
+    câu nhập = đồ thị["mô đun"][0]["cây"]["câu lệnh"];
+    loại gốc = câu gốc[0]["loại"];
+    loại nhập = câu nhập[0]["loại"];
+    số gốc = độ dài(câu gốc);
+    số nhập = độ dài(câu nhập);
+    // Mutate nested maps and lists on both a cache miss and a cache hit.
+    lặp(i = 0; i < 2; i++) {
+        câu gốc[0]["loại"] = "changed";
+        câu nhập[0]["loại"] = "changed";
+        máy ảo thêm cuối danh sách(câu gốc, {});
+        máy ảo thêm cuối danh sách(câu nhập, {});
+        đồ thị = biên dịch nguồn đồ thị(điểm vào, tạm, bộ đệm);
+        câu gốc = đồ thị["cây điểm vào"]["câu lệnh"];
+        câu nhập = đồ thị["mô đun"][0]["cây"]["câu lệnh"];
+        nếu (độ dài(câu gốc) != số gốc || độ dài(câu nhập) != số nhập ||
+            câu gốc[0]["loại"] != loại gốc || câu nhập[0]["loại"] != loại nhập) {
+            ném "Source AST cache leaked a mutable graph";
+        };
+    };
+    nếu (bộ đệm["cây nguồn"]["trúng"] != 4 || bộ đệm["cây nguồn"]["trượt"] != 2) {
+        ném "Source AST snapshot test did not exercise cache hits";
+    };
+};
+
 hàm chính() {
     // SHA-256 of the original length-framed cache observations, calculated
     // independently. The byte-oriented fast path must keep existing keys.
@@ -36,6 +68,12 @@ hàm chính() {
         ["S", "a" + chuỗi từ byte máy ảo([0]) + "b"]]);
     nếu (dấu chuẩn != "5a15eb379ae50f8ef68848796c1d2c2643f3b3e856e8801b13a375b9a172016b") {
         ném "AOT cache key changed its SHA-256 framing";
+    };
+    lớn = "Việt 🌿" + chuỗi từ byte máy ảo([0]) + ":;";
+    lặp(i = 0; i < 11; i++) { lớn += lớn; };
+    dấu lớn = biên dịch AOT chữ ký liên kết([["S", lớn], ["S", ""], ["S", "尾"], ["S", "a:b;c"]]);
+    nếu (dấu lớn != "36b278be1987f06f90ce89f40fd0e8dd54c78a9532e845d946b4feb27ed1194b") {
+        ném "AOT cache key changed large UTF-8 framing";
     };
     gốc = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_ROOT", "");
     chế độ = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_MODE", "");
@@ -57,6 +95,7 @@ hàm chính() {
         nếu (biên dịch AOT dùng chỉ mục nguồn()) { ném "driver ignored profiling source-index policy"; };
         tạm = biên dịch AOT tạo thư mục tạm(gốc);
         nếu (!là thư mục(tạm)) { ném "driver failed to allocate a temporary directory"; };
+        kiểm snapshot AST(tạm);
         đường = tạm + "/embedded.vi";
         biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿\";\n");
         có tệp = đường dẫn thống kê tệp(đường);

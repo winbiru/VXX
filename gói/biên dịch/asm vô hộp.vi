@@ -4,6 +4,16 @@ nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
+// Hàm vô hộp cũng nhận bảng từ điển cũ khi gọi độc lập. Đường AOT
+// chính dùng danh sách opcode đã kiểm tra, không cấp phát khóa chuỗi.
+hàm riêng tư biên dịch asm tên mã vô hộp(bảng, mã) {
+    nếu (loại của(bảng) == "danh sách") {
+        nếu (mã < 0 || mã >= độ dài(bảng)) { trả về ""; };
+        trả về bảng[mã];
+    };
+    trả về lấy từ điển(bảng, "" + mã, "");
+};
+
 lớp công khai Bộ Phát Vô Hộp {
     hàm công khai khởi tạo(số tham số = 0, số ô nhớ = -1) {
         mình.lệnh = []; mình.sâu = 0; mình.cao = 0;
@@ -49,7 +59,7 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
     mẫu đầu = ["OP_LIST_LITERAL", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
         "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
     lặp(j = 0; j < 8; j++) {
-        nếu (lấy từ điển(bảng, "" + nguồn[đầu + j][0], "") != mẫu đầu[j]) { trả về rỗng; };
+        nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[đầu + j][0]) != mẫu đầu[j]) { trả về rỗng; };
     };
     nếu (nguồn[đầu][1] != 0 || nguồn[đầu + 4][1] != 0) { trả về rỗng; };
 
@@ -60,7 +70,7 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
         "intrinsic", "OP_DONG_KHOI", "OP_CAP_NHAT",
         "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
     lặp(j = 0; j < 16; j++) {
-        tên = lấy từ điển(bảng, "" + nguồn[vòng tạo + j][0], "");
+        tên = biên dịch asm tên mã vô hộp(bảng, nguồn[vòng tạo + j][0]);
         nếu (j == 10) {
             nếu (nguồn[vòng tạo + j][0] != biên dịch mã thao tác("OP_VM_LIST_APPEND")) { trả về rỗng; };
         } hoặc nếu (tên != mẫu tạo[j]) { trả về rỗng; };
@@ -77,7 +87,7 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
     mẫu giữa = ["OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
         "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
     lặp(j = 0; j < 8; j++) {
-        nếu (lấy từ điển(bảng, "" + nguồn[giữa + j][0], "") != mẫu giữa[j]) { trả về rỗng; };
+        nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[giữa + j][0]) != mẫu giữa[j]) { trả về rỗng; };
     };
     tổng = nguồn[giữa + 1][2];
     nếu (nguồn[giữa][1] != 0 || nguồn[giữa + 4][1] != 0 || tổng < 0 ||
@@ -94,7 +104,7 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
         "OP_DONG_KHOI", "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_TEN_BIEN_ID",
         "OP_CONG_MOT", "OP_JUMP"];
     lặp(j = 0; j < 29; j++) {
-        nếu (lấy từ điển(bảng, "" + nguồn[vòng lọc + j][0], "") != mẫu lọc[j]) { trả về rỗng; };
+        nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[vòng lọc + j][0]) != mẫu lọc[j]) { trả về rỗng; };
     };
     chia = nguồn[vòng lọc + 10][1]; mong đợi = nguồn[vòng lọc + 12][1];
     nếu (chia <= 0 || nguồn[vòng lọc + 1][2] != bộ đếm ||
@@ -107,16 +117,16 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
 
     sau = vòng lọc + 29;
     khi (sau < n) {
-        tên = lấy từ điển(bảng, "" + nguồn[sau][0], "");
+        tên = biên dịch asm tên mã vô hộp(bảng, nguồn[sau][0]);
         nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { thoát; };
         sau += 1;
     };
-    nếu (sau + 1 >= n || lấy từ điển(bảng, "" + nguồn[sau][0], "") != "OP_TEN_BIEN_GIA_TRI" ||
-        nguồn[sau][2] != tổng || lấy từ điển(bảng, "" + nguồn[sau + 1][0], "") != "OP_TRA_VE") {
+    nếu (sau + 1 >= n || biên dịch asm tên mã vô hộp(bảng, nguồn[sau][0]) != "OP_TEN_BIEN_GIA_TRI" ||
+        nguồn[sau][2] != tổng || biên dịch asm tên mã vô hộp(bảng, nguồn[sau + 1][0]) != "OP_TRA_VE") {
         trả về rỗng;
     };
     lặp(j = sau + 2; j < n; j++) {
-        tên = lấy từ điển(bảng, "" + nguồn[j][0], "");
+        tên = biên dịch asm tên mã vô hộp(bảng, nguồn[j][0]);
         nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { trả về rỗng; };
     };
 
@@ -150,17 +160,17 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
 hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii) {
     n = độ dài(nguồn);
     nếu (n < 4 || n > 256) { trả về rỗng; };
-    nếu (lấy từ điển(bảng, "" + nguồn[0][0], "") != "OP_MO_KHOI") { trả về rỗng; };
+    nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[0][0]) != "OP_MO_KHOI") { trả về rỗng; };
     tham số = []; cục bộ = []; ô = {}; khai báo = {}; i = 1;
     khi (i < n) {
         v = nguồn[i];
-        nếu (lấy từ điển(bảng, "" + v[0], "") != "OP_KHOI_TAO") { thoát; };
+        nếu (biên dịch asm tên mã vô hộp(bảng, v[0]) != "OP_KHOI_TAO") { thoát; };
         khóa = "" + v[2];
         nếu (v[2] < 0 || lấy từ điển(khai báo, khóa, sai)) { trả về rỗng; };
         khai báo[khóa] = đúng;
         nếu (i + 1 < n) {
             sau = nguồn[i + 1];
-            nếu (lấy từ điển(bảng, "" + sau[0], "") == "OP_PARAM") {
+            nếu (biên dịch asm tên mã vô hộp(bảng, sau[0]) == "OP_PARAM") {
                 nếu (sau[2] != v[2] || sau[3] != độ dài(tham số) || độ dài(tham số) >= 4) { trả về rỗng; };
                 ô[khóa] = độ dài(tham số); máy ảo thêm cuối danh sách(tham số, v[2]);
                 i += 2; bỏ qua;
@@ -183,12 +193,12 @@ hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii)
     bắt đầu = i; vị trí = []; vá = []; đích = {}; kiểu = []; dùng = 0;
     lặp(j = 0; j < n; j++) {
         máy ảo thêm cuối danh sách(vị trí, -1);
-        tên = lấy từ điển(bảng, "" + nguồn[j][0], "");
+        tên = biên dịch asm tên mã vô hộp(bảng, nguồn[j][0]);
         nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE") { đích["" + nguồn[j][1]] = đúng; };
     };
     lặp(pc = bắt đầu; pc < n; pc++) {
         vị trí[pc] = độ dài(phát.lệnh); v = nguồn[pc];
-        tên = lấy từ điển(bảng, "" + v[0], "");
+        tên = biên dịch asm tên mã vô hộp(bảng, v[0]);
         sâu = độ dài(kiểu); k = lấy từ điển(ô, "" + v[2], -1);
         nếu (tên == "OP_MO_KHOI" || tên == "OP_DONG_KHOI" || tên == "OP_DONG_LENH" ||
             tên == "OP_NEU" || tên == "OP_LAP" || tên == "OP_DIEU_KIEN" || tên == "OP_CAP_NHAT") { bỏ qua; };
@@ -214,13 +224,13 @@ hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii)
         nếu (tên == "OP_TEN_BIEN_ID") {
             nếu (ascii || k < 0 || pc + 1 >= n) { trả về rỗng; };
             nếu (lấy từ điển(đích, "" + (pc + 1), sai)) { trả về rỗng; };
-            sau = lấy từ điển(bảng, "" + nguồn[pc + 1][0], "");
+            sau = biên dịch asm tên mã vô hộp(bảng, nguồn[pc + 1][0]);
             nếu (sau == "OP_GAN" && sâu == 1) {
                 phát.phát("StoreSlot", 0, k); phát.phát("Drop"); kiểu = [];
             } hoặc nếu ((sau == "OP_CONG_MOT" || sau == "OP_TRU_MOT") && sâu == 0) {
                 // Chỉ bỏ giá trị tăng/giảm khi nó đứng ngay trước cạnh lùi.
                 nếu (pc + 2 >= n) { trả về rỗng; };
-                nếu (lấy từ điển(bảng, "" + nguồn[pc + 2][0], "") != "OP_JUMP") { trả về rỗng; };
+                nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[pc + 2][0]) != "OP_JUMP") { trả về rỗng; };
                 phát.phát("LoadSlot", 0, k); phát.phát("PushConstant", 1);
                 phép = "Add"; nếu (sau == "OP_TRU_MOT") { phép = "Sub"; };
                 phát.phát(phép); phát.phát("StoreSlot", 0, k); phát.phát("Drop");
@@ -263,7 +273,7 @@ hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii)
         so = phép == "Equal" || phép == "NotEqual" || phép == "Less" || phép == "Greater" || phép == "LessEqual" || phép == "GreaterEqual";
         nếu (a != b || (a == 1 && !so)) { trả về rỗng; };
         nếu (phép == "Div" || phép == "Mod") {
-            nếu (lấy từ điển(bảng, "" + nguồn[pc - 1][0], "") != "OP_BIEN_SO" || nguồn[pc - 1][1] <= 0) { trả về rỗng; };
+            nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[pc - 1][0]) != "OP_BIEN_SO" || nguồn[pc - 1][1] <= 0) { trả về rỗng; };
         };
         nếu (tên == "OP_Logic_VA" || tên == "OP_Logic_HOAC") {
             phát.phát("PushConstant", 0); phát.phát("NotEqual"); phát.phát("StoreSlot", 0, tạm); phát.phát("Drop");

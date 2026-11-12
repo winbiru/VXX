@@ -2,6 +2,10 @@
 // Trả AST dưới dạng map/list; không gọi bien_dich_phan_tich_vm.
 // Đây là pass biểu thức, chưa thay parser statement/semantic C++.
 nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa gọn;
+nhập gói.biên dịch.từ vựng.biên dịch trường từ tố;
+nhập gói.biên dịch.từ vựng.biên dịch mã loại từ tố;
+nhập gói.biên dịch.từ vựng.biên dịch mã cú pháp từ tố;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
@@ -10,7 +14,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     hàm công khai khởi tạo() {};
 
     hàm công khai biên dịch biểu thức tạo phân tích cú pháp(các từ tố) {
-        trả về {"token": các từ tố, "vị trí": 0};
+        trả về {"token": các từ tố, "vị trí": 0, "bảng ưu tiên": biên dịch bảng ưu tiên toán tử()};
     };
 
     hàm công khai biên dịch biểu thức nhìn(p) {
@@ -24,28 +28,31 @@ lớp công khai Bộ Phân Tích Biểu Thức {
 
     hàm công khai biên dịch biểu thức lỗi(p, thông báo) {
         từ tố = mình.biên dịch biểu thức nhìn(p);
-        nếu (lấy từ điển(từ tố, "loại", "") == "hết") {
+        nếu (biên dịch mã loại từ tố(từ tố) == 8) {
             ném "biên dịch biểu thức: " + thông báo + " tại cuối biểu thức";
         };
         ném "biên dịch biểu thức: " + thông báo + " tại dòng " +
-            thành chuỗi(lấy từ điển(từ tố, "dòng", 0)) + ", cột " +
-            thành chuỗi(lấy từ điển(từ tố, "cột", 0));
+            thành chuỗi(biên dịch trường từ tố(từ tố, 2, "dòng", 0)) + ", cột " +
+            thành chuỗi(biên dịch trường từ tố(từ tố, 3, "cột", 0));
     };
 
     hàm công khai biên dịch biểu thức lấy(p) {
-        từ tố = mình.biên dịch biểu thức nhìn(p);
-        nếu (lấy từ điển(từ tố, "loại", "") != "hết") {
-            p["vị trí"] = p["vị trí"] + 1;
+        i = p["vị trí"];
+        các từ tố = p["token"];
+        nếu (i >= máy ảo lấy độ dài(các từ tố)) {
+            trả về {"giá trị": "", "loại": "hết", "dòng": 0, "cột": 0};
         };
+        từ tố = các từ tố[i];
+        nếu (biên dịch mã loại từ tố(từ tố) != 8) { p["vị trí"] = i + 1; };
         trả về từ tố;
     };
 
     hàm công khai biên dịch biểu thức chờ(p, cần) {
-        nhận = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "");
+        nhận = biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "");
         nếu (nhận != cần) {
             vị trí = p["vị trí"];
             trước = "";
-            nếu (vị trí > 0) { trước = p["token"][vị trí - 1]["giá trị"]; };
+            nếu (vị trí > 0) { trước = biên dịch trường từ tố(p["token"][vị trí - 1], 1, "giá trị", ""); };
             mình.biên dịch biểu thức lỗi(p, "cần '" + cần + "' (gặp '" + nhận + "' sau '" + trước + "')");
         };
         mình.biên dịch biểu thức lấy(p);
@@ -80,27 +87,35 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     // Chỉ tách receiver đặc biệt của phương thức để không làm sai binding
     // bí danh module trước khi có pass phân giải tên/kiểu hoàn chỉnh.
     hàm công khai biên dịch biểu thức receiver(giá trị, vị trí) {
+        // Chỉ receiver đặc biệt cần tách tên. Kiểm tra tiền tố trước,
+        // tránh dựng từng ký tự cho mọi tên thông thường và tên mô-đun.
         gốc dữ liệu = "";
         điểm = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(giá trị); i++) {
-            nếu (giá trị[i] == ".") { điểm = i; thoát; };
-            gốc dữ liệu += giá trị[i];
+        n = máy ảo lấy độ dài(giá trị);
+        nếu (n >= 4) {
+            nếu (máy ảo cắt chuỗi(giá trị, 0, 4) == "gốc.") {
+                gốc dữ liệu = "gốc"; điểm = 3;
+            };
         };
-        nếu (điểm < 0 || (gốc dữ liệu != "mình" && gốc dữ liệu != "gốc")) {
+        nếu (điểm < 0 && n >= 5) {
+            nếu (máy ảo cắt chuỗi(giá trị, 0, 5) == "mình.") {
+                gốc dữ liệu = "mình"; điểm = 4;
+            };
+        };
+        nếu (điểm < 0) {
             trả về {"loại": "tên", "giá trị": giá trị, "vị trí": vị trí};
         };
         trái = {"loại": "tên", "giá trị": gốc dữ liệu, "vị trí": vị trí};
-        tên = "";
-        lặp(i = điểm + 1; i <= máy ảo lấy độ dài(giá trị); i++) {
+        đầu tên = điểm + 1;
+        lặp(i = đầu tên; i <= n; i++) {
             // VM hiện đánh giá cả hai vế ||, nên không đọc [i] ở vị trí cuối.
-            tách = i == máy ảo lấy độ dài(giá trị);
+            tách = i == n;
             nếu (!tách) { tách = giá trị[i] == "."; };
             nếu (tách) {
-                nếu (tên == "") { ném "biên dịch biểu thức: tên thành viên rỗng"; };
+                nếu (i == đầu tên) { ném "biên dịch biểu thức: tên thành viên rỗng"; };
+                tên = máy ảo cắt chuỗi(giá trị, đầu tên, i - đầu tên);
                 trái = {"loại": "thành viên", "đối tượng": trái, "tên": tên};
-                tên = "";
-            } hoặc {
-                tên += giá trị[i];
+                đầu tên = i + 1;
             };
         };
         trả về trái;
@@ -108,13 +123,22 @@ lớp công khai Bộ Phân Tích Biểu Thức {
 
     hàm công khai biên dịch biểu thức sơ cấp(p) {
         từ tố = mình.biên dịch biểu thức nhìn(p);
-        s = lấy từ điển(từ tố, "giá trị", "");
-        loại = lấy từ điển(từ tố, "loại", "hết");
+        gọn = máy ảo lấy loại(từ tố) == "danh sách";
+        nếu (gọn) { gọn = máy ảo lấy độ dài(từ tố) > 11; };
+        nếu (gọn) {
+            s = từ tố[1];
+            loại = từ tố[10];
+            mã cú pháp = từ tố[11];
+        } hoặc {
+            s = biên dịch trường từ tố(từ tố, 1, "giá trị", "");
+            loại = biên dịch mã loại từ tố(từ tố);
+            mã cú pháp = biên dịch mã cú pháp từ tố(từ tố);
+        };
         là hàm ẩn danh = sai;
-        nếu (s == "hàm") {
+        nếu (mã cú pháp == 324) {
             tiếp = p["vị trí"] + 1;
             nếu (tiếp < máy ảo lấy độ dài(p["token"])) {
-                là hàm ẩn danh = p["token"][tiếp]["giá trị"] == "(";
+                là hàm ẩn danh = biên dịch trường từ tố(p["token"][tiếp], 1, "giá trị", "") == "(";
             };
         };
         nếu (là hàm ẩn danh) {
@@ -122,23 +146,23 @@ lớp công khai Bộ Phân Tích Biểu Thức {
             nếu (bộ == rỗng) { mình.biên dịch biểu thức lỗi(p, "hàm ẩn danh cần bộ phân tích chương trình"); };
             trả về bộ.đọc hàm ẩn danh(p);
         };
-        nếu (s == "(" ) {
+        nếu (mã cú pháp == 200 ) {
             mình.biên dịch biểu thức lấy(p);
             trong = mình.biên dịch biểu thức đọc(p, 1);
             mình.biên dịch biểu thức chờ(p, ")");
             trả về trong;
         };
-        nếu (s == "[") {
+        nếu (mã cú pháp == 202) {
             mình.biên dịch biểu thức lấy(p);
             phần tử = [];
-            khi (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]") {
-                nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            khi (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") != "]") {
+                nếu (biên dịch mã loại từ tố(mình.biên dịch biểu thức nhìn(p)) == 8) {
                     mình.biên dịch biểu thức lỗi(p, "thiếu ']' đóng danh sách");
                 };
                 máy ảo thêm cuối danh sách(phần tử, mình.biên dịch biểu thức đọc(p, 1));
-                nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]") {
+                nếu (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") != "]") {
                     mình.biên dịch biểu thức chờ(p, ",");
-                    nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") == "]") {
+                    nếu (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") == "]") {
                         mình.biên dịch biểu thức lỗi(p, "dấu phẩy cuối danh sách không hợp lệ");
                     };
                 };
@@ -146,46 +170,46 @@ lớp công khai Bộ Phân Tích Biểu Thức {
             mình.biên dịch biểu thức chờ(p, "]");
             trả về {"loại": "danh sách", "phần tử": phần tử};
         };
-        nếu (s == "{") {
+        nếu (mã cú pháp == 204) {
             mình.biên dịch biểu thức lấy(p);
             mục = [];
-            khi (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}") {
-                nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            khi (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") != "}") {
+                nếu (biên dịch mã loại từ tố(mình.biên dịch biểu thức nhìn(p)) == 8) {
                     mình.biên dịch biểu thức lỗi(p, "thiếu '}' đóng từ điển");
                 };
                 khóa = mình.biên dịch biểu thức đọc(p, 1);
                 mình.biên dịch biểu thức chờ(p, ":");
                 giá trị = mình.biên dịch biểu thức đọc(p, 1);
                 máy ảo thêm cuối danh sách(mục, {"khóa": khóa, "giá trị": giá trị});
-                nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}") {
+                nếu (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") != "}") {
                     mình.biên dịch biểu thức chờ(p, ",");
                 };
             };
             mình.biên dịch biểu thức chờ(p, "}");
             trả về {"loại": "từ điển", "mục": mục};
         };
-        nếu (s == "!" || s == "-" || s == "+" || s == "~") {
+        nếu (mã cú pháp == 1 || mã cú pháp == 161 || mã cú pháp == 160 || mã cú pháp == 2) {
             mình.biên dịch biểu thức lấy(p);
             trả về {"loại": "một ngôi", "toán tử": s,
                      "toán hạng": mình.biên dịch biểu thức đọc(p, 12)};
         };
-        nếu (loại == "số nguyên" || loại == "số thực" || loại == "chuỗi" ||
-            s == "đúng" || s == "sai" || s == "rỗng") {
+        nếu (loại == 3 || loại == 4 || loại == 5 ||
+            mã cú pháp == 332 || mã cú pháp == 333 || mã cú pháp == 334) {
             mình.biên dịch biểu thức lấy(p);
-            trả về {"loại": "hằng", "kiểu": loại, "giá trị": s,
-                     "vị trí": lấy từ điển(từ tố, "vị trí", 0)};
+            trả về {"loại": "hằng", "kiểu": biên dịch trường từ tố(từ tố, 0, "loại", "hết"), "giá trị": s,
+                     "vị trí": biên dịch trường từ tố(từ tố, 4, "vị trí", 0)};
         };
-        nếu (loại == "định danh" || s == "mặc định" || s == "ca" ||
-            (loại == "từ khóa" && lấy từ điển(p, "tên nhiều từ", sai))) {
+        nếu (loại == 1 || mã cú pháp == 340 || mã cú pháp == 331 ||
+            (loại == 2 && lấy từ điển(p, "tên nhiều từ", sai))) {
             mình.biên dịch biểu thức lấy(p);
             nếu (lấy từ điển(p, "tên nhiều từ", sai)) {
                 khi (đúng) {
-                    loại tiếp = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "");
-                    nếu (loại tiếp != "định danh" && loại tiếp != "từ khóa") { thoát; };
-                    s += " " + mình.biên dịch biểu thức lấy(p)["giá trị"];
+                    loại tiếp = biên dịch mã loại từ tố(mình.biên dịch biểu thức nhìn(p));
+                    nếu (loại tiếp != 1 && loại tiếp != 2) { thoát; };
+                    s += " " + biên dịch trường từ tố(mình.biên dịch biểu thức lấy(p), 1, "giá trị", "");
                 };
             };
-            trả về mình.biên dịch biểu thức receiver(s, lấy từ điển(từ tố, "vị trí", 0));
+            trả về mình.biên dịch biểu thức receiver(s, biên dịch trường từ tố(từ tố, 4, "vị trí", 0));
         };
         mình.biên dịch biểu thức lỗi(p, "thiếu toán hạng hoặc token không hợp lệ '" + s + "'");
         trả về rỗng;
@@ -198,22 +222,34 @@ lớp công khai Bộ Phân Tích Biểu Thức {
 
     hàm công khai biên dịch biểu thức đọc(p, tối thiểu) {
         trái = mình.biên dịch biểu thức sơ cấp(p);
+        cố định = lấy từ điển(p, "mã cú pháp cố định", sai);
+        bảng mức = rỗng;
+        nếu (!cố định) { bảng mức = lấy từ điển(p, "bảng ưu tiên", rỗng); };
         // Gọi hàm và truy cập chỉ số có độ ưu tiên cao hơn toán tử một ngôi.
         tiếp tục = đúng;
         khi (tiếp tục) {
-            s = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "");
-            nếu (s == "++" || s == "--") {
+            từ tố = mình.biên dịch biểu thức nhìn(p);
+            gọn = máy ảo lấy loại(từ tố) == "danh sách";
+            nếu (gọn) { gọn = máy ảo lấy độ dài(từ tố) > 11; };
+            nếu (gọn) {
+                mã cú pháp = từ tố[11];
+                s = từ tố[1];
+            } hoặc {
+                mã cú pháp = biên dịch mã cú pháp từ tố(từ tố);
+                s = biên dịch trường từ tố(từ tố, 1, "giá trị", "");
+            };
+            nếu (mã cú pháp == 3 || mã cú pháp == 4) {
                 mình.biên dịch biểu thức lấy(p);
                 trái = {"loại": "cập nhật", "toán tử": s, "đối tượng": trái};
             } hoặc {
-              nếu (s == "(" ) {
+              nếu (mã cú pháp == 200 ) {
                 mình.biên dịch biểu thức lấy(p);
                 đối số = [];
-                nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != ")") {
+                nếu (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") != ")") {
                     máy ảo thêm cuối danh sách(đối số, mình.biên dịch biểu thức đọc(p, 1));
                     còn = đúng;
                     khi (còn) {
-                        nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") == ",") {
+                        nếu (biên dịch trường từ tố(mình.biên dịch biểu thức nhìn(p), 1, "giá trị", "") == ",") {
                             mình.biên dịch biểu thức lấy(p);
                             máy ảo thêm cuối danh sách(đối số, mình.biên dịch biểu thức đọc(p, 1));
                         } hoặc { còn = sai; };
@@ -222,38 +258,43 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                 mình.biên dịch biểu thức chờ(p, ")");
                 trái = {"loại": "gọi", "hàm": trái, "đối số": đối số};
               } hoặc {
-                nếu (s == "[") {
+                nếu (mã cú pháp == 202) {
                     mình.biên dịch biểu thức lấy(p);
                     chỉ số = mình.biên dịch biểu thức đọc(p, 1);
                     mình.biên dịch biểu thức chờ(p, "]");
                     trái = {"loại": "chỉ số", "đối tượng": trái, "chỉ số": chỉ số};
                 } hoặc {
-                  nếu (mình.biên dịch biểu thức là chấm(s)) {
+                  nếu (mã cú pháp == 300) {
                     mình.biên dịch biểu thức lấy(p);
-                    tên = "";
-                    lặp(i = 1; i < máy ảo lấy độ dài(s); i++) { tên += s[i]; };
+                    tên = máy ảo cắt chuỗi(s, 1, máy ảo lấy độ dài(s) - 1);
                     nếu (s == ".") {
-                        tên = mình.biên dịch biểu thức lấy(p)["giá trị"];
+                        tên = biên dịch trường từ tố(mình.biên dịch biểu thức lấy(p), 1, "giá trị", "");
                     };
                     nếu (lấy từ điển(p, "tên nhiều từ", sai)) {
                         khi (đúng) {
                             tiếp = mình.biên dịch biểu thức nhìn(p);
-                            kiểu = lấy từ điển(tiếp, "loại", "");
-                            nếu (kiểu != "định danh" && kiểu != "từ khóa") { thoát; };
-                            tên += " " + mình.biên dịch biểu thức lấy(p)["giá trị"];
+                            kiểu = biên dịch mã loại từ tố(tiếp);
+                            nếu (kiểu != 1 && kiểu != 2) { thoát; };
+                            tên += " " + biên dịch trường từ tố(mình.biên dịch biểu thức lấy(p), 1, "giá trị", "");
                         };
                     };
                     nếu (tên == "") { mình.biên dịch biểu thức lỗi(p, "cần tên thành viên sau '.'"); };
                     trái = {"loại": "thành viên", "đối tượng": trái,
                              "tên": tên};
                   } hoặc {
-                    mức = mình.biên dịch biểu thức ưu tiên(s);
+                    mức = 0;
+                    nếu (cố định) {
+                        nếu (mã cú pháp >= 16 && mã cú pháp < 192) {
+                            mức = mã cú pháp >> 4;
+                        };
+                    } hoặc nếu (bảng mức == rỗng) { mức = mình.biên dịch biểu thức ưu tiên(s); }
+                    hoặc nếu (máy ảo có khóa từ điển(bảng mức, s)) { mức = bảng mức[s]; };
                     nếu (mức == 0 || mức < tối thiểu) {
                         tiếp tục = sai;
                     } hoặc {
                         mình.biên dịch biểu thức lấy(p);
                         mức phải = mức + 1;
-                        nếu (mình.biên dịch biểu thức là phép gán(s)) { mức phải = mức; };
+                        nếu (mức == 1) { mức phải = mức; };
                         phải = mình.biên dịch biểu thức đọc(p, mức phải);
                         trái = {"loại": "hai ngôi", "toán tử": s,
                                 "trái": trái, "phải": phải};
@@ -269,7 +310,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     // API chưa đụng compiler bootstrap: parse một biểu thức hoàn chỉnh thành AST.
     // Không chấp nhận token sót (vd "a b"), toán hạng thiếu, ngoặc chưa đóng.
     hàm công khai biên dịch phân tích biểu thức(mã nguồn) {
-        p = mình.biên dịch biểu thức tạo phân tích cú pháp(biên dịch từ tố hóa(mã nguồn));
+        p = {"token": biên dịch từ tố hóa gọn(mã nguồn)["token"], "vị trí": 0, "mã cú pháp cố định": đúng};
         cây = mình.biên dịch biểu thức đọc(p, 1);
         nếu (p["vị trí"] != máy ảo lấy độ dài(p["token"])) {
             mình.biên dịch biểu thức lỗi(p, "còn token sau biểu thức");
@@ -280,28 +321,49 @@ lớp công khai Bộ Phân Tích Biểu Thức {
 
 
 hàm công khai biên dịch biểu thức tạo phân tích cú pháp(các từ tố) {
-    bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
-    trả về bộ chuyển tiếp.biên dịch biểu thức tạo phân tích cú pháp(các từ tố);
+    trả về {"token": các từ tố, "vị trí": 0, "bảng ưu tiên": biên dịch bảng ưu tiên toán tử()};
 };
 
 hàm công khai biên dịch biểu thức nhìn(p) {
-    bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
-    trả về bộ chuyển tiếp.biên dịch biểu thức nhìn(p);
+    i = p["vị trí"];
+    các từ tố = p["token"];
+    nếu (i >= máy ảo lấy độ dài(các từ tố)) {
+        trả về {"giá trị": "", "loại": "hết", "dòng": 0, "cột": 0};
+    };
+    trả về các từ tố[i];
 };
 
 hàm công khai biên dịch biểu thức lỗi(p, thông báo) {
-    bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
-    trả về bộ chuyển tiếp.biên dịch biểu thức lỗi(p, thông báo);
+    từ tố = biên dịch biểu thức nhìn(p);
+    nếu (biên dịch mã loại từ tố(từ tố) == 8) {
+        ném "biên dịch biểu thức: " + thông báo + " tại cuối biểu thức";
+    };
+    ném "biên dịch biểu thức: " + thông báo + " tại dòng " +
+        thành chuỗi(biên dịch trường từ tố(từ tố, 2, "dòng", 0)) + ", cột " +
+        thành chuỗi(biên dịch trường từ tố(từ tố, 3, "cột", 0));
 };
 
 hàm công khai biên dịch biểu thức lấy(p) {
-    bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
-    trả về bộ chuyển tiếp.biên dịch biểu thức lấy(p);
+    i = p["vị trí"];
+    các từ tố = p["token"];
+    nếu (i >= máy ảo lấy độ dài(các từ tố)) {
+        trả về {"giá trị": "", "loại": "hết", "dòng": 0, "cột": 0};
+    };
+    từ tố = các từ tố[i];
+    nếu (biên dịch mã loại từ tố(từ tố) != 8) { p["vị trí"] = i + 1; };
+    trả về từ tố;
 };
 
 hàm công khai biên dịch biểu thức chờ(p, cần) {
-    bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
-    trả về bộ chuyển tiếp.biên dịch biểu thức chờ(p, cần);
+    nhận = biên dịch trường từ tố(biên dịch biểu thức nhìn(p), 1, "giá trị", "");
+    nếu (nhận != cần) {
+        vị trí = p["vị trí"];
+        trước = "";
+        nếu (vị trí > 0) { trước = biên dịch trường từ tố(p["token"][vị trí - 1], 1, "giá trị", ""); };
+        biên dịch biểu thức lỗi(p, "cần '" + cần + "' (gặp '" + nhận + "' sau '" + trước + "')");
+    };
+    biên dịch biểu thức lấy(p);
+    trả về đúng;
 };
 
 hàm công khai biên dịch biểu thức ưu tiên(mã phép toán) {
@@ -337,4 +399,13 @@ hàm công khai biên dịch biểu thức đọc(p, tối thiểu) {
 hàm công khai biên dịch phân tích biểu thức(mã nguồn) {
     bộ chuyển tiếp = Bộ Phân Tích Biểu Thức();
     trả về bộ chuyển tiếp.biên dịch phân tích biểu thức(mã nguồn);
+};
+
+// Một bảng mỗi phiên parser, không tạo lại cho từng toán tử.
+hàm công khai biên dịch bảng ưu tiên toán tử() {
+    trả về {"=": 1, "+=": 1, "-=": 1, "*=": 1, "/=": 1, "%=": 1,
+        "&=": 1, "|=": 1, "^=": 1, "<<=": 1, ">>=": 1,
+        "||": 2, "&&": 3, "|": 4, "^": 5, "&": 6, "==": 7, "!=": 7,
+        "<": 8, ">": 8, "<=": 8, ">=": 8, "<<": 9, ">>": 9,
+        "+": 10, "-": 10, "*": 11, "/": 11, "%": 11};
 };
