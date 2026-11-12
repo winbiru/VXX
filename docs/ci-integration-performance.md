@@ -554,3 +554,7 @@ executable cache và cấu hình direct ASM/link; trace của cả hai lượt l
 Đây là **một lần đo mỗi phiên bản**, chưa phải median, và chỉ đo đường
 cache đã trúng. Thời gian MISS và tổng integration cần được đo riêng:
 với fixture chỉ chạy một lần, thời gian frontend và assembler/linker vẫn còn.
+
+Điều tra tiếp ngày 2026-11-12 đo riêng CPU, ghi assembly, cache key và thời
+gian chạy executable, kèm đối chiếu Actions:
+[ci-stall-investigation-2026-11-12.md](ci-stall-investigation-2026-11-12.md).

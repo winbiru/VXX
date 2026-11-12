@@ -25,6 +25,7 @@ hàm chính() {
     kiểm(văn bản, "c93eee2d0db02f10acc7460d9576e122dcf8cd53c4bf8dfcae1b3e74ebcfff5a");
     byte = []; lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(byte, i); };
     nếu (mật mã thập lục phân(mật mã sha256 các byte(byte)) != "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880") { ném "AOT binary hash mismatch"; };
+    nếu (độ dài(byte) != 256 || byte[0] != 0 || byte[255] != 255) { ném "SHA-256 mutated its input"; };
     khóa = ""; khi (độ dài(khóa) < 131) { khóa += "a"; };
     nếu (hmac sha256(khóa, "long key 🌿") != "da22f5c58a3f6f8b58cfde80198a41e60b338feaf8b61f5c65ab3069460b1566") { ném "AOT HMAC mismatch"; };
     in "AOT_HASH_OK";

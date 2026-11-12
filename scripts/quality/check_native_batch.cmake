@@ -3,6 +3,12 @@ foreach(required IN ITEMS VPP_EXEC VPP_ROOT VPP_NATIVE_COMPILER VPP_OUTPUT_DIR)
         message(FATAL_ERROR "Native batch check missing ${required}")
     endif()
 endforeach()
+if(NOT DEFINED VPP_BATCH_CHECK)
+    set(VPP_BATCH_CHECK all)
+endif()
+if(NOT VPP_BATCH_CHECK MATCHES "^(all|parity|source-cache|asm-cache)$")
+    message(FATAL_ERROR "Unknown native batch check: ${VPP_BATCH_CHECK}")
+endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/expected")
 file(REMOVE "${VPP_OUTPUT_DIR}/batch.profile" "${VPP_OUTPUT_DIR}/uncached.profile")
 file(WRITE "${VPP_OUTPUT_DIR}/before.vi" "nhập shared.*; hàm chính() { in giá trị(); };\n")
@@ -28,7 +34,10 @@ list(INSERT sources 1 "${VPP_OUTPUT_DIR}/before.vi")
 set(environment "VPP_HOME=${VPP_ROOT}" "VPP_AOT_ROOT=${VPP_ROOT}"
     "VPP_NATIVE_COMPILER=${VPP_NATIVE_COMPILER}" "VPP_AOT_DIRECT_LINK_CPP=1"
     "VPP_NATIVE_GOLDEN_FAIL_FAST=0" "VPP_COMPILER_PROFILE_FILE=" "VPP_AOT_ASM_DIRECT=1")
+if(VPP_BATCH_CHECK MATCHES "^(all|parity)$")
+message(STATUS "Native batch: checking isolated/cached/uncached execution")
 foreach(mode IN ITEMS single batch uncached)
+    message(STATUS "Native batch mode: ${mode}")
     file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/${mode}")
     file(WRITE "${VPP_OUTPUT_DIR}/shared.vi" "hàm giá trị() { trả về 7; };\n")
     file(REMOVE "${VPP_OUTPUT_DIR}/${mode}.aot-trace")
@@ -39,6 +48,11 @@ foreach(mode IN ITEMS single batch uncached)
                 "VPP_NATIVE_NO_CACHE=1" "VPP_AOT_ASM_DIRECT=0"
                 "${VPP_EXEC}" run --compiler=vpp "${source}"
                 OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE status TIMEOUT 45)
+            # Only deliberate syntax/runtime failures may return nonzero.
+            # A timeout must fail here, rather than become an oracle result.
+            if(NOT status MATCHES "^[01]$")
+                message(FATAL_ERROR "Native isolated ${name} failed: ${status}\n${output}\n${errors}")
+            endif()
             file(WRITE "${VPP_OUTPUT_DIR}/single/${name}.output" "${output}${errors}")
             file(WRITE "${VPP_OUTPUT_DIR}/single/${name}.status" "${status}\n")
         endforeach()
@@ -117,6 +131,11 @@ if(status STREQUAL "0" OR NOT EXISTS "${VPP_OUTPUT_DIR}/fail-fast/before.status"
     EXISTS "${VPP_OUTPUT_DIR}/fail-fast/after.status" OR NOT errors MATCHES "GOLDEN FAIL")
     message(FATAL_ERROR "Native batch fail-fast did not stop with evidence: ${status}\n${output}\n${errors}")
 endif()
+message(STATUS "Native batch: isolated/cached/uncached parity and fail-fast: PASS")
+endif()
+
+if(VPP_BATCH_CHECK MATCHES "^(all|source-cache)$")
+message(STATUS "Native source cache: checking early hits and import invalidation")
 # In a single batch, the second invocation of the exact same entrypoint
 # must skip the frontend entirely. If an imported file changes between
 # calls, the same entrypoint must compile again and observe the new value.
@@ -147,6 +166,7 @@ endif()
 # Test both a nearer source module and a package entrypoint (chính.vi) that
 # shadows an already-resolved gói/<name>.vi module.
 foreach(shadow_kind IN ITEMS source package)
+    message(STATUS "Native source cache shadow: ${shadow_kind}")
     set(shadow_root "${VPP_OUTPUT_DIR}/shadow-${shadow_kind}")
     set(shadow_app "${shadow_root}/app")
     set(shadow_run "${shadow_root}/results")
@@ -206,10 +226,16 @@ foreach(shadow_kind IN ITEMS source package)
         message(FATAL_ERROR "${shadow_kind} shadow invalidation trace missing: ${shadow_delta}")
     endif()
 endforeach()
+message(STATUS "Native source cache: early hits, source edits and import shadowing: PASS")
+endif()
+
+if(VPP_BATCH_CHECK MATCHES "^(all|asm-cache)$")
+message(STATUS "Native ASM cache: checking cold/warm/disabled execution")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${environment}
     "${VPP_EXEC}" run --compiler=vpp "${VPP_ROOT}/src/tests/kiem_tra_asm_cache.vi"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0" OR NOT output MATCHES "ASM cache parity: đạt")
     message(FATAL_ERROR "Cold/warm/disabled ASM parity failed: ${status}\n${output}\n${errors}")
 endif()
-message(STATUS "Native batch: isolated/cached/uncached/early-index parity, import shadowing, source edits, error recovery, UTF-8, cwd and fail-fast: PASS")
+message(STATUS "Native ASM cache: cold/warm/disabled parity: PASS")
+endif()

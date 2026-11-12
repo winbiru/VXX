@@ -30,6 +30,13 @@ hàm vị trí đối số(lệnh, giá trị) {
 };
 
 hàm chính() {
+    // SHA-256 of the original length-framed cache observations, calculated
+    // independently. The byte-oriented fast path must keep existing keys.
+    dấu chuẩn = biên dịch AOT chữ ký liên kết([["S", "unicode 🌿"],
+        ["S", "a" + chuỗi từ byte máy ảo([0]) + "b"]]);
+    nếu (dấu chuẩn != "5a15eb379ae50f8ef68848796c1d2c2643f3b3e856e8801b13a375b9a172016b") {
+        ném "AOT cache key changed its SHA-256 framing";
+    };
     gốc = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_ROOT", "");
     chế độ = đọc biến môi trường("VPP_AOT_DRIVER_FIXTURE_MODE", "");
     nếu (chế độ == "launch-error") {

@@ -10,6 +10,7 @@ param(
 # directly so the Windows matrix cannot silently drift behind it.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "runner-support.ps1")
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $script:Vpp = (Resolve-Path -LiteralPath $VppExecutable).Path
@@ -125,8 +126,8 @@ function Invoke-Vpp {
         if ($_ -match '\s') { '"' + $_ + '"' } else { $_ }
     })
     $runArguments = @("run", "--compiler=$compiler") + $quotedArguments
-    $process = Start-Process -FilePath $script:Vpp -ArgumentList $runArguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
-    return $process.ExitCode
+    $process = Start-Process -FilePath $script:Vpp -ArgumentList $runArguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -NoNewWindow
+    return Wait-VppTestProcess $process -Description ($Arguments -join ' ')
 }
 
 function Invoke-VppBatch {
@@ -153,9 +154,10 @@ function Invoke-VppBatch {
     $stderr = Join-Path $OutputDirectory "$BatchName.stderr"
     $process = Start-Process -FilePath $script:Vpp -ArgumentList $quotedArguments `
         -WorkingDirectory $repoRoot -RedirectStandardOutput $stdout `
-        -RedirectStandardError $stderr -PassThru -Wait -NoNewWindow
-    if ($process.ExitCode -ne 0) {
-        throw "V++ $Backend golden batch failed (exit $($process.ExitCode)): $(Get-NormalizedUtf8Text $stdout) $(Get-NormalizedUtf8Text $stderr)"
+        -RedirectStandardError $stderr -PassThru -NoNewWindow
+    $exitCode = Wait-VppTestProcess $process -Description "$Backend golden batch"
+    if ($exitCode -ne 0) {
+        throw "V++ $Backend golden batch failed (exit ${exitCode}): $(Get-NormalizedUtf8Text $stdout) $(Get-NormalizedUtf8Text $stderr)"
     }
 }
 
@@ -174,7 +176,6 @@ function Invoke-NativeGoldenShards {
         throw "Windows VPP_NATIVE_TEST_WORKERS must be 1, 2 or 3"
     }
     $workerCount = [int]$workerSetting
-    $python = Get-Command python -CommandType Application -ErrorAction Stop
     $sharder = Join-Path $repoRoot "scripts/quality/shard_native_golden.py"
     $costs = Join-Path $repoRoot "scripts/quality/native_golden_costs.tsv"
     # The batch driver writes results by filename stem. Distinct fixture paths
@@ -193,7 +194,7 @@ function Invoke-NativeGoldenShards {
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
     $manifest = Join-Path $OutputDirectory "manifest.list"
     [System.IO.File]::WriteAllLines($manifest, $TestFiles, [System.Text.UTF8Encoding]::new($false))
-    & $python.Source $sharder --costs $costs --workers $workerCount `
+    & $script:Python $sharder --costs $costs --workers $workerCount `
         --output $OutputDirectory --sources-file $manifest --auto-classify
     if ($LASTEXITCODE -ne 0) { throw "Could not partition Windows native golden fixtures" }
 
@@ -236,13 +237,28 @@ function Invoke-NativeGoldenShards {
                 -WorkingDirectory $repoRoot -RedirectStandardOutput $stdout `
                 -RedirectStandardError $stderr -Environment @{ VPP_NATIVE_GOLDEN_FAIL_FAST = "1" } `
                 -PassThru -NoNewWindow
-            $running.Add([pscustomobject]@{ Process = $process; Worker = $worker; Completed = $false; ErrorLog = $stderr })
+            $running.Add([pscustomobject]@{
+                Process = $process; Worker = $worker; Completed = $false; ErrorLog = $stderr
+                Output = $workerOutput; Total = $workerFiles.Count; Count = 0
+                Progress = [System.Diagnostics.Stopwatch]::StartNew()
+            })
         }
         $remaining = $running.Count
         while ($remaining -gt 0) {
             foreach ($entry in $running) {
-                if ($entry.Completed -or -not $entry.Process.HasExited) { continue }
-                $entry.Process.WaitForExit()
+                if ($entry.Completed) { continue }
+                if (-not $entry.Process.HasExited) {
+                    $count = @(Get-ChildItem -LiteralPath $entry.Output -Filter '*.status' -File).Count
+                    if ($count -ne $entry.Count) {
+                        $entry.Count = $count
+                        $entry.Progress.Restart()
+                        Write-Host "Windows native worker $($entry.Worker): $count/$($entry.Total) fixtures completed"
+                    }
+                    if ($entry.Progress.Elapsed.TotalSeconds -ge 900) {
+                        throw "Windows native worker $($entry.Worker) made no fixture progress for 900s; logs: $($entry.Output)"
+                    }
+                    continue
+                }
                 $entry.Completed = $true
                 $remaining--
                 if ($entry.Process.ExitCode -ne 0) {
@@ -259,8 +275,7 @@ function Invoke-NativeGoldenShards {
         # nested CMake/linker processes when an early golden mismatch occurs.
         foreach ($entry in $running) {
             try {
-                if (-not $entry.Process.HasExited) { $entry.Process.Kill($true) }
-                $entry.Process.WaitForExit()
+                Stop-VppTestProcess $entry.Process
             } catch { Write-Warning "Could not stop native golden worker $($entry.Worker): $_" }
         }
     }
@@ -307,12 +322,9 @@ function Stop-VppServer {
     }
 
     try {
-        if (-not $Process.HasExited) {
-            Stop-Process -Id $Process.Id -Force -ErrorAction Stop
-        }
-        $Process.WaitForExit()
+        Stop-VppTestProcess $Process
     } catch {
-        # Best-effort cleanup: the process may already have exited.
+        Write-Warning "Could not stop V++ server process tree: $_"
     }
 }
 
@@ -481,6 +493,11 @@ function Get-BashTestArray {
 }
 
 try {
+    # Resolve and execute exactly one Python before starting any background
+    # server or paying for native fixture compilation.
+    $script:Python = Get-VppTestPython
+    & $script:Python --version
+    if ($LASTEXITCODE -ne 0) { throw "Python preflight failed: $script:Python" }
     if (-not (Test-Path -LiteralPath $script:Vpp -PathType Leaf)) {
         throw "Khong tim thay vpp-cli: $VppExecutable"
     }

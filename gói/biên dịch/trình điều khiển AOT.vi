@@ -29,7 +29,7 @@ nhập gói.nhập xuất.đường dẫn.đường dẫn có thể thực thi;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
 nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
 nhập gói.bảo mật.mật mã.mật mã thập lục phân;
-nhập gói.bảo mật.mật mã.băm sha256;
+nhập gói.lõi.toán học.làm tròn xuống;
 nhập gói.văn bản.chuỗi.kết thúc bằng;
 nhập gói.văn bản.chuỗi.bắt đầu bằng;
 nhập gói.văn bản.chuỗi.tách hằng văn bản;
@@ -45,6 +45,13 @@ hàm riêng tư AOT công cụ(tên, mặc định) {
 
 hàm riêng tư AOT thêm(đích, nguồn) {
     lặp(i = 0; i < độ dài(nguồn); i++) { máy ảo thêm cuối danh sách(đích, nguồn[i]); };
+};
+
+// Cache observations are already byte-framed compiler/OS data. Hash those
+// bytes directly with the same V++ SHA-256 implementation; re-validating
+// every UTF-8 codepoint in multi-megabyte assembly adds a redundant V++ pass.
+hàm riêng tư AOT băm quan sát(văn bản) {
+    trả về mật mã thập lục phân(mật mã sha256 các byte(chuỗi thành byte máy ảo(văn bản)));
 };
 
 hàm riêng tư AOT chạy(bước, nhãn, pha, lệnh) {
@@ -509,7 +516,7 @@ hàm công khai biên dịch AOT đường cache thực thi(các trường, thư
     };
     thử { tạo thư mục(thư mục); } bắt lỗi(e) { trả về ""; };
     nếu (!là thư mục(thư mục)) { trả về ""; };
-    chữ ký = băm sha256(AOT mã quan sát(các trường, "vpp-aot-executable-v5"));
+    chữ ký = AOT băm quan sát(AOT mã quan sát(các trường, "vpp-aot-executable-v5"));
     đuôi = "";
     nếu (tên nền tảng() == "windows") { đuôi = ".exe"; };
     trả về đường dẫn nối(thư mục, "aot-" + chữ ký + đuôi);
@@ -535,7 +542,7 @@ hàm công khai biên dịch AOT đầu vào dấu liên kết(gốc, thư việ
 };
 
 hàm công khai biên dịch AOT chữ ký liên kết(các trường) {
-    trả về băm sha256(AOT mã quan sát(các trường, "vpp-aot-linker-dependencies-v4"));
+    trả về AOT băm quan sát(AOT mã quan sát(các trường, "vpp-aot-linker-dependencies-v4"));
 };
 
 // A completed cache entry is immutable. Never rename over a competing writer:
@@ -731,6 +738,9 @@ hàm riêng tư AOT đường công cụ(tên) {
 // and keeps cache invalidation independent of filesystem timestamp precision.
 // These hashes identify build inputs; they are not security digests.
 hàm riêng tư AOT dấu vân tay tệp(đường) {
+    đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+    trước = 0;
+    nếu (đường đo != "") { trước = thời gian đơn điệu mili giây(); };
     bộ đọc = Bộ Đệm Tệp(đường, "đọc");
     a = 1; b = 7; tổng = 0;
     thử {
@@ -749,6 +759,12 @@ hàm riêng tư AOT dấu vân tay tệp(đường) {
     } bắt lỗi(e) {
         thử { bộ đọc.đóng(); } bắt lỗi(lỗi đóng) {};
         ném e;
+    };
+    nếu (đường đo != "") {
+        thử {
+            ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING file.fingerprint " + đường + " " +
+                "" + làm tròn xuống(thời gian đơn điệu mili giây() - trước) + " ms bytes=" + tổng + "\n");
+        } bắt lỗi(e) {};
     };
     trả về "" + tổng + ":" + a + ":" + b;
 };
@@ -952,7 +968,7 @@ hàm riêng tư AOT chữ ký đối tượng(bước) {
         văn bản += "" + độ dài(chuỗi thành byte máy ảo(công cụ)) + ":" + công cụ;
         văn bản += AOT dấu vân tay tệp(công cụ);
     };
-    trả về băm sha256(văn bản);
+    trả về AOT băm quan sát(văn bản);
 };
 
 hàm riêng tư AOT xây đối tượng(bước) {

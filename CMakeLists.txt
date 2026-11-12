@@ -1355,9 +1355,26 @@ if (BUILD_TESTS)
                 "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                 "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-batch"
+                -DVPP_BATCH_CHECK=parity
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_batch.cmake)
         set_tests_properties(vpp-native-batch-parity PROPERTIES
-            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 300)
+            FIXTURES_REQUIRED native-cli-compiler PROCESSORS 2 TIMEOUT 300)
+
+        # Keep expensive cache invalidation and ASM checks separately bounded.
+        # Previously their combined work exceeded the single 300s Windows
+        # deadline while another native compiler consumed the second CPU slot.
+        foreach(vpp_batch_check IN ITEMS source-cache asm-cache)
+            add_test(NAME vpp-native-${vpp_batch_check}-parity
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-${vpp_batch_check}"
+                    "-DVPP_BATCH_CHECK=${vpp_batch_check}"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_batch.cmake)
+            set_tests_properties(vpp-native-${vpp_batch_check}-parity PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler PROCESSORS 2 TIMEOUT 300)
+        endforeach()
 
         add_test(NAME vpp-native-linker-cache-parity
             COMMAND ${CMAKE_COMMAND}

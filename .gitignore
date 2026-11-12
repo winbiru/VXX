@@ -95,6 +95,7 @@ node_modules/
 *.md
 !docs/concurrency-workers.md
 !docs/ci-integration-performance.md
+!docs/ci-stall-investigation-2026-11-12.md
 !docs/native-aot-direct-link.md
 !docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md

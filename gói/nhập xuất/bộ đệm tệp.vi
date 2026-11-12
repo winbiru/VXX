@@ -125,7 +125,28 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     };
 
     hàm công khai ghi(nội dung) {
-        trả về mình.ghi các byte(chuỗi thành byte máy ảo(thành chuỗi(nội dung)));
+        mình.yêu cầu mở();
+        nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
+        văn bản = thành chuỗi(nội dung);
+        vị trí ghi = 0;
+        khi (đúng) {
+            còn = mình.kích thước - máy ảo lấy độ dài(mình.đệm ghi);
+            nếu (còn == 0) { mình.đẩy đệm(); còn = mình.kích thước; };
+            // The representation primitive produces valid bytes. Transfer a
+            // whole bounded chunk instead of validating/copying every byte
+            // through dynamic V++ calls and instance-field lookups.
+            khối = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí ghi, còn));
+            n = máy ảo lấy độ dài(khối);
+            nếu (n == 0) { thoát; };
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == 0) {
+                mình.đệm ghi = khối;
+            } hoặc {
+                lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(mình.đệm ghi, khối[i]); };
+            };
+            vị trí ghi += n;
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { mình.đẩy đệm(); };
+        };
+        trả về 1;
     };
 
     hàm công khai đẩy đệm() {
@@ -138,7 +159,10 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
                 đệm = [];
                 lặp(i = mình.đã ghi; i < máy ảo lấy độ dài(mình.đệm ghi); i++) { máy ảo thêm cuối danh sách(đệm, mình.đệm ghi[i]); };
             };
-            n = tệp thô ghi(mình.mã tài nguyên, đệm, máy ảo lấy độ dài(đệm));
+            // Accepted byte lists were validated by ghi các byte; text
+            // chunks came from the representation primitive. The raw OS
+            // boundary also validates its buffer, so no second V++ byte scan.
+            n = máy tệp ghi(mình.mã tài nguyên, đệm, máy ảo lấy độ dài(đệm));
             nếu (n < 0 && tệp thô mã lỗi() == mình.lỗi gián đoạn) { bỏ qua; };
             nếu (n <= 0 || n > máy ảo lấy độ dài(đệm)) {
                 mình.báo lỗi("ghi", "FILE_WRITE_FAILED", "không thể ghi tệp");

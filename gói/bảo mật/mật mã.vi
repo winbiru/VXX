@@ -201,22 +201,29 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sha256 các byte(các byte) {
-        thông điệp = [];
         lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
             byte = các byte[i];
             nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
                 ném "băm sha256: dữ liệu byte không hợp lệ";
             };
-            máy ảo thêm cuối danh sách(thông điệp, byte);
         };
-        độ dài gốc = máy ảo lấy độ dài(thông điệp);
-        máy ảo thêm cuối danh sách(thông điệp, 128);
-        khi (máy ảo lấy độ dài(thông điệp) % 64 != 56) {
-            máy ảo thêm cuối danh sách(thông điệp, 0);
+        độ dài gốc = máy ảo lấy độ dài(các byte);
+        // Full blocks are read directly from the caller's immutable input.
+        // Only the final 64/128 padding bytes need a separate allocation.
+        // Copying multi-megabyte assembly into a second boxed byte list made
+        // concurrent compiler workers consume gigabytes for cache hashing.
+        cuối khối đầy = độ dài gốc - độ dài gốc % 64;
+        đuôi = [];
+        lặp(i = cuối khối đầy; i < độ dài gốc; i++) {
+            máy ảo thêm cuối danh sách(đuôi, các byte[i]);
+        };
+        máy ảo thêm cuối danh sách(đuôi, 128);
+        khi (máy ảo lấy độ dài(đuôi) % 64 != 56) {
+            máy ảo thêm cuối danh sách(đuôi, 0);
         };
         dài bit = mình.mật mã độ dài bit các byte(độ dài gốc);
         lặp(i = 0; i < 8; i++) {
-            máy ảo thêm cuối danh sách(thông điệp, dài bit[i]);
+            máy ảo thêm cuối danh sách(đuôi, dài bit[i]);
         };
 
         // SHA-256 word arithmetic uses wrapping i32 operators shared by VM
@@ -230,10 +237,17 @@ lớp công khai Bộ Mật Mã {
             q = byte k[i];
             máy ảo thêm cuối danh sách(k, (q[0] << 24) | (q[1] << 16) | (q[2] << 8) | q[3]);
         };
-        lặp(bắt đầu = 0; bắt đầu < máy ảo lấy độ dài(thông điệp); bắt đầu += 64) {
+        tổng byte = cuối khối đầy + máy ảo lấy độ dài(đuôi);
+        lặp(bắt đầu = 0; bắt đầu < tổng byte; bắt đầu += 64) {
+            thông điệp = các byte;
+            vị trí khối = bắt đầu;
+            nếu (bắt đầu >= cuối khối đầy) {
+                thông điệp = đuôi;
+                vị trí khối = bắt đầu - cuối khối đầy;
+            };
             w = [];
             lặp(t = 0; t < 16; t++) {
-                p = bắt đầu + t * 4;
+                p = vị trí khối + t * 4;
                 máy ảo thêm cuối danh sách(w, (thông điệp[p] << 24) |
                     (thông điệp[p + 1] << 16) | (thông điệp[p + 2] << 8) | thông điệp[p + 3]);
             };

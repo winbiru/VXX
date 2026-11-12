@@ -53,9 +53,17 @@ hàm công khai biên dịch AOT chuẩn hóa yêu cầu(kế hoạch) {
 };
 
 hàm riêng tư AOT phiên đánh dấu(các pha, pha, trước) {
-    nếu (đọc biến môi trường("VPP_NATIVE_PROFILE", "") != "1") { trả về 0; };
+    đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+    hồ sơ = đọc biến môi trường("VPP_NATIVE_PROFILE", "") == "1";
+    nếu (!hồ sơ && đường đo == "") { trả về 0; };
     bây giờ = thời gian đơn điệu mili giây();
-    máy ảo thêm cuối danh sách(các pha, [pha, "" + làm tròn xuống(bây giờ - trước)]);
+    nếu (hồ sơ) { máy ảo thêm cuối danh sách(các pha, [pha, "" + làm tròn xuống(bây giờ - trước)]); };
+    nếu (đường đo != "") {
+        thử {
+            ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING " + pha + " " +
+                "" + làm tròn xuống(bây giờ - trước) + " ms\n");
+        } bắt lỗi(e) {};
+    };
     trả về bây giờ;
 };
 
@@ -141,7 +149,11 @@ hàm công khai biên dịch AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba
         tên = "program";
         nếu (tên nền tảng() == "windows") { tên = "program.exe"; };
         executable = đường dẫn nối(tạm, tên); chạy = executable; các pha = [];
+        đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+        trước = 0;
+        nếu (đường đo != "") { trước = thời gian đơn điệu mili giây(); };
         đích = AOT phiên đường cache(asm, gốc, thư mục chương trình);
+        trước = AOT phiên đo cache(đường đo, "executable.key", trước);
         nếu (đích != "") {
             khóa = thử khóa tệp(đích + ".lock");
             nếu (biên dịch AOT cache thực thi hợp lệ(đích)) {
@@ -160,6 +172,7 @@ hàm công khai biên dịch AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba
         } hoặc {
             các pha = biên dịch AOT lắp ráp(asm, executable, gốc, phiên, bộ ba, ffi, thư mục chương trình);
         };
+        trước = AOT phiên đo cache(đường đo, "executable.prepare", trước);
         nếu (chỉ mục != "" && chạy != executable) {
             thử {
                 khóa = thử khóa tệp(chỉ mục + ".lock");
@@ -169,6 +182,7 @@ hàm công khai biên dịch AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba
             } bắt lỗi(lỗi cache) {};
             mở khóa tệp(khóa); khóa = 0;
         };
+        AOT phiên đo cache(đường đo, "source.index.publish", trước);
         trả về [chạy, tạm, các pha];
     } bắt lỗi(e) {
         mở khóa tệp(khóa);

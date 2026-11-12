@@ -118,7 +118,13 @@ lớp công khai Hệ Tệp {
     hàm công khai ghi tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
         văn bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), sai, "ghi tệp");
+        tệp = Bộ Đệm Tệp(đường, "ghi", 4096, "ghi tệp");
+        thử { tệp.ghi(văn bản); } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
+            ném e;
+        };
+        tệp.đóng();
+        trả về 1;
     };
 
     // Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
@@ -126,7 +132,13 @@ lớp công khai Hệ Tệp {
     hàm công khai ghi nối tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
         văn bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), đúng, "ghi nối tệp");
+        tệp = Bộ Đệm Tệp(đường, "nối", 4096, "ghi nối tệp");
+        thử { tệp.ghi(văn bản); } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
+            ném e;
+        };
+        tệp.đóng();
+        trả về 1;
     };
 
     // Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là

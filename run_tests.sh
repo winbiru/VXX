@@ -441,9 +441,12 @@ done
 # Filesystem, network, subprocess, concurrency and configuration tests share
 # an ordered lane. Fill that lane's idle capacity with independent fixtures
 # while preserving the relative order of every external-state fixture.
-# Four native workers reduced the measured macOS integration wall time from
-# 645.20s to 564.11s. CI can override this for smaller runners.
-VPP_NATIVE_TEST_WORKERS="${VPP_NATIVE_TEST_WORKERS:-4}"
+# The self-hosted AOT driver hashes large emitted assemblies. A measured
+# worker peaked at several GB, so four workers can exceed the 7 GB ARM64 macOS
+# runner's memory. Keep two there; Linux's 16 GB runners retain four.
+native_default_workers=4
+if [ "$(uname -s)" = Darwin ]; then native_default_workers=2; fi
+VPP_NATIVE_TEST_WORKERS="${VPP_NATIVE_TEST_WORKERS:-$native_default_workers}"
 if [[ ! "$VPP_NATIVE_TEST_WORKERS" =~ ^[1-4]$ ]]; then
   echo "ERROR: VPP_NATIVE_TEST_WORKERS must be an integer from 1 to 4" >&2
   exit 2

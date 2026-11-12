@@ -523,6 +523,7 @@ jobs:
       - name: Verify Windows x64 native file, process and SHA ABI (COFF + Win32 + UCRT + CNG)
         shell: pwsh
         run: |
+          & ./scripts/windows/test-runner-support.ps1
           $probe = Join-Path $env:RUNNER_TEMP "vpp-windows-file-boundary"
           cmake -S scripts/quality/windows_file_boundary -B $probe -A x64
           if ($LASTEXITCODE -ne 0) { throw "Windows file boundary configure failed" }
@@ -612,6 +613,9 @@ jobs:
           name: ctest-windows-diagnostics
           path: |
             build/Testing/Temporary/
+            build/native-batch/
+            build/native-source-cache/
+            build/native-asm-cache/
             build/integration-logs/
             src/tests/.tmp/windows-*/native-golden/
             src/tests/.tmp/windows-*/vm-golden/
