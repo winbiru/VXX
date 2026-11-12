@@ -1,0 +1,136 @@
+// Exercise the internal mnemonic printer independently of byte encoding.
+// The host C harness supplies the callees and checks ABI results.
+nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+
+hàm chính() {
+    chín = [biên dịch mã máy lệnh("LoadSlot", 0, 0)];
+    lặp(i = 1; i < 9; i++) {
+        máy ảo thêm cuối danh sách(chín, biên dịch mã máy lệnh("PushConstant", i + 1, 0, i));
+    };
+    máy ảo thêm cuối danh sách(chín, biên dịch mã máy lệnh("Call", 0, 9, 9, "direct_sum9"));
+    máy ảo thêm cuối danh sách(chín, biên dịch mã máy lệnh("Return", 0, 0, 1));
+    // A branch enters the middle of a scalar-argument group. Fusing that
+    // group would discard a live argument on one side of the join.
+    nhánh = [
+        biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("BranchZero", 0, 4, 1),
+        biên dịch mã máy lệnh("PushConstant", 10),
+        biên dịch mã máy lệnh("Jump", 0, 5, 1),
+        biên dịch mã máy lệnh("PushConstant", 20),
+        biên dịch mã máy lệnh("PushConstant", 3, 0, 1),
+        biên dịch mã máy lệnh("Call", 0, 2, 2, "direct_sum2"),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)
+    ];
+    lớn = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("StoreSlot", 0, 4099, 1),
+        biên dịch mã máy lệnh("Drop", 0, 0, 1),
+        biên dịch mã máy lệnh("LoadSlot", 0, 4099),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    trạng thái = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("Call", 0, 1, 1, "direct_identity"),
+        biên dịch mã máy lệnh("BranchZero", 0, 4, 1),
+        biên dịch mã máy lệnh("Jump", 0, 6),
+        biên dịch mã máy lệnh("PushConstant", 9),
+        biên dịch mã máy lệnh("Return", 0, 0, 1),
+        biên dịch mã máy lệnh("PushConstant", -9),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    // Specialized i32 and fast selectors receive multiple native ABI args
+    // (not the single dynamic frame ID). Cover registers, overflow stack
+    // parameters, signed division, and a nested native call.
+    hai = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh("Add", 0, 0, 2),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    chín tham số = [biên dịch mã máy lệnh("LoadSlot", 0, 8),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    chia = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh("Div", 0, 0, 2),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    dư = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh("Mod", 0, 0, 2),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    gọi_hai = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh("Call", 0, 2, 2, "direct_sum2"),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    // Eight incoming registers and eight live eval values exercise the
+    // full W0..W8/W11..W17 ARM64 leaf-slot mapping (including W16/W17).
+    tám = [];
+    lặp(j = 0; j < 8; j++) {
+        máy ảo thêm cuối danh sách(tám, biên dịch mã máy lệnh("LoadSlot", 0, j, j));
+    };
+    lặp(j = 0; j < 7; j++) {
+        máy ảo thêm cuối danh sách(tám, biên dịch mã máy lệnh("Add", 0, 0, 8 - j));
+    };
+    máy ảo thêm cuối danh sách(tám, biên dịch mã máy lệnh("Return", 0, 0, 1));
+    nhánh lá = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("BranchZero", 0, 4, 1),
+        biên dịch mã máy lệnh("PushConstant", 13),
+        biên dịch mã máy lệnh("Jump", 0, 5, 1),
+        biên dịch mã máy lệnh("PushConstant", 23),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    dư lá = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("PushConstant", 2, 0, 1),
+        biên dịch mã máy lệnh("Mod", 0, 0, 2),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    máy = [
+        {"parameterCount": 1, "slotCount": 2, "maxStackDepth": 9, "instructions": chín},
+        {"parameterCount": 1, "slotCount": 2, "maxStackDepth": 2, "instructions": nhánh},
+        {"parameterCount": 1, "slotCount": 4100, "maxStackDepth": 1, "instructions": lớn},
+        {"parameterCount": 1, "slotCount": 2, "maxStackDepth": 1, "instructions": trạng thái},
+        {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": hai},
+        {"parameterCount": 9, "slotCount": 9, "maxStackDepth": 1, "instructions": chín tham số},
+        {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": chia},
+        {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": dư},
+        {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": gọi_hai},
+        {"parameterCount": 8, "slotCount": 8, "maxStackDepth": 8, "instructions": tám},
+        {"parameterCount": 1, "slotCount": 1, "maxStackDepth": 1, "instructions": nhánh lá},
+        {"parameterCount": 1, "slotCount": 7, "maxStackDepth": 2, "instructions": dư lá},
+        {"parameterCount": 1, "slotCount": 10, "maxStackDepth": 2, "instructions": dư lá}
+    ];
+    tên = ["direct_probe9", "direct_branch", "direct_large_frame", "direct_status",
+        "direct_spec_add", "direct_spec_arg9", "direct_spec_div", "direct_spec_mod", "direct_spec_call",
+        "direct_leaf_eight", "direct_leaf_branch", "direct_leaf_mod", "direct_leaf_mod_fallback"];
+    lưu lá = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+        biên dịch mã máy lệnh("StoreSlot", 0, 1, 1),
+        biên dịch mã máy lệnh("Drop", 0, 0, 1),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1),
+        biên dịch mã máy lệnh("PushConstant", 2, 0, 1),
+        biên dịch mã máy lệnh("Mul", 0, 0, 2),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    máy ảo thêm cuối danh sách(máy, {"parameterCount": 1, "slotCount": 2,
+        "maxStackDepth": 2, "instructions": lưu lá});
+    máy ảo thêm cuối danh sách(tên, "direct_leaf_store");
+    phép lá = ["BitAnd", "BitOr", "BitXor", "ShiftLeft", "ShiftRight",
+        "Equal", "NotEqual", "Less", "LessEqual", "Greater", "GreaterEqual", "Sub", "Mul"];
+    tên phép lá = ["direct_leaf_and", "direct_leaf_or", "direct_leaf_xor",
+        "direct_leaf_shl", "direct_leaf_shr", "direct_leaf_eq", "direct_leaf_ne",
+        "direct_leaf_lt", "direct_leaf_le", "direct_leaf_gt", "direct_leaf_ge",
+        "direct_leaf_sub", "direct_leaf_mul"];
+    lặp(k = 0; k < độ dài(phép lá); k++) {
+        lệnh lá = [biên dịch mã máy lệnh("LoadSlot", 0, 0),
+            biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+            biên dịch mã máy lệnh(phép lá[k], 0, 0, 2),
+            biên dịch mã máy lệnh("Return", 0, 0, 1)];
+        máy ảo thêm cuối danh sách(máy, {"parameterCount": 2, "slotCount": 2,
+            "maxStackDepth": 2, "instructions": lệnh lá});
+        máy ảo thêm cuối danh sách(tên, tên phép lá[k]);
+    };
+    các đích = [["aarch64", "macos"], ["aarch64", "linux"],
+        ["x86_64", "macos"], ["x86_64", "linux"], ["x86_64", "windows"]];
+    lặp(t = 0; t < độ dài(các đích); t++) {
+        đích = các đích[t]; ra = ".text\n"; tiền = "";
+        nếu (đích[1] == "macos") { tiền = "_"; };
+        lặp(i = 0; i < độ dài(máy); i++) {
+            ra += ".globl " + tiền + tên[i] + "\n" + tiền + tên[i] + ":\n";
+            ra += biên dịch asm động trực tiếp(máy[i], tên[i], đích[0], đích[1], i < 4);
+        };
+        ghi tệp(đọc biến môi trường("VPP_DIRECT_ASM_TEST_DIR", ".") +
+            "/direct-" + đích[0] + "-" + đích[1] + ".s", ra);
+    };
+};

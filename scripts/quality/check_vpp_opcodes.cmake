@@ -1,5 +1,6 @@
 # Verify the Stage 0 C++ and self-hosted V++ opcode and intrinsic ABI in both
 # directions. A new C++ entry must never silently lack a V++ implementation.
+cmake_policy(SET CMP0057 NEW)
 if (NOT DEFINED VPP_ROOT)
     message(FATAL_ERROR "VPP_ROOT is required")
 endif()
@@ -60,6 +61,26 @@ if (NOT mapped_count EQUAL enum_count)
 endif()
 message(STATUS "V++ opcode ABI: all ${mapped_count} entries agree with active C++ enum")
 
+# The artifact validator has a separate numeric allowlist. Matching the name
+# lookup alone would miss an opcode that compiles but cannot be serialized.
+file(STRINGS "${VPP_ROOT}/gói/biên dịch/mã thao tác.vi" known_opcode_rows
+    REGEX "^[ \t]*ca [0-9]+:" ENCODING UTF-8)
+set(known_numbers)
+foreach(row IN LISTS known_opcode_rows)
+    if(row MATCHES "ca ([0-9]+):.*trả về đúng;")
+        list(APPEND known_numbers "${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+list(LENGTH known_numbers known_count)
+if(NOT known_count EQUAL enum_count)
+    message(FATAL_ERROR "Artifact opcode allowlist count differs from C++ ABI")
+endif()
+foreach(opcode IN LISTS cpp_opcodes)
+    if(NOT "${cpp_${opcode}}" IN_LIST known_numbers)
+        message(FATAL_ERROR "Artifact validator does not recognize ${opcode}")
+    endif()
+endforeach()
+
 # Keep opcode, argument count and reservation status of every intrinsic in
 # gói/biên dịch/nội tại.vi aligned with intrinsic.h. The C++ alias table is
 # included because aliases are also recognized by the Stage 0 compiler.
@@ -85,6 +106,7 @@ foreach(row IN LISTS cpp_intrinsic_rows)
         set("cpp_intrinsic_${key}" "${opcode}|${arity}|${reserved}")
         set("cpp_intrinsic_name_${key}" "${name}")
         set("cpp_intrinsic_by_opcode_${opcode}" "${arity}|${reserved}")
+        list(APPEND cpp_intrinsic_opcodes "${opcode}")
         list(APPEND cpp_intrinsic_keys "${key}")
         math(EXPR cpp_intrinsic_count "${cpp_intrinsic_count} + 1")
     endif()
@@ -142,3 +164,50 @@ if (NOT vpp_intrinsic_count EQUAL cpp_intrinsic_count)
     message(FATAL_ERROR "Intrinsic count mismatch: V++=${vpp_intrinsic_count}, C++=${cpp_intrinsic_count}")
 endif()
 message(STATUS "V++ intrinsic ABI: all ${vpp_intrinsic_count} entries agree with C++")
+
+# The native V++ AOT lowerer must recognize every intrinsic, and reject other
+# bytecodes rather than treating all known opcode numbers as runtime intrinsics.
+file(READ "${VPP_ROOT}/gói/biên dịch/asm chương trình.vi" aot_source)
+string(FIND "${aot_source}" "BEGIN native intrinsic opcodes" aot_begin)
+string(FIND "${aot_source}" "END native intrinsic opcodes" aot_end)
+if (aot_begin LESS 0 OR aot_end LESS aot_begin)
+    message(FATAL_ERROR "V++ AOT intrinsic table markers missing")
+endif()
+math(EXPR aot_length "${aot_end} - ${aot_begin}")
+string(SUBSTRING "${aot_source}" ${aot_begin} ${aot_length} aot_table)
+string(REGEX MATCHALL "OP_[A-Za-z0-9_]+" aot_intrinsic_opcodes "${aot_table}")
+list(SORT cpp_intrinsic_opcodes)
+list(SORT aot_intrinsic_opcodes)
+if (NOT cpp_intrinsic_opcodes STREQUAL aot_intrinsic_opcodes)
+    message(FATAL_ERROR "V++ native AOT intrinsic opcode table differs from C++ ABI")
+endif()
+message(STATUS "V++ native AOT recognizes all intrinsic opcodes")
+
+# The standalone interpreter calls ASM directly and owns its own host policy.
+# Check its closed arity table against the same stable instruction ABI.
+file(STRINGS "${VPP_ROOT}/gói/máy ảo/host ABI.vi" vm_host_rows
+    REGEX "// OP_" ENCODING UTF-8)
+set(vm_host_count 0)
+foreach(row IN LISTS vm_host_rows)
+    if (NOT row MATCHES "op == ([0-9]+).*trả về ([0-9]+).*// (OP_[A-Za-z0-9_]+)")
+        message(FATAL_ERROR "Malformed ASM VM host ABI row: ${row}")
+    endif()
+    set(number "${CMAKE_MATCH_1}")
+    set(arity "${CMAKE_MATCH_2}")
+    set(opcode "${CMAKE_MATCH_3}")
+    if (NOT DEFINED "cpp_intrinsic_by_opcode_${opcode}" OR
+        NOT number STREQUAL "${cpp_${opcode}}" OR
+        NOT "${cpp_intrinsic_by_opcode_${opcode}}" MATCHES "^${arity}[|]")
+        message(FATAL_ERROR "ASM VM host ABI mismatch: ${opcode}")
+    endif()
+    if (DEFINED "vm_host_${opcode}")
+        message(FATAL_ERROR "Duplicate ASM VM host ABI: ${opcode}")
+    endif()
+    set("vm_host_${opcode}" TRUE)
+    math(EXPR vm_host_count "${vm_host_count} + 1")
+endforeach()
+list(LENGTH cpp_intrinsic_opcodes native_intrinsic_count)
+if (NOT vm_host_count EQUAL native_intrinsic_count)
+    message(FATAL_ERROR "ASM VM host ABI count mismatch")
+endif()
+message(STATUS "V++ ASM VM host ABI: all ${vm_host_count} arities agree")

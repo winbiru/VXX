@@ -1,7 +1,7 @@
-nhập gói/văn bản/chính;
-nhập gói/lõi/định dạng;
-nhập gói/lõi/biểu thức chính quy;
-nhập gói/kiểm thử/chính;
+nhập gói.văn bản.chính.*;
+nhập gói.lõi.định dạng.*;
+nhập gói.lõi.biểu thức chính quy.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm chính() {
     a = Bộ Quét("12 3.5 Việt");

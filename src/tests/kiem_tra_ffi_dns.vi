@@ -1,5 +1,5 @@
 nhập phân giải dns;
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 hàm chính() {
     kết_quả = phân giải tên miền phân giải("localhost");

@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        # Ubuntu 26.04's static OpenSSL requires libjitterentropy.a at link time.
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        # Static OpenSSL on Ubuntu 26.04 also needs entropy and compression libraries.
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Configure CMake
         run: cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Release
@@ -48,6 +48,14 @@ jobs:
           cmake --build "$smoke" --parallel 2
           ctest --test-dir "$smoke" --output-on-failure --no-tests=error
 
+      - name: Verify Linux x86-64 bit-identical self-hosting and no OpenSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap="$RUNNER_TEMP/vpp-native-smoke/native-aot-bootstrap"
+          bash scripts/quality/check_linux_selfhosting_convergence.sh --verify-pair \
+            "$bootstrap/stage2" "$bootstrap/stage3" "$bootstrap/convergence-ci"
+
       - name: Verify Linux x86-64 native JIT and interpreter parity
         shell: bash
         run: |
@@ -57,7 +65,7 @@ jobs:
           diagnostics="$(mktemp)"
           trap 'rm -f "$output" "$diagnostics"' EXIT
           VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-            cmake-build-debug/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            cmake-build-debug/bin/vpp-cli run --compiler=cpp src/tests/kiem_tra_machine_jit.vi \
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as x86-64 machine code$' "$diagnostics"
@@ -78,8 +86,30 @@ jobs:
         run: ctest --test-dir cmake-build-debug -R '^vpp-native-elf-x86-writer$' --output-on-failure --no-tests=error
 
       - name: Run full V++ regression suite
-        # Installed native smoke verifies the compiler Stage 1 -> Stage 2 -> Stage 3.
-        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        # The costly ASM VM self-host convergence runs in a parallel CI job.
+        # Keep the VM ASM fixture and all other tests in the normal suite.
+        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer|vpp-vm-asm-selfhost)$'
+
+      - name: Preserve integration timings (x86-64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-linux-x86-64
+          path: cmake-build-debug/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve native AOT parity evidence on failure (x86-64)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-aot-parity-linux-x86-64
+          path: |
+            cmake-build-debug/native-aot-vpp-parity/
+            cmake-build-debug/integration-logs/
+            cmake-build-debug/Testing/Temporary/LastTest.log
+            cmake-build-debug/Testing/Temporary/LastTestsFailed.log
+          if-no-files-found: ignore
 
       - name: Run RC compiler hardening checks
         shell: bash
@@ -118,16 +148,22 @@ jobs:
         run: |
           cmake -S . -B cmake-build-sanitized \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DVPP_BUILD_NATIVE_CLI=OFF \
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized --parallel 2
           # Release regression and installed smoke cover native self-hosting,
           # linker and machine-code checks without sanitizer instrumentation.
-          # Exercise frontend, runtime and integration with ASan/UBSan here.
+          # Selective imports needs the excluded native compiler/ASM VM fixtures.
+          # Bit operators also needs the excluded native-cli-compiler fixture.
+          # Exercise the C++ frontend and runtime with ASan/UBSan here.
+          # The V++ native integration suite runs in the normal regression job;
+          # its self-hosted ASM binary is not instrumented by these sanitizers.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$)'
+              --label-exclude native-toolchain \
+              --exclude-regex '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-integration$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -136,7 +172,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Linux ARM64 build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 libssl-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Build V++ on Linux ARM64
         run: |
@@ -177,7 +213,7 @@ jobs:
           diagnostics="$(mktemp)"
           trap 'rm -f "$output" "$diagnostics"' EXIT
           VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-            build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            build/bin/vpp-cli run --compiler=cpp src/tests/kiem_tra_machine_jit.vi \
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as AArch64 machine code$' "$diagnostics"
@@ -195,8 +231,30 @@ jobs:
           diff -u src/tests/expected/kiem_tra_ffi_thu_muc.expected "$output"
 
       - name: Run Linux ARM64 regression suite
-        # Native AOT bootstrap is covered by installed smoke above.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        # The ASM VM self-host convergence runs in a parallel ARM64 job.
+        # Keep vpp-vm-asm itself and every other regression here.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer|vpp-vm-asm-selfhost)$'
+
+      - name: Preserve integration timings (ARM64)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-linux-arm64
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve native AOT parity evidence on failure (ARM64)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-aot-parity-linux-arm64
+          path: |
+            build/native-aot-vpp-parity/
+            build/integration-logs/
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+          if-no-files-found: ignore
 
       - name: Link and run Linux ARM64 native calls
         run: ctest --test-dir build -R '^vpp-native-calls-host-link$' --output-on-failure --no-tests=error
@@ -216,7 +274,7 @@ jobs:
           # which is provided by libjitterentropy3-dev (not always pulled in
           # by libssl-dev). Without it, linking the host vpp-cli fails.
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config \
+            build-essential cmake libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config \
             gcc-powerpc64-linux-gnu gcc-riscv64-linux-gnu \
             gcc-loongarch64-linux-gnu libc6-dev-ppc64-cross \
             libc6-dev-riscv64-cross libc6-dev-loong64-cross \
@@ -248,14 +306,72 @@ jobs:
             loongarch64-linux-gnu loongarch64-linux-gnu-gcc qemu-loongarch64 \
             build-native-cross/smoke-loongarch64
 
+  vm-asm-selfhost:
+    # The standalone ASM VM bootstrap currently supports Linux x86-64 and
+    # macOS ARM64. Linux ARM64 has native compiler coverage in other jobs,
+    # but does not register the vpp-vm-asm-selfhost CTest test yet.
+    name: ASM VM selfhost (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86-64
+            os: ubuntu-latest
+            family: linux
+          - name: macos
+            os: macos-latest
+            family: macos
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build tools
+        if: matrix.family == 'linux'
+        run: |
+          sudo apt-get update
+          dependencies=(build-essential cmake curl sqlite3 libssl-dev zlib1g-dev libzstd-dev libffi-dev pkg-config)
+          dependencies+=(libjitterentropy3-dev)
+          sudo apt-get install -y "${dependencies[@]}"
+
+      - name: Install macOS POSIX FFI dependency
+        if: matrix.family == 'macos'
+        run: |
+          brew install libffi pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
+      - name: Build V++ for ASM VM convergence
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+
+      - name: Verify V++ ASM VM self-hosting
+        # CTest automatically includes the native-stage1, native-cli-compiler
+        # and vm-asm setup fixtures required by this test.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -R '^vpp-vm-asm-selfhost$'
+
+      - name: Preserve ASM VM convergence diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-asm-selfhost-diagnostics-${{ matrix.name }}
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+            build/vm-asm-selfhost/verification.json
+          if-no-files-found: ignore
+
   quality:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify native golden shard scheduling
+        run: python3 -m unittest discover -s scripts/quality -p test_shard_native_golden.py
+
       - name: Install quality tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl sqlite3 clang-tidy lcov libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Run clang-tidy baseline
         run: |
@@ -284,20 +400,137 @@ jobs:
             build-coverage/Testing/Temporary/LastTestsFailed.log
             build-coverage/Testing/Temporary/LastTest.log
 
-      - name: Build and run benchmark baseline
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install benchmark build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
+
+      - name: Build and exercise benchmark cases
         run: |
-          cmake -S . -B build-benchmark \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_BENCHMARKS=ON
-          cmake --build build-benchmark --target vpp-benchmark-baseline --parallel 2
-          ./build-benchmark/bin/vpp-benchmark-baseline
+          cmake -S . -B build-benchmark-smoke -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=ON
+          cmake --build build-benchmark-smoke --parallel 2 --target vpp-benchmark-baseline vpp-cli
+          build-benchmark-smoke/bin/vpp-benchmark-baseline --iterations 1 \
+            > build-benchmark-smoke/measurements.jsonl
+
+      - name: Bootstrap native V++ compiler for benchmark checks
+        run: |
+          cmake -D"VPP_CLI=$PWD/build-benchmark-smoke/bin/vpp-cli" \
+            -D"VPP_ROOT=$PWD" \
+            -D"VPP_OUTPUT_DIR=$PWD/build-benchmark-smoke/native-compiler" \
+            -D"VPP_EXECUTABLE_SUFFIX=" \
+            -P scripts/quality/prepare_native_compiler.cmake
+          echo "VPP_NATIVE_COMPILER=$PWD/build-benchmark-smoke/native-compiler/vpp-native" >> "$GITHUB_ENV"
+
+      - name: Validate the statistical comparator written in V++
+        run: |
+          mkdir -p build-benchmark-smoke/fixtures
+          VPP_HOME="$PWD" VPP_BENCHMARK_FIXTURES="$PWD/build-benchmark-smoke/fixtures" \
+            build-benchmark-smoke/bin/vpp-cli run --compiler=vpp \
+            scripts/quality/test_benchmark_gate.vi
+
+      - name: Validate shared benchmark harness across Git revisions
+        run: bash scripts/quality/check_benchmark_gate_runner.sh
+
+      - name: Check benchmark gate exit codes for every decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          for entry in pass:0 fail:1 inconclusive:2 noisy:2 invalid:3; do
+            name="${entry%%:*}"
+            expected="${entry##*:}"
+            actual=0
+            VPP_EXEC="$PWD/build-benchmark-smoke/bin/vpp-cli" \
+              sh scripts/quality/compare_benchmarks.sh \
+              "$PWD/build-benchmark-smoke/fixtures/$name.json" \
+              > "$PWD/build-benchmark-smoke/fixtures/$name.out" 2>&1 || actual=$?
+            if [ "$actual" -ne "$expected" ]; then
+              cat "$PWD/build-benchmark-smoke/fixtures/$name.out"
+              echo "unexpected $name benchmark exit code: $actual (expected $expected)" >&2
+              exit 1
+            fi
+          done
+
+      - name: Exercise alternating process collector with identical binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-benchmark-smoke/collector-check
+          export VPP_GATE_ROOT="$PWD" VPP_GATE_OUTPUT="$PWD/build-benchmark-smoke/collector-check"
+          export VPP_GATE_BASELINE_BIN="$PWD/build-benchmark-smoke/bin/vpp-benchmark-baseline"
+          export VPP_GATE_CANDIDATE_BIN="$VPP_GATE_BASELINE_BIN"
+          export VPP_GATE_BASELINE_SHA="$GITHUB_SHA" VPP_GATE_CANDIDATE_SHA="$GITHUB_SHA"
+          export VPP_GATE_BASELINE_SNAPSHOT_SHA=smoke VPP_GATE_CANDIDATE_SNAPSHOT_SHA=smoke
+          export VPP_GATE_BASELINE_BINARY_SHA="smoke" VPP_GATE_CANDIDATE_BINARY_SHA="smoke"
+          export VPP_GATE_HARNESS_SHA="smoke" VPP_GATE_HOST="$(uname -sm)"
+          export VPP_GATE_COLLECTOR_SHA="smoke" VPP_GATE_COMPARATOR_SHA="smoke"
+          export VPP_GATE_CLI_SHA="smoke" VPP_GATE_CPU="smoke" VPP_GATE_OS="$(uname -sr)"
+          export VPP_GATE_CASES=vm_verify VPP_GATE_SAMPLES=10 VPP_GATE_TARGET_MS=10
+          VPP_HOME="$PWD" VPP_AOT_ROOT="$PWD" \
+          build-benchmark-smoke/bin/vpp-cli run --compiler=vpp \
+            scripts/quality/collect_benchmark_gate.vi
+          # Identical-binary smoke validates collection and evidence. Shared
+          # runner noise can make valid samples statistically inconclusive.
+          status=0
+          VPP_EXEC="$PWD/build-benchmark-smoke/bin/vpp-cli" \
+            sh scripts/quality/compare_benchmarks.sh \
+              "$VPP_GATE_OUTPUT/report.json" || status=$?
+          case "$status" in
+            0) ;;
+            2) echo "::notice::Collector smoke produced valid inconclusive evidence; see benchmark-smoke artifacts." ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: Upload benchmark smoke measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-smoke
+          if-no-files-found: ignore
+          path: |
+            build-benchmark-smoke/measurements.jsonl
+            build-benchmark-smoke/fixtures/
+            build-benchmark-smoke/collector-check/
+
+  windows-wine-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Windows x64 ABI with MinGW and Wine in Docker
+        shell: bash
+        run: bash scripts/quality/check_windows_file_boundary_docker.sh
 
   windows-build:
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Python for weighted native golden shards
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify native golden shard scheduling
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/quality -p test_shard_native_golden.py
+          if ($LASTEXITCODE -ne 0) { throw "Native golden shard regression failed" }
+
+      - name: Verify Windows x64 native file, process and SHA ABI (COFF + Win32 + UCRT + CNG)
+        shell: pwsh
+        run: |
+          & ./scripts/windows/test-runner-support.ps1
+          $probe = Join-Path $env:RUNNER_TEMP "vpp-windows-file-boundary"
+          cmake -S scripts/quality/windows_file_boundary -B $probe -A x64
+          if ($LASTEXITCODE -ne 0) { throw "Windows file boundary configure failed" }
+          cmake --build $probe --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "Windows file boundary build failed" }
+          ctest --test-dir $probe -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Windows native file boundary test failed" }
 
       - name: Install SQLite CLI
         shell: pwsh
@@ -341,7 +574,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stdout"
           $diagnostics = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stderr"
           $process = Start-Process -FilePath (Resolve-Path "build/bin/Release/vpp-cli.exe").Path `
-            -ArgumentList @("src/tests/kiem_tra_machine_jit.vi") `
+            -ArgumentList @("run", "--compiler=cpp", "src/tests/kiem_tra_machine_jit.vi") `
             -WorkingDirectory (Get-Location).Path `
             -RedirectStandardOutput $output -RedirectStandardError $diagnostics `
             -NoNewWindow -Wait -PassThru
@@ -363,6 +596,31 @@ jobs:
         run: |
           ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { throw "Windows V++ regression suite failed" }
+
+      - name: Preserve Windows integration timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-windows
+          path: build/integration-logs/timings-windows-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve Windows CTest diagnostics on failure or cancellation
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-windows-diagnostics
+          path: |
+            build/Testing/Temporary/
+            build/native-batch/
+            build/native-source-cache/
+            build/native-asm-cache/
+            build/integration-logs/
+            src/tests/.tmp/windows-*/native-golden/
+            src/tests/.tmp/windows-*/vm-golden/
+          include-hidden-files: true
+          if-no-files-found: ignore
 
       - name: Link and run Windows x86-64 native COFF calls
         shell: pwsh
@@ -441,7 +699,28 @@ jobs:
 
       - name: Run macOS full V++ regression suite
         # Installed smoke verifies full-language native Stage 1 -> Stage 2 -> Stage 3.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^vpp-native-compiler-driver$'
+        # Full ASM VM self-host convergence runs in a parallel macOS job.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-vm-asm-selfhost)$'
+
+      - name: Preserve integration timings (macOS)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-timings-macos
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve macOS regression diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-macos-diagnostics
+          path: |
+            build/integration-logs/
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+          if-no-files-found: ignore
 
       - name: Run macOS RC compiler hardening checks
         shell: bash

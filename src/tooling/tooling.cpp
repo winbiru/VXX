@@ -167,6 +167,7 @@ const char *tenDangLap(vietvm::frontend::AstLoopForm form) noexcept {
     switch (form) {
         case AstLoopForm::Unstructured: return "chưa cấu trúc";
         case AstLoopForm::ForBlock: return "khối lặp";
+        case AstLoopForm::WhileBlock: return "khối khi";
     }
     return "chưa cấu trúc";
 }
@@ -291,6 +292,9 @@ void writeAstStatement(std::ostringstream &out,
             vietvm::frontend::AstImportForm::LocalSourceFile) {
             out << " đích=" << std::quoted(statement.importSpec.target)
                 << " dấu chấm phẩy=" << coKhong(statement.importSpec.hasSemicolon);
+            if (!statement.importSpec.selectedName.empty()) {
+                out << " tên nhập=" << std::quoted(statement.importSpec.selectedName);
+            }
             if (!statement.importSpec.alias.empty()) {
                 out << " bí danh=" << std::quoted(statement.importSpec.alias);
             }
@@ -387,7 +391,12 @@ void writeIrInstruction(std::ostringstream &out,
     if (instruction.visibility != vietvm::frontend::AstVisibility::Unspecified) {
         out << " phạm vi=" << tenPhamVi(instruction.visibility);
     }
-    if (instruction.opcode == vietvm::compiler::IrOpcode::DefineClass) {
+    if (instruction.opcode == vietvm::compiler::IrOpcode::Import &&
+        !instruction.importSpec.selectedName.empty()) {
+        out << " đích=" << std::quoted(instruction.importSpec.target)
+            << " tên nhập=" << std::quoted(instruction.importSpec.selectedName)
+            << " bí danh=" << std::quoted(instruction.importSpec.alias);
+    } else if (instruction.opcode == vietvm::compiler::IrOpcode::DefineClass) {
         out << " dạng=" << tenDangLop(instruction.classForm);
         if (!instruction.superclassName.empty()) {
             out << " lớp cha=" << std::quoted(instruction.superclassName)
@@ -613,6 +622,20 @@ struct FormatItem {
     std::size_t end = 0;
 };
 
+std::string normalizeCommentNewlines(std::string_view text) {
+    std::string result;
+    result.reserve(text.size());
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\r') {
+            result.push_back('\n');
+            if (i + 1 < text.size() && text[i + 1] == '\n') ++i;
+        } else {
+            result.push_back(text[i]);
+        }
+    }
+    return result;
+}
+
 void appendGapComments(const std::string &source,
                        std::size_t begin,
                        std::size_t end,
@@ -622,7 +645,7 @@ void appendGapComments(const std::string &source,
         if (source[index] == '/' && index + 1 < end && source[index + 1] == '/') {
             const std::size_t commentBegin = index;
             index += 2;
-            while (index < end && source[index] != '\n') ++index;
+            while (index < end && source[index] != '\n' && source[index] != '\r') ++index;
             items.push_back({FormatItemKind::LineComment,
                              source.substr(commentBegin, index - commentBegin),
                              commentBegin, index});
@@ -637,7 +660,7 @@ void appendGapComments(const std::string &source,
             }
             if (index + 1 < end) index += 2;
             items.push_back({FormatItemKind::BlockComment,
-                             source.substr(commentBegin, index - commentBegin),
+                             normalizeCommentNewlines(std::string_view(source).substr(commentBegin, index - commentBegin)),
                              commentBegin, index});
             continue;
         }
@@ -674,7 +697,7 @@ bool isOperatorToken(const std::string &token) noexcept {
 }
 
 bool isControlBeforeParen(const std::string &token) noexcept {
-    return token == "nếu" || token == "lặp" || token == "chọn" ||
+    return token == "nếu" || token == "lặp" || token == "khi" || token == "chọn" ||
            token == "bắt" || token == "bắt lỗi";
 }
 

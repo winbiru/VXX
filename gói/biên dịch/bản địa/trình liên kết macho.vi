@@ -1,0 +1,333 @@
+// Native Mach-O MH_OBJECT relocatable merger for the ARM64 compiler subset.
+// Input archives contain the canonical single-__text objects emitted by V++.
+// No external linker is needed to combine their code, symbols and BRANCH26
+// relocations. Other Mach-O forms are rejected rather than silently mangled.
+
+hàm macho tên bằng(kho trái, vị trí trái, kho phải, vị trí phải) {
+    nếu (vị trí trái < 0 || vị trí phải < 0) { trả về 0; };
+    nếu (vị trí trái >= byte dài(kho trái) || vị trí phải >= byte dài(kho phải)) { trả về 0; };
+    biến i = 0;
+    khi (vị trí trái + i < byte dài(kho trái) && vị trí phải + i < byte dài(kho phải)) {
+        biến a = byte lấy(kho trái, vị trí trái + i);
+        biến b = byte lấy(kho phải, vị trí phải + i);
+        nếu (a != b) { trả về 0; };
+        nếu (a == 0) { trả về 1; };
+        i = i + 1;
+    };
+    trả về 0;
+};
+
+// Rebuild the symbol table deterministically: definitions first, then one
+// entry per still-unresolved external import. Remap every BRANCH26 reference
+// before publishing the merged object. Keep the original string table, since
+// retained symbol offsets refer to it and unused strings are harmless.
+hàm macho chuẩn hóa ký hiệu(ký hiệu, chuỗi, tái định vị, chuẩn) {
+    nếu (ký hiệu == chuẩn || tái định vị == chuẩn) { trả về -1; };
+    nếu (byte làm rỗng(chuẩn) != 0) { trả về -1; };
+    biến ánh xạ = byte mới();
+    nếu (ánh xạ <= 0) { trả về -1; };
+    biến trạng thái = 0;
+    biến số cũ = máy chia số nguyên ba mươi hai bit(byte dài(ký hiệu), 16);
+    lặp (i = 0; i < số cũ; i++) {
+        nếu (đối tượng i32(ánh xạ, -1) != 0) { trạng thái = -1; thoát; };
+    };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < số cũ; i++) {
+            biến vị trí định nghĩa = i * 16;
+            nếu (byte lấy(ký hiệu, vị trí định nghĩa + 4) == 15) {
+                biến bản ghi định nghĩa = byte cắt(ký hiệu, vị trí định nghĩa, 16);
+                nếu (bản ghi định nghĩa <= 0) { trạng thái = -1; thoát; };
+                biến chỉ mục = máy chia số nguyên ba mươi hai bit(byte dài(chuẩn), 16);
+                nếu (byte nối(chuẩn, bản ghi định nghĩa) != 0) { trạng thái = -1; };
+                byte hủy(bản ghi định nghĩa);
+                nếu (trạng thái != 0) { thoát; };
+                nếu (byte ghi số nguyên ba mươi hai bit(ánh xạ, i * 4, chỉ mục) != 0) { trạng thái = -1; thoát; };
+            };
+        };
+    };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < số cũ; i++) {
+            biến vị trí nhập = i * 16;
+            nếu (byte lấy(ký hiệu, vị trí nhập + 4) != 1) { bỏ qua; };
+            biến tên = byte đọc số nguyên ba mươi hai bit(ký hiệu, vị trí nhập);
+            biến tìm thấy = -1;
+            // Ưu tiên định nghĩa ngay cả khi mô đun nguồn xuất hiện phía sau.
+            lặp (j = 0; j < số cũ; j++) {
+                nếu (byte lấy(ký hiệu, j * 16 + 4) == 15) {
+                    biến tên định nghĩa so sánh = byte đọc số nguyên ba mươi hai bit(ký hiệu, j * 16);
+                    nếu (macho tên bằng(chuỗi, tên, chuỗi, tên định nghĩa so sánh) == 1) {
+                        tìm thấy = byte đọc số nguyên ba mươi hai bit(ánh xạ, j * 4);
+                        thoát;
+                    };
+                };
+            };
+            nếu (tìm thấy < 0) {
+                // Nếu vẫn là ký hiệu ngoài, dùng lại lần nhập đầu tiên phía trước.
+                lặp (j = 0; j < i; j++) {
+                    nếu (byte lấy(ký hiệu, j * 16 + 4) == 1) {
+                        biến tên nhập so sánh = byte đọc số nguyên ba mươi hai bit(ký hiệu, j * 16);
+                        nếu (macho tên bằng(chuỗi, tên, chuỗi, tên nhập so sánh) == 1) {
+                            tìm thấy = byte đọc số nguyên ba mươi hai bit(ánh xạ, j * 4);
+                            thoát;
+                        };
+                    };
+                };
+            };
+            nếu (tìm thấy < 0) {
+                biến bản ghi nhập = byte cắt(ký hiệu, vị trí nhập, 16);
+                nếu (bản ghi nhập <= 0) { trạng thái = -1; thoát; };
+                tìm thấy = máy chia số nguyên ba mươi hai bit(byte dài(chuẩn), 16);
+                nếu (byte nối(chuẩn, bản ghi nhập) != 0) { trạng thái = -1; };
+                byte hủy(bản ghi nhập);
+                nếu (trạng thái != 0) { thoát; };
+            };
+            nếu (byte ghi số nguyên ba mươi hai bit(ánh xạ, i * 4, tìm thấy) != 0) { trạng thái = -1; thoát; };
+        };
+    };
+    nếu (trạng thái == 0) {
+        lặp (i = 0; i < byte dài(tái định vị); i = i + 8) {
+            biến kiểu = byte đọc số nguyên ba mươi hai bit(tái định vị, i + 4);
+            biến cũ = kiểu - 754974720;
+            nếu (cũ < 0 || cũ >= số cũ) { trạng thái = -1; thoát; };
+            biến mới = byte đọc số nguyên ba mươi hai bit(ánh xạ, cũ * 4);
+            nếu (mới < 0) { trạng thái = -1; thoát; };
+            nếu (byte ghi số nguyên ba mươi hai bit(tái định vị, i + 4, 754974720 + mới) != 0) {
+                trạng thái = -1; thoát;
+            };
+        };
+    };
+    byte hủy(ánh xạ);
+    nếu (trạng thái != 0) { byte làm rỗng(chuẩn); trả về -1; };
+    trả về máy chia số nguyên ba mươi hai bit(byte dài(chuẩn), 16);
+};
+
+hàm macho hợp nhất mô đun(kho, đích) {
+    nếu (kho == đích) { trả về -1; };
+    nếu (byte làm rỗng(đích) != 0) { trả về -1; };
+    biến mã = byte mới();
+    biến tái định vị = byte mới();
+    biến bảng ký hiệu = byte mới();
+    biến chuỗi = byte mới();
+    biến trạng thái = 0;
+    nếu (mã <= 0 || tái định vị <= 0 || bảng ký hiệu <= 0 || chuỗi <= 0) { trạng thái = -1; };
+    biến vị trí = 0;
+    biến tổng ký hiệu = 0;
+    biến số đối tượng = 0;
+    // Keep section-name handles alive across objects. Creating string
+    // literals inside the per-byte loop exhausts the 64-slot byte arena.
+    biến tên phần văn bản = "__text";
+    biến tên đoạn văn bản = "__TEXT";
+    nếu (tên phần văn bản <= 0 || tên đoạn văn bản <= 0) { trạng thái = -1; };
+    khi (trạng thái == 0 && vị trí < byte dài(kho)) {
+        nếu (vị trí > byte dài(kho) - 4) { trạng thái = -1; thoát; };
+        biến dài = byte đọc số nguyên ba mươi hai bit(kho, vị trí);
+        nếu (dài < 233 || dài > byte dài(kho) - vị trí - 4) { trạng thái = -1; thoát; };
+        biến gốc = vị trí + 4;
+        // Fixed 232-byte V++ header: MH_OBJECT, ARM64, one __text section,
+        // LC_SYMTAB and LC_BUILD_VERSION. High halves of sizes stay zero.
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc) != -17958193) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 4) != 16777228) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 8) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 12) != 1) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 16) != 3) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 20) != 200) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 24) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 28) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 32) != 25) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 36) != 152) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 56) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 72) != 232) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 88) != 7) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 92) != 5) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 96) != 1) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 100) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 136) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 140) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 148) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 152) != 232) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 156) != 2) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 168) != -2147482624) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 172) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 176) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 180) != 0) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 184) != 2) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 188) != 24) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 208) != 50) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 212) != 24) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 216) != 1) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 220) != 720896) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 224) != 720896) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 228) != 0) { trạng thái = -1; thoát; };
+        lặp (k = 0; k < 4; k++) {
+            nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 60 + k * 8) != 0) { trạng thái = -1; };
+        };
+        // The canonical producer emits one __TEXT,__text section and a
+        // zeroed segment name. Reject different section names or padding.
+        lặp (k = 0; k < 16; k++) {
+            biến tên phần = 0;
+            biến tên đoạn = 0;
+            nếu (k < 6) { tên phần = byte lấy(tên phần văn bản, k); tên đoạn = byte lấy(tên đoạn văn bản, k); };
+            nếu (byte lấy(kho, gốc + 40 + k) != 0) { trạng thái = -1; };
+            nếu (byte lấy(kho, gốc + 104 + k) != tên phần) { trạng thái = -1; };
+            nếu (byte lấy(kho, gốc + 120 + k) != tên đoạn) { trạng thái = -1; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        biến dài mã = byte đọc số nguyên ba mươi hai bit(kho, gốc + 144);
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 64) != dài mã) { trạng thái = -1; thoát; };
+        nếu (byte đọc số nguyên ba mươi hai bit(kho, gốc + 80) != dài mã) { trạng thái = -1; thoát; };
+        biến rel = byte đọc số nguyên ba mươi hai bit(kho, gốc + 160);
+        biến nrel = byte đọc số nguyên ba mươi hai bit(kho, gốc + 164);
+        biến sym = byte đọc số nguyên ba mươi hai bit(kho, gốc + 192);
+        biến nsym = byte đọc số nguyên ba mươi hai bit(kho, gốc + 196);
+        biến str = byte đọc số nguyên ba mươi hai bit(kho, gốc + 200);
+        biến nstr = byte đọc số nguyên ba mươi hai bit(kho, gốc + 204);
+        nếu (dài mã <= 0 || dài mã > dài - 232) { trạng thái = -1; thoát; };
+        nếu (nrel < 0 || nsym < 1 || nstr < 2) { trạng thái = -1; thoát; };
+        biến rel mong đợi = 232 + dài mã;
+        khi (rel mong đợi - máy chia số nguyên ba mươi hai bit(rel mong đợi, 8) * 8 != 0) { rel mong đợi = rel mong đợi + 1; };
+        nếu (rel mong đợi > dài) { trạng thái = -1; thoát; };
+        lặp (k = 232 + dài mã; k < rel mong đợi; k++) {
+            nếu (byte lấy(kho, gốc + k) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        nếu (nrel > máy chia số nguyên ba mươi hai bit(dài - rel mong đợi, 8)) { trạng thái = -1; thoát; };
+        nếu (rel != 0 && rel != rel mong đợi) { trạng thái = -1; thoát; };
+        nếu (nrel > 0 && rel != rel mong đợi) { trạng thái = -1; thoát; };
+        nếu (sym != rel mong đợi + nrel * 8) { trạng thái = -1; thoát; };
+        nếu (nsym > máy chia số nguyên ba mươi hai bit(dài - sym, 16)) { trạng thái = -1; thoát; };
+        nếu (str != sym + nsym * 16) { trạng thái = -1; thoát; };
+        nếu (nstr != dài - str) { trạng thái = -1; thoát; };
+        nếu (byte lấy(kho, gốc + str) != 0) { trạng thái = -1; thoát; };
+        nếu (byte lấy(kho, gốc + dài - 1) != 0) { trạng thái = -1; thoát; };
+        biến gốc mã = byte dài(mã);
+        biến gốc chuỗi = byte dài(chuỗi);
+        nếu (gốc mã > 900000 - dài mã) { trạng thái = -1; thoát; };
+        nếu (tổng ký hiệu > 16777215 - nsym) { trạng thái = -1; thoát; };
+        nếu (số đối tượng == 0) {
+            biến phần đầu = byte cắt(kho, gốc, 232);
+            nếu (phần đầu <= 0) { trạng thái = -1; thoát; };
+            nếu (byte nối(đích, phần đầu) != 0) { trạng thái = -1; };
+            byte hủy(phần đầu);
+            nếu (trạng thái != 0) { thoát; };
+        };
+        biến khối mã = byte cắt(kho, gốc + 232, dài mã);
+        nếu (khối mã <= 0) { trạng thái = -1; thoát; };
+        nếu (byte nối(mã, khối mã) != 0) { trạng thái = -1; };
+        byte hủy(khối mã);
+        nếu (trạng thái != 0) { thoát; };
+        // Keep the next module's instructions 4-byte aligned.
+        khi (byte dài(mã) - máy chia số nguyên ba mươi hai bit(byte dài(mã), 4) * 4 != 0) {
+            nếu (byte thêm(mã, 0) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        lặp (i = 0; i < nrel; i++) {
+            biến vị trí tái định vị = byte đọc số nguyên ba mươi hai bit(kho, gốc + rel mong đợi + i * 8);
+            biến kiểu = byte đọc số nguyên ba mươi hai bit(kho, gốc + rel mong đợi + i * 8 + 4);
+            nếu (vị trí tái định vị < 0 || vị trí tái định vị > dài mã - 4) { trạng thái = -1; thoát; };
+            nếu (vị trí tái định vị - máy chia số nguyên ba mươi hai bit(vị trí tái định vị, 4) * 4 != 0) { trạng thái = -1; thoát; };
+            nếu (kiểu < 754974720 || kiểu >= 754974720 + nsym) { trạng thái = -1; thoát; };
+            nếu (đối tượng i32(tái định vị, vị trí tái định vị + gốc mã) != 0) { trạng thái = -1; thoát; };
+            nếu (đối tượng i32(tái định vị, kiểu + tổng ký hiệu) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        lặp (i = 0; i < nsym; i++) {
+            biến vị trí ký hiệu = gốc + sym + i * 16;
+            biến strx = byte đọc số nguyên ba mươi hai bit(kho, vị trí ký hiệu);
+            biến loại = byte lấy(kho, vị trí ký hiệu + 4);
+            biến đoạn = byte lấy(kho, vị trí ký hiệu + 5);
+            biến giá trị = byte đọc số nguyên ba mươi hai bit(kho, vị trí ký hiệu + 8);
+            nếu (byte lấy(kho, vị trí ký hiệu + 6) != 0 || byte lấy(kho, vị trí ký hiệu + 7) != 0) { trạng thái = -1; thoát; };
+            nếu (strx <= 0 || strx >= nstr) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, gốc + str + strx - 1) != 0) { trạng thái = -1; thoát; };
+            nếu (byte lấy(kho, gốc + str + strx) == 0) { trạng thái = -1; thoát; };
+            biến kết thúc = 0;
+            lặp (j = strx; j < nstr; j++) {
+                nếu (byte lấy(kho, gốc + str + j) == 0) { kết thúc = 1; thoát; };
+            };
+            nếu (kết thúc == 0) { trạng thái = -1; thoát; };
+            nếu (loại == 15 && đoạn == 1) {
+                nếu (giá trị < 0 || giá trị >= dài mã) { trạng thái = -1; thoát; };
+                // Từ chối định nghĩa ngoài bị trùng trước khi xuất đối tượng
+                // có thể tái định vị; ký hiệu nhập chưa định nghĩa được phép lặp.
+                lặp (cũ = 0; cũ < byte dài(bảng ký hiệu); cũ = cũ + 16) {
+                    nếu (byte lấy(bảng ký hiệu, cũ + 4) == 15) {
+                        biến tên cũ = byte đọc số nguyên ba mươi hai bit(bảng ký hiệu, cũ);
+                        nếu (macho tên bằng(chuỗi, tên cũ, kho, gốc + str + strx) == 1) {
+                            trạng thái = -1; thoát;
+                        };
+                    };
+                };
+                nếu (trạng thái != 0) { thoát; };
+                giá trị = giá trị + gốc mã;
+            } hoặc {
+                nếu (loại != 1 || đoạn != 0 || giá trị != 0) { trạng thái = -1; thoát; };
+            };
+            nếu (byte đọc số nguyên ba mươi hai bit(kho, vị trí ký hiệu + 12) != 0) { trạng thái = -1; thoát; };
+            nếu (đối tượng i32(bảng ký hiệu, strx + gốc chuỗi) != 0) { trạng thái = -1; thoát; };
+            lặp (k = 4; k < 8; k++) {
+                nếu (byte thêm(bảng ký hiệu, byte lấy(kho, vị trí ký hiệu + k)) != 0) { trạng thái = -1; thoát; };
+            };
+            nếu (trạng thái != 0) { thoát; };
+            nếu (đối tượng u64(bảng ký hiệu, giá trị) != 0) { trạng thái = -1; thoát; };
+        };
+        nếu (trạng thái != 0) { thoát; };
+        biến khối chuỗi = byte cắt(kho, gốc + str, nstr);
+        nếu (khối chuỗi <= 0) { trạng thái = -1; thoát; };
+        nếu (byte nối(chuỗi, khối chuỗi) != 0) { trạng thái = -1; };
+        byte hủy(khối chuỗi);
+        nếu (trạng thái != 0) { thoát; };
+        tổng ký hiệu = tổng ký hiệu + nsym;
+        vị trí = vị trí + dài + 4;
+        số đối tượng = số đối tượng + 1;
+    };
+    nếu (trạng thái == 0 && vị trí != byte dài(kho)) { trạng thái = -1; };
+    nếu (trạng thái == 0 && số đối tượng < 1) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        biến chuẩn = byte mới();
+        nếu (chuẩn <= 0) { trạng thái = -1; } hoặc {
+            biến số chuẩn = macho chuẩn hóa ký hiệu(bảng ký hiệu, chuỗi, tái định vị, chuẩn);
+            nếu (số chuẩn <= 0) { trạng thái = -1; } hoặc {
+                byte hủy(bảng ký hiệu);
+                bảng ký hiệu = chuẩn;
+                tổng ký hiệu = số chuẩn;
+                chuẩn = -1;
+            };
+        };
+        nếu (chuẩn > 0) { byte hủy(chuẩn); };
+    };
+    nếu (trạng thái == 0) {
+        biến n = byte dài(mã);
+        biến reloff = 232 + n;
+        khi (reloff - máy chia số nguyên ba mươi hai bit(reloff, 8) * 8 != 0) { reloff = reloff + 1; };
+        biến symoff = reloff + byte dài(tái định vị);
+        biến stroff = symoff + byte dài(bảng ký hiệu);
+        nếu (stroff > 2097152 - byte dài(chuỗi)) { trạng thái = -1; };
+        nếu (trạng thái == 0) {
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 64, n) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 80, n) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 144, n) != 0) { trạng thái = -1; };
+            biến offset rel = 0;
+            nếu (byte dài(tái định vị) > 0) { offset rel = reloff; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 160, offset rel) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 164, máy chia số nguyên ba mươi hai bit(byte dài(tái định vị), 8)) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 192, symoff) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 196, tổng ký hiệu) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 200, stroff) != 0) { trạng thái = -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(đích, 204, byte dài(chuỗi)) != 0) { trạng thái = -1; };
+            nếu (byte nối(đích, mã) != 0) { trạng thái = -1; };
+            nếu (đối tượng đệm(đích, reloff) != 0) { trạng thái = -1; };
+            nếu (byte nối(đích, tái định vị) != 0) { trạng thái = -1; };
+            nếu (byte nối(đích, bảng ký hiệu) != 0) { trạng thái = -1; };
+            nếu (byte nối(đích, chuỗi) != 0) { trạng thái = -1; };
+            nếu (byte dài(đích) != stroff + byte dài(chuỗi)) { trạng thái = -1; };
+        };
+    };
+    nếu (tên phần văn bản > 0) { byte hủy(tên phần văn bản); };
+    nếu (tên đoạn văn bản > 0) { byte hủy(tên đoạn văn bản); };
+    nếu (mã > 0) { byte hủy(mã); };
+    nếu (tái định vị > 0) { byte hủy(tái định vị); };
+    nếu (bảng ký hiệu > 0) { byte hủy(bảng ký hiệu); };
+    nếu (chuỗi > 0) { byte hủy(chuỗi); };
+    nếu (trạng thái != 0) { byte làm rỗng(đích); trả về -1; };
+    trả về byte dài(đích);
+};

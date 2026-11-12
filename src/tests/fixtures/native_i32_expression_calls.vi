@@ -1,0 +1,18 @@
+// Nhiều biểu thức hậu tố là đối số, cùng một biến xuất hiện nhiều lần.
+hàm nhân đôi(a) { trả về a * 2 + 1; };
+hàm ghép số(a, b, c, d) { trả về a + b * 2 + c * 3 + d * 4; };
+hàm chính() {
+    x = 3;
+    y = 4;
+    in nhân đôi((x + 3) * 2);
+    in ghép số((x + 1) * 2, (y + 2) * 3, 1 + 2, x * y);
+    in ghép số((x + 1) * 2, x + x, x * 3, (x + 1) * (x + 2));
+    // Bốn đối số cùng một ô chỉ cần một guard trước lời gọi ABI.
+    in ghép số(x, x, x, x);
+    // Đổi kiểu sau lời gọi: guard phải chuyển sang phép cộng số thực.
+    x = 1.5;
+    in nhân đôi((x + 3) * 2);
+    in ghép số((x + 1) * 2, 2, 3, 4);
+    x = 3;
+    in nhân đôi((x + 3) * 2);
+};

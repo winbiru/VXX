@@ -2,7 +2,7 @@
 // API hàm tự do của các module bộ sưu tập hiện tại vẫn tương thích.
 // Dùng trực tiếp từ module hoặc qua `gói/bộ sưu tập/chính`.
 
-nhập gói/bộ sưu tập/bộ đệm danh sách;
+nhập gói.bộ sưu tập.bộ đệm danh sách.*;
 
 lớp công khai Ngăn Xếp kế thừa Bộ Đệm Danh Sách {
     hàm công khai khởi tạo() {

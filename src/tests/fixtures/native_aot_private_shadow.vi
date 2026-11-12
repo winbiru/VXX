@@ -1,0 +1,13 @@
+lớp Cha Riêng {
+    hàm riêng tư kín() { trả về 1; };
+    hàm công khai gọi() { trả về mình.kín(); };
+};
+
+lớp Con Riêng kế thừa Cha Riêng {
+    hàm riêng tư kín() { trả về 2; };
+};
+
+hàm chính() {
+    x = Con Riêng();
+    in x.gọi();
+};

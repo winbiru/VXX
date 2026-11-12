@@ -6,10 +6,14 @@
 // - VM chỉ giữ entropy bảo mật của hệ điều hành/OpenSSL.
 // - Digest và random bảo mật trả hex chữ thường.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/nguồn ngẫu nhiên;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.cộng;
+nhập gói.lõi.toán học.lũy thừa;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Mật Mã {
@@ -24,35 +28,13 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã xor byte(a, b) {
-        x = a;
-        y = b;
-        trọng số = 1;
-        kết quả = 0;
-        lặp(i = 0; i < 8; i++) {
-            nếu ((x % 2) != (y % 2)) {
-                kết quả = kết quả + trọng số;
-            };
-            x = làm tròn xuống(x / 2);
-            y = làm tròn xuống(y / 2);
-            trọng số = trọng số * 2;
-        };
-        trả về kết quả;
+        // Toán tử bit có cùng ABI i32 trong VM và AOT. Chỉ giữ tám bit
+        // thấp như thuật toán từng bit, không chuyển phép băm về host.
+        trả về (a ^ b) & 255;
     };
 
     hàm công khai mật mã và byte(a, b) {
-        x = a;
-        y = b;
-        trọng số = 1;
-        kết quả = 0;
-        lặp(i = 0; i < 8; i++) {
-            nếu ((x % 2) == 1 && (y % 2) == 1) {
-                kết quả = kết quả + trọng số;
-            };
-            x = làm tròn xuống(x / 2);
-            y = làm tròn xuống(y / 2);
-            trọng số = trọng số * 2;
-        };
-        trả về kết quả;
+        trả về (a & b) & 255;
     };
 
     hàm công khai mật mã xor từ máy(a, b) {
@@ -94,7 +76,7 @@ lớp công khai Bộ Mật Mã {
         kết quả = [0, 0, 0, 0];
         lặp(i = 0; i < 4; i++) {
             nguồn = i - dịch byte;
-            lặp(v = 0; nguồn < 0; v++) {
+            khi (nguồn < 0) {
                 nguồn = nguồn + 4;
             };
             nguồn = nguồn % 4;
@@ -219,90 +201,187 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sha256 các byte(các byte) {
-        thông điệp = [];
-        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        độ dài gốc = máy ảo lấy độ dài(các byte);
+        lặp(i = 0; i < độ dài gốc; i++) {
             byte = các byte[i];
-            nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            // Guard the type before ordering comparisons; native logical
+            // operators may evaluate both operands.
+            nếu (loại của(byte) != "số nguyên") {
                 ném "băm sha256: dữ liệu byte không hợp lệ";
             };
-            máy ảo thêm cuối danh sách(thông điệp, byte);
+            nếu (byte < 0 || byte > 255) {
+                ném "băm sha256: dữ liệu byte không hợp lệ";
+            };
         };
-        độ dài gốc = máy ảo lấy độ dài(thông điệp);
-        máy ảo thêm cuối danh sách(thông điệp, 128);
-        lặp(vòng = 0; máy ảo lấy độ dài(thông điệp) % 64 != 56; vòng++) {
-            máy ảo thêm cuối danh sách(thông điệp, 0);
+        trả về mình.mật mã sha256 lõi(các byte);
+    };
+
+    // The runtime creates the byte list from a string; arbitrary callers
+    // cannot supply an invalid element through this entrypoint.
+    hàm công khai mật mã băm chuỗi máy ảo(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi") { ném "băm sha256: văn bản phải là chuỗi"; };
+        trả về mình.mật mã thập lục phân(mình.mật mã sha256 lõi(chuỗi thành byte máy ảo(văn bản)));
+    };
+
+    hàm riêng tư mật mã sha256 lõi(các byte) {
+        độ dài gốc = máy ảo lấy độ dài(các byte);
+        // Full blocks are read directly from the caller's immutable input.
+        // Only the final 64/128 padding bytes need a separate allocation.
+        // Copying multi-megabyte assembly into a second boxed byte list made
+        // concurrent compiler workers consume gigabytes for cache hashing.
+        cuối khối đầy = độ dài gốc - độ dài gốc % 64;
+        đuôi = [];
+        lặp(i = cuối khối đầy; i < độ dài gốc; i++) {
+            máy ảo thêm cuối danh sách(đuôi, các byte[i]);
+        };
+        máy ảo thêm cuối danh sách(đuôi, 128);
+        khi (máy ảo lấy độ dài(đuôi) % 64 != 56) {
+            máy ảo thêm cuối danh sách(đuôi, 0);
         };
         dài bit = mình.mật mã độ dài bit các byte(độ dài gốc);
         lặp(i = 0; i < 8; i++) {
-            máy ảo thêm cuối danh sách(thông điệp, dài bit[i]);
+            máy ảo thêm cuối danh sách(đuôi, dài bit[i]);
         };
 
-        h = [
-            [106,9,230,103], [187,103,174,133], [60,110,243,114], [165,79,245,58],
-            [81,14,82,127], [155,5,104,140], [31,131,217,171], [91,224,205,25]
-        ];
-        k = mình.mật mã hằng số sha256();
-
-        lặp(bắt đầu = 0; bắt đầu < máy ảo lấy độ dài(thông điệp); bắt đầu += 64) {
-            w = [];
+        // SHA-256 word arithmetic uses wrapping i32 operators shared by VM
+        // and AOT. Mask signed right shifts to obtain logical shifts. The
+        // public byte API and digest stay identical; no native hash callback.
+        h = [1779033703, -1150833019, 1013904242, -1521486534,
+             1359893119, -1694144372, 528734635, 1541459225];
+        byte k = mình.mật mã hằng số sha256();
+        k = [];
+        lặp(i = 0; i < 64; i++) {
+            q = byte k[i];
+            máy ảo thêm cuối danh sách(k, (q[0] << 24) | (q[1] << 16) | (q[2] << 8) | q[3]);
+        };
+        tổng byte = cuối khối đầy + máy ảo lấy độ dài(đuôi);
+        // Reuse the fixed-size message schedule for every block. All 64
+        // words are overwritten before use, including the padded blocks.
+        w = [];
+        lặp(t = 0; t < 64; t++) { máy ảo thêm cuối danh sách(w, 0); };
+        lặp(bắt đầu = 0; bắt đầu < tổng byte; bắt đầu += 64) {
+            thông điệp = các byte;
+            vị trí khối = bắt đầu;
+            nếu (bắt đầu >= cuối khối đầy) {
+                thông điệp = đuôi;
+                vị trí khối = bắt đầu - cuối khối đầy;
+            };
             lặp(t = 0; t < 16; t++) {
-                p = bắt đầu + t * 4;
-                máy ảo thêm cuối danh sách(w, [thông điệp[p], thông điệp[p + 1], thông điệp[p + 2], thông điệp[p + 3]]);
+                p = vị trí khối + t * 4;
+                w[t] = (thông điệp[p] << 24) |
+                    (thông điệp[p + 1] << 16) | (thông điệp[p + 2] << 8) | thông điệp[p + 3];
             };
-            lặp(t mở rộng = 16; t mở rộng < 64; t mở rộng++) {
-                giá trị = mình.mật mã cộng từ máy(
-                    mình.mật mã sigma nhỏ một(w[t mở rộng - 2]),
-                    w[t mở rộng - 7]
-                );
-                giá trị = mình.mật mã cộng từ máy(
-                    giá trị,
-                    mình.mật mã sigma nhỏ không(w[t mở rộng - 15])
-                );
-                giá trị = mình.mật mã cộng từ máy(giá trị, w[t mở rộng - 16]);
-                máy ảo thêm cuối danh sách(w, giá trị);
+            lặp(t = 16; t < 64; t++) {
+                x = w[t - 15]; y = w[t - 2];
+                s0 = (((x >> 7) & 33554431) | (x << 25)) ^
+                     (((x >> 18) & 16383) | (x << 14)) ^ ((x >> 3) & 536870911);
+                s1 = (((y >> 17) & 32767) | (y << 15)) ^
+                     (((y >> 19) & 8191) | (y << 13)) ^ ((y >> 10) & 4194303);
+                w[t] = w[t - 16] + s0 + w[t - 7] + s1;
             };
-
-            a = h[0];
-            b = h[1];
-            c = h[2];
-            d = h[3];
-            e = h[4];
-            f = h[5];
-            g = h[6];
-            hh = h[7];
-
-            lặp(t vòng = 0; t vòng < 64; t vòng++) {
-                t1 = mình.mật mã cộng từ máy(hh, mình.mật mã sigma lớn một(e));
-                t1 = mình.mật mã cộng từ máy(t1, mình.mật mã lựa chọn(e, f, g));
-                t1 = mình.mật mã cộng từ máy(t1, k[t vòng]);
-                t1 = mình.mật mã cộng từ máy(t1, w[t vòng]);
-                t2 = mình.mật mã cộng từ máy(mình.mật mã sigma lớn không(a), mình.mật mã đa số(a, b, c));
-
-                hh = g;
-                g = f;
-                f = e;
-                e = mình.mật mã cộng từ máy(d, t1);
-                d = c;
-                c = b;
-                b = a;
-                a = mình.mật mã cộng từ máy(t1, t2);
+            a = h[0]; b = h[1]; c = h[2]; d = h[3];
+            e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+            // Eight rounds restore the original register ordering. Rotate names
+            // at compile time rather than copying all eight boxed values per round.
+            lặp(t = 0; t < 64; t += 8) {
+                // Round 1
+                s1 = (((e >> 6) & 67108863) | (e << 26)) ^
+                     (((e >> 11) & 2097151) | (e << 21)) ^
+                     (((e >> 25) & 127) | (e << 7));
+                lựa = g ^ (e & (f ^ g));
+                t1 = hh + s1 + lựa + k[t] + w[t];
+                s0 = (((a >> 2) & 1073741823) | (a << 30)) ^
+                     (((a >> 13) & 524287) | (a << 19)) ^
+                     (((a >> 22) & 1023) | (a << 10));
+                đa số = (a & b) | (c & (a | b));
+                d = d + t1; hh = s0 + đa số + t1;
+                // Round 2
+                s1 = (((d >> 6) & 67108863) | (d << 26)) ^
+                     (((d >> 11) & 2097151) | (d << 21)) ^
+                     (((d >> 25) & 127) | (d << 7));
+                lựa = f ^ (d & (e ^ f));
+                t1 = g + s1 + lựa + k[t + 1] + w[t + 1];
+                s0 = (((hh >> 2) & 1073741823) | (hh << 30)) ^
+                     (((hh >> 13) & 524287) | (hh << 19)) ^
+                     (((hh >> 22) & 1023) | (hh << 10));
+                đa số = (hh & a) | (b & (hh | a));
+                c = c + t1; g = s0 + đa số + t1;
+                // Round 3
+                s1 = (((c >> 6) & 67108863) | (c << 26)) ^
+                     (((c >> 11) & 2097151) | (c << 21)) ^
+                     (((c >> 25) & 127) | (c << 7));
+                lựa = e ^ (c & (d ^ e));
+                t1 = f + s1 + lựa + k[t + 2] + w[t + 2];
+                s0 = (((g >> 2) & 1073741823) | (g << 30)) ^
+                     (((g >> 13) & 524287) | (g << 19)) ^
+                     (((g >> 22) & 1023) | (g << 10));
+                đa số = (g & hh) | (a & (g | hh));
+                b = b + t1; f = s0 + đa số + t1;
+                // Round 4
+                s1 = (((b >> 6) & 67108863) | (b << 26)) ^
+                     (((b >> 11) & 2097151) | (b << 21)) ^
+                     (((b >> 25) & 127) | (b << 7));
+                lựa = d ^ (b & (c ^ d));
+                t1 = e + s1 + lựa + k[t + 3] + w[t + 3];
+                s0 = (((f >> 2) & 1073741823) | (f << 30)) ^
+                     (((f >> 13) & 524287) | (f << 19)) ^
+                     (((f >> 22) & 1023) | (f << 10));
+                đa số = (f & g) | (hh & (f | g));
+                a = a + t1; e = s0 + đa số + t1;
+                // Round 5
+                s1 = (((a >> 6) & 67108863) | (a << 26)) ^
+                     (((a >> 11) & 2097151) | (a << 21)) ^
+                     (((a >> 25) & 127) | (a << 7));
+                lựa = c ^ (a & (b ^ c));
+                t1 = d + s1 + lựa + k[t + 4] + w[t + 4];
+                s0 = (((e >> 2) & 1073741823) | (e << 30)) ^
+                     (((e >> 13) & 524287) | (e << 19)) ^
+                     (((e >> 22) & 1023) | (e << 10));
+                đa số = (e & f) | (g & (e | f));
+                hh = hh + t1; d = s0 + đa số + t1;
+                // Round 6
+                s1 = (((hh >> 6) & 67108863) | (hh << 26)) ^
+                     (((hh >> 11) & 2097151) | (hh << 21)) ^
+                     (((hh >> 25) & 127) | (hh << 7));
+                lựa = b ^ (hh & (a ^ b));
+                t1 = c + s1 + lựa + k[t + 5] + w[t + 5];
+                s0 = (((d >> 2) & 1073741823) | (d << 30)) ^
+                     (((d >> 13) & 524287) | (d << 19)) ^
+                     (((d >> 22) & 1023) | (d << 10));
+                đa số = (d & e) | (f & (d | e));
+                g = g + t1; c = s0 + đa số + t1;
+                // Round 7
+                s1 = (((g >> 6) & 67108863) | (g << 26)) ^
+                     (((g >> 11) & 2097151) | (g << 21)) ^
+                     (((g >> 25) & 127) | (g << 7));
+                lựa = a ^ (g & (hh ^ a));
+                t1 = b + s1 + lựa + k[t + 6] + w[t + 6];
+                s0 = (((c >> 2) & 1073741823) | (c << 30)) ^
+                     (((c >> 13) & 524287) | (c << 19)) ^
+                     (((c >> 22) & 1023) | (c << 10));
+                đa số = (c & d) | (e & (c | d));
+                f = f + t1; b = s0 + đa số + t1;
+                // Round 8
+                s1 = (((f >> 6) & 67108863) | (f << 26)) ^
+                     (((f >> 11) & 2097151) | (f << 21)) ^
+                     (((f >> 25) & 127) | (f << 7));
+                lựa = hh ^ (f & (g ^ hh));
+                t1 = a + s1 + lựa + k[t + 7] + w[t + 7];
+                s0 = (((b >> 2) & 1073741823) | (b << 30)) ^
+                     (((b >> 13) & 524287) | (b << 19)) ^
+                     (((b >> 22) & 1023) | (b << 10));
+                đa số = (b & c) | (d & (b | c));
+                e = e + t1; a = s0 + đa số + t1;
             };
-
-            h[0] = mình.mật mã cộng từ máy(h[0], a);
-            h[1] = mình.mật mã cộng từ máy(h[1], b);
-            h[2] = mình.mật mã cộng từ máy(h[2], c);
-            h[3] = mình.mật mã cộng từ máy(h[3], d);
-            h[4] = mình.mật mã cộng từ máy(h[4], e);
-            h[5] = mình.mật mã cộng từ máy(h[5], f);
-            h[6] = mình.mật mã cộng từ máy(h[6], g);
-            h[7] = mình.mật mã cộng từ máy(h[7], hh);
+            h[0] = h[0] + a; h[1] = h[1] + b; h[2] = h[2] + c; h[3] = h[3] + d;
+            h[4] = h[4] + e; h[5] = h[5] + f; h[6] = h[6] + g; h[7] = h[7] + hh;
         };
-
         kết quả = [];
         lặp(i = 0; i < 8; i++) {
-            lặp(j = 0; j < 4; j++) {
-                máy ảo thêm cuối danh sách(kết quả, h[i][j]);
-            };
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 24) & 255);
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 16) & 255);
+            máy ảo thêm cuối danh sách(kết quả, (h[i] >> 8) & 255);
+            máy ảo thêm cuối danh sách(kết quả, h[i] & 255);
         };
         trả về kết quả;
     };
@@ -464,6 +543,11 @@ hàm công khai mật mã độ dài bit các byte(số byte) {
 hàm công khai mật mã sha256 các byte(các byte) {
     bộ chuyển tiếp = Bộ Mật Mã();
     trả về bộ chuyển tiếp.mật mã sha256 các byte(các byte);
+};
+
+hàm công khai mật mã băm chuỗi máy ảo(văn bản) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã băm chuỗi máy ảo(văn bản);
 };
 
 hàm công khai mật mã thập lục phân(các byte) {

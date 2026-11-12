@@ -1,10 +1,10 @@
 // API hàm, lớp và phương thức giữ hành vi qua import, callback và kế thừa.
-nhập gói/bộ sưu tập/danh sách như a;
-nhập gói/bộ sưu tập/danh sách như b;
-nhập gói/văn bản/chuỗi;
-nhập gói/dữ liệu/json/json;
-nhập gói/dữ liệu/xml/cây tài liệu;
-nhập gói/kiểm thử/khẳng định;
+nhập gói.bộ sưu tập.danh sách.* như a;
+nhập gói.bộ sưu tập.danh sách.* như b;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.dữ liệu.xml.cây tài liệu.*;
+nhập gói.kiểm thử.khẳng định.*;
 
 lớp công khai Chuỗi Tùy Biến kế thừa Xử Lý Chuỗi {
     hàm công khai cắt chuỗi(s, bắt_đầu, số_lượng) { trả về "!"; };

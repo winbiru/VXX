@@ -51,6 +51,12 @@ hàm công khai biên dịch mã thao tác(tên) {
         ca "OP_TEN_BIEN_GIA_TRI": { trả về 61; }
         ca "OP_JUMP_IF_FALSE": { trả về 62; }
         ca "OP_JUMP": { trả về 63; }
+        ca "OP_BIT_VA": { trả về 209; }
+        ca "OP_BIT_HOAC": { trả về 210; }
+        ca "OP_BIT_XOR": { trả về 211; }
+        ca "OP_DICH_TRAI": { trả về 212; }
+        ca "OP_DICH_PHAI": { trả về 213; }
+        ca "OP_GOI_LOI_BAN_DIA": { trả về 215; }
         ca "OP_MODULO": { trả về 64; }
         ca "OP_CHUOI": { trả về 65; }
         ca "OP_PHU_DINH": { trả về 66; }
@@ -141,6 +147,9 @@ hàm công khai biên dịch mã thao tác(tên) {
         ca "OP_VM_MAP_REMOVE": { trả về 151; }
         ca "OP_VM_MAP_KEYS": { trả về 152; }
         ca "OP_VM_STRING_BYTES": { trả về 153; }
+        ca "OP_VM_STRING_SLICE": { trả về 214; }
+        ca "OP_VM_STRING_REPLACE_EXACT": { trả về 216; }
+        ca "OP_VM_STRING_BYTE_SLICE": { trả về 217; }
         ca "OP_VM_STRING_FROM_BYTES": { trả về 154; }
         ca "OP_VM_FLOAT_FROM_BITS": { trả về 155; }
         ca "OP_FFI_CALL": { trả về 156; }
@@ -154,6 +163,18 @@ hàm công khai biên dịch mã thao tác(tên) {
         ca "OP_VM_MACHINE_FILE_TELL": { trả về 164; }
         ca "OP_VM_MACHINE_FILE_ERROR": { trả về 165; }
         ca "OP_VM_MACHINE_FILE_REMOVE": { trả về 166; }
+        ca "OP_VM_MACHINE_FILE_RENAME": { trả về 218; }
+        ca "OP_VM_MACHINE_FILE_COPY": { trả về 219; }
+        ca "OP_VM_MACHINE_FILE_LINK": { trả về 220; }
+        ca "OP_VM_MACHINE_PATH_STAT": { trả về 221; }
+        ca "OP_VM_MACHINE_PATH_ABSOLUTE": { trả về 222; }
+        ca "OP_VM_MACHINE_PATH_CANONICAL": { trả về 223; }
+        ca "OP_VM_MACHINE_PATH_EQUIVALENT": { trả về 224; }
+        ca "OP_VM_MACHINE_PATH_CURRENT": { trả về 225; }
+        ca "OP_VM_MACHINE_PATH_SET_CURRENT": { trả về 226; }
+        ca "OP_VM_MACHINE_PATH_TEMP": { trả về 227; }
+        ca "OP_VM_MACHINE_PATH_EXECUTABLE": { trả về 228; }
+        ca "OP_VM_MACHINE_FILE_LOCK": { trả về 229; }
         ca "OP_VM_MACHINE_PROCESS_PID": { trả về 167; }
         ca "OP_VM_MACHINE_PROCESS_PPID": { trả về 168; }
         ca "OP_VM_MACHINE_PROCESS_UID": { trả về 169; }
@@ -395,6 +416,27 @@ hàm công khai biên dịch có mã thao tác(mã) {
         ca 206: { trả về đúng; }
         ca 207: { trả về đúng; }
         ca 208: { trả về đúng; }
+        ca 209: { trả về đúng; }
+        ca 210: { trả về đúng; }
+        ca 211: { trả về đúng; }
+        ca 212: { trả về đúng; }
+        ca 213: { trả về đúng; }
+        ca 214: { trả về đúng; }
+        ca 215: { trả về đúng; }
+        ca 216: { trả về đúng; }
+        ca 217: { trả về đúng; }
+        ca 218: { trả về đúng; }
+        ca 219: { trả về đúng; }
+        ca 220: { trả về đúng; }
+        ca 221: { trả về đúng; }
+        ca 222: { trả về đúng; }
+        ca 223: { trả về đúng; }
+        ca 224: { trả về đúng; }
+        ca 225: { trả về đúng; }
+        ca 226: { trả về đúng; }
+        ca 227: { trả về đúng; }
+        ca 228: { trả về đúng; }
+        ca 229: { trả về đúng; }
         mặc định: { trả về sai; }
     }
 };

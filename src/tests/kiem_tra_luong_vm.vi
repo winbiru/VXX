@@ -1,5 +1,5 @@
 nhập đồng thời;
-nhập gói/hệ thống/nền tảng;
+nhập gói.hệ thống.nền tảng.*;
 
 hàm chính() {
     chậm = hàm() {

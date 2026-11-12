@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -70,6 +71,8 @@ enum class IrValueOpcode {
     Lambda,
 };
 
+enum class IrScalarType { Dynamic, I32, F64 };
+
 // Biểu diễn một giá trị trong untyped IR; record lưu opcode, source ExprId, symbol, text và operand ids để codegen dựng giá trị theo đồ thị phụ thuộc.
 struct IrValue {
     IrValueId id = kInvalidIrValueId;
@@ -96,6 +99,11 @@ struct IrValue {
     // Evaluation order is source order.  Calls store the callee first and then
     // their arguments.  Stores keep the target expression before the value.
     std::vector<IrValueId> operands;
+    // Optimizer annotations do not change source spelling, expression ID or
+    // diagnostics. Direct emitters may use the folded result when available.
+    IrScalarType scalarType = IrScalarType::Dynamic;
+    bool hasFoldedI32 = false;
+    std::int32_t foldedI32 = 0;
 };
 
 // Lưu metadata một tham số IR gồm tên, symbol id và default-value id; emitter dùng record này để phát binding `OP_PARAM`/default.

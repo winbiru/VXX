@@ -1,0 +1,46 @@
+// Compare complete assembly, including labels, relocations and metadata.
+// Reuse one session across changing string/function IDs and target ABIs.
+nhập gói.biên dịch.liên kết.biên dịch chương trình tự chủ;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;
+nhập gói.biên dịch.asm chương trình.biên dịch asm chương trình;
+
+hàm chính() {
+    bộ đệm = {"thân": {}, "byte": 0, "trúng": 0, "trượt": 0};
+    nguồn = [
+        "hàm một() { trả về 7; }; hàm hai() { trả về 7; }; hàm chính() { in một() + hai(); };",
+        "hàm trước() { trả về 99; }; hàm chính() { in \"mới 🌿\"; in trước(); };",
+        "hàm tổng(n) { nếu (n <= 0) { trả về 0; }; trả về n + tổng(n - 1); }; hàm chính() { in tổng(4); };",
+        "lớp Hộp { hàm khởi tạo(n) { mình.n = n; }; hàm lấy() { trả về mình.n; }; }; hàm chính() { h = Hộp(23); in h.lấy(); };"
+    ];
+    đích = ["aarch64-apple-darwin", "aarch64-linux-gnu", "x86_64-linux-gnu", "x86_64-windows-msvc"];
+    lặp(i = 0; i < độ dài(nguồn); i++) {
+        dây = biên dịch nạp sản phẩm biên dịch(biên dịch chương trình tự chủ(nguồn[i]));
+        lặp(j = 0; j < độ dài(đích); j++) {
+            gốc = biên dịch asm chương trình(dây, đích[j], sai, rỗng, sai);
+            lạnh = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, sai);
+            ấm = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, sai);
+            nếu (gốc != lạnh || gốc != ấm) {
+                ném "ASM cache đổi byte/relocation/metadata tại " + i + "/" + đích[j];
+            };
+            gốc trực = biên dịch asm chương trình(dây, đích[j], sai, rỗng, đúng);
+            nếu (gốc trực != biên dịch asm chương trình(dây, đích[j])) {
+                ném "ASM mặc định chưa dùng backend trực tiếp";
+            };
+            lạnh trực = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, đúng);
+            ấm trực = biên dịch asm chương trình(dây, đích[j], sai, bộ đệm, đúng);
+            nếu (gốc trực != lạnh trực || gốc trực != ấm trực) {
+                ném "ASM trực tiếp đổi nhãn/thân khi cache tại " + i + "/" + đích[j];
+            };
+        };
+    };
+    nếu (bộ đệm["trúng"] <= 0 || bộ đệm["trượt"] <= 0) {
+        ném "ASM cache chưa kiểm tra cả hit và miss";
+    };
+    bộ đệm["byte"] = 67108864;
+    dây = biên dịch nạp sản phẩm biên dịch(biên dịch chương trình tự chủ("hàm chính() { in 4567; };"));
+    gốc = biên dịch asm chương trình(dây, đích[0]);
+    nếu (gốc != biên dịch asm chương trình(dây, đích[0], sai, bộ đệm) || bộ đệm["byte"] >= 67108864) {
+        ném "ASM cache không giải phóng an toàn khi đầy";
+    };
+    in "ASM cache parity: đạt";
+};

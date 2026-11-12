@@ -1,4 +1,4 @@
-nhập gói/mạng/phân giải tên miền;
+nhập gói.mạng.phân giải tên miền.*;
 
 // Các lỗi phải được phát hiện trước khi cần kết nối DNS; chạy được offline.
 hàm chính() {

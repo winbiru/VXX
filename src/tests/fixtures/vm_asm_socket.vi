@@ -1,0 +1,15 @@
+// End-to-end bytecode guest using V++ host dispatcher and POSIX socket ASM.
+hàm yêu cầu ổ cắm(điều kiện) {
+    nếu (!điều kiện) { ném "V++ VM socket regression"; };
+};
+hàm chính() {
+    lặp(i = 0; i < 40; i++) {
+        mã = máy đầu nối kết nối([127, 0, 0, 1], 9, 1, 1000);
+        yêu cầu ổ cắm(mã >= 1073741825);
+        yêu cầu ổ cắm(máy đầu nối loại(mã) == 1);
+        yêu cầu ổ cắm(máy đầu nối thời gian chờ(mã, 1000) == 1);
+        yêu cầu ổ cắm(máy đầu nối gửi(mã, [65, 66, 67], 3, 0) == 3);
+        yêu cầu ổ cắm(máy đầu nối đóng(mã) == 0);
+    };
+    in "VM ASM SOCKET GUEST OK";
+};

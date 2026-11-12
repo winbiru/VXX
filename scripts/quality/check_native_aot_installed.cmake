@@ -19,7 +19,7 @@ if (NOT compile_status STREQUAL "0" OR NOT EXISTS "${executable}")
     message(FATAL_ERROR "Native AOT compile failed (${compile_status}):\n${compile_output}\n${compile_errors}")
 endif()
 
-execute_process(COMMAND "${executable}"
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}" "${executable}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE run_status OUTPUT_VARIABLE run_output
     ERROR_VARIABLE run_errors TIMEOUT 30)

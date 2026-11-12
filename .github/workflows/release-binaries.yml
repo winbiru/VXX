@@ -29,7 +29,7 @@ jobs:
       - name: Install Linux crypto and FFI dependencies
         if: runner.os == 'Linux'
         # Ubuntu 26.04's static libcrypto.a also needs libjitterentropy.a.
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libjitterentropy3-dev zlib1g-dev libzstd-dev libffi-dev pkg-config
 
       - name: Install macOS POSIX FFI dependency
         if: runner.os == 'macOS'
@@ -139,6 +139,25 @@ jobs:
             Remove-Item $first, $second -Force
           }
 
+      - name: Preserve release integration timings
+        if: always() && runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-integration-timings-${{ matrix.os }}
+          path: build/integration-logs/timings-*.tsv
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Preserve release test diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-diagnostics-${{ matrix.os }}
+          path: |
+            build/Testing/Temporary/
+            build/integration-logs/
+          if-no-files-found: ignore
+
       - name: Package VDK
         run: cpack --config build/CPackConfig.cmake -C Release -B build/vdk-artifacts
 
@@ -167,12 +186,11 @@ jobs:
           mkdir -p dist
           cp "$BIN_PATH" dist/vpp
           chmod +x dist/vpp
-          NATIVE_BIN=""
-          for p in build/native-compiler/vpp-native build/bin/vpp-native; do
-            if [ -x "$p" ]; then NATIVE_BIN="$p"; break; fi
-          done
-          if [ -z "$NATIVE_BIN" ]; then
-            echo "Native V++ bootstrap compiler is missing from the release build" >&2
+          # vpp-native-cli is an ALL target. Package that exact compiler,
+          # rather than an older test-generated or legacy binary.
+          NATIVE_BIN=build/native-cli/vpp-native
+          if [ ! -x "$NATIVE_BIN" ]; then
+            echo "Native V++ compiler from the default build is missing: $NATIVE_BIN" >&2
             exit 1
           fi
           mkdir -p dist/bin dist/lib dist/scripts/quality dist/src/runtime/native

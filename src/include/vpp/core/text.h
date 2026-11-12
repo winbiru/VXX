@@ -26,5 +26,11 @@ std::optional<std::string> utf8CodePointAt(const std::string &value,
 std::string utf8CodePointSlice(const std::string &value,
                                std::size_t start,
                                std::size_t count);
+// Thay mọi lần xuất hiện literal không chồng lấp tại đúng biên đơn vị UTF-8.
+// Byte UTF-8 lỗi vẫn là một đơn vị thô, cùng quy tắc với các helper phía trên.
+// Mẫu rỗng chèn `replacement` tại mọi biên, gồm cả đầu và cuối chuỗi.
+std::string utf8ReplaceExact(const std::string &value,
+                             const std::string &pattern,
+                             const std::string &replacement);
 
 } // namespace vietvm::core

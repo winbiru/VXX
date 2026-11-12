@@ -1,13 +1,101 @@
 // Linker bytecode bootstrap thuần V++ cho một đơn vị và đồ thị mô-đun.
 // Hợp đồng ABI theo src/compiler/codegen.cpp::Emitter::emitProgram(true).
 // Đồ thị có initializer độc lập; bộ nạp VM ở gói/biên dịch/bộ nạp.vi.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/biên dịch/kiểu mô đun;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian IR đồ thị lõi;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian thuần;
+nhập gói.biên dịch.nhập chọn lọc.*;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tìm mô đun;
+nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
+nhập gói.biên dịch.kiểu mô đun.Bộ Đăng Ký Kiểu;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch dựng đồ thị nguồn thuần;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.đồng thời.chạy luồng;
+nhập gói.lõi.đồng thời.chờ luồng;
+nhập gói.lõi.đồng thời.hủy luồng;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ đường;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ bắt đầu;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ ghi;
+
+// Mỗi worker hạ một nhóm AST liên tiếp, dùng chung runtime snapshot.
+// IR vẫn độc lập theo module; registry, StringPool và emitter ở luồng chính.
+hàm riêng tư biên dịch worker hạ IR(các cây, đã kiểm tra ngữ nghĩa) {
+    kết quả = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(các cây); i++) {
+        máy ảo thêm cuối danh sách(kết quả,
+            biên dịch hạ IR từ cây thuần(các cây[i], đúng, đã kiểm tra ngữ nghĩa));
+    };
+    trả về kết quả;
+};
+
+hàm riêng tư biên dịch worker số luồng() {
+    cấu hình = đọc biến môi trường("VPP_COMPILER_WORKERS", "2");
+    thử {
+        số luồng = thành số nguyên(cấu hình);
+        nếu (số luồng < 0 || số luồng > 8) {
+            ném "VPP_COMPILER_WORKERS phải trong khoảng 0..8";
+        };
+        trả về số luồng;
+    } bắt lỗi (e) {
+        ném "biên dịch worker: VPP_COMPILER_WORKERS không hợp lệ: " + thành chuỗi(cấu hình);
+    };
+};
+
+// Join các nhóm liên tiếp theo thứ tự nguồn để giữ thứ tự kết quả và lỗi.
+// Giới hạn nhóm nhỏ để tránh giữ AST/IR quá lớn và mất cân bằng tải.
+hàm riêng tư biên dịch worker nhận IR(cache, mục) {
+    các IR = chờ luồng(mục["mã"]);
+    các tên = mục["tên"];
+    lặp(i = 0; i < máy ảo lấy độ dài(các tên); i++) {
+        cache[các tên[i]] = các IR[i];
+    };
+};
+
+hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, giới hạn, đã kiểm tra ngữ nghĩa) {
+    các tên = [đồ thị["điểm vào"]];
+    phụ thuộc = đồ thị["mô đun"];
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        máy ảo thêm cuối danh sách(các tên, phụ thuộc[i]["định danh"]);
+    };
+    cache = {};
+    đang chạy = [];
+    đã nhận = 0;
+    // Small graphs keep one module per worker so parallelism is not lost.
+    cỡ nhóm = 4;
+    nếu (máy ảo lấy độ dài(các tên) <= giới hạn * cỡ nhóm) { cỡ nhóm = 1; };
+    thử {
+        i = 0;
+        khi (i < máy ảo lấy độ dài(các tên)) {
+            nhóm tên = []; nhóm cây = [];
+            lặp(j = 0; j < cỡ nhóm && i < máy ảo lấy độ dài(các tên); j++) {
+                tên = các tên[i]; i += 1;
+                máy ảo thêm cuối danh sách(nhóm tên, tên);
+                máy ảo thêm cuối danh sách(nhóm cây, bộ kiểu.cây hạ IR(tên, đã kiểm tra ngữ nghĩa));
+            };
+            mã luồng = chạy luồng(biên dịch worker hạ IR, [nhóm cây, đã kiểm tra ngữ nghĩa]);
+            máy ảo thêm cuối danh sách(đang chạy, {"tên": nhóm tên, "mã": mã luồng});
+            nếu (máy ảo lấy độ dài(đang chạy) - đã nhận >= giới hạn) {
+                biên dịch worker nhận IR(cache, đang chạy[đã nhận]);
+                đã nhận += 1;
+            };
+        };
+        lặp(i = đã nhận; i < máy ảo lấy độ dài(đang chạy); i++) {
+            biên dịch worker nhận IR(cache, đang chạy[i]);
+            đã nhận += 1;
+        };
+    } bắt lỗi (e) {
+        lặp(i = đã nhận; i < máy ảo lấy độ dài(đang chạy); i++) {
+            thử { hủy luồng(đang chạy[i]["mã"]); } bắt lỗi (hủy lỗi) {};
+            thử { chờ luồng(đang chạy[i]["mã"]); } bắt lỗi (chờ lỗi) {};
+        };
+        ném "biên dịch worker hạ IR: " + thành chuỗi(e);
+    };
+    trả về cache;
+};
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Liên Kết Bytecode {
@@ -31,19 +119,15 @@ lớp công khai Bộ Liên Kết Bytecode {
         trả về mình.kết quả;
     };
 
-    // StringPool của C++ deduplicate chuỗi và đánh địa chỉ từ 0.
-    hàm riêng tư biên dịch liên kết tìm chuỗi(chuỗi, tên) {
-        lặp(i = 0; i < máy ảo lấy độ dài(chuỗi); i++) {
-            nếu (chuỗi[i] == tên) { trả về i; };
+    // Chỉ mục giữ vị trí đầu tiên, tương đương phép quét tuần tự cũ.
+    // Không đổi thứ tự StringPool hoặc slot; chỉ tránh quét lại cho mỗi hàm.
+    hàm riêng tư biên dịch liên kết chỉ mục(danh sách) {
+        chỉ mục = {};
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
+            tên = danh sách[i];
+            nếu (!máy ảo có khóa từ điển(chỉ mục, tên)) { chỉ mục[tên] = i; };
         };
-        trả về -1;
-    };
-
-    hàm riêng tư biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) {
-        lặp(i = 0; i < máy ảo lấy độ dài(các ô nhớ); i++) {
-            nếu (các ô nhớ[i] == tên) { trả về i; };
-        };
-        trả về -1;
+        trả về chỉ mục;
     };
 
     // Đối chiếu toàn bộ OP_HAM với registry đã predeclare. Một khai báo
@@ -66,7 +150,9 @@ lớp công khai Bộ Liên Kết Bytecode {
             };
         };
         lặp(i = 0; i < máy ảo lấy độ dài(số khai báo); i++) {
-            nếu (số khai báo[i] != 1) {
+            cần = 1;
+            nếu (lấy từ điển(bảng hàm[i], "ẩn danh", sai)) { cần = 0; };
+            nếu (số khai báo[i] != cần) {
                 ném "biên dịch liên kết: thiếu hoặc trùng OP_HAM cho hàm '" +
                     bảng hàm[i]["tên"] + "'";
             };
@@ -84,25 +170,29 @@ lớp công khai Bộ Liên Kết Bytecode {
         các ô nhớ = lấy từ điển(sản phẩm biên dịch, "slots", []);
         chuỗi = lấy từ điển(sản phẩm biên dịch, "chuỗi", []);
         bảng hàm = [];
+        chỉ mục ô = mình.biên dịch liên kết chỉ mục(các ô nhớ);
+        chỉ mục chuỗi = mình.biên dịch liên kết chỉ mục(chuỗi);
+        tên đã gặp = {};
         lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             h = các hàm[i];
             tên = lấy từ điển(h, "tên", "");
             mã định danh = lấy từ điển(h, "id", -1);
-            nếu (tên == "" || mã định danh != i) {
+            ẩn danh = lấy từ điển(h, "ẩn danh", sai);
+            nếu ((!ẩn danh && tên == "") || mã định danh != i) {
                 ném "biên dịch liên kết: tên hoặc thứ tự function ID không hợp lệ";
             };
-            nếu (mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) != mã định danh) {
+            nếu (!ẩn danh && lấy từ điển(chỉ mục ô, tên, -1) != mã định danh) {
                 ném "biên dịch liên kết: ô nhớ hàm không khớp function ID";
             };
-            tên chỉ mục = mình.biên dịch liên kết tìm chuỗi(chuỗi, tên);
-            nếu (tên chỉ mục < 0) {
+            tên chỉ mục = lấy từ điển(chỉ mục chuỗi, tên, -1);
+            nếu (ẩn danh) { tên chỉ mục = -1; };
+            nếu (!ẩn danh && tên chỉ mục < 0) {
                 ném "biên dịch liên kết: thiếu tên hàm trong StringPool";
             };
-            lặp(j = 0; j < máy ảo lấy độ dài(bảng hàm); j++) {
-                nếu (bảng hàm[j]["tên"] == tên) {
-                    ném "biên dịch liên kết: trùng tên hàm '" + tên + "'";
-                };
+            nếu (!ẩn danh && máy ảo có khóa từ điển(tên đã gặp, tên)) {
+                ném "biên dịch liên kết: trùng tên hàm '" + tên + "'";
             };
+            tên đã gặp[tên] = đúng;
             thân = lấy từ điển(h, "bytecode", []);
             nếu (máy ảo lấy độ dài(thân) < 2) {
                 ném "biên dịch liên kết: mã trung gian thân hàm quá ngắn '" + tên + "'";
@@ -111,20 +201,25 @@ lớp công khai Bộ Liên Kết Bytecode {
                 thân[máy ảo lấy độ dài(thân) - 1]["op"] != biên dịch mã thao tác("OP_DONG_KHOI")) {
                 ném "biên dịch liên kết: mã trung gian thân hàm không hợp lệ '" + tên + "'";
             };
-            máy ảo thêm cuối danh sách(bảng hàm, {"tên": tên, "id": mã định danh, "tên index": tên chỉ mục,
+            máy ảo thêm cuối danh sách(bảng hàm, {"tên": tên, "id": mã định danh, "tên index": tên chỉ mục, "ẩn danh": ẩn danh,
                              "bytecode": thân});
         };
         mình.biên dịch liên kết kiểm tra khai báo(nguồn, bảng hàm);
 
         // C++ tra cứu entrypoint trong bảng slot CHIA SẺ với function ID.
         // `chính` ưu tiên hơn alias tương thích `main`.
-        điểm vào = mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, "chính");
-        nếu (điểm vào == -1) { điểm vào = mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, "main"); };
+        điểm vào = lấy từ điển(chỉ mục ô, "chính", -1);
+        nếu (điểm vào == -1) { điểm vào = lấy từ điển(chỉ mục ô, "main", -1); };
         mã trung gian = [];
         lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) { máy ảo thêm cuối danh sách(mã trung gian, nguồn[i]); };
         nếu (điểm vào != -1) {
             máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
                             "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
+        } hoặc {
+            // Không có chính(): chạy top-level thành công phải trả status 0,
+            // dù biểu thức cuối còn giá trị nguyên trên ngăn xếp.
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_BIEN_SO"),
+                            "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         };
         máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
                         "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
@@ -141,20 +236,71 @@ lớp công khai Bộ Liên Kết Bytecode {
     // Linker nhiều mô-đun: mỗi initializer có bytecode và slot riêng, còn
     // StringPool và function ID là duy nhất trong toàn phiên. Không nối trực
     // tiếp các initializer vì jump/slot đều là offset cục bộ của emitter.
-    hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+    hàm công khai biên dịch liên kết đồ thị thuần(đồ thị, số worker = rỗng) {
         nếu (lấy từ điển(đồ thị, "loại", "") != "đồ thị mô đun V++") {
             ném "biên dịch liên kết: cần đồ thị mô đun V++";
         };
+        đường hồ sơ = biên dịch hồ sơ đường();
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.registry", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
         bộ kiểu.đăng ký();
-        phiên = {"đa mô đun": đúng, "cạnh dùng": [],
-                 "đã phát": [], "id tối đa": -1, "ngoại": []};
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.types", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        đã kiểm tra ngữ nghĩa = biên dịch lọc nhập chọn lọc(sổ, đồ thị);
+        nếu (đã kiểm tra ngữ nghĩa) {
+            // Reassign contiguous IDs only after computing the dependency
+            // closure; omitted declarations never reach IR or serialization.
+            sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+            bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
+            bộ kiểu.đăng ký();
+        };
+        // Chế độ đối chiếu để đo A/B và truy vết lỗi semantic sau khi lọc.
+        // Mặc định tận dụng lần kiểm tra đầy đủ ở trên trong cùng phiên.
+        dùng lại ngữ nghĩa = đã kiểm tra ngữ nghĩa &&
+            đọc biến môi trường("VPP_SELECTIVE_REVALIDATE", "0") != "1";
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.selective_imports", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        // Index theo importer giữ nguyên thứ tự cạnh trong đồ thị. Khi phát
+        // mỗi import, chỉ cần quét các cạnh của chính module đó; đánh dấu
+        // bằng map để import trùng vẫn lấy đúng cạnh chưa dùng đầu tiên.
+        cạnh theo nguồn = {};
+        các cạnh = đồ thị["cạnh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các cạnh); i++) {
+            nguồn cạnh = các cạnh[i]["nguồn"];
+            nếu (!máy ảo có khóa từ điển(cạnh theo nguồn, nguồn cạnh)) {
+                cạnh theo nguồn[nguồn cạnh] = [];
+            };
+            máy ảo thêm cuối danh sách(cạnh theo nguồn[nguồn cạnh], i);
+        };
+        phiên = {"đa mô đun": đúng, "cạnh dùng": {},
+                 "cạnh theo nguồn": cạnh theo nguồn,
+                 "đã phát": [], "đã phát theo tên": {},
+                 "id tối đa": -1, "ngoại": [],
+                 "ngữ nghĩa đã kiểm tra": dùng lại ngữ nghĩa};
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.edge_index", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         tên gốc = đồ thị["điểm vào"];
-        cây gốc = bộ kiểu.cây(tên gốc);
-        biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng);
+        nếu (số worker == rỗng) { số worker = biên dịch worker số luồng(); };
+        // Đồ thị có một phụ thuộc vẫn có hai mô-đun: root + dependency.
+        nếu (số worker > 1 && máy ảo lấy độ dài(đồ thị["mô đun"]) > 0) {
+            phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker, dùng lại ngữ nghĩa);
+            nếu (!máy ảo có khóa từ điển(phiên["IR đã chuẩn bị"], tên gốc)) {
+                ném "biên dịch worker: thiếu IR của mô-đun gốc";
+            };
+            biểu diễn trung gian gốc = phiên["IR đã chuẩn bị"][tên gốc];
+        } hoặc {
+            cây gốc = bộ kiểu.cây hạ IR(tên gốc, dùng lại ngữ nghĩa);
+            biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng, dùng lại ngữ nghĩa);
+        };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.prepare_ir", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         gốc dữ liệu = biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian gốc, sổ,
-            biên dịch sổ tìm mô đun(sổ["mô đun"], tên gốc), đồ thị, phiên);
+            biên dịch sổ tìm mô đun(sổ, tên gốc), đồ thị, phiên);
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.emit_graph", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         bảng hàm = [];
         lặp(i = 0; i < máy ảo lấy độ dài(sổ["hàm"]); i++) {
             khai = sổ["hàm"][i];
@@ -164,34 +310,32 @@ lớp công khai Bộ Liên Kết Bytecode {
             máy ảo thêm cuối danh sách(bảng hàm, {"tên": khai["tên"], "id": i,
                   "tên index": khai["tên index"], "mô đun": khai["mô đun"],
                   "tên chạy": khai["tên chạy"],
+                  "ẩn danh": lấy từ điển(khai, "ẩn danh", sai),
                   "tên index runtime": khai["tên index runtime"],
                   "bytecode": []});
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.function_table", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         tất cả khai = [];
         initializer = [];
         thứ tự = đồ thị["thứ tự khởi tạo"];
         lặp(i = 0; i <= máy ảo lấy độ dài(thứ tự); i++) {
             tên mô đun = đồ thị["điểm vào"];
             nếu (i < máy ảo lấy độ dài(thứ tự)) { tên mô đun = thứ tự[i]; };
-            ký hiệu = biên dịch sổ tìm mô đun(sổ["mô đun"], tên mô đun);
+            ký hiệu = biên dịch sổ tìm mô đun(sổ, tên mô đun);
             phần = gốc dữ liệu;
             nếu (i < máy ảo lấy độ dài(thứ tự)) {
-                đã tìm = sai;
-                các phần = phiên["đã phát"];
-                lặp(j = 0; j < máy ảo lấy độ dài(các phần); j++) {
-                    nếu (các phần[j]["định danh"] == tên mô đun) {
-                        phần = các phần[j]["phần"];
-                        đã tìm = đúng;
-                    };
-                };
-                nếu (!đã tìm) {
+                theo tên = phiên["đã phát theo tên"];
+                nếu (!máy ảo có khóa từ điển(theo tên, tên mô đun)) {
                     ném "biên dịch liên kết: thiếu initializer '" + tên mô đun + "'";
                 };
+                phần = theo tên[tên mô đun];
             };
             nếu (lấy từ điển(phần, "loại", "") != "bytecode V++ chưa liên kết") {
                 ném "biên dịch liên kết: emitter không trả bytecode chưa liên kết";
             };
             các hàm = phần["hàm"];
+            chỉ mục ô = mình.biên dịch liên kết chỉ mục(phần["slots"]);
             số toàn cục = máy ảo lấy độ dài(ký hiệu["trực tiếp"]);
             nếu (máy ảo lấy độ dài(các hàm) < số toàn cục) {
                 ném "biên dịch liên kết: số hàm không khớp sổ mô-đun";
@@ -205,7 +349,7 @@ lớp công khai Bộ Liên Kết Bytecode {
                         ném "biên dịch liên kết: hàm global không khớp sổ mô-đun";
                     };
                 } hoặc {
-                    nếu (!lấy từ điển(h, "phương thức", sai)) {
+                    nếu (!lấy từ điển(h, "phương thức", sai) && !lấy từ điển(h, "ẩn danh", sai)) {
                         ném "biên dịch liên kết: thiếu định danh phương thức";
                     };
                 };
@@ -213,7 +357,8 @@ lớp công khai Bộ Liên Kết Bytecode {
                     bảng hàm[mã định danh]["mô đun"] != tên mô đun ||
                     bảng hàm[mã định danh]["tên"] != h["tên"] ||
                     bảng hàm[mã định danh]["tên index"] != h["tên index"] ||
-                    mình.biên dịch liên kết tìm ô nhớ(phần["slots"], h["tên"]) != mã định danh) {
+                    (!lấy từ điển(h, "ẩn danh", sai) &&
+                     lấy từ điển(chỉ mục ô, h["tên"], -1) != mã định danh)) {
                     ném "biên dịch liên kết: thông tin hàm sai mô-đun/function ID";
                 };
                 thân = h["bytecode"];
@@ -248,11 +393,14 @@ lớp công khai Bộ Liên Kết Bytecode {
                 ném "biên dịch liên kết: thiếu thân hàm '" + bảng hàm[i]["tên"] + "'";
             };
         };
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.validate_modules", bắt đầu);
+        bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         // Chỉ root có entrypoint; một hàm chính trong dependency không được
         // tự động gọi. Giữ opcode call + HALT giống emitter C++.
-        điểm vào = mình.biên dịch liên kết tìm ô nhớ(gốc dữ liệu["slots"], "chính");
+        chỉ mục ô gốc = mình.biên dịch liên kết chỉ mục(gốc dữ liệu["slots"]);
+        điểm vào = lấy từ điển(chỉ mục ô gốc, "chính", -1);
         nếu (điểm vào == -1) {
-            điểm vào = mình.biên dịch liên kết tìm ô nhớ(gốc dữ liệu["slots"], "main");
+            điểm vào = lấy từ điển(chỉ mục ô gốc, "main", -1);
         };
         mã trung gian = [];
         lặp(i = 0; i < máy ảo lấy độ dài(gốc dữ liệu["bytecode"]); i++) {
@@ -261,9 +409,13 @@ lớp công khai Bộ Liên Kết Bytecode {
         nếu (điểm vào != -1) {
             máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
                  "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
+        } hoặc {
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_BIEN_SO"),
+                 "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         };
         máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
              "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
+        biên dịch hồ sơ ghi(đường hồ sơ, "link.finalize", bắt đầu);
         trả về {"loại": "bytecode V++ đồ thị đã liên kết",
             "bytecode": mã trung gian, "hàm": bảng hàm,
             "điểm vào": điểm vào, "slots": gốc dữ liệu["slots"],
@@ -288,9 +440,9 @@ hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
     trả về bộ chuyển tiếp.biên dịch chương trình tự chủ(mã nguồn);
 };
 
-hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+hàm công khai biên dịch liên kết đồ thị thuần(đồ thị, số worker = rỗng) {
     bộ chuyển tiếp = Bộ Liên Kết Bytecode();
-    trả về bộ chuyển tiếp.biên dịch liên kết đồ thị thuần(đồ thị);
+    trả về bộ chuyển tiếp.biên dịch liên kết đồ thị thuần(đồ thị, số worker);
 };
 
 hàm công khai biên dịch chương trình mô đun tự chủ(điểm vào, nguồn) {

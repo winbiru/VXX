@@ -1,4 +1,4 @@
-nhập gói / lượng tử / mạch;
+nhập gói . lượng tử . mạch.*;
 hàm công khai xuất openqasm(mạch) {
     qasm = "OPENQASM 3.0;\ninclude \"stdgates.inc\";\n";
     qasm = qasm + "qubit[" + mạch.số qubit() + "] q;\n";

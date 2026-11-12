@@ -1,7 +1,7 @@
-nhập gói/mạng/bảng tên máy;
-nhập gói/mạng/phân giải tên miền;
-nhập gói/nhập xuất/bộ đệm tệp;
-nhập gói/nhập xuất/tệp thô;
+nhập gói.mạng.bảng tên máy.*;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.nhập xuất.bộ đệm tệp.*;
+nhập gói.nhập xuất.tệp thô.*;
 
 hàm hosts phát sinh lỗi(bộ, nội_dung, tên) {
     thử { bộ.phân giải tên miền phân tích bảng tên máy(nội_dung, tên); }

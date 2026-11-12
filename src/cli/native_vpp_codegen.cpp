@@ -108,7 +108,8 @@ void writeSourceInstruction(std::ostream &out, const compiler::IrInstruction &in
         << quoted(inst.conditionalForm == frontend::AstConditionalForm::IfBlock ? "IfBlock" :
                   inst.conditionalForm == frontend::AstConditionalForm::IfElseBlocks ? "IfElseBlocks" : "Unstructured")
         << ",\"loopForm\":"
-        << quoted(inst.loopForm == frontend::AstLoopForm::ForBlock ? "ForBlock" : "Unstructured")
+        << quoted(inst.loopForm == frontend::AstLoopForm::ForBlock ? "ForBlock" :
+                  inst.loopForm == frontend::AstLoopForm::WhileBlock ? "WhileBlock" : "Unstructured")
         << ",\"unsupported\":" << (inst.unsupportedDirectRegion ? "đúng" : "sai")
         << ",\"parameters\":[";
     for (std::size_t i = 0; i < inst.parameters.size(); ++i) {
@@ -139,6 +140,13 @@ const char *opcodeName(MachineOpcode op) {
         case Op::Add: return "Add";
         case Op::Sub: return "Sub";
         case Op::Mul: return "Mul";
+        case Op::Div: return "Div";
+        case Op::BitAnd: return "BitAnd";
+        case Op::BitOr: return "BitOr";
+        case Op::BitXor: return "BitXor";
+        case Op::ShiftLeft: return "ShiftLeft";
+        case Op::ShiftRight: return "ShiftRight";
+        case Op::Mod: return "Mod";
         case Op::Equal: return "Equal";
         case Op::NotEqual: return "NotEqual";
         case Op::Less: return "Less";
@@ -206,7 +214,7 @@ std::string makeVppObjectSource(const Target &target,
         throw std::runtime_error("V++ object writer: định dạng object không khớp hệ điều hành");
 
     std::ostringstream source;
-    source << "nhập gói/biên dịch/đối tượng;\n"
+    source << "nhập gói.biên dịch.đối tượng.*;\n"
            << "hàm chính() {\n  code = [";
     for (std::size_t i = 0; i < bytes.size(); ++i) {
         if (i) source << ',';
@@ -243,15 +251,15 @@ std::string makeSelfHostedObjectSource(const Target &target,
     if (!symbolSafe(nativeAbiSymbol(functionName)))
         throw std::runtime_error("tên symbol native không hợp lệ");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy từ cây;\n"
+    code << "nhập gói.biên dịch.mã máy từ cây.*;\n"
          << "hàm chính() {\n"
-         << "  kết_quả = biên dịch bản địa đối tượng tự chủ("
+         << "  kết_quả = tạo đối tượng hàm("
          << quoted(std::string(source)) << ','
          << quoted(std::string(functionName)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
-         << "  biên dịch bản địa in bản ghi(kết_quả);\n"
+         << "  xuất bản ghi(kết_quả);\n"
          << "}\n";
     return code.str();
 }
@@ -260,16 +268,16 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
     if (target.arch != Architecture::X86_64 && target.arch != Architecture::AArch64)
         throw std::runtime_error("native AST V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy từ cây;\n"
+    code << "nhập gói.biên dịch.mã máy từ cây.*;\n"
          << "hàm chính() {\n"
-         << "  các_hàm = biên dịch bản địa chương trình đối tượng tự chủ("
+         << "  các_hàm = tạo đối tượng chương trình("
          << quoted(std::string(source)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
          << "  lặp (i = 0; i < độ dài(các_hàm); i++) {\n"
          << "    in \"F:\" + các_hàm[i][\"name\"];\n"
-         << "    biên dịch bản địa in bản ghi(các_hàm[i]);\n"
+         << "    xuất bản ghi(các_hàm[i]);\n"
          << "  };\n}\n";
     return code.str();
 }
@@ -277,7 +285,8 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
 std::string makeLoweringSource(const compiler::IrProgram &ir,
                                std::string_view functionName, bool leaf = false,
                                const Target *emitTarget = nullptr,
-                               bool emitObject = false) {
+                               bool emitObject = false, bool emitAssembly = false,
+                               const std::vector<std::string> *leafNames = nullptr) {
     if (emitObject && !emitTarget)
         throw std::runtime_error("V++ object writer cần target phát mã máy");
     const auto abiName = nativeAbiSymbol(functionName);
@@ -287,9 +296,10 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
         emitTarget->arch != Architecture::AArch64)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;\n";
-    if (emitTarget) code << "nhập gói/biên dịch/mã máy;\n";
-    if (emitObject) code << "nhập gói/biên dịch/đối tượng;\n";
+    code << "nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.*;\n";
+    if (emitTarget) code << "nhập gói.biên dịch.mã máy.*;\n";
+    if (emitObject) code << "nhập gói.biên dịch.đối tượng.*;\n";
+    if (emitAssembly) code << "nhập gói.biên dịch.lắp ráp.*;\n";
     code << "hàm chính() {\n  ir = {\"values\":[";
     for (std::size_t i = 0; i < ir.values.size(); ++i) {
         const auto &v = ir.values[i];
@@ -317,6 +327,20 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
     }
     code << "]};\n";
     if (leaf) {
+        if (leafNames) {
+            code << "  names = [";
+            for (std::size_t i = 0; i < leafNames->size(); ++i) {
+                if (i) code << ',';
+                code << quoted(nativeAbiSymbol((*leafNames)[i]));
+            }
+            code << "];\n  lặp (i = 0; i < độ dài(names); i++) {\n"
+                 << "    thử {\n"
+                 << "      fn = biên dịch máy hạ lá(ir, names[i]);\n"
+                 << "      in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n"
+                 << "    } bắt lỗi (e) { in \"E:unsupported leaf\"; };\n"
+                 << "  };\n}\n";
+            return code.str();
+        }
         code << "  fn = biên dịch máy hạ lá(ir, " << quoted(abiName) << ");\n"
              << "  in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n";
     } else {
@@ -353,6 +377,22 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                  << "    in \"R:\" + mục[\"offset\"] + \":\" + mục[\"symbol\"];\n"
                  << "  };\n";
         }
+        if (emitAssembly) {
+            if (leaf) {
+                code << "  asm = biên dịch lắp ráp lá(" << arch << ", " << os << ", "
+                     << quoted(abiName) << ", fn[\"kind\"], fn[\"constant\"], byte);\n";
+            } else {
+                code << "  asm = biên dịch lắp ráp mã máy(" << arch << ", " << os << ", "
+                     << quoted(abiName) << ", kết_quả);\n";
+            }
+            code << "  asm_bytes = chuỗi thành byte máy ảo(asm);\n"
+                 << "  asm_hex = \"\";\n"
+                 << "  lặp (i = 0; i < độ dài(asm_bytes); i++) {\n"
+                 << "    b = asm_bytes[i];\n"
+                 << "    asm_hex += bảng[(b - b % 16) / 16] + bảng[b % 16];\n"
+                 << "  };\n"
+                 << "  in \"A:\" + asm_hex;\n";
+        }
         if (emitObject) {
             code << "  object = biên dịch đối tượng(" << arch << ", " << os << ", "
                  << quoted(targetAbi(*emitTarget)) << ", byte, "
@@ -384,7 +424,8 @@ std::string makeVppSource(const Target &target, const MachineFunction &function)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
 
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy;\n"
+    code << "nhập gói.biên dịch.mã máy.*;\n"
+         << "nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;\n"
          << "hàm chính() {\n  lệnh = [];\n";
     for (const auto &inst : function.instructions) {
         if (!inst.symbol.empty() && !symbolSafe(inst.symbol))
@@ -433,7 +474,7 @@ std::string makeVppLeafSource(const Target &target, const RawLeaf &leaf) {
         default: throw std::runtime_error("V++ leaf encoder: loại hàm chưa định nghĩa");
     }
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy;\n"
+    code << "nhập gói.biên dịch.mã máy.*;\n"
          << "hàm chính() {\n"
          << "  byte = biên dịch mã máy lá(\"" << architectureName(target.arch)
          << "\", \"" << kind << "\", " << leaf.constant << ", \"" << os << "\");\n"
@@ -448,9 +489,38 @@ std::string makeVppLeafSource(const Target &target, const RawLeaf &leaf) {
     return code.str();
 }
 
+std::string makeVppLeavesSource(const std::vector<std::pair<Target, RawLeaf>> &requests) {
+    std::ostringstream code;
+    code << "nhập gói.biên dịch.mã máy.*;\nhàm chính() {\n  requests = [";
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (i) code << ',';
+        const auto &[target, leaf] = requests[i];
+        const char *kind = nullptr;
+        switch (leaf.kind) {
+            case RawLeafKind::ReturnConstantI32: kind = "hằng"; break;
+            case RawLeafKind::AddI32Arguments: kind = "cộng"; break;
+            case RawLeafKind::SubI32Arguments: kind = "trừ"; break;
+            default: throw std::runtime_error("V++ leaf encoder: loại hàm chưa định nghĩa");
+        }
+        code << '[' << quoted(architectureName(target.arch)) << ',' << quoted(kind)
+             << ',' << leaf.constant << ',' << quoted(targetOperatingSystem(target)) << ']';
+    }
+    code << "];\n  bảng = \"0123456789abcdef\";\n"
+         << "  lặp (i = 0; i < độ dài(requests); i++) {\n"
+         << "    request = requests[i];\n"
+         << "    byte = biên dịch mã máy lá(request[0], request[1], request[2], request[3]);\n"
+         << "    hex = \"\";\n"
+         << "    lặp (j = 0; j < độ dài(byte); j++) {\n"
+         << "      b = byte[j];\n"
+         << "      nếu (b < 0 || b > 255) { ném \"V++ leaf encoder trả byte ngoài u8\"; };\n"
+         << "      hex += bảng[(b - b % 16) / 16] + bảng[b % 16];\n"
+         << "    };\n    in \"B:\" + hex;\n  };\n}\n";
+    return code.str();
+}
+
 std::string makeVppTargetSource(std::string_view triple) {
     std::ostringstream code;
-    code << "nhập gói/biên dịch/đích;\n"
+    code << "nhập gói.biên dịch.đích.*;\n"
          << "hàm chính() {\n"
          << "  đích = biên dịch phân tích đích(" << quoted(std::string(triple)) << ");\n"
          << "  in \"T:\" + đích[\"kiến trúc\"] + \":\" + đích[\"hệ điều hành\"] + \":\" + đích[\"ABI\"] + \":\" + đích[\"định dạng\"];\n"
@@ -466,6 +536,10 @@ std::string executeVppSource(const std::string &source,
     compiler::CompilationContext context;
     context.importResolutionBase = sourceBase.empty() ? std::filesystem::current_path() : sourceBase;
     context.currentSourceIdentity = "<native-machine-bridge>";
+    if (profile && source.size() > 65536) {
+        std::cerr << "native Stage 0 frontend started: source=" << source.size()
+                  << " bytes\n";
+    }
     const auto artifacts = compiler::compilePipeline(context, source, keywordMap, true);
     const auto afterFrontend = std::chrono::steady_clock::now();
     if (profile) {
@@ -539,9 +613,34 @@ std::string executeVppSource(const std::string &source,
                          std::chrono::steady_clock::now() - afterFrontend).count()
                   << " ms\n";
     }
+    // The large Stage 1 bootstrap can time out while executing the generated
+    // compiler under Linux x86-64 emulation. Keep its exact executable on
+    // request so it can be rerun or inspected without rebuilding Stage 0.
+    // Small target-probe bridges must not overwrite the Stage 1 diagnostic.
+    if (source.size() > 65536) {
+        if (const char *saved = std::getenv("VPP_NATIVE_STAGE0_KEEP_BRIDGE");
+            saved && *saved) {
+            const auto destination = std::filesystem::absolute(saved);
+            if (!std::filesystem::is_directory(destination.parent_path()))
+                throw std::runtime_error("Native Stage 0: bridge output directory missing");
+            std::filesystem::copy_file(executable, destination,
+                std::filesystem::copy_options::overwrite_existing);
+            if (profile)
+                std::cerr << "native Stage 0 saved bootstrap bridge: "
+                          << destination.u8string() << '\n';
+        }
+    }
+    const auto beforeExecute = std::chrono::steady_clock::now();
+    if (profile)
+        std::cerr << "native Stage 0 bridge execution started: source="
+                  << source.size() << " bytes\n";
     const auto result = aot::runProcess({executable.u8string()});
     if (profile) {
-        std::cerr << "native Stage 0 bridge exit: " << result.status << '\n';
+        std::cerr << "native Stage 0 bridge exit: " << result.status
+                  << ", elapsed="
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - beforeExecute).count()
+                  << " ms\n";
     }
     // Native wrappers emit newline-delimited text records. The Windows CRT
     // writes CRLF to stdout, while the target parser and machine/object
@@ -585,7 +684,7 @@ std::int32_t parseI32(const std::string &s) {
 
 MachineOpcode parseMachineOpcode(const std::string &name) {
     for (int i = static_cast<int>(MachineOpcode::PushConstant);
-         i <= static_cast<int>(MachineOpcode::Trap); ++i) {
+         i <= static_cast<int>(MachineOpcode::ShiftRight); ++i) {
         auto op = static_cast<MachineOpcode>(i);
         if (name == opcodeName(op)) return op;
     }
@@ -711,6 +810,16 @@ MachineEmission decodeOutput(const std::string &text, const MachineFunction &fun
         result.bytes.push_back(static_cast<std::uint8_t>(hexNibble(line[i]) * 16 + hexNibble(line[i + 1])));
     while (std::getline(lines, line)) {
         if (line.empty()) continue;
+        if (line.compare(0, 2, "A:") == 0) {
+            if (!result.assembly.empty() || line.size() <= 2 || (line.size() - 2) % 2)
+                throw std::runtime_error("V++ assembly trả bản ghi A: không hợp lệ");
+            for (std::size_t i = 2; i < line.size(); i += 2)
+                result.assembly.push_back(static_cast<char>(hexNibble(line[i]) * 16 +
+                                                             hexNibble(line[i + 1])));
+            if (result.assembly.compare(0, 6, ".text\n") != 0)
+                throw std::runtime_error("V++ assembly thiếu section .text");
+            continue;
+        }
         if (line.compare(0, 2, "R:") != 0)
             throw std::runtime_error("V++ encoder trả bản ghi không hợp lệ");
         const auto colon = line.find(':', 2);
@@ -801,6 +910,24 @@ RawLeafLowering lowerRawLeafVpp(const compiler::IrProgram &ir,
     }
 }
 
+std::vector<RawLeafLowering> lowerRawLeavesVpp(const compiler::IrProgram &ir,
+                                             const std::vector<std::string> &functionNames,
+                                             const std::filesystem::path &sourceBase) {
+    if (functionNames.empty()) return {};
+    std::istringstream lines(executeVppSource(makeLoweringSource(
+        ir, functionNames.front(), true, nullptr, false, false, &functionNames), sourceBase));
+    std::vector<RawLeafLowering> results;
+    for (const auto &name : functionNames) {
+        std::string line;
+        if (!std::getline(lines, line)) throw std::runtime_error("V++ leaf batch: missing " + name);
+        if (line == "E:unsupported leaf") results.push_back({{}, "unsupported leaf: " + name});
+        else results.push_back({decodeLeafLowering(line), {}});
+    }
+    std::string extra;
+    if (std::getline(lines, extra)) throw std::runtime_error("V++ leaf batch: extra lowering record");
+    return results;
+}
+
 MachineEmission emitMachineFunctionVpp(const Target &target,
                                       const MachineFunction &function,
                                       const std::filesystem::path &sourceBase) {
@@ -821,6 +948,22 @@ RawLeafResult emitRawLeafVpp(const Target &target, const RawLeaf &leaf,
     }
 }
 
+std::vector<RawLeafResult> emitRawLeavesVpp(
+    const std::vector<std::pair<Target, RawLeaf>> &requests,
+    const std::filesystem::path &sourceBase) {
+    if (requests.empty()) return {};
+    std::istringstream lines(executeVppSource(makeVppLeavesSource(requests), sourceBase));
+    std::vector<RawLeafResult> results;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        std::string line;
+        if (!std::getline(lines, line)) throw std::runtime_error("V++ leaf batch: missing byte record");
+        results.push_back(decodeLeafOutput(line));
+    }
+    std::string extra;
+    if (std::getline(lines, extra)) throw std::runtime_error("V++ leaf batch: extra byte record");
+    return results;
+}
+
 RawObjectResult emitRawObjectBytesVpp(const Target &target,
                                       const std::vector<std::uint8_t> &code,
                                       std::string_view symbol,
@@ -839,12 +982,12 @@ RawObjectResult emitRawObjectBytesVpp(const Target &target,
 VppCompiledLeaf compileRawLeafVpp(const Target &target, const compiler::IrProgram &ir,
                                   std::string_view functionName,
                                   const std::filesystem::path &sourceBase,
-                                  bool emitObject) {
+                                  bool emitObject, bool emitAssembly) {
     VppCompiledLeaf result;
     std::string partial;
     try {
         const auto output = executeVppSource(
-            makeLoweringSource(ir, functionName, true, &target, emitObject), sourceBase, &partial);
+            makeLoweringSource(ir, functionName, true, &target, emitObject, emitAssembly), sourceBase, &partial);
         const auto start = encodedRecordStart(output);
         result.leaf = decodeLeafLowering(output.substr(0, start));
         result.lowered = true;
@@ -852,6 +995,12 @@ VppCompiledLeaf compileRawLeafVpp(const Target &target, const compiler::IrProgra
             const auto objectStart = encodedObjectRecordStart(output);
             result.emission = decodeLeafOutput(output.substr(start, objectStart - start));
             result.object = decodeObjectOutput(output.substr(objectStart));
+        } else if (emitAssembly) {
+            const auto decoded = decodeOutput(output.substr(start), {});
+            result.emission = {decoded.bytes, {}};
+            result.assembly = decoded.assembly;
+            if (result.assembly.empty())
+                throw std::runtime_error("V++ leaf assembly không trả bản ghi A:");
         } else {
             result.emission = decodeLeafOutput(output.substr(start));
         }
@@ -868,11 +1017,11 @@ VppCompiledMachine compileMachineFunctionVpp(const Target &target,
                                              const compiler::IrProgram &ir,
                                              std::string_view functionName,
                                              const std::filesystem::path &sourceBase,
-                                             bool emitObject) {
+                                             bool emitObject, bool emitAssembly) {
     VppCompiledMachine result;
     try {
         const auto output = executeVppSource(
-            makeLoweringSource(ir, functionName, false, &target, emitObject), sourceBase);
+            makeLoweringSource(ir, functionName, false, &target, emitObject, emitAssembly), sourceBase);
         const auto start = encodedRecordStart(output);
         result.function = decodeLowering(output.substr(0, start));
         if (emitObject) {

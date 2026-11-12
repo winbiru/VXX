@@ -1,8 +1,8 @@
 // vpp.packaging — đóng gói cơ bản thành thư mục phân phối.
 // M3 chỉ mang entry + tài nguyên + manifest; bundle runtime tùy biến thuộc M4.
-nhập nhập xuất;
-nhập bộ sưu tập;
-nhập công cụ lưu trữ;
+nhập nhập xuất.*;
+nhập bộ sưu tập.*;
+nhập công cụ lưu trữ.*;
 
 hàm công khai đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên) {
     tạo thư mục(thư mục đích);

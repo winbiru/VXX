@@ -1,4 +1,4 @@
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 hàm chính() {
     tcp = đầu nối giao vận tin cậy mở("127.0.0.1", "18080", "1000");

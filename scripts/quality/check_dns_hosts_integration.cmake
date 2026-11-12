@@ -6,9 +6,33 @@ if (NOT DEFINED VPP_SOURCE_ROOT OR NOT DEFINED VPP_BINARY_ROOT)
     message(FATAL_ERROR "Missing source or binary root")
 endif()
 set(fixture "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_dns_hosts_resolver.vi")
-set(hosts_file "${VPP_BINARY_ROOT}/vpp-dns-hosts-integration.hosts")
+if (NOT DEFINED VPP_COMPILER)
+    set(VPP_COMPILER cpp)
+endif()
+if (VPP_COMPILER STREQUAL "cpp")
+    set(jit_modes 0 1)
+    set(run_command "${VPP_EXEC}" run --compiler=cpp "${fixture}")
+elseif (VPP_COMPILER STREQUAL "vpp")
+    if (NOT DEFINED VPP_NATIVE_COMPILER OR NOT EXISTS "${VPP_NATIVE_COMPILER}")
+        message(FATAL_ERROR "Native DNS hosts integration requires VPP_NATIVE_COMPILER")
+    endif()
+    # Environment changes affect execution, so compile once for all modes.
+    # Native code has no interpreter/JIT distinction.
+    set(jit_modes 0)
+    set(executable "${VPP_BINARY_ROOT}/vpp-dns-hosts-integration${CMAKE_EXECUTABLE_SUFFIX}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_SOURCE_ROOT}"
+        "${VPP_NATIVE_COMPILER}" build "${fixture}" -o "${executable}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE diagnostics TIMEOUT 240)
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "Native DNS hosts compilation failed (${status}):\n${output}\n${diagnostics}")
+    endif()
+    set(run_command "${executable}")
+else()
+    message(FATAL_ERROR "Unsupported DNS hosts compiler: ${VPP_COMPILER}")
+endif()
+set(hosts_file "${VPP_BINARY_ROOT}/vpp-dns-hosts-integration-${VPP_COMPILER}.hosts")
 file(WRITE "${hosts_file}" "127.0.0.1 fixture.test\n::1 fixture.test\n")
-foreach(jit IN ITEMS 0 1)
+foreach(jit IN LISTS jit_modes)
     foreach(mode IN ITEMS hosts hosts-only-miss hosts-dns-miss os-default)
         set(dns_server "")
         set(hosts_path "${hosts_file}")
@@ -25,11 +49,11 @@ foreach(jit IN ITEMS 0 1)
                 "VPP_DNS_VI_HOSTS_FILE=${hosts_path}"
                 "VPP_DNS_VI_SERVER=${dns_server}"
                 "VPP_DNS_VI_SERVERS=" "VPP_DNS_VI_RESOLV_CONF="
-                "${VPP_EXEC}" "${fixture}"
+                ${run_command}
             WORKING_DIRECTORY "${VPP_BINARY_ROOT}"
             RESULT_VARIABLE status
             OUTPUT_VARIABLE actual
-            ERROR_VARIABLE diagnostics)
+            ERROR_VARIABLE diagnostics TIMEOUT 300)
         string(REPLACE "\r\n" "\n" actual "${actual}")
         if (NOT status STREQUAL "0" OR NOT actual STREQUAL "1\n")
             file(REMOVE "${hosts_file}")

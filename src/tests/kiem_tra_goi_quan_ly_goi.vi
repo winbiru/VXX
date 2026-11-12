@@ -1,5 +1,8 @@
 nhập quản lý gói;
 nhập nhập xuất;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.văn bản.chuỗi.chứa chính xác;
 
 hàm chính() {
     bản kê = {

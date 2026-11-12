@@ -1,4 +1,4 @@
-nhập gói/dựng/ứng dụng;
+nhập gói.dựng.ứng dụng.*;
 
 hàm chính() {
     ghi tệp(".tmp_starter_runtime.txt", "xin");

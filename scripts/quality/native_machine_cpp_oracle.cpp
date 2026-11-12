@@ -11,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+#include "frontend/lexer.h"
 #include "frontend/keywords.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/native/raw_codegen.h"
@@ -23,6 +24,25 @@ std::string readSource(const std::filesystem::path &source) {
     std::ifstream in(source, std::ios::binary);
     if (!in) throw std::runtime_error("Cannot read fixture: " + source.string());
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// This oracle inspects Machine IR.  Stop after lowering/optimization: the VM
+// direct-bytecode emitter may reject unrelated functions in the same fixture
+// even when the native machine lowerer supports the functions under test.
+vietvm::compiler::IrProgram compileFixtureIr(const std::filesystem::path &source) {
+    auto tokens = vietvm::compiler::postProcessTokensWithSpans(
+        vietvm::compiler::tokenizeWithSpans(readSource(source)));
+    auto ast = vietvm::frontend::parseTokens(std::move(tokens));
+    auto semantic = vietvm::compiler::analyzeSemantics(
+        ast, vietvm::compiler::SemanticEnvironment{},
+        vietvm::compiler::ResolutionPolicy::PreserveLegacy);
+    for (const auto &diagnostic : semantic.diagnostics) {
+        if (diagnostic.severity == vietvm::compiler::SemanticDiagnosticSeverity::Error)
+            throw std::runtime_error(diagnostic.message);
+    }
+    auto ir = vietvm::compiler::lowerToIr(ast, semantic);
+    vietvm::compiler::optimizeIr(ir);
+    return ir;
 }
 
 std::string toHex(const std::vector<std::uint8_t> &bytes) {
@@ -39,15 +59,10 @@ std::string toHex(const std::vector<std::uint8_t> &bytes) {
 void verifyFunctions(const std::filesystem::path &source,
                      const std::vector<std::string> &names,
                      const std::vector<std::string> &triples) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
 
     for (const auto &name : names) {
-        const auto lowered = vietvm::native::lowerMachineFunction(artifacts.ir, name);
+        const auto lowered = vietvm::native::lowerMachineFunction(ir, name);
         if (!lowered) throw std::runtime_error(name + ": " + lowered.error);
         for (const auto &triple : triples) {
             const auto target = vietvm::native::parseTarget(triple);
@@ -94,8 +109,23 @@ void verifyLowering(const vietvm::compiler::IrProgram &ir,
         if (x.opcode != y.opcode || x.immediate != y.immediate ||
             x.operand != y.operand || x.depthBefore != y.depthBefore ||
             x.symbol != y.symbol) {
-            throw std::runtime_error(name + ": MachineInstruction differs at index " +
-                                     std::to_string(i) + " (opcode/immediate/operand/depth/symbol)");
+            auto describe = [](const vietvm::native::MachineInstruction &inst) {
+                return "opcode=" + std::to_string(static_cast<int>(inst.opcode)) +
+                    ", immediate=" + std::to_string(inst.immediate) +
+                    ", operand=" + std::to_string(inst.operand) +
+                    ", depth=" + std::to_string(inst.depthBefore) +
+                    ", symbol='" + inst.symbol + "'";
+            };
+            std::string details = name + ": MachineInstruction differs at index " +
+                                  std::to_string(i) + "; C++ [" + describe(x) +
+                                  "] V++ [" + describe(y) + "]";
+            const auto begin = i > 3 ? i - 3 : 0;
+            const auto end = std::min(a.instructions.size(), i + 4);
+            for (auto j = begin; j < end; ++j)
+                details += "\n  " + std::to_string(j) + " C++ [" +
+                           describe(a.instructions[j]) + "] V++ [" +
+                           describe(b.instructions[j]) + "]";
+            throw std::runtime_error(details);
         }
     }
 }
@@ -103,18 +133,13 @@ void verifyLowering(const vietvm::compiler::IrProgram &ir,
 void verifyLoweringFixture(const std::filesystem::path &source,
                            const std::vector<std::string> &successes,
                            const std::vector<std::string> &failures) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
     for (const auto &name : successes) {
-        verifyLowering(artifacts.ir, source, name, true);
+        verifyLowering(ir, source, name, true);
         std::cout << "PASS " << name << '\n';
     }
     for (const auto &name : failures) {
-        verifyLowering(artifacts.ir, source, name, false);
+        verifyLowering(ir, source, name, false);
         std::cout << "REJECT " << name << '\n';
     }
 }
@@ -181,12 +206,7 @@ void verifySyntheticBoundaries(const std::filesystem::path &sourceBase) {
 // Both the leaf classifier and ISA encoder are independently implemented in
 // C++ and V++; compare them before exercising the production CLI/object path.
 void verifyLeafParity(const std::filesystem::path &source) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
     const std::vector<std::string> targets = {
         "x86_64-linux-gnu", "aarch64-linux-gnu", "riscv64-linux-gnu",
         "armv7-linux-gnueabihf", "i386-linux-gnu", "powerpc-linux-gnu",
@@ -203,10 +223,16 @@ void verifyLeafParity(const std::filesystem::path &source) {
     const std::vector<std::string> invalid = {
         "tru_dao", "hang_tran", "hang_tran_trung_gian", "hang_chia", "chua_ho_tro",
     };
-    std::size_t verified = 0;
-    for (const auto &name : valid) {
-        const auto cpp = vietvm::native::lowerRawLeaf(artifacts.ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(artifacts.ir, name, context.importResolutionBase);
+    auto names = valid;
+    names.insert(names.end(), invalid.begin(), invalid.end());
+    const auto lowered = vietvm::native::lowerRawLeavesVpp(ir, names, source.parent_path());
+    std::vector<std::pair<vietvm::native::Target, vietvm::native::RawLeaf>> requests;
+    std::vector<vietvm::native::RawLeafResult> expected;
+    std::vector<std::string> labels;
+    for (std::size_t i = 0; i < valid.size(); ++i) {
+        const auto &name = valid[i];
+        const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
+        const auto &vpp = lowered.at(i);
         if (!cpp || !vpp || cpp.leaf.kind != vpp.leaf.kind ||
             cpp.leaf.constant != vpp.leaf.constant) {
             throw std::runtime_error(name + ": leaf lowering differs; C++=" +
@@ -216,27 +242,31 @@ void verifyLeafParity(const std::filesystem::path &source) {
         for (const auto &triple : targets) {
             const auto parsed = vietvm::native::parseTarget(triple);
             if (!parsed.target) throw std::runtime_error(triple + ": " + parsed.error);
-            const auto a = vietvm::native::emitRawLeaf(*parsed.target, cpp.leaf);
-            const auto b = vietvm::native::emitRawLeafVpp(*parsed.target, vpp.leaf,
-                                                         context.importResolutionBase);
-            if (!a || !b || a.bytes != b.bytes) {
-                throw std::runtime_error(name + "/" + triple + ": leaf byte mismatch; C++=" +
-                                         (a ? toHex(a.bytes) : a.error) + "; V++=" +
-                                         (b ? toHex(b.bytes) : b.error));
-            }
-            ++verified;
+            requests.emplace_back(*parsed.target, vpp.leaf);
+            expected.push_back(vietvm::native::emitRawLeaf(*parsed.target, cpp.leaf));
+            labels.push_back(name + "/" + triple);
         }
     }
-    for (const auto &name : invalid) {
-        const auto cpp = vietvm::native::lowerRawLeaf(artifacts.ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(artifacts.ir, name,
-                                                        context.importResolutionBase);
+    for (std::size_t i = 0; i < invalid.size(); ++i) {
+        const auto &name = invalid[i];
+        const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
+        const auto &vpp = lowered.at(valid.size() + i);
         if (cpp || vpp)
             throw std::runtime_error(name + ": unsupported leaf was accepted");
     }
+    const auto encoded = vietvm::native::emitRawLeavesVpp(requests, source.parent_path());
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        const auto &a = expected[i];
+        const auto &b = encoded.at(i);
+        if (!a || !b || a.bytes != b.bytes) {
+            throw std::runtime_error(labels[i] + ": leaf byte mismatch; C++=" +
+                                     (a ? toHex(a.bytes) : a.error) + "; V++=" +
+                                     (b ? toHex(b.bytes) : b.error));
+        }
+    }
     std::cout << "Leaf C++/V++ lowerer parity: " << valid.size() + invalid.size()
               << "/" << valid.size() + invalid.size() << "\n";
-    std::cout << "Leaf C++/V++ ISA bytes: " << verified << "/" << verified << "\n";
+    std::cout << "Leaf C++/V++ ISA bytes: " << encoded.size() << "/" << requests.size() << "\n";
 }
 
 void verifyTargetParity(const std::filesystem::path &source) {
@@ -283,6 +313,7 @@ void verifyTargetParity(const std::filesystem::path &source) {
 } // namespace
 
 int main(int argc, char **argv) {
+    const bool bitParity = argc == 3 && std::string(argv[1]) == "--bit-parity";
     const bool lowering = argc == 5 && std::string(argv[1]) == "--lowering-parity";
     const bool leafParity = argc == 3 && std::string(argv[1]) == "--leaf-parity";
     const bool targetParity = argc == 3 && std::string(argv[1]) == "--target-parity";
@@ -293,6 +324,30 @@ int main(int argc, char **argv) {
         return 2;
     }
     try {
+        if (bitParity) {
+            const std::filesystem::path source = argv[2];
+            const std::vector<std::string> names = {"bit_va", "bit_hoac", "bit_xor",
+                "dao_bit", "dich_trai", "dich_phai", "uu_tien_bit", "bit_khung"};
+            verifyLoweringFixture(source, names, {});
+            const auto ir = compileFixtureIr(source);
+            for (const auto &name : names) {
+                const auto lowered = vietvm::native::lowerMachineFunction(ir, name);
+                if (!lowered) throw std::runtime_error(lowered.error);
+                for (const auto *triple : {"aarch64-apple-darwin", "aarch64-linux-gnu",
+                                          "x86_64-linux-gnu", "x86_64-windows-msvc"}) {
+                    const auto target = vietvm::native::parseTarget(triple);
+                    if (!target.target) throw std::runtime_error(target.error);
+                    const auto cpp = vietvm::native::emitMachineFunction(*target.target, lowered.function);
+                    const auto vpp = vietvm::native::emitMachineFunctionVpp(
+                        *target.target, lowered.function, source.parent_path());
+                    if (!cpp || !vpp || cpp.bytes != vpp.bytes)
+                        throw std::runtime_error(name + "/" + triple + ": mã bit C++/V++ khác nhau; " +
+                                                 cpp.error + " / " + vpp.error);
+                }
+            }
+            std::cout << "Mã bit C++/V++ khớp trên 4 đích\n";
+            return 0;
+        }
         if (targetParity) {
             verifyTargetParity(argv[2]);
             return 0;
@@ -304,20 +359,20 @@ int main(int argc, char **argv) {
         if (lowering) {
             verifyLoweringFixture(argv[2],
                 {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong",
-                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh"}, {});
+                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh", "tong_khi", "dieu_khien_khi"}, {});
             verifyLoweringFixture(argv[3],
                 {"goi_bon", "goi_muoi", "tong_muoi", "nhan_sau", "tinh_vong", "ket_hop"}, {});
             verifyLoweringFixture(argv[4],
                 {"min_i32", "max_i32_const", "add_limit", "neg_limit"}, {});
             verifySyntheticBoundaries(argv[4]);
-            std::cout << "Machine IR C++/V++ lowering parity: 26/26 cases\n";
+            std::cout << "Machine IR C++/V++ lowering parity: 28/28 cases\n";
             return 0;
         }
         const std::vector<std::string> targets = {
             "aarch64-apple-darwin", "aarch64-linux-gnu",
             "x86_64-linux-gnu", "x86_64-windows-msvc",
         };
-        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong"}, targets);
+        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "so_sanh_nho", "so_sanh_lon", "so_sanh_am", "max_i32", "tong", "tong_khi", "dieu_khien_khi", "hoist_vong", "hoist_hai_vong", "hoist_long_nhau"}, targets);
         verifyFunctions(argv[2], {"goi_bon", "goi_muoi", "tong_muoi"}, targets);
     } catch (const std::exception &e) {
         std::cerr << "C++ machine oracle: " << e.what() << '\n';

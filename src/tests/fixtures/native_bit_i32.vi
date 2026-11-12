@@ -1,0 +1,22 @@
+// Hàm nhận dữ liệu động để kiểm tra mã máy, tránh chỉ kiểm tra gấp hằng.
+hàm bit_va(a, b) { trả về a&b; };
+hàm bit_hoac(a, b) { trả về a|b; };
+hàm bit_xor(a, b) { trả về a^b; };
+hàm dao_bit(a) { trả về ~a; };
+hàm dich_trai(a, b) { trả về a<<b; };
+hàm dich_phai(a, b) { trả về a>>b; };
+hàm gan_bit(a, b) {
+    a&=b; a|=129; a^=33; a<<=b; a>>=b;
+    trả về a;
+};
+hàm uu_tien_bit(a, b) {
+    trả về (a|b&3) + (a^b&7) + (a<<b+1) + (~a+2) + (a==b<3);
+};
+hàm bit_khung(a, b) {
+    // Buộc backend ARM64 dùng khung nhớ thay vì giữ mọi ô trong thanh ghi.
+    biến c = a+1; biến d = b+2; biến e = c+3; biến f = d+4;
+    biến g = e+5; biến h = f+6; biến i = g+7; biến j = h+8;
+    biến k = i+9; biến l = j+10; biến m = k+11; biến n = l+12;
+    biến o = m+13; biến p = n+14; biến q = o+15;
+    trả về ((~a^b)&q) | ((p<<b)>>(a&31));
+};

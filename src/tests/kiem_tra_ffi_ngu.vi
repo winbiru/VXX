@@ -1,5 +1,5 @@
-nhập gói/hệ thống/nền tảng;
-nhập gói/thời gian/đơn điệu;
+nhập gói.hệ thống.nền tảng.*;
+nhập gói.thời gian.đơn điệu.*;
 
 // Foreign declarations belong to their declaring module. Bind test probes
 // locally rather than reaching the platform module's private FFI aliases.

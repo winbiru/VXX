@@ -1,4 +1,12 @@
-
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chứa chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.bộ sưu tập.danh sách.tìm chỉ số;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bảo mật.mật mã.ngẫu nhiên bảo mật;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Mã Hóa Tiện Ích {
@@ -614,4 +622,3 @@ hàm công khai bit xor(a, b) {
     bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
     trả về bộ chuyển tiếp.bit xor(a, b);
 };
-nhập gói/lõi/chuyển kiểu;

@@ -1,0 +1,25 @@
+lớp Hộp Riêng {
+    hàm riêng tư không() { trả về 11; };
+    hàm riêng tư hằng(x) { trả về x + 1; };
+    hàm riêng tư ô(x) { trả về x + 2; };
+    hàm riêng tư chuỗi(x) { trả về x; };
+    hàm riêng tư hai(a, b) { trả về a + b; };
+
+    hàm công khai chạy(x) {
+        a = mình.không();
+        b = mình.hằng(5);
+        c = mình.ô(x);
+        d = mình.chuỗi("Việt");
+        e = mình.hai(x, 9);
+        trả về [a, b, c, d, e];
+    };
+};
+
+hàm chính() {
+    r = Hộp Riêng().chạy(7);
+    in r[0];
+    in r[1];
+    in r[2];
+    in r[3];
+    in r[4];
+};

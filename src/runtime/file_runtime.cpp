@@ -3,9 +3,11 @@
 #include "vpp/runtime/resource_token.h"
 #include "vpp/runtime/error.h"
 #include "vpp/core/text.h"
+#include "vpp/core/project_layout.h"
 #include <cerrno>
 #include <charconv>
 #include <climits>
+#include <filesystem>
 #include <limits>
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -14,6 +16,7 @@
 #include <windows.h>
 #else
 #include <fcntl.h>
+#include <sys/file.h>
 #include <unistd.h>
 #endif
 
@@ -80,6 +83,10 @@ MachineResult perform(Opcode opcode, const std::vector<StackValue> &arguments, F
     const bool seek = opcode == OP_VM_MACHINE_FILE_SEEK;
     const bool tell = opcode == OP_VM_MACHINE_FILE_TELL;
     const bool remove = opcode == OP_VM_MACHINE_FILE_REMOVE;
+    const bool rename = opcode == OP_VM_MACHINE_FILE_RENAME;
+    const bool copy = opcode == OP_VM_MACHINE_FILE_COPY;
+    const bool link = opcode == OP_VM_MACHINE_FILE_LINK;
+    const bool lock = opcode == OP_VM_MACHINE_FILE_LOCK;
     const auto integer = [&](std::size_t index) {
         const auto *value = std::get_if<int>(&arguments[index]);
         if (!value) throw machineError("primitive tệp yêu cầu i32");
@@ -122,9 +129,55 @@ MachineResult perform(Opcode opcode, const std::vector<StackValue> &arguments, F
         return {make_int_value(static_cast<int>(removed.value)), removed.error};
 #endif
     }
+    if (rename || copy || link) {
+        const auto &source = checkedPath(arguments[0]);
+        const auto &destination = checkedPath(arguments[1]);
+#if defined(_WIN32)
+        if (rename) {
+            if (!MoveFileExW(widePath(source).c_str(), widePath(destination).c_str(),
+                    MOVEFILE_REPLACE_EXISTING))
+                return {make_int_value(-1), windowsError(GetLastError())};
+            return {make_int_value(0), 0};
+        }
+        if (link) {
+            if (!CreateHardLinkW(widePath(destination).c_str(), widePath(source).c_str(), nullptr))
+                return {make_int_value(-1), windowsError(GetLastError())};
+            return {make_int_value(0), 0};
+        }
+#else
+        if (rename) {
+            if (::rename(source.c_str(), destination.c_str()) != 0)
+                return {make_int_value(-1), errno};
+            return {make_int_value(0), 0};
+        }
+        if (link) {
+            if (::link(source.c_str(), destination.c_str()) != 0)
+                return {make_int_value(-1), errno};
+            return {make_int_value(0), 0};
+        }
+#endif
+        // Native byte transfer preserves binary data and executable permissions.
+        // The V++ caller owns the destination/staging and publication policy.
+        std::error_code error;
+        std::filesystem::copy_file(core::utf8Path(source), core::utf8Path(destination),
+            std::filesystem::copy_options::overwrite_existing, error);
+        return {make_int_value(error ? -1 : 0), error.value()};
+    }
     const auto entry = state.files.find(integer(0));
     if (entry == state.files.end()) throw machineError("c_tệp thô đã đóng hoặc không thuộc VM");
     const auto file = entry->second;
+    if (lock) {
+#if defined(_WIN32)
+        OVERLAPPED position{};
+        if (!LockFileEx(reinterpret_cast<HANDLE>(file.descriptor), LOCKFILE_EXCLUSIVE_LOCK,
+                0, 1, 0, &position))
+            return {make_int_value(-1), windowsError(GetLastError())};
+#else
+        if (::flock(static_cast<int>(file.descriptor), LOCK_EX) != 0)
+            return {make_int_value(-1), errno};
+#endif
+        return {make_int_value(0), 0};
+    }
     if (close) {
         state.files.erase(entry);
         const int error = closeRawFile(file.descriptor);
@@ -194,7 +247,9 @@ MachineResult perform(Opcode opcode, const std::vector<StackValue> &arguments, F
 } // namespace
 
 bool isFileMachinePrimitive(int opcode) noexcept {
-    return opcode >= OP_VM_MACHINE_FILE_OPEN && opcode <= OP_VM_MACHINE_FILE_REMOVE;
+    return (opcode >= OP_VM_MACHINE_FILE_OPEN && opcode <= OP_VM_MACHINE_FILE_REMOVE) ||
+           (opcode >= OP_VM_MACHINE_FILE_RENAME && opcode <= OP_VM_MACHINE_FILE_LINK) ||
+           opcode == OP_VM_MACHINE_FILE_LOCK;
 }
 FileMachineState::~FileMachineState() { closeAll(); }
 void FileMachineState::closeAll() noexcept {
@@ -214,6 +269,10 @@ StackValue executeFileMachinePrimitive(Opcode opcode, const std::vector<StackVal
         case OP_VM_MACHINE_FILE_TELL: operation = "tell"; arity = 1; break;
         case OP_VM_MACHINE_FILE_ERROR: operation = "error"; arity = 1; break;
         case OP_VM_MACHINE_FILE_REMOVE: operation = "remove"; arity = 1; break;
+        case OP_VM_MACHINE_FILE_RENAME: operation = "rename"; arity = 2; break;
+        case OP_VM_MACHINE_FILE_COPY: operation = "copy"; arity = 2; break;
+        case OP_VM_MACHINE_FILE_LINK: operation = "link"; arity = 2; break;
+        case OP_VM_MACHINE_FILE_LOCK: operation = "lock"; arity = 1; break;
         default: throw machineError("opcode không hợp lệ");
     }
     if (!capabilities.count(std::string("machine.file.") + operation))

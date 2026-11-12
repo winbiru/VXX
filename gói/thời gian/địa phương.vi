@@ -1,6 +1,8 @@
 // Đọc lịch địa phương qua machine ABI; V++ giải mã và định dạng.
-nhập gói/thời gian/giờ quốc tế;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.thời gian.giờ quốc tế.thời gian giờ quốc tế đọc i64;
+nhập gói.thời gian.giờ quốc tế.thời gian giờ quốc tế chia sàn;
+nhập gói.thời gian.giờ quốc tế.thời gian giờ quốc tế đọc mốc thời gian byte ffi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Đồng Hồ Địa Phương {

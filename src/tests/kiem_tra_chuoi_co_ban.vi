@@ -1,5 +1,5 @@
 // Regression cho API chuỗi, ưu tiên semantics tiếng Việt UTF-8.
-nhập gói/văn bản/chính;
+nhập gói.văn bản.chính.*;
 
 in đảo ngược("abc");
 in đếm ký tự("banana", "a");

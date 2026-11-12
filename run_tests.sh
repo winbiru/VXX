@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -u
+# Group each background worker with its children for reliable cancellation
+# even when process listing is restricted by the CI/sandbox environment.
+set -m
 
 ROOT_DIR="$(pwd)"
 if [ -n "${VPP_EXEC:-}" ]; then
@@ -27,8 +30,28 @@ if [ ! -x "$EXEC_PATH" ]; then
   echo "ERROR: VPP executable khong chay duoc: $EXEC_PATH" >&2
   exit 2
 fi
+# Keep the package lookup root independent from the native ASM toolchain.
+# Do this before any fixture starts, including those that change VPP_HOME.
+export VPP_HOME="${VPP_HOME:-$ROOT_DIR}"
+export VPP_AOT_ROOT="${VPP_AOT_ROOT:-$ROOT_DIR}"
+# The macOS Stage 0 bootstrap can directly assemble/link V++ emitted ASM.
+# The opt-out retains the CMake parity path for debugging and CI bisects.
+if [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ]; then
+  export VPP_AOT_DIRECT_LINK_CPP="${VPP_AOT_DIRECT_LINK_CPP:-1}"
+fi
+# Ordinary integration tests run through the bootstrapped V++ compiler/ASM
+# backend. Keep an explicit Stage 0 lane for VM/JIT-specific contracts.
+NATIVE_COMMAND=("$EXEC_PATH" run --compiler=vpp)
+VM_COMMAND=("$EXEC_PATH" run --compiler=cpp)
+source "$ROOT_DIR/scripts/quality/native_test_workers.sh"
+NATIVE_BATCH_PIDS=()
 tmpdir=$(mktemp -d "src/tests/.tmp.XXXXXX")
 export VPP_PREFERENCES_HOME="$ROOT_DIR/$tmpdir/preferences"
+# One integration run owns a disposable, shared executable cache. Every
+# unique emitted assembly/link configuration is assembled and linked once;
+# each test still executes in a separate child with its original cwd/env.
+# Cross-worker entries are published atomically by the native compiler.
+export VPP_AOT_EXECUTABLE_CACHE_DIR="${VPP_AOT_EXECUTABLE_CACHE_DIR:-$ROOT_DIR/$tmpdir/aot-executables}"
 # Deterministic environment values for public System/FFI API regression tests.
 export VPP_FFI_ENV_TEST="vpp-env-ffi-ok"
 export VPP_FFI_ENV_EMPTY_TEST=""
@@ -40,7 +63,7 @@ HTTP_NETWORK_RESTRICTED=0
 # the execution environment denies bind(2), only tests that require localhost
 # sockets are skipped; protocol parsing/framing still runs as ordinary V++ tests.
 HTTP_FIXTURE_PID=""
-HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-120}"
+HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-600}"
 if [[ ! "$HTTP_FIXTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] ||
    [ "${#HTTP_FIXTURE_TIMEOUT}" -gt 4 ] || [ "$HTTP_FIXTURE_TIMEOUT" -gt 3600 ]; then
   echo "ERROR: VPP_HTTP_FIXTURE_TIMEOUT must be an integer from 1 to 3600 seconds" >&2
@@ -49,12 +72,26 @@ if [[ ! "$HTTP_FIXTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] ||
 fi
 VPP_HOME_TEST_DIR=""
 cleanup() {
+  local exit_status=$?
+  local pid
+  if [ "${#NATIVE_BATCH_PIDS[@]}" -gt 0 ]; then
+    for pid in "${NATIVE_BATCH_PIDS[@]}"; do vpp_test_stop_tree "$pid"; done
+    for pid in "${NATIVE_BATCH_PIDS[@]}"; do wait "$pid" 2>/dev/null || true; done
+  fi
   if [ -n "$HTTP_FIXTURE_PID" ]; then
-    kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
+    vpp_test_stop_tree "$HTTP_FIXTURE_PID"
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
   if [ -n "$VPP_HOME_TEST_DIR" ] && [ -d "$VPP_HOME_TEST_DIR" ]; then
     rm -rf "$VPP_HOME_TEST_DIR"
+  fi
+  if [ "$exit_status" -ne 0 ] && [ -d "$tmpdir" ]; then
+    local evidence="${VPP_TEST_LOG_DIR:-$ROOT_DIR/build/integration-logs}/run-$(date +%Y%m%d-%H%M%S)-$$"
+    if mkdir -p "$evidence" && cp -R "$tmpdir/." "$evidence/"; then
+      echo "Integration failure evidence: $evidence" >&2
+    else
+      echo "ERROR: could not preserve integration evidence at $evidence" >&2
+    fi
   fi
   rm -f src/tests/.tmp_api_project.db src/tests/.tmp_api_project.db-journal \
         src/tests/.tmp_api_project.db-shm src/tests/.tmp_api_project.db-wal
@@ -63,7 +100,9 @@ cleanup() {
   rm -f src/tests/.tmp_oop_zip.txt src/tests/.tmp_oop_zip.zip src/tests/.tmp_oop_manifest.json
   rm -rf "$tmpdir"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 http_get() {
   local url="$1"
@@ -91,13 +130,13 @@ wait_http_value() {
 
 # The HTTP fixture exercises TCP listen/accept/recv/send. Keep its server
 # side under the strict migration gate as well as the client-side FFI tests.
-VPP_STRICT_SYSTEM_FFI_POSIX=1 "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
+VPP_STRICT_SYSTEM_FFI_POSIX=1 "${NATIVE_COMMAND[@]}" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
 if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
   if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
-  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013)|^Lỗi: ngoại lệ không bắt được: FFI: socket_listen OS=(1|13|10013)$)' "$tmpdir/http_fixture.log"; then
+  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013)|^(Lỗi: )?ngoại lệ không bắt được: FFI: socket_listen OS=(1|13|10013)$)' "$tmpdir/http_fixture.log"; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
     HTTP_FIXTURE_PID=""
@@ -122,7 +161,8 @@ if cp src/tests/kiem_tra_package_tieng_viet.vi "$VPP_HOME_TEST_DIR/kiem_tra_pack
   cp -R "$ROOT_DIR/gói" "$VPP_HOME_TEST_DIR/gói" &&
   (
     cd "$VPP_HOME_TEST_DIR" &&
-    VPP_HOME="$VPP_HOME_TEST_DIR" "$EXEC_PATH" kiem_tra_package_tieng_viet.vi >"$ROOT_DIR/$vpp_home_out" 2>&1
+    VPP_HOME="$VPP_HOME_TEST_DIR" VPP_AOT_ROOT="$ROOT_DIR" \
+      "${NATIVE_COMMAND[@]}" kiem_tra_package_tieng_viet.vi >"$ROOT_DIR/$vpp_home_out" 2>&1
   ) &&
   diff -u src/tests/expected/kiem_tra_package_tieng_viet.expected "$vpp_home_out"; then
   echo "PASS: Vietnamese package import via VPP_HOME"; PASS=$((PASS+1))
@@ -135,12 +175,16 @@ TESTS=(
   src/tests/kiem_tra_boolean.vi
   src/tests/kiem_tra_bo_qua.vi
   src/tests/kiem_tra_thoat_vong_lap.vi
+  src/tests/kiem_tra_khi.vi
+  src/tests/kiem_tra_bien_dich_khi.vi
+  src/tests/kiem_tra_bien_dich_khi_vm.vi
   src/tests/kiem_tra_chon_ca.vi
   src/tests/kiem_tra_chuoi_co_ban.vi
   src/tests/kiem_tra_de_quy.vi
   src/tests/kiem_tra_file_dem.vi
   src/tests/kiem_tra_ngoai_le.vi
   src/tests/kiem_tra_ngoai_le_xuyen_ham.vi
+  src/tests/kiem_tra_aot_tang.vi
   src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi
   src/tests/kiem_tra_dieu_kien_phu_dinh.vi
   src/tests/kiem_tra_ham.vi
@@ -201,6 +245,7 @@ TESTS=(
   src/tests/kiem_tra_goi_xml.vi
   src/tests/kiem_tra_goi_luu_tru.vi
   src/tests/kiem_tra_goi_dong_thoi.vi
+  src/tests/kiem_tra_native_worker.vi
   src/tests/kiem_tra_goi_tuy_chon.vi
   src/tests/kiem_tra_goi_bang_ma.vi
   src/tests/kiem_tra_vm_ieee754.vi
@@ -219,8 +264,11 @@ TESTS=(
   src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi
   src/tests/kiem_tra_bo_dang_ky_ham.vi
   src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
+  src/tests/kiem_tra_lexer_bang_byte.vi
+  src/tests/kiem_tra_lexer_token_gon.vi
   src/tests/kiem_tra_bien_dich_bieu_thuc_vi.vi
   src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi
+  src/tests/kiem_tra_bien_dich_chuong_trinh_vm.vi
   src/tests/kiem_tra_khai_bao_kieu_ffi_tu_chu.vi
   src/tests/kiemtrathamsotrung.vi
   src/tests/kiemtramacdinh.vi
@@ -317,10 +365,13 @@ TESTS=(
   src/tests/kiem_tra_ten_kieu_nhieu_tu.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
   src/tests/kiem_tra_closure_capture.vi
+  src/tests/kiem_tra_ham_an_danh_tu_chu.vi
   src/tests/kiem_tra_list_literal.vi
+  src/tests/kiem_tra_khung_bien_module.vi
   src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi
+  src/tests/kiem_tra_lop_phuong_thuc_forward.vi
   src/tests/kiem_tra_object_model.vi
   src/tests/kiem_tra_constructor_tham_so.vi
   src/tests/kiem_tra_visibility_instance.vi
@@ -338,7 +389,36 @@ TESTS=(
   src/tests/program.vi
 )
 
-RUNNABLE_TESTS=()
+# These fixtures explicitly compare against Stage 0 compiler snapshot/opcode
+# oracles (bien_dich_phan_tich_vm), or exercise VM-only task/JIT contracts.
+# Keep the C++ oracle tests visible as a compatibility lane until they can be
+# replaced by independent native V++ checks. Never silently fall back.
+VM_GOLDEN_TESTS=(
+  src/tests/kiem_tra_bien_dich_khi_vm.vi
+  src/tests/kiem_tra_goi_bien_dich.vi
+  src/tests/kiem_tra_goi_bien_dich_moi.vi
+  src/tests/kiem_tra_kien_truc_oop_compiler.vi
+  src/tests/kiem_tra_lop_mo_rong_compiler.vi
+  src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi
+  src/tests/kiem_tra_goi_phan_tich_phu_thuoc.vi
+  src/tests/kiem_tra_goi_tai_lieu.vi
+  src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
+  src/tests/kiem_tra_bien_dich_chuong_trinh_vm.vi
+  src/tests/kiemtracompilervpp.vi
+  src/tests/kiem_tra_ir_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_module_tu_chu.vi
+  src/tests/kiem_tra_oracle_module_tu_chu.vi
+  src/tests/kiem_tra_oracle_chuoi_module.vi
+  src/tests/kiem_tra_escape_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_lien_ket_tu_chu.vi
+  src/tests/kiem_tra_tap_hop_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_quy_trinh_oop.vi
+  src/tests/kiem_tra_machine_jit.vi
+  src/tests/kiem_tra_vm_ieee754.vi
+)
+NATIVE_RUNNABLE_TESTS=()
+VM_RUNNABLE_TESTS=()
 for testfile in "${TESTS[@]}"; do
   base=$(basename "${testfile%.vi}")
   if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
@@ -348,14 +428,150 @@ for testfile in "${TESTS[@]}"; do
         ;;
     esac
   fi
-  RUNNABLE_TESTS+=("$testfile")
+  is_vm_test=0
+  for vm_test in "${VM_GOLDEN_TESTS[@]}"; do
+    if [ "$testfile" = "$vm_test" ]; then is_vm_test=1; break; fi
+  done
+  if [ "$is_vm_test" -eq 1 ]; then
+    VM_RUNNABLE_TESTS+=("$testfile")
+  else
+    NATIVE_RUNNABLE_TESTS+=("$testfile")
+  fi
 done
 
-# Chạy các golden test thường trong một tiến trình V++ duy nhất. Worker vẫn ghi
-# output/status riêng cho từng file nên phần so sánh expected bên dưới giữ nguyên
-# semantics, trong khi compiler có thể tái sử dụng AST module giữa các test.
-if ! "$EXEC_PATH" --batch-run-tests "$tmpdir" "${RUNNABLE_TESTS[@]}"; then
-  echo "ERROR: batch test worker failed" >&2
+# Each native batch retains one self-hosted compiler and a bounded V++ memo.
+# Filesystem, network, subprocess, concurrency and configuration tests share
+# an ordered lane. Fill that lane's idle capacity with independent fixtures
+# while preserving the relative order of every external-state fixture.
+# The self-hosted AOT driver hashes large emitted assemblies. A measured
+# worker peaked at several GB, so four workers can exceed the 7 GB ARM64 macOS
+# runner's memory. Keep two there; Linux's 16 GB runners retain four.
+native_default_workers=4
+if [ "$(uname -s)" = Darwin ]; then native_default_workers=2; fi
+VPP_NATIVE_TEST_WORKERS="${VPP_NATIVE_TEST_WORKERS:-$native_default_workers}"
+if [[ ! "$VPP_NATIVE_TEST_WORKERS" =~ ^[1-4]$ ]]; then
+  echo "ERROR: VPP_NATIVE_TEST_WORKERS must be an integer from 1 to 4" >&2
+  exit 2
+fi
+
+native_golden_is_independent() {
+  local name="${1##*/}"
+  # These fixtures only exercise in-memory data/AST processing. The broad
+  # keyword exclusions below also match their names (events, FFI syntax,
+  # network-format helpers, quantum math), unnecessarily serializing them.
+  case "$name" in
+    kiem_tra_su_kien.vi|kiem_tra_khai_bao_kieu_ffi_tu_chu.vi|\
+    kiem_tra_goi_mang.vi|kiem_tra_goi_luong_tu.vi|\
+    kiem_tra_mang_3_chieu.vi|kiem_tra_so_nguyen.vi|\
+    kiem_tra_http_thuan_vpp.vi|kiem_tra_http_response_vpp.vi|\
+    kiem_tra_http_may_chu_thuan_vpp.vi|kiem_tra_goi_may_chu_http.vi|\
+    kiem_tra_process_quote_windows.vi|kiem_tra_socket_ip.vi|\
+    kiem_tra_dns_goi_tin.vi)
+      return 0 ;;
+  esac
+  case "$name" in
+    *file*|*tep*|*thumuc*|*thu_muc*|*luu_tru*|*zip*|*json_file*|\
+    *http*|*socket*|*dns*|*tls*|*ffi*|*network*|*mang*|*o_cam*|\
+    *process*|*tien_trinh*|*worker*|*dong_thoi*|*su_kien*|\
+    *db*|*database*|*sqlite*|*api*|*nhat_ky*|*logger*|\
+    *cau_hinh*|*thoi_gian*|*goi_repl*|*cong_cu*|*dong_goi*|\
+    *goi_dung*|*preferences*|*goi_luong_tu*|*goi_ngau_nhien*|\
+    *stdlib_io*|*goi_kich_ban*|*goi_soan_thao*|*ngu*|*entropy*)
+      return 1 ;;
+  esac
+  return 0
+}
+
+run_native_golden_batches() {
+  local suite="$1"
+  shift
+  [ "$#" -gt 0 ] || return 0
+  local golden_fail_fast=0
+  if [ "$suite" = golden ]; then golden_fail_fast=1; fi
+  if [ "$VPP_NATIVE_TEST_WORKERS" -eq 1 ]; then
+    VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+      "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "$@"
+    return $?
+  fi
+
+  local source worker index failure=0
+  local -a independent=() ordered=() shard=() pids=()
+  for source in "$@"; do
+    if native_golden_is_independent "$source"; then
+      independent+=("$source")
+    else
+      ordered+=("$source")
+    fi
+  done
+  local independent_workers="$VPP_NATIVE_TEST_WORKERS"
+  if [ "${#ordered[@]}" -gt 0 ]; then
+    independent_workers=$((VPP_NATIVE_TEST_WORKERS - 1))
+  fi
+  local shards_dir="$tmpdir/native-shards-$suite"
+  local weighted_shards=0
+  local shard_workers="$VPP_NATIVE_TEST_WORKERS"
+  if command -v python3 >/dev/null 2>&1; then
+    local ordered_file="$tmpdir/native-ordered-$suite.list"
+    : > "$ordered_file"
+    if [ "${#ordered[@]}" -gt 0 ]; then
+      printf '%s\n' "${ordered[@]}" > "$ordered_file"
+    fi
+    if ! python3 "$ROOT_DIR/scripts/quality/shard_native_golden.py" \
+      --costs "$ROOT_DIR/scripts/quality/native_golden_costs.tsv" \
+      --workers "$shard_workers" --output "$shards_dir" \
+      --ordered-file "$ordered_file" \
+      "${independent[@]}"; then
+      echo "ERROR: unable to split native golden tests" >&2
+      return 2
+    fi
+    weighted_shards=1
+  else
+    echo "INFO: python3 unavailable; using round-robin native shards" >&2
+  fi
+  if [ "$weighted_shards" -eq 1 ]; then
+    echo "== Native $suite: ${#independent[@]} independent fixtures balanced across ${shard_workers} workers, ${#ordered[@]} fixtures pinned in order =="
+  else
+    shard_workers="$independent_workers"
+    echo "== Native $suite: ${#independent[@]} independent fixtures on ${shard_workers} workers, ${#ordered[@]} ordered fixtures on one worker =="
+  fi
+  if [ "$weighted_shards" -eq 0 ] && [ "${#ordered[@]}" -gt 0 ]; then
+    VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+      "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${ordered[@]}" &
+    pids+=("$!")
+  fi
+  for ((worker=0; worker<shard_workers; worker++)); do
+    shard=()
+    if [ "$weighted_shards" -eq 1 ]; then
+      while IFS= read -r source || [ -n "$source" ]; do
+        shard+=("$source")
+      done < "$shards_dir/$worker.list"
+    else
+      for ((index=worker; index<${#independent[@]}; index+=independent_workers)); do
+        shard+=("${independent[index]}")
+      done
+    fi
+    if [ "${#shard[@]}" -gt 0 ]; then
+      VPP_NATIVE_GOLDEN_FAIL_FAST="$golden_fail_fast" \
+        "$EXEC_PATH" --batch-run-tests --compiler=vpp "$tmpdir" "${shard[@]}" &
+      pids+=("$!")
+    fi
+  done
+  NATIVE_BATCH_PIDS=("${pids[@]}")
+  if ! vpp_test_wait_workers "${pids[@]}"; then failure=1; fi
+  NATIVE_BATCH_PIDS=()
+  [ "$failure" -eq 0 ]
+}
+
+# Both lanes produce identical per-file output/status artifacts for the
+# existing golden comparisons. Explicit --compiler=vpp forbids VM fallback.
+if [ "${#NATIVE_RUNNABLE_TESTS[@]}" -gt 0 ] &&
+   ! run_native_golden_batches golden "${NATIVE_RUNNABLE_TESTS[@]}"; then
+  echo "ERROR: V++ native batch test worker failed" >&2
+  exit 2
+fi
+if [ "${#VM_RUNNABLE_TESTS[@]}" -gt 0 ] &&
+   ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${VM_RUNNABLE_TESTS[@]}"; then
+  echo "ERROR: VM-specific batch test worker failed" >&2
   exit 2
 fi
 
@@ -396,44 +612,50 @@ done
 # opcode groups must reject calls even when no strict testing flag is present.
 case "$(uname -s)" in
   Darwin|Linux)
+    # Stage 0 validates each retired opcode in isolation. Batch the fixtures
+    # per mode to reuse the parser/AST cache without sharing VM state.
+    legacy_kinds=(tep moi_truong process nen_tang ngu socket tls utc local entropy)
+    legacy_sources=()
+    for legacy_kind in "${legacy_kinds[@]}"; do
+      legacy_sources+=("src/tests/kiem_tra_ffi_opcode_${legacy_kind}_cu.vi")
+    done
     for legacy_mode in interpreter jit; do
       legacy_jit=0
       if [ "$legacy_mode" = jit ]; then legacy_jit=1; fi
-      for legacy_kind in tep moi_truong process nen_tang ngu socket tls utc local entropy; do
-        legacy_out="$tmpdir/removed_native_${legacy_mode}_${legacy_kind}.output"
+      legacy_dir="$tmpdir/removed-native-$legacy_mode"
+      if ! VPP_ENABLE_JIT="$legacy_jit" "$EXEC_PATH" --batch-run-tests --compiler=cpp \
+        "$legacy_dir" "${legacy_sources[@]}"; then
+        echo "ERROR: removed native opcode batch worker failed [$legacy_mode]" >&2
+        exit 2
+      fi
+      for legacy_kind in "${legacy_kinds[@]}"; do
+        legacy_out="$legacy_dir/kiem_tra_ffi_opcode_${legacy_kind}_cu.output"
+        legacy_status_file="$legacy_dir/kiem_tra_ffi_opcode_${legacy_kind}_cu.status"
         case "$legacy_kind" in
           tep)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_tep_cu.vi
             legacy_diagnostic='System FFI strict file: legacy VM file opcode is disabled' ;;
           moi_truong)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_moi_truong_cu.vi
             legacy_diagnostic='System FFI: legacy environment opcode is disabled' ;;
           process)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_process_cu.vi
             legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
           nen_tang)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi
             legacy_diagnostic='System FFI: legacy monotonic clock opcode is disabled' ;;
           ngu)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_ngu_cu.vi
             legacy_diagnostic='System FFI: legacy sleep opcode is disabled' ;;
           socket)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_socket_cu.vi
             legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
           tls)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_tls_cu.vi
             legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
           utc)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_utc_cu.vi
             legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
           local)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_local_cu.vi
             legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
           entropy)
-            legacy_fixture=src/tests/kiem_tra_ffi_opcode_entropy_cu.vi
             legacy_diagnostic='System FFI: legacy secure entropy opcode is disabled' ;;
         esac
-        if VPP_ENABLE_JIT="$legacy_jit" "$EXEC_PATH" "$legacy_fixture" >"$legacy_out" 2>&1; then
+        if [ ! -f "$legacy_status_file" ]; then
+          echo "FAIL: removed native $legacy_kind opcode missing batch status [$legacy_mode]"; FAIL=$((FAIL+1))
+        elif [ "$(cat "$legacy_status_file")" -eq 0 ]; then
           echo "FAIL: removed native $legacy_kind opcode allowed [$legacy_mode]"; FAIL=$((FAIL+1))
         elif grep -q "$legacy_diagnostic" "$legacy_out"; then
           echo "PASS: removed native $legacy_kind opcode [$legacy_mode]"; PASS=$((PASS+1))
@@ -449,11 +671,11 @@ case "$(uname -s)" in
     for tz_mode in interpreter jit; do
       local_clock_out="$tmpdir/ffi_local_clock_${tz_mode}.output"
       if [ "$tz_mode" = jit ]; then
-        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT=1 "$EXEC_PATH" \
+        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT=1 "${VM_COMMAND[@]}" \
           src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
         local_clock_status=$?
       else
-        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 "$EXEC_PATH" \
+        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 "${NATIVE_COMMAND[@]}" \
           src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
         local_clock_status=$?
       fi
@@ -467,7 +689,7 @@ case "$(uname -s)" in
     done
 
     strict_file_out="$tmpdir/strict_ffi_file.output"
-    if VPP_STRICT_SYSTEM_FFI_FILE=1 "$EXEC_PATH" src/tests/kiem_tra_ffi_tep.vi >"$strict_file_out" 2>&1 &&
+    if VPP_STRICT_SYSTEM_FFI_FILE=1 "${NATIVE_COMMAND[@]}" src/tests/kiem_tra_ffi_tep.vi >"$strict_file_out" 2>&1 &&
       diff -u src/tests/expected/kiem_tra_ffi_tep.expected "$strict_file_out"; then
       echo "PASS: System FFI strict public file API"; PASS=$((PASS+1))
     else
@@ -475,7 +697,7 @@ case "$(uname -s)" in
       cat "$strict_file_out" >&2
     fi
     strict_legacy_out="$tmpdir/strict_ffi_legacy.output"
-    if VPP_STRICT_SYSTEM_FFI_FILE=1 "$EXEC_PATH" src/tests/kiem_tra_ffi_opcode_tep_cu.vi >"$strict_legacy_out" 2>&1; then
+    if VPP_STRICT_SYSTEM_FFI_FILE=1 "${VM_COMMAND[@]}" src/tests/kiem_tra_ffi_opcode_tep_cu.vi >"$strict_legacy_out" 2>&1; then
       echo "FAIL: System FFI strict legacy opcode was allowed"; FAIL=$((FAIL+1))
     elif grep -q 'System FFI strict file: legacy VM file opcode is disabled' "$strict_legacy_out"; then
       echo "PASS: System FFI strict rejects legacy file opcode"; PASS=$((PASS+1))
@@ -502,27 +724,79 @@ case "$(uname -s)" in
       kiem_tra_ffi_tls
       kiem_tra_ffi_http_transport_bat_loi
     )
+    # Compile the native strict-FFI fixtures in one self-hosted session so
+    # identical imported Machine IR bodies can reuse the bounded ASM memo.
+    # Keep the interpreter/JIT checks and their independent oracle comparisons.
+    strict_native_dir="$tmpdir/strict-posix-native"
+    strict_native_sources=()
+    for strict_name in "${strict_posix_tests[@]}"; do
+      if [ "$strict_name" = kiem_tra_ffi_socket ] && [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
+        continue
+      fi
+      strict_native_sources+=("src/tests/${strict_name}.vi")
+    done
+    if [ "${#strict_native_sources[@]}" -gt 0 ]; then
+      VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT=0 VPP_NATIVE_GOLDEN_FAIL_FAST=0 \
+        "$EXEC_PATH" --batch-run-tests --compiler=vpp "$strict_native_dir" \
+        "${strict_native_sources[@]}" || {
+          echo "ERROR: native strict POSIX batch worker failed" >&2
+          exit 2
+        }
+    fi
     for strict_mode in interpreter jit; do
       strict_jit=0
       if [ "$strict_mode" = jit ]; then strict_jit=1; fi
+      # The four negative checks use Stage 0 in both modes. Public POSIX
+      # wrappers use native V++ in interpreter mode and Stage 0 only for JIT.
+      strict_mode_dir="$tmpdir/strict-posix-$strict_mode"
+      strict_mode_sources=(
+        src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi
+        src/tests/kiem_tra_ffi_opcode_socket_cu.vi
+        src/tests/kiem_tra_ffi_opcode_tls_cu.vi
+        src/tests/kiem_tra_ffi_opcode_process_cu.vi
+      )
+      if [ "$strict_mode" = jit ]; then
+        strict_mode_sources+=("${strict_native_sources[@]}")
+      fi
+      if ! VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" \
+        "$EXEC_PATH" --batch-run-tests --compiler=cpp \
+        "$strict_mode_dir" "${strict_mode_sources[@]}"; then
+        echo "ERROR: strict POSIX Stage 0 batch worker failed [$strict_mode]" >&2
+        exit 2
+      fi
       for strict_name in "${strict_posix_tests[@]}"; do
         if [ "$strict_name" = kiem_tra_ffi_socket ] && [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
           echo "SKIP: System FFI strict POSIX socket [$strict_mode] (localhost bind restricted)"
           continue
         fi
-        strict_out="$tmpdir/strict_posix_${strict_mode}_${strict_name}.output"
-        if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
-          "src/tests/${strict_name}.vi" >"$strict_out" 2>&1 &&
+        if [ "$strict_mode" = interpreter ]; then
+          strict_out="$strict_native_dir/${strict_name}.output"
+          strict_status_file="$strict_native_dir/${strict_name}.status"
+          strict_status=1
+          if [ -f "$strict_status_file" ]; then
+            strict_status=$(cat "$strict_status_file")
+          fi
+        else
+          strict_out="$strict_mode_dir/${strict_name}.output"
+          strict_status_file="$strict_mode_dir/${strict_name}.status"
+          strict_status=1
+          if [ -f "$strict_status_file" ]; then
+            strict_status=$(cat "$strict_status_file")
+          fi
+        fi
+        if [ "$strict_status" -eq 0 ] &&
           diff -u "src/tests/expected/${strict_name}.expected" "$strict_out"; then
           echo "PASS: System FFI strict POSIX $strict_name [$strict_mode]"; PASS=$((PASS+1))
         else
           echo "FAIL: System FFI strict POSIX $strict_name [$strict_mode]"; FAIL=$((FAIL+1))
-          cat "$strict_out" >&2
+          if [ -f "$strict_out" ]; then cat "$strict_out" >&2; fi
         fi
       done
-      strict_old_out="$tmpdir/strict_posix_old_${strict_mode}.output"
-      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
-        src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi >"$strict_old_out" 2>&1; then
+      strict_old_out="$strict_mode_dir/kiem_tra_ffi_opcode_nen_tang_cu.output"
+      strict_old_status="$strict_mode_dir/kiem_tra_ffi_opcode_nen_tang_cu.status"
+      if [ ! -f "$strict_old_status" ] || [ ! -f "$strict_old_out" ]; then
+        echo "FAIL: System FFI strict POSIX missing legacy monotonic evidence [$strict_mode]"; FAIL=$((FAIL+1))
+      elif [ "$(cat "$strict_old_status")" -eq 0 ]; then
         echo "FAIL: System FFI strict POSIX legacy opcode allowed [$strict_mode]"; FAIL=$((FAIL+1))
       elif grep -q 'System FFI: legacy monotonic clock opcode is disabled' "$strict_old_out"; then
         echo "PASS: System FFI strict POSIX rejects legacy monotonic opcode [$strict_mode]"; PASS=$((PASS+1))
@@ -530,9 +804,11 @@ case "$(uname -s)" in
         echo "FAIL: System FFI strict POSIX legacy opcode failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
         cat "$strict_old_out" >&2
       fi
-      strict_socket_old_out="$tmpdir/strict_posix_socket_old_${strict_mode}.output"
-      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
-        src/tests/kiem_tra_ffi_opcode_socket_cu.vi >"$strict_socket_old_out" 2>&1; then
+      strict_socket_old_out="$strict_mode_dir/kiem_tra_ffi_opcode_socket_cu.output"
+      strict_socket_old_status="$strict_mode_dir/kiem_tra_ffi_opcode_socket_cu.status"
+      if [ ! -f "$strict_socket_old_status" ] || [ ! -f "$strict_socket_old_out" ]; then
+        echo "FAIL: System FFI strict POSIX missing legacy socket evidence [$strict_mode]"; FAIL=$((FAIL+1))
+      elif [ "$(cat "$strict_socket_old_status")" -eq 0 ]; then
         echo "FAIL: System FFI strict POSIX legacy socket allowed [$strict_mode]"; FAIL=$((FAIL+1))
       elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_socket_old_out"; then
         echo "PASS: System FFI strict POSIX rejects legacy socket [$strict_mode]"; PASS=$((PASS+1))
@@ -540,9 +816,11 @@ case "$(uname -s)" in
         echo "FAIL: System FFI strict POSIX legacy socket failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
         cat "$strict_socket_old_out" >&2
       fi
-      strict_tls_old_out="$tmpdir/strict_posix_tls_old_${strict_mode}.output"
-      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
-        src/tests/kiem_tra_ffi_opcode_tls_cu.vi >"$strict_tls_old_out" 2>&1; then
+      strict_tls_old_out="$strict_mode_dir/kiem_tra_ffi_opcode_tls_cu.output"
+      strict_tls_old_status="$strict_mode_dir/kiem_tra_ffi_opcode_tls_cu.status"
+      if [ ! -f "$strict_tls_old_status" ] || [ ! -f "$strict_tls_old_out" ]; then
+        echo "FAIL: System FFI strict POSIX missing legacy TLS evidence [$strict_mode]"; FAIL=$((FAIL+1))
+      elif [ "$(cat "$strict_tls_old_status")" -eq 0 ]; then
         echo "FAIL: System FFI strict POSIX legacy TLS opcode allowed [$strict_mode]"; FAIL=$((FAIL+1))
       elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_tls_old_out"; then
         echo "PASS: System FFI strict POSIX rejects legacy TLS [$strict_mode]"; PASS=$((PASS+1))
@@ -550,9 +828,11 @@ case "$(uname -s)" in
         echo "FAIL: System FFI strict POSIX legacy TLS failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
         cat "$strict_tls_old_out" >&2
       fi
-      strict_process_old_out="$tmpdir/strict_posix_process_old_${strict_mode}.output"
-      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
-        src/tests/kiem_tra_ffi_opcode_process_cu.vi >"$strict_process_old_out" 2>&1; then
+      strict_process_old_out="$strict_mode_dir/kiem_tra_ffi_opcode_process_cu.output"
+      strict_process_old_status="$strict_mode_dir/kiem_tra_ffi_opcode_process_cu.status"
+      if [ ! -f "$strict_process_old_status" ] || [ ! -f "$strict_process_old_out" ]; then
+        echo "FAIL: System FFI strict POSIX missing legacy process evidence [$strict_mode]"; FAIL=$((FAIL+1))
+      elif [ "$(cat "$strict_process_old_status")" -eq 0 ]; then
         echo "FAIL: System FFI strict POSIX legacy process allowed [$strict_mode]"; FAIL=$((FAIL+1))
       elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_process_old_out"; then
         echo "PASS: System FFI strict POSIX rejects legacy process [$strict_mode]"; PASS=$((PASS+1))
@@ -564,9 +844,49 @@ case "$(uname -s)" in
     ;;
 esac
 
-# Các ca lỗi runtime dưới đây khóa cơ chế chẩn đoán từ trạng thái thực tế: VM phải
-# tự suy ra nguyên nhân và giải thích mà không cần nơi phát sinh gắn mã lỗi.
-EXPECTED_FAILURE_TESTS=( \
+# Native runtime/compile-time error checks run through the self-hosted V++
+# compiler. The shared UTF-8 manifest supplies platform-independent diagnostic
+# fragments; checking the exit status prevents successful runs from passing.
+NATIVE_FAILURE_TESTS=()
+NATIVE_FAILURE_DIAGNOSTICS=()
+NATIVE_FAILURE_MANIFEST="src/tests/expected/native_failures.tsv"
+while IFS=$'\t' read -r native_source native_diagnostic || [ -n "$native_source" ]; do
+  case "$native_source" in ''|'#'*) continue ;; esac
+  if [ ! -f "$native_source" ] || [ -z "$native_diagnostic" ]; then
+    echo "ERROR: invalid native failure entry: $native_source" >&2
+    exit 2
+  fi
+  NATIVE_FAILURE_TESTS+=("$native_source")
+  NATIVE_FAILURE_DIAGNOSTICS+=("$native_diagnostic")
+done < "$NATIVE_FAILURE_MANIFEST"
+
+if [ "${#NATIVE_FAILURE_TESTS[@]}" -gt 0 ] &&
+   ! run_native_golden_batches expected-failure "${NATIVE_FAILURE_TESTS[@]}"; then
+  echo "ERROR: native expected-failure batch worker failed" >&2
+  exit 2
+fi
+for ((native_idx=0; native_idx<${#NATIVE_FAILURE_TESTS[@]}; native_idx++)); do
+  native_source="${NATIVE_FAILURE_TESTS[native_idx]}"
+  native_name="$(basename "$native_source" .vi)"
+  native_out="$tmpdir/${native_name}.output"
+  native_status_file="$tmpdir/${native_name}.status"
+  echo "== Running $native_source [V++ native expected failure] =="
+  if [ ! -f "$native_status_file" ]; then
+    echo "FAIL: $native_source (no native status)"; FAIL=$((FAIL+1))
+  elif [ "$(cat "$native_status_file")" -ne 1 ]; then
+    echo "FAIL: $native_source (expected native error exit 1, got $(cat "$native_status_file"))"; FAIL=$((FAIL+1))
+  elif grep -Fq -- "${NATIVE_FAILURE_DIAGNOSTICS[native_idx]}" "$native_out"; then
+    echo "PASS: $native_source [V++ native error]"; PASS=$((PASS+1))
+  else
+    echo "FAIL: $native_source (wrong native diagnostic)"; FAIL=$((FAIL+1))
+    cat "$native_out" >&2
+  fi
+done
+
+# The original detailed trace/diagnostic snapshots specifically check Stage 0
+# VM error explanations. Keep them in a named compatibility lane, independent
+# of the native failures above.
+VM_EXPECTED_FAILURE_TESTS=( \
   src/tests/kiem_tra_de_quy_vuot_gioi_han.vi \
   src/tests/kiem_tra_stack_trace.vi \
   src/tests/kiem_tra_stack_trace_module.vi \
@@ -595,12 +915,12 @@ EXPECTED_FAILURE_TESTS=( \
 
 # Các ca expected-failure cũng chạy trong một worker duy nhất để tái sử dụng
 # AST/mid-end cache. Mỗi test vẫn tạo CompilationContext và VM riêng.
-if ! "$EXEC_PATH" --batch-run-tests "$tmpdir" "${EXPECTED_FAILURE_TESTS[@]}"; then
+if ! "$EXEC_PATH" --batch-run-tests --compiler=cpp "$tmpdir" "${VM_EXPECTED_FAILURE_TESTS[@]}"; then
   echo "ERROR: expected-failure batch worker failed" >&2
   exit 2
 fi
 
-for runtime_failure_test in "${EXPECTED_FAILURE_TESTS[@]}"; do
+for runtime_failure_test in "${VM_EXPECTED_FAILURE_TESTS[@]}"; do
   runtime_failure_name="$(basename "$runtime_failure_test" .vi)"
   runtime_failure_out="$tmpdir/${runtime_failure_name}.output"
   runtime_failure_exp="src/tests/expected/${runtime_failure_name}.expected"
@@ -623,7 +943,7 @@ done
 echo "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
 jit_out="$tmpdir/kiem_tra_jit_mvp.output"
 jit_exp="src/tests/expected/kiem_tra_jit_mvp.expected"
-VPP_ENABLE_JIT=1 "$EXEC_PATH" src/tests/kiem_tra_jit_mvp.vi > "$jit_out" 2>&1
+VPP_ENABLE_JIT=1 "${VM_COMMAND[@]}" src/tests/kiem_tra_jit_mvp.vi > "$jit_out" 2>&1
 jit_status=$?
 if [ "$jit_status" -ne 0 ]; then
   echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT] (exit code: $jit_status)"; FAIL=$((FAIL+1))
@@ -645,11 +965,11 @@ if { [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ]; } || \
     machine_output="$tmpdir/kiem_tra_machine_jit_${machine_mode}.output"
     machine_stats="$tmpdir/kiem_tra_machine_jit_${machine_mode}.stderr"
     if [ "$machine_mode" = machine-jit ]; then
-      VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 "$EXEC_PATH" \
+      VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 "${VM_COMMAND[@]}" \
         "$machine_fixture" >"$machine_output" 2>"$machine_stats"
       machine_status=$?
     else
-      VPP_ENABLE_JIT=1 "$EXEC_PATH" \
+      VPP_ENABLE_JIT=1 "${VM_COMMAND[@]}" \
         "$machine_fixture" >"$machine_output" 2>"$machine_stats"
       machine_status=$?
     fi
@@ -666,13 +986,17 @@ fi
 
 # Chạy thư viện .vi thực với JIT: hàm, vòng lặp, collection, Unicode, regex,
 # intrinsic và xử lý lỗi phải tương đương đường interpreter mặc định.
-for jit_case in \
+# Một phiên Stage 0 batch tái sử dụng AST cache, nhưng vẫn tạo VM và kết quả
+# độc lập cho mỗi fixture. Giữ file kết quả riêng, tránh ghi đè golden native.
+JIT_CASES=(
   kiem_tra_goi_bien_dich_moi \
   kiem_tra_kien_truc_oop_compiler \
   kiem_tra_lop_mo_rong_compiler \
   kiem_tra_chi_muc_ast_bo_kiem_thu \
   kiem_tra_bo_dang_ky_ham \
   kiem_tra_bien_dich_tu_vung_vi \
+  kiem_tra_lexer_bang_byte \
+  kiem_tra_lexer_token_gon \
   kiem_tra_bien_dich_bieu_thuc_vi \
   kiem_tra_bien_dich_chuong_trinh_vi \
   kiem_tra_khai_bao_kieu_ffi_tu_chu \
@@ -716,6 +1040,8 @@ for jit_case in \
   kiem_tra_opcode_chon_ca \
   kiem_tra_khai_bao_bien_runtime \
   kiem_tra_goi_bo_suu_tap \
+  kiem_tra_goi_cau_hinh \
+  kiem_tra_luong_du_lieu \
   kiem_tra_goi_regex \
   kiem_tra_goi_bang_ma \
   kiem_tra_goi_thoi_gian \
@@ -723,13 +1049,31 @@ for jit_case in \
   kiem_tra_vm_ieee754 \
   kiem_tra_hoi_quy_tong_hop \
   kiem_tra_closure_capture \
+  kiem_tra_ham_an_danh_tu_chu \
   kiem_tra_lambda_hof_mac_dinh \
-  kiem_tra_goi_dong_thoi; do
+  kiem_tra_goi_dong_thoi
+)
+JIT_TESTS=()
+for jit_case in "${JIT_CASES[@]}"; do
+  JIT_TESTS+=("src/tests/${jit_case}.vi")
+done
+JIT_BATCH_DIR="$tmpdir/jit-batch"
+if ! VPP_ENABLE_JIT=1 "$EXEC_PATH" --batch-run-tests --compiler=cpp \
+  "$JIT_BATCH_DIR" "${JIT_TESTS[@]}"; then
+  echo "ERROR: JIT batch worker failed" >&2
+  exit 2
+fi
+for jit_case in "${JIT_CASES[@]}"; do
   jit_test="src/tests/${jit_case}.vi"
   jit_exp="src/tests/expected/${jit_case}.expected"
-  jit_out="$tmpdir/${jit_case}.jit.output"
-  VPP_ENABLE_JIT=1 "$EXEC_PATH" "$jit_test" >"$jit_out" 2>&1
-  jit_status=$?
+  jit_out="$JIT_BATCH_DIR/${jit_case}.output"
+  jit_status_file="$JIT_BATCH_DIR/${jit_case}.status"
+  if [ ! -f "$jit_status_file" ]; then
+    echo "FAIL: $jit_test [JIT] (batch worker did not produce status)"
+    FAIL=$((FAIL+1))
+    continue
+  fi
+  jit_status=$(cat "$jit_status_file")
   if [ "$jit_status" -eq 0 ] && diff -u "$jit_exp" "$jit_out"; then
     echo "PASS: $jit_test [JIT]"; PASS=$((PASS+1))
   else
@@ -741,7 +1085,7 @@ done
 echo "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
 gc_out="$tmpdir/kiem_tra_gc_mvp.output"
 gc_exp="src/tests/expected/kiem_tra_gc_mvp.expected"
-VPP_ENABLE_GC=1 VPP_GC_INTERVAL=1 "$EXEC_PATH" src/tests/kiem_tra_gc_mvp.vi > "$gc_out" 2>&1
+VPP_ENABLE_GC=1 VPP_GC_INTERVAL=1 "${VM_COMMAND[@]}" src/tests/kiem_tra_gc_mvp.vi > "$gc_out" 2>&1
 gc_status=$?
 if [ "$gc_status" -ne 0 ]; then
   echo "FAIL: src/tests/kiem_tra_gc_mvp.vi [GC] (exit code: $gc_status)"; FAIL=$((FAIL+1))
@@ -753,6 +1097,24 @@ else
 fi
 
 echo ""
+echo "== 15 slowest golden tests (elapsed milliseconds) =="
+for timing_file in "$tmpdir"/*.milliseconds; do
+  [ -f "$timing_file" ] || continue
+  milliseconds=$(cat "$timing_file")
+  case "$milliseconds" in
+    ''|*[!0-9]*) continue ;;
+  esac
+  printf '%s\t%s\n' "$milliseconds" "$(basename "${timing_file%.milliseconds}")"
+done | sort -nr > "$tmpdir/timings.tsv"
+head -n 15 "$tmpdir/timings.tsv"
+timing_dir="${VPP_TEST_LOG_DIR:-$ROOT_DIR/build/integration-logs}"
+if mkdir -p "$timing_dir"; then
+  timing_report="$timing_dir/timings-$(date +%Y%m%d-%H%M%S)-$$.tsv"
+  if cp "$tmpdir/timings.tsv" "$timing_report"; then
+    echo "Integration timings: $timing_report"
+  fi
+fi
+
 echo "=== PASS: $PASS, FAIL: $FAIL ==="
 
 if [ "$FAIL" -ne 0 ]; then

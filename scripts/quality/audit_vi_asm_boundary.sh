@@ -101,11 +101,12 @@ if ! has_call "$socket_module" 'bộ.địa chỉ mạng các byte(địa chỉ 
     echo 'FAIL: shared IP parser or V++ hosts socket resolver missing' >&2
     exit 1
 fi
-if grep -E '^[[:space:]]*ngoại (hàm|thư viện) |nhập gói/mạng/ổ cắm;' "$dns_config_module"; then
+if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$dns_config_module" ||
+   has_call "$dns_config_module" 'nhập gói.mạng.ổ cắm.*;'; then
     echo 'FAIL: DNS config must use the shared V++ IP parser without Socket/FFI' >&2
     exit 1
 fi
-if ! has_call "$dns_config_module" 'nhập gói/mạng/địa chỉ mạng;' ||
+if ! has_call "$dns_config_module" 'nhập gói.mạng.địa chỉ mạng.*;' ||
    ! has_call "$dns_config_module" 'bộ.địa chỉ mạng các byte(địa chỉ)' ||
    ! grep -q 'VPP_SOCKET_VI_ONLY' "$socket_module"; then
     echo 'FAIL: DNS config parser or strict V++ socket resolver boundary missing' >&2
@@ -190,7 +191,7 @@ done
 
 cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) | wc -l | tr -d '[:space:]')
 ffi_symbols=$(grep -E -o 'ffi_call|dlopen|dlsym' "$root/src/runtime/foreign.cpp" | wc -l | tr -d '[:space:]')
-asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
+asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.s' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
 printf 'Remaining C/C++ source files in src/: %s\n' "$cpp_sources"
 printf 'foreign.cpp references to ffi_call/dlopen/dlsym: %s\n' "$ffi_symbols"
 printf 'ASM call instructions requiring boundary review: %s\n' "$asm_calls"

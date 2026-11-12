@@ -1,9 +1,10 @@
 // Kiểm tra ngữ nghĩa trên AST thuần V++ của parser chương trình.
 // Chưa suy luận kiểu hoặc phân giải tên ngoài phạm vi khai báo cục bộ.
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/biểu thức;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu thức.biên dịch biểu thức là phép gán;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.bảng mã.mã điểm unicode;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
@@ -14,6 +15,15 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
             nếu (tập[i] == tên) { trả về đúng; };
         };
         trả về sai;
+    };
+
+    // Vị trí khai báo được parser giữ theo byte UTF-8 (cùng SourceSpan C++).
+    // Đính vị trí của lần khai báo thứ hai vào lỗi, không suy đoán từ tên
+    // (tên có thể xuất hiện trong comment hoặc string literal).
+    hàm riêng tư biên dịch ngữ nghĩa lỗi khai báo(mục, thông báo) {
+        ném thông báo + " tại dòng " +
+            thành chuỗi(lấy từ điển(mục, "dòng", 1)) + ", cột " +
+            thành chuỗi(lấy từ điển(mục, "cột", 1));
     };
 
     // Bảng kiểu của một đơn vị biên dịch. Việc phân giải kiểu từ module nhập
@@ -257,6 +267,14 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
         nếu (cây == rỗng) { trả về đúng; };
         loại = lấy từ điển(cây, "loại", "");
         nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "hàm ẩn danh") {
+            // Thân closure có phạm vi hàm riêng, kể cả khi nằm trong vòng lặp.
+            khai = {"loại": "hàm", "tham số": cây["tham số"],
+                "mặc định tham số": cây["mặc định tham số"], "thân": cây["thân"]};
+            mình.biên dịch ngữ nghĩa câu lệnh(khai, sai, sai, sai);
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(khai, [], []);
+            trả về đúng;
+        };
         nếu (loại == "danh sách") {
             phần tử = lấy từ điển(cây, "phần tử", []);
             lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
@@ -555,6 +573,21 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
         nếu (cây == rỗng) { trả về đúng; };
         loại = lấy từ điển(cây, "loại", "");
         nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "hàm ẩn danh") {
+            tên trong hàm = [];
+            tham số = cây["tham số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
+                máy ảo thêm cuối danh sách(tên trong hàm, tham số[i]);
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(cây["thân"], tên trong hàm, các hàm);
+            lặp(i = 0; i < máy ảo lấy độ dài(tên cục bộ); i++) {
+                nếu (!mình.biên dịch ngữ nghĩa chứa(tên trong hàm, tên cục bộ[i])) {
+                    máy ảo thêm cuối danh sách(tên trong hàm, tên cục bộ[i]);
+                };
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(cây["thân"], các hàm, tên trong hàm);
+            trả về đúng;
+        };
         nếu (loại == "hai ngôi") {
             trái = lấy từ điển(cây, "trái", rỗng);
             nếu (biên dịch biểu thức là phép gán(lấy từ điển(cây, "toán tử", ""))) {
@@ -733,19 +766,22 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
             nếu (loại == "lớp" || loại == "giao diện") {
                 tên kiểu = mục["tên"];
                 nếu (mình.biên dịch ngữ nghĩa chứa(kiểu đã khai báo, tên kiểu)) {
-                    ném "biên dịch ngữ nghĩa: trùng khai báo kiểu '" + tên kiểu + "'";
+                    mình.biên dịch ngữ nghĩa lỗi khai báo(mục,
+                        "biên dịch ngữ nghĩa: trùng khai báo kiểu '" + tên kiểu + "'");
                 };
                 máy ảo thêm cuối danh sách(kiểu đã khai báo, tên kiểu);
             };
             nếu (loại == "ngoại thư viện") {
                 nếu (mình.biên dịch ngữ nghĩa chứa(thư viện đã khai báo, mục["tên"])) {
-                    ném "biên dịch ngữ nghĩa: trùng thư viện FFI '" + mục["tên"] + "'";
+                    mình.biên dịch ngữ nghĩa lỗi khai báo(mục,
+                        "biên dịch ngữ nghĩa: trùng thư viện FFI '" + mục["tên"] + "'");
                 };
                 máy ảo thêm cuối danh sách(thư viện đã khai báo, mục["tên"]);
             };
             nếu (loại == "ngoại hàm") {
                 nếu (mình.biên dịch ngữ nghĩa chứa(ngoại đã khai báo, mục["tên"])) {
-                    ném "biên dịch ngữ nghĩa: trùng ngoại hàm '" + mục["tên"] + "'";
+                    mình.biên dịch ngữ nghĩa lỗi khai báo(mục,
+                        "biên dịch ngữ nghĩa: trùng ngoại hàm '" + mục["tên"] + "'");
                 };
                 máy ảo thêm cuối danh sách(ngoại đã khai báo, mục["tên"]);
                 mình.biên dịch ngữ nghĩa kiểm tra FFI(mục);
@@ -753,7 +789,8 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
             nếu (lấy từ điển(mục, "loại", "") == "hàm") {
                 tên = lấy từ điển(mục, "tên", "");
                 nếu (mình.biên dịch ngữ nghĩa chứa(danh sách hàm đã khai báo, tên)) {
-                    ném "biên dịch ngữ nghĩa: trùng khai báo hàm '" + tên + "'";
+                    mình.biên dịch ngữ nghĩa lỗi khai báo(mục,
+                        "biên dịch ngữ nghĩa: trùng khai báo hàm '" + tên + "'");
                 };
                 máy ảo thêm cuối danh sách(danh sách hàm đã khai báo, tên);
             };

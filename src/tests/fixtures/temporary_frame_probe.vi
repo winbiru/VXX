@@ -1,0 +1,5 @@
+nhập gói.bộ sưu tập.tập hợp.Tiện Ích Tập Hợp;
+hàm công khai kiểm tra khung(x) {
+    bộ chuyển tiếp = Tiện Ích Tập Hợp();
+    trả về bộ chuyển tiếp.tập hợp(x);
+};

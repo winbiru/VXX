@@ -1,0 +1,67 @@
+// Golden snapshots from the exact C++ oracle comparisons in
+// kiem_tra_oop_bytecode_tu_chu.vi. Keep that legacy VM test intact.
+// This native-only test verifies the self-host compiler without intrinsic 98.
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian thuần;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm băm_mã(mã) {
+    t = "";
+    lặp(i = 0; i < độ dài(mã); i++) {
+        x = mã[i];
+        t += thành chuỗi(x["op"]) + ":" + thành chuỗi(x["toán hạng"]) + ":" + thành chuỗi(x["chỉ số"]) + ":" + thành chuỗi(x["giá trị"]) + ";";
+    };
+    bytes = chuỗi thành byte máy ảo(t);
+    a = 0; b = 0;
+    lặp(i = 0; i < độ dài(bytes); i++) {
+        a = (a * 33 + bytes[i]) % 1000003;
+        b = (b * 37 + bytes[i]) % 1000033;
+    };
+    trả về thành chuỗi(độ dài(mã)) + ":" + thành chuỗi(a) + ":" + thành chuỗi(b);
+};
+
+hàm băm_snapshot(mã, hàm_mã) {
+    t = băm_mã(mã);
+    lặp(i = 0; i < độ dài(hàm_mã); i++) {
+        f = hàm_mã[i];
+        t += "|" + f["tên"] + "#" + thành chuỗi(f["id"]) + "=" + băm_mã(f["bytecode"]);
+    };
+    trả về t;
+};
+
+hàm thử_oop(nguồn, chuẩn) {
+    v = biên dịch phát mã trung gian thuần(nguồn);
+    d = băm_snapshot(v["bytecode"], v["hàm"]);
+    in d == chuẩn;
+};
+
+hàm chính() {
+    thử_oop("lớp A {};", "1:169269:428850");
+    thử_oop("lớp A { hàm công khai f() { trả về 1; }; };",
+            "3:305316:648931|A.f#0=4:379389:135641");
+    thử_oop("lớp A { hàm khởi tạo(x) { mình.x = x; }; " +
+            "hàm công khai f() { trả về mình.x; }; };",
+            "5:764743:681566|A.khởi tạo#0=9:495370:172927|A.f#1=7:284484:627715");
+    thử_oop("lớp A { hàm khởi tạo(x) { mình.x = x; }; " +
+            "hàm công khai f() { trả về mình.x; }; }; " +
+            "a = A(5); in a.f();",
+            "12:777312:187775|A.khởi tạo#0=9:495370:172927|A.f#1=7:284484:627715");
+    thử_oop("lớp Cha { hàm công khai f() { trả về 2; }; }; " +
+            "lớp Con kế thừa Cha { hàm công khai f() { trả về gốc.f() + 1; }; }; " +
+            "c = Con(); in c.f();",
+            "12:187224:243284|Cha.f#0=4:746715:804441|Con.f#1=9:56176:18966");
+    thử_oop("hàm trước() { trả về 1; }; lớp A { hàm công khai f() { trả về 2; }; }; " +
+            "in trước();",
+            "6:740276:198279|trước#0=4:379389:135641|A.f#1=4:746715:804441");
+    thử_oop("lớp công khai A { hàm riêng tư ẩn() { trả về 1; }; " +
+            "hàm bảo vệ giữ() { trả về 2; }; hàm công khai mở() { trả về 3; }; };",
+            "7:752191:997770|A.ẩn#0=4:379389:135641|A.giữ#1=4:746715:804441|A.mở#2=4:114038:473208");
+    thử_oop("lớp Ngăn Xếp { hàm công khai đẩy(x) { " +
+            "mình.đỉnh = x; trả về mình.đỉnh; }; }; " +
+            "ngăn = Ngăn Xếp(); in ngăn.đẩy(8);",
+            "10:938677:379235|Ngăn Xếp.đẩy#0=12:211602:254916");
+    thử_oop("lớp A { hàm set(x) { mình.x = x; }; " +
+            "hàm get() { trả về mình.x; }; " +
+            "hàm bump() { mình.set(mình.get() + 1); trả về mình.get(); }; }; " +
+            "a = A(); in a.bump();",
+            "13:488538:439891|A.set#0=9:495370:172927|A.get#1=7:284484:627715|A.bump#2=13:151507:74730");
+}

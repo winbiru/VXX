@@ -1,7 +1,7 @@
-nhập gói/mạng/cấu hình phân giải tên miền;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/tệp thô;
+nhập gói.mạng.cấu hình phân giải tên miền.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.tệp thô.*;
 
 // Fixture offline kiểm tra search/domain/ndots và thứ tự candidate.
 hàm chính() {

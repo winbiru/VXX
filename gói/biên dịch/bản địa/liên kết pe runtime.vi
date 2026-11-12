@@ -1,0 +1,296 @@
+// PE32+ AMD64 linking with the preassembled Windows boundary. All machine
+// references must be REL32..REL32_5; absolute relocations fail closed. Code
+// uses RIP-relative addressing; the image is fixed-base, NX and has no RWX
+// sections. DLL imports are limited to the boundary's explicit API catalog.
+hàm pe rt tên(kho, mục, chuỗi) {
+    biến tại = mục;
+    biến cuối = mục + 8;
+    nếu (byte đọc số nguyên ba mươi hai bit(kho, mục) == 0) {
+        biến chỉ mục = byte đọc số nguyên ba mươi hai bit(kho, mục + 4);
+        nếu (chỉ mục < 4 || chỉ mục >= byte dài(kho) - chuỗi) { trả về -1; };
+        tại = chuỗi + chỉ mục;
+        cuối = byte dài(kho);
+    };
+    nếu (tại < 0 || tại >= byte dài(kho)) { trả về -1; };
+    biến n = 0;
+    khi (tại + n < cuối && byte lấy(kho, tại + n) != 0 && n < 1024) { n = n + 1; };
+    nếu (n == 0 || n == 1024 || (cuối > mục + 8 && tại + n == cuối)) { trả về -1; };
+    trả về byte cắt(kho, tại, n);
+};
+
+hàm pe rt tìm(kho, sym, ns, str, tên) {
+    biến i = 0;
+    khi (i < ns) {
+        biến q = sym + i * 18;
+        nếu (byte lấy(kho, q + 16) == 2 && byte lấy(kho, q + 12) > 0 && byte lấy(kho, q + 13) == 0) {
+            biến so = pe rt tên(kho, q, str);
+            biến bằng = 0;
+            nếu (so > 0) { bằng = byte bằng(so, tên); byte hủy(so); };
+            nếu (bằng == 1) { trả về i; };
+        };
+        i = i + 1 + byte lấy(kho, q + 17);
+    };
+    trả về -1;
+};
+
+hàm pe rt thư viện(tên) {
+    biến khóa = "|"; byte nối(khóa, tên); byte thêm(khóa, 124);
+    biến kết quả = -1;
+    biến danh sách = "|VirtualAlloc|MultiByteToWideChar|WideCharToMultiByte|MoveFileExW|GetFileInformationByHandle|CreateFileW|CloseHandle|GetLastError|SetLastError|GetEnvironmentVariableW|GetModuleFileNameW|GetCommandLineW|LocalFree|";
+    nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 1; };
+    byte hủy(danh sách);
+    danh sách = "|_read|_write|_wopen|_close|_errno|_wunlink|_wmkdir|_waccess|_wmktemp_s|_get_osfhandle|_wgetcwd|realloc|calloc|malloc|free|_wspawnvp|_cwait|atexit|";
+    nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 2; };
+    byte hủy(danh sách);
+    danh sách = "|CommandLineToArgvW|";
+    nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 3; };
+    byte hủy(danh sách);
+    danh sách = "|BCryptOpenAlgorithmProvider|BCryptCreateHash|BCryptCloseAlgorithmProvider|BCryptHashData|BCryptFinishHash|BCryptDestroyHash|";
+    nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 4; };
+    byte hủy(danh sách); byte hủy(khóa);
+    trả về kết quả;
+};
+
+hàm pe rt phần(đích, tên, dài, rva, thô, off, cờ) {
+    nếu (đối tượng tên định danh(đích, tên, 8) != 0) { trả về -1; };
+    đối tượng i32(đích, dài); đối tượng i32(đích, rva); đối tượng i32(đích, thô); đối tượng i32(đích, off);
+    đối tượng i32(đích, 0); đối tượng i32(đích, 0); đối tượng i32(đích, 0);
+    trả về đối tượng i32(đích, cờ);
+};
+
+hàm pe rt tạo(coff, runtime, kết quả) {
+    nếu (coff == kết quả || runtime == kết quả || byte làm rỗng(kết quả) != 0) { trả về -1; };
+    biến dài = byte dài(runtime);
+    nếu (dài < 20 || elf bản địa đọc u16(runtime, 0) != 34404 || elf bản địa đọc u16(runtime, 16) != 0) { trả về -1; };
+    biến số phần = elf bản địa đọc u16(runtime, 2);
+    biến sym = byte đọc số nguyên ba mươi hai bit(runtime, 8);
+    biến ns = byte đọc số nguyên ba mươi hai bit(runtime, 12);
+    nếu (số phần < 1 || số phần > 16 || sym < 20 + số phần * 40 || ns < 1 || ns > 4096 || sym > dài || ns > (dài - sym - 4) / 18) { trả về -1; };
+    biến str = sym + ns * 18;
+    biến nstr = byte đọc số nguyên ba mươi hai bit(runtime, str);
+    nếu (nstr < 4 || nstr != dài - str) { trả về -1; };
+    biến osym = byte đọc số nguyên ba mươi hai bit(coff, 8);
+    biến ons = byte đọc số nguyên ba mươi hai bit(coff, 12);
+    biến ostr = osym + ons * 18;
+    biến n = byte đọc số nguyên ba mươi hai bit(coff, 36);
+    nếu (ons < 1 || ons > 16384 || n < 1 || n > 1700000) { trả về -1; };
+    biến mã = byte cắt(coff, 60, n); biến dữ liệu = byte mới();
+    nếu (mã <= 0 || dữ liệu <= 0) { nếu (mã > 0) { byte hủy(mã); }; nếu (dữ liệu > 0) { byte hủy(dữ liệu); }; trả về -1; };
+    biến trạng thái = 0;
+    lặp (i = 0; i < ns; i++) {
+        máy ghi số nguyên ba mươi hai bit(67210000 + i * 4, -1);
+        máy ghi số nguyên ba mươi hai bit(67230000 + i * 4, 0);
+    };
+    lặp (i = 0; i < số phần; i++) {
+        biến vị trí phần runtime = 20 + i * 40;
+        biến kích thước phần runtime = byte đọc số nguyên ba mươi hai bit(runtime, vị trí phần runtime + 16);
+        biến off = byte đọc số nguyên ba mươi hai bit(runtime, vị trí phần runtime + 20);
+        biến rel = byte đọc số nguyên ba mươi hai bit(runtime, vị trí phần runtime + 24);
+        biến số tái định vị phần = elf bản địa đọc u16(runtime, vị trí phần runtime + 32);
+        biến cờ = byte đọc số nguyên ba mươi hai bit(runtime, vị trí phần runtime + 36);
+        nếu (cờ != 1615855648 && cờ != -1069547456 && cờ != -1070595968 && cờ != 1074790464) { trạng thái = -1; thoát; };
+        biến ghi = 0;
+        nếu (cờ < 0) { ghi = 1; };
+        nếu (kích thước phần runtime < 0 || kích thước phần runtime > 65536 || (kích thước phần runtime > 0 && (off < 20 + số phần * 40 || off > dài - kích thước phần runtime)) || rel < 0 || rel > dài || số tái định vị phần > (dài - rel) / 10) { trạng thái = -1; thoát; };
+        // Chỉ nhận mã thường, dữ liệu đã khởi tạo và BSS rỗng. COMDAT,
+        // unwind, TLS và bản ghi tái định vị tràn cần hỗ trợ riêng.
+        biến tên phần runtime = byte cắt(runtime, vị trí phần runtime, 8);
+        biến text = ".text"; đối tượng đệm(text, 8);
+        biến data = ".data"; đối tượng đệm(data, 8);
+        biến rdata = ".rdata"; đối tượng đệm(rdata, 8);
+        biến bss = ".bss"; đối tượng đệm(bss, 8);
+        // Chỉ cờ không đủ xác định phần. COFF sai có thể đổi tên mã thực thi
+        // thành dữ liệu ghi được hoặc ngược lại nhưng vẫn giữ cờ hợp lệ.
+        biến hợp lệ = 0;
+        nếu (byte bằng(tên phần runtime, text) == 1 && cờ == 1615855648) { hợp lệ = 1; };
+        nếu (byte bằng(tên phần runtime, data) == 1 && cờ == -1069547456) { hợp lệ = 1; };
+        nếu (byte bằng(tên phần runtime, rdata) == 1 && cờ == 1074790464) { hợp lệ = 1; };
+        nếu (byte bằng(tên phần runtime, bss) == 1 && cờ == -1070595968 && kích thước phần runtime == 0 && số tái định vị phần == 0) { hợp lệ = 1; };
+        byte hủy(tên phần runtime); byte hủy(text); byte hủy(data); byte hủy(rdata); byte hủy(bss);
+        nếu (hợp lệ != 1) { trạng thái = -1; thoát; };
+        biến đích phần runtime = mã; nếu (ghi == 1) { đích phần runtime = dữ liệu; };
+        đối tượng đệm(đích phần runtime, macho rt căn(byte dài(đích phần runtime), 16));
+        máy ghi số nguyên ba mươi hai bit(67200000 + i * 32, byte dài(đích phần runtime));
+        máy ghi số nguyên ba mươi hai bit(67200004 + i * 32, ghi);
+        máy ghi số nguyên ba mươi hai bit(67200008 + i * 32, kích thước phần runtime);
+        máy ghi số nguyên ba mươi hai bit(67200012 + i * 32, rel);
+        máy ghi số nguyên ba mươi hai bit(67200016 + i * 32, số tái định vị phần);
+        nếu (kích thước phần runtime > 0 && coff nối vùng(đích phần runtime, runtime, off, kích thước phần runtime) != 0) { trạng thái = -1; thoát; };
+        lặp (j = 0; j < số tái định vị phần; j++) {
+            biến chỉ mục tái định vị phần = byte đọc số nguyên ba mươi hai bit(runtime, rel + j * 10 + 4);
+            nếu (chỉ mục tái định vị phần < 0 || chỉ mục tái định vị phần >= ns) { trạng thái = -1; thoát; };
+            máy ghi số nguyên ba mươi hai bit(67230000 + chỉ mục tái định vị phần * 4, 1);
+        };
+    };
+    biến số nhập = 0;
+    biến i = 0;
+    khi (trạng thái == 0 && i < ns) {
+        biến vị trí ký hiệu runtime = sym + i * 18;
+        biến phần ký hiệu runtime = elf bản địa đọc u16(runtime, vị trí ký hiệu runtime + 12);
+        biến aux = byte lấy(runtime, vị trí ký hiệu runtime + 17);
+        nếu (aux > ns - i - 1) { trạng thái = -1; thoát; };
+        biến tên ký hiệu runtime = pe rt tên(runtime, vị trí ký hiệu runtime, str);
+        nếu (tên ký hiệu runtime <= 0) { trạng thái = -1; thoát; };
+        nếu (phần ký hiệu runtime == 0 && máy đọc số nguyên ba mươi hai bit(67230000 + i * 4) == 1) {
+            nếu (byte đọc số nguyên ba mươi hai bit(runtime, vị trí ký hiệu runtime + 8) != 0 || byte lấy(runtime, vị trí ký hiệu runtime + 16) != 2 || aux != 0) { byte hủy(tên ký hiệu runtime); trạng thái = -1; thoát; };
+            biến tìm ký hiệu đối tượng cho nhập = pe rt tìm(coff, osym, ons, ostr, tên ký hiệu runtime);
+            nếu (tìm ký hiệu đối tượng cho nhập >= 0) { máy ghi số nguyên ba mươi hai bit(67210000 + i * 4, 4096 + byte đọc số nguyên ba mươi hai bit(coff, osym + tìm ký hiệu đối tượng cho nhập * 18 + 8)); }
+            hoặc {
+                biến dll = pe rt thư viện(tên ký hiệu runtime);
+                nếu (dll < 1 || số nhập >= 128) { byte hủy(tên ký hiệu runtime); trạng thái = -1; thoát; };
+                máy ghi số nguyên ba mươi hai bit(67310000 + số nhập * 16, i);
+                máy ghi số nguyên ba mươi hai bit(67310004 + số nhập * 16, dll);
+                số nhập = số nhập + 1;
+            };
+        } hoặc nếu (phần ký hiệu runtime > số phần && phần ký hiệu runtime != 65535 && phần ký hiệu runtime != 65534) { byte hủy(tên ký hiệu runtime); trạng thái = -1; thoát; };
+        byte hủy(tên ký hiệu runtime);
+        i = i + 1 + aux;
+    };
+    biến stub = macho rt căn(byte dài(mã), 16);
+    biến data rva = 4096 + macho rt căn(stub + số nhập * 6, 4096);
+    biến bảng nhập tại = macho rt căn(byte dài(dữ liệu), 16);
+    nếu (data rva > 1900000) { trạng thái = -1; };
+    nếu (trạng thái == 0) {
+        đối tượng đệm(dữ liệu, bảng nhập tại + 100);
+        lặp (dll = 1; dll <= 4; dll++) {
+            biến tên dll = "kernel32.dll";
+            nếu (dll == 2) { byte hủy(tên dll); tên dll = "msvcrt.dll"; };
+            nếu (dll == 3) { byte hủy(tên dll); tên dll = "shell32.dll"; };
+            nếu (dll == 4) { byte hủy(tên dll); tên dll = "bcrypt.dll"; };
+            biến tên tại = byte dài(dữ liệu); byte nối(dữ liệu, tên dll); byte thêm(dữ liệu, 0); byte hủy(tên dll);
+            biến số = 0;
+            lặp (j = 0; j < số nhập; j++) { nếu (máy đọc số nguyên ba mươi hai bit(67310004 + j * 16) == dll) { số = số + 1; }; };
+            biến ilt = macho rt căn(byte dài(dữ liệu), 8);
+            biến iat = ilt + (số + 1) * 8;
+            đối tượng đệm(dữ liệu, iat + (số + 1) * 8);
+            biến desc = bảng nhập tại + (dll - 1) * 20;
+            byte ghi số nguyên ba mươi hai bit(dữ liệu, desc, data rva + ilt);
+            byte ghi số nguyên ba mươi hai bit(dữ liệu, desc + 12, data rva + tên tại);
+            byte ghi số nguyên ba mươi hai bit(dữ liệu, desc + 16, data rva + iat);
+            biến mục = 0;
+            lặp (j = 0; j < số nhập; j++) {
+                nếu (máy đọc số nguyên ba mươi hai bit(67310004 + j * 16) != dll) { bỏ qua; };
+                biến chỉ mục ký hiệu nhập = máy đọc số nguyên ba mươi hai bit(67310000 + j * 16);
+                biến tên ký hiệu nhập = pe rt tên(runtime, sym + chỉ mục ký hiệu nhập * 18, str);
+                đối tượng đệm(dữ liệu, macho rt căn(byte dài(dữ liệu), 2));
+                biến hint = byte dài(dữ liệu); byte thêm(dữ liệu, 0); byte thêm(dữ liệu, 0);
+                nếu (tên ký hiệu nhập <= 0 || byte nối(dữ liệu, tên ký hiệu nhập) != 0 || byte thêm(dữ liệu, 0) != 0) { trạng thái = -1; };
+                nếu (tên ký hiệu nhập > 0) { byte hủy(tên ký hiệu nhập); };
+                byte ghi số nguyên ba mươi hai bit(dữ liệu, ilt + mục * 8, data rva + hint);
+                byte ghi số nguyên ba mươi hai bit(dữ liệu, iat + mục * 8, data rva + hint);
+                máy ghi số nguyên ba mươi hai bit(67310008 + j * 16, data rva + iat + mục * 8);
+                máy ghi số nguyên ba mươi hai bit(67210000 + chỉ mục ký hiệu nhập * 4, 4096 + stub + j * 6);
+                mục = mục + 1;
+            };
+        };
+        đối tượng đệm(mã, stub);
+        lặp (j = 0; j < số nhập; j++) {
+            biến vị trí stub = byte dài(mã); byte thêm(mã, 255); byte thêm(mã, 37);
+            đối tượng i32(mã, máy đọc số nguyên ba mươi hai bit(67310008 + j * 16) - 4096 - vị trí stub - 6);
+        };
+    };
+    i = 0;
+    khi (trạng thái == 0 && i < ns) {
+        biến vị trí ký hiệu định nghĩa = sym + i * 18;
+        biến phần định nghĩa = elf bản địa đọc u16(runtime, vị trí ký hiệu định nghĩa + 12);
+        nếu (phần định nghĩa >= 1 && phần định nghĩa <= số phần) {
+            nếu (byte lấy(runtime, vị trí ký hiệu định nghĩa + 16) == 2) {
+                biến tên định nghĩa = pe rt tên(runtime, vị trí ký hiệu định nghĩa, str);
+                nếu (tên định nghĩa <= 0) { trạng thái = -1; thoát; };
+                biến trùng = pe rt tìm(runtime, sym, ns, str, tên định nghĩa) != i || pe rt tìm(coff, osym, ons, ostr, tên định nghĩa) >= 0;
+                byte hủy(tên định nghĩa);
+                nếu (trùng) { trạng thái = -1; thoát; };
+            };
+            biến giá trị định nghĩa = byte đọc số nguyên ba mươi hai bit(runtime, vị trí ký hiệu định nghĩa + 8);
+            biến kích thước phần định nghĩa = macho rt trường(phần định nghĩa - 1, 8);
+            nếu (giá trị định nghĩa < 0 || giá trị định nghĩa > kích thước phần định nghĩa) { trạng thái = -1; thoát; };
+            biến địa chỉ nền định nghĩa = 4096; nếu (macho rt trường(phần định nghĩa - 1, 4) == 1) { địa chỉ nền định nghĩa = data rva; };
+            máy ghi số nguyên ba mươi hai bit(67210000 + i * 4, địa chỉ nền định nghĩa + macho rt trường(phần định nghĩa - 1, 0) + giá trị định nghĩa);
+        };
+        i = i + 1 + byte lấy(runtime, vị trí ký hiệu định nghĩa + 17);
+    };
+    biến main = -1;
+    nếu (trạng thái == 0) {
+        lặp (j = 0; j < ons; j++) {
+            biến vị trí ký hiệu đối tượng = osym + j * 18;
+            biến giá trị ký hiệu đối tượng = 4096 + byte đọc số nguyên ba mươi hai bit(coff, vị trí ký hiệu đối tượng + 8);
+            biến phần ký hiệu đối tượng = elf bản địa đọc u16(coff, vị trí ký hiệu đối tượng + 12);
+            nếu (phần ký hiệu đối tượng > 1 || elf bản địa đọc u16(coff, vị trí ký hiệu đối tượng + 14) != 32 || byte lấy(coff, vị trí ký hiệu đối tượng + 16) != 2 || byte lấy(coff, vị trí ký hiệu đối tượng + 17) != 0 || (phần ký hiệu đối tượng == 0 && giá trị ký hiệu đối tượng != 4096) || (phần ký hiệu đối tượng == 1 && (giá trị ký hiệu đối tượng < 4096 || giá trị ký hiệu đối tượng >= 4096 + n))) { trạng thái = -1; thoát; };
+            biến tên ký hiệu đối tượng = pe rt tên(coff, vị trí ký hiệu đối tượng, ostr);
+            nếu (tên ký hiệu đối tượng <= 0) { trạng thái = -1; thoát; };
+            nếu (byte lấy(coff, vị trí ký hiệu đối tượng + 12) == 0) {
+                biến tìm định nghĩa đối tượng = pe rt tìm(coff, osym, ons, ostr, tên ký hiệu đối tượng);
+                nếu (tìm định nghĩa đối tượng >= 0) { giá trị ký hiệu đối tượng = 4096 + byte đọc số nguyên ba mươi hai bit(coff, osym + tìm định nghĩa đối tượng * 18 + 8); }
+                hoặc {
+                    tìm định nghĩa đối tượng = pe rt tìm(runtime, sym, ns, str, tên ký hiệu đối tượng);
+                    nếu (tìm định nghĩa đối tượng < 0) { trạng thái = -1; } hoặc { giá trị ký hiệu đối tượng = máy đọc số nguyên ba mươi hai bit(67210000 + tìm định nghĩa đối tượng * 4); };
+                };
+            } hoặc {
+                nếu (pe rt tìm(coff, osym, ons, ostr, tên ký hiệu đối tượng) != j || pe rt tìm(runtime, sym, ns, str, tên ký hiệu đối tượng) >= 0) { trạng thái = -1; };
+                nếu (pe tên main(coff, osym, ostr, j) == 1) { main = giá trị ký hiệu đối tượng; };
+            };
+            byte hủy(tên ký hiệu đối tượng);
+            nếu (giá trị ký hiệu đối tượng < 0) { trạng thái = -1; };
+            máy ghi số nguyên ba mươi hai bit(67240000 + j * 4, giá trị ký hiệu đối tượng);
+        };
+        nếu (main < 4096) { trạng thái = -1; };
+    };
+    nếu (trạng thái == 0) {
+        biến số tái định vị đối tượng = elf bản địa đọc u16(coff, 52);
+        lặp (j = 0; j < số tái định vị đối tượng; j++) {
+            biến vị trí bản ghi tái định vị đối tượng = 60 + n + j * 10;
+            biến vị trí tái định vị đối tượng = byte đọc số nguyên ba mươi hai bit(coff, vị trí bản ghi tái định vị đối tượng);
+            biến chỉ mục tái định vị đối tượng = byte đọc số nguyên ba mươi hai bit(coff, vị trí bản ghi tái định vị đối tượng + 4);
+            nếu (vị trí tái định vị đối tượng < 0 || vị trí tái định vị đối tượng > n - 4 || chỉ mục tái định vị đối tượng < 0 || chỉ mục tái định vị đối tượng >= ons || elf bản địa đọc u16(coff, vị trí bản ghi tái định vị đối tượng + 8) != 4) { trạng thái = -1; thoát; };
+            byte ghi số nguyên ba mươi hai bit(mã, vị trí tái định vị đối tượng, máy đọc số nguyên ba mươi hai bit(67240000 + chỉ mục tái định vị đối tượng * 4) - 4096 - vị trí tái định vị đối tượng - 4 + byte đọc số nguyên ba mươi hai bit(mã, vị trí tái định vị đối tượng));
+        };
+        lặp (s = 0; s < số phần; s++) {
+            biến đích phần = mã; biến địa chỉ nền phần = 4096;
+            nếu (macho rt trường(s, 4) == 1) { đích phần = dữ liệu; địa chỉ nền phần = data rva; };
+            lặp (j = 0; j < macho rt trường(s, 16); j++) {
+                biến vị trí bản ghi tái định vị runtime = macho rt trường(s, 12) + j * 10;
+                biến vị trí tái định vị runtime = byte đọc số nguyên ba mươi hai bit(runtime, vị trí bản ghi tái định vị runtime);
+                biến chỉ mục tái định vị runtime = byte đọc số nguyên ba mươi hai bit(runtime, vị trí bản ghi tái định vị runtime + 4);
+                biến loại = elf bản địa đọc u16(runtime, vị trí bản ghi tái định vị runtime + 8);
+                nếu (vị trí tái định vị runtime < 0 || vị trí tái định vị runtime > macho rt trường(s, 8) - 4 || chỉ mục tái định vị runtime < 0 || chỉ mục tái định vị runtime >= ns || loại < 4 || loại > 9) { trạng thái = -1; thoát; };
+                biến giá trị tái định vị runtime = máy đọc số nguyên ba mươi hai bit(67210000 + chỉ mục tái định vị runtime * 4);
+                nếu (giá trị tái định vị runtime < 0) { trạng thái = -1; thoát; };
+                vị trí tái định vị runtime = vị trí tái định vị runtime + macho rt trường(s, 0);
+                byte ghi số nguyên ba mươi hai bit(đích phần, vị trí tái định vị runtime, giá trị tái định vị runtime - địa chỉ nền phần - vị trí tái định vị runtime - 4 - (loại - 4) + byte đọc số nguyên ba mươi hai bit(đích phần, vị trí tái định vị runtime));
+            };
+        };
+    };
+    nếu (trạng thái == 0) {
+        biến thô = macho rt căn(byte dài(mã), 512);
+        biến thô data = macho rt căn(byte dài(dữ liệu), 512);
+        nếu (512 + thô + thô data > 2097152) { trạng thái = -1; }
+        hoặc {
+            đối tượng i32(kết quả, 23117); đối tượng đệm(kết quả, 60); đối tượng i32(kết quả, 128); đối tượng đệm(kết quả, 128);
+            đối tượng i32(kết quả, 17744); byte thêm(kết quả, 100); byte thêm(kết quả, 134); byte thêm(kết quả, 2); byte thêm(kết quả, 0);
+            đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 0);
+            byte thêm(kết quả, 240); byte thêm(kết quả, 0); byte thêm(kết quả, 35); byte thêm(kết quả, 0); // đã loại bỏ tái định vị
+            byte thêm(kết quả, 11); byte thêm(kết quả, 2); byte thêm(kết quả, 0); byte thêm(kết quả, 0);
+            đối tượng i32(kết quả, thô); đối tượng i32(kết quả, thô data); đối tượng i32(kết quả, 0);
+            đối tượng i32(kết quả, main); đối tượng i32(kết quả, 4096);
+            đối tượng i32(kết quả, 1073741824); đối tượng i32(kết quả, 1);
+            đối tượng i32(kết quả, 4096); đối tượng i32(kết quả, 512);
+            lặp (j = 0; j < 3; j++) { byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0); };
+            đối tượng i32(kết quả, 0); đối tượng i32(kết quả, data rva + macho rt căn(byte dài(dữ liệu), 4096)); đối tượng i32(kết quả, 512); đối tượng i32(kết quả, 0);
+            byte thêm(kết quả, 3); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 1);
+            đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096); đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+            đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 16);
+            lặp (j = 0; j < 16; j++) {
+                biến v = 0; biến kích thước thư mục dữ liệu = 0;
+                nếu (j == 1) { v = data rva + bảng nhập tại; kích thước thư mục dữ liệu = 100; };
+                đối tượng i32(kết quả, v); đối tượng i32(kết quả, kích thước thư mục dữ liệu);
+            };
+            nếu (byte dài(kết quả) != 392) { trạng thái = -1; };
+            pe rt phần(kết quả, ".text", byte dài(mã), 4096, thô, 512, 1610612768);
+            pe rt phần(kết quả, ".data", byte dài(dữ liệu), data rva, thô data, 512 + thô, -1073741760);
+            nếu (đối tượng đệm(kết quả, 512) != 0 || byte nối(kết quả, mã) != 0 || đối tượng đệm(kết quả, 512 + thô) != 0 || byte nối(kết quả, dữ liệu) != 0 || đối tượng đệm(kết quả, 512 + thô + thô data) != 0) { trạng thái = -1; };
+        };
+    };
+    byte hủy(mã); byte hủy(dữ liệu);
+    nếu (trạng thái != 0) { thực thi liên kết báo lỗi("V++ PE: runtime symbol, section, import or relocation failure\n"); byte làm rỗng(kết quả); trả về -1; };
+    trả về byte dài(kết quả);
+};

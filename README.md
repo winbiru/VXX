@@ -16,7 +16,7 @@ LSP, formatter, linter và bộ thư viện chuẩn.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](CMakeLists.txt)
 
-[🚀 Cài đặt](#-cài-v-trong-vài-phút) · [✨ Xem cú pháp](#-v-trông-như-thế-nào) · [🧰 Tooling](#-tooling-đi-kèm) · [🗺️ Roadmap](plans/roadmap-1.0.md) · [🤝 Đóng góp](CONTRIBUTING.md)
+[🚀 Cài đặt](#-cài-v-trong-vài-phút) · [✨ Xem cú pháp](#-v-trông-như-thế-nào) · [🧰 Tooling](#-tooling-đi-kèm) · [📊 Benchmark](#-benchmark) · [🗺️ Roadmap](plans/roadmap-1.0.md) · [🤝 Đóng góp](CONTRIBUTING.md)
 </div>
 
 ---
@@ -264,6 +264,69 @@ Chạy trực tiếp:
 
 Windows có thể build bằng MSVC/CMake; hướng dẫn chi tiết nằm trong
 [docs/installation.md](docs/installation.md).
+
+## 📊 Benchmark
+
+Đo lại ngày **05/11/2026** trên **macOS 26.6.2 ARM64**. Có **387/387 mẫu
+hợp lệ** từ 43 tổ hợp ngôn ngữ/bài đo, mỗi tổ hợp chạy 9 tiến trình độc lập,
+ba batch làm nóng rồi một batch đo. Thứ tự chạy được xáo trộn; số vòng được
+hiệu chỉnh với mục tiêu 100 ms/batch. Kết quả, checksum, trung vị/MAD và
+SHA-256 được kiểm chứng độc lập bằng Ruby; **MAD/trung vị cao nhất 4,12%**.
+
+**Trung vị µs/thao tác; thấp hơn là nhanh hơn.** Ứng dụng V++ được dựng lại
+bằng AOT, dùng **runtime V++/ASM** cho giá trị động, GC, Unicode và JSON;
+executable chỉ liên kết `libSystem`. C/C++ dùng Clang 21 `-O3`, Rust 1.99.1
+dùng `opt-level=3`, không LTO. Node.js 20.11.1 và Java 21.0.2 dùng JIT mặc
+định; Python 3.14.3 và Ruby 2.6.10 dùng cấu hình mặc định. Tất cả chạy ARM64.
+
+| Ngôn ngữ | Số học | Vòng lặp có nhánh | Fibonacci vòng lặp | Danh sách 128 phần tử | Thay Unicode | Phân tích JSON |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **V++ AOT + V++/ASM** | **0.001779** | **0.158637** | **0.022305** | **0.128629** | **82.252344** | **1003.270835** |
+| C | 0.000838 | 0.201920 | 0.009191 | — | — | — |
+| Rust | 0.000830 | 0.202038 | 0.009172 | — | — | — |
+| C++ | 0.000837 | 0.203985 | 0.009167 | 0.253461 | 0.190372 | — |
+| Node.js | 0.001149 | 0.156904 | 0.011807 | 0.542440 | 1.357444 | 0.432746 |
+| Java | 0.001401 | 0.070227 | 0.004602 | 0.352566 | 0.192991 | — |
+| Python | 0.101871 | 4.336261 | 0.479938 | 5.162452 | 0.471819 | 2.061762 |
+| Ruby | 0.082067 | 6.597334 | 1.087142 | 7.464361 | 1.278848 | 2.217100 |
+
+Dấu `—` nghĩa là bộ đo chưa có bài tương ứng: C/Rust chỉ có ba kernel số
+học; C++/Java chưa có bài JSON. Các ngôn ngữ dùng cấu trúc dữ liệu và thư
+viện bản địa tương ứng; JSON so sánh cả hiệu quả của thư viện parser.
+
+Trong các bài đã đo, danh sách V++ nhanh hơn C++ khoảng **1,97 lần**;
+Fibonacci mất khoảng **2,43 lần thời gian C/Rust**. **Unicode và JSON vẫn
+còn chậm nhiều**: Unicode mất khoảng **432 lần thời gian C++**, JSON mất
+khoảng **2.318 lần thời gian Node.js**. Các tỷ lệ này chỉ áp dụng cho từng
+workload, không phải hệ số tốc độ chung của ngôn ngữ.
+
+Các kernel V++ i32 riêng dùng chung bộ đo C++ và ABI bốn tham số i32 với
+C/Rust, biên dịch ở đơn vị riêng, không LTO. **Đơn vị ns/thao tác**:
+
+| Kernel | V++ i32 | C | Rust |
+| --- | ---: | ---: | ---: |
+| Số học | 1.170 | 0.838 | 0.830 |
+| Vòng lặp có nhánh | 153.566 | 201.920 | 202.038 |
+| Fibonacci vòng lặp | 20.595 | 9.191 | 9.172 |
+
+Ứng dụng AOT ở bảng đầu dùng bộ đo viết bằng V++; đường kernel i32 dùng
+driver C++. Cấu trúc vòng lặp và tối ưu có thể khác nhau, nên không lấy
+hiệu hai bảng để suy ra chi phí riêng của một lời gọi hàm.
+
+Kiểm tra bổ sung xác nhận các phép đo ngắn 64 vòng trước đây bị chi phí cố
+định của bộ đo chi phối. Lượt này dùng batch dài khoảng **54,9–171,1 ms**;
+không coi chênh lệch do tăng số vòng là một tối ưu compiler mới.
+
+Phép đo không tính khởi động, biên dịch, chuẩn bị đầu vào hay làm nóng;
+vẫn tính vòng lặp bộ đo, gọi hàm, cấp phát và GC còn lại sau tối ưu.
+Đầu vào lặp theo chu kỳ 16 giá trị `17..32`; profiling tắt khi đo.
+Đây là benchmark trên một máy, chưa đo riêng RAM, I/O, đa luồng hay thời
+gian biên dịch.
+
+[Mã nguồn workload và cấu hình dựng](benchmark/languages/)
+· [Bộ đo, oracle và thống kê](scripts/quality/compare_languages_aot.py).
+Báo cáo và dữ liệu từng mẫu được sinh cục bộ trong `report/` và
+`benchmark/reports/`, đã được đưa vào `.gitignore`.
 
 ## 🧠 Kiến trúc
 

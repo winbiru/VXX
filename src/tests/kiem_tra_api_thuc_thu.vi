@@ -1,5 +1,5 @@
-nhập gói/dựng/ứng dụng;
-nhập gói/mạng/kiểm thử/giao diện lập trình;
+nhập gói.dựng.ứng dụng.*;
+nhập gói.mạng.kiểm thử.giao diện lập trình.*;
 
 // Java-style API implementation in test: Controller -> Service -> ResponseEntity
 lớp công khai UserService {

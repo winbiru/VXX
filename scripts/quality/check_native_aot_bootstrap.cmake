@@ -62,7 +62,8 @@ if (NOT EXISTS "${probe}")
 endif()
 execute_process(COMMAND "${probe}"
     RESULT_VARIABLE probe_status OUTPUT_VARIABLE probe_output ERROR_VARIABLE probe_error TIMEOUT 30)
-if (NOT probe_status STREQUAL "0" OR NOT probe_output STREQUAL "-2147483648\n42\n0\n")
+# nativeaotprint.vi deliberately returns 7 to verify the program exit ABI.
+if (NOT probe_status STREQUAL "7" OR NOT probe_output STREQUAL "-2147483648\n42\n0\n")
     message(FATAL_ERROR "Stage 3 probe mismatch (${probe_status}): ${probe_output} ${probe_error}")
 endif()
 

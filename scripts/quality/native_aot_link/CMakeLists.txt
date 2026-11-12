@@ -1,10 +1,163 @@
 cmake_minimum_required(VERSION 3.20)
-project(vpp_native_aot_link LANGUAGES CXX)
+set(vpp_aot_runtime "$ENV{VPP_AOT_RUNTIME}")
+if (vpp_aot_runtime STREQUAL "vpp" OR vpp_aot_runtime STREQUAL "vpp-freestanding")
+    # These Stage 0 configuration values only apply to the legacy archives.
+    set(vpp_aot_legacy_configuration
+        "${VPP_AOT_CONFIGURATION};${VPP_AOT_LIB_ROOT};${VPP_AOT_LINK_LEGACY_LIBFFI}")
+    project(vpp_native_aot_link LANGUAGES NONE)
+elseif (vpp_aot_runtime STREQUAL "" OR vpp_aot_runtime STREQUAL "cpp")
+    # The Windows Stage 0 linker compiles the same C bootstrap used on POSIX.
+    project(vpp_native_aot_link LANGUAGES C CXX)
+else()
+    message(FATAL_ERROR "VPP_AOT_RUNTIME must be vpp, vpp-freestanding or cpp")
+endif()
 foreach(required IN ITEMS VPP_AOT_ROOT VPP_AOT_SOURCE VPP_AOT_OUTPUT)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "Missing ${required}")
     endif()
 endforeach()
+# Older installed V++ drivers may pass Win32 backslashes through -D. CMake's
+# generated VerifyGlobs.cmake does not escape them, so a path such as D:\a\...
+# fails during Visual Studio's ZERO_CHECK with "Invalid character escape \a".
+# Normalize the received values before any CONFIGURE_DEPENDS glob is emitted.
+foreach(path_var IN ITEMS VPP_AOT_ROOT VPP_AOT_LIB_ROOT VPP_AOT_SOURCE VPP_AOT_OUTPUT)
+    if (DEFINED ${path_var})
+        string(REPLACE "\\" "/" ${path_var} "${${path_var}}")
+    endif()
+endforeach()
+# Already bootstrapped native compilers may still emit the former flat
+# include name. Search common/ in addition to ASM/ while those seeds are
+# upgraded; all actual runtime sources stay in platform/common directories.
+set(vpp_aot_asm_include_dirs
+    "-I${VPP_AOT_ROOT}/scripts/ASM"
+    "-I${VPP_AOT_ROOT}/scripts/ASM/common")
+# Linux x86-64: compile V++-emitted ASM and its V++-authored runtime into a
+# static ELF. All host services enter through the raw syscall assembly layer.
+# Keep this route independent from the Darwin and Stage 0 C++ linkers.
+if (vpp_aot_runtime STREQUAL "vpp-freestanding")
+    if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
+        NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        message(FATAL_ERROR "V++ freestanding AOT link requires Linux x86-64")
+    endif()
+    set(runtime_object "$ENV{VPP_AOT_VPP_OBJECT}")
+    if (runtime_object STREQUAL "")
+        set(runtime_object "${VPP_AOT_ROOT}/build/native-vpp-runtime/runtime.o")
+    endif()
+    if (NOT IS_ABSOLUTE "${runtime_object}" OR NOT EXISTS "${runtime_object}")
+        message(FATAL_ERROR "Produce a Linux ELF runtime.o with scripts/build-vpp-aot-runtime.sh and set VPP_AOT_VPP_OBJECT to its absolute path")
+    endif()
+    find_program(VPP_AOT_ASSEMBLER NAMES clang REQUIRED)
+    set(asm_dir "${VPP_AOT_ROOT}/scripts/ASM")
+    file(GLOB_RECURSE asm_includes CONFIGURE_DEPENDS
+        "${asm_dir}/*.inc" "${asm_dir}/*.S" "${asm_dir}/*.s")
+    set(objects)
+    foreach(component IN ITEMS program start syscalls runtime-core directory sha256 process socket bridge numeric)
+        if (component STREQUAL "program")
+            set(source "${VPP_AOT_SOURCE}")
+            set(flags -DVPP_AOT_VPP_RUNTIME=1)
+        elseif (component STREQUAL "start")
+            set(source "${asm_dir}/linux/vpp_linux_start_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "syscalls")
+            set(source "${asm_dir}/linux/vpp_linux_syscalls_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "runtime-core")
+            set(source "${asm_dir}/linux/vpp_linux_runtime_core_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "directory")
+            set(source "${asm_dir}/linux/vpp_linux_directory_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "sha256")
+            set(source "${asm_dir}/linux/vpp_linux_sha256_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "process")
+            set(source "${asm_dir}/linux/vpp_linux_process_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "socket")
+            set(source "${asm_dir}/linux/vpp_linux_socket_x86_64.S")
+            set(flags)
+        elseif (component STREQUAL "bridge")
+            set(source "${asm_dir}/linux/vpp_linux_aot_runtime_bridge_x86_64.S")
+            set(flags)
+        else()
+            set(source "${asm_dir}/linux/vpp_linux_f64_x86_64.S")
+            set(flags)
+        endif()
+        set(object "${CMAKE_CURRENT_BINARY_DIR}/${component}.o")
+        add_custom_command(OUTPUT "${object}"
+            COMMAND "${VPP_AOT_ASSEMBLER}" -target x86_64-unknown-linux-gnu
+                -c "${source}" ${flags} ${vpp_aot_asm_include_dirs} -o "${object}"
+            DEPENDS "${source}" ${asm_includes}
+            VERBATIM)
+        list(APPEND objects "${object}")
+    endforeach()
+    set(executable "${CMAKE_CURRENT_BINARY_DIR}/bin/vpp-aot-program")
+    add_custom_command(OUTPUT "${executable}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/bin"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -target x86_64-unknown-linux-gnu
+            -nostdlib -static -no-pie -Wl,-e,_start
+            -Wl,--no-undefined -Wl,--build-id=none -Wl,-z,noexecstack
+            ${objects} "${runtime_object}" -o "${executable}"
+        COMMAND /bin/bash "${VPP_AOT_ROOT}/scripts/quality/audit_linux_static_elf.sh"
+            "${executable}"
+        DEPENDS ${objects} "${runtime_object}"
+            "${VPP_AOT_ROOT}/scripts/quality/audit_linux_static_elf.sh"
+        VERBATIM)
+    add_custom_target(vpp-aot-program ALL DEPENDS "${executable}")
+    add_custom_command(TARGET vpp-aot-program POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy "${executable}" "${VPP_AOT_OUTPUT}"
+        VERBATIM)
+    return()
+endif()
+# The dynamic V++ runtime is a native object, built by the self-hosted i32
+# compiler. No Stage 0 archives or foreign-call library enter this link.
+if (vpp_aot_runtime STREQUAL "vpp")
+    if (NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+        message(FATAL_ERROR "V++ dynamic AOT runtime currently requires macOS ARM64")
+    endif()
+    set(runtime_object "$ENV{VPP_AOT_VPP_OBJECT}")
+    if (runtime_object STREQUAL "")
+        set(runtime_object "${VPP_AOT_ROOT}/build/native-vpp-runtime/runtime.o")
+    endif()
+    if (NOT IS_ABSOLUTE "${runtime_object}" OR NOT EXISTS "${runtime_object}")
+        message(FATAL_ERROR "Build the V++ runtime with scripts/build-vpp-aot-runtime.sh, then set VPP_AOT_VPP_OBJECT to its absolute runtime.o path")
+    endif()
+    set(program_object "${CMAKE_CURRENT_BINARY_DIR}/program.o")
+    set(primitives_object "${CMAKE_CURRENT_BINARY_DIR}/primitives.o")
+    find_program(VPP_AOT_ASSEMBLER NAMES clang REQUIRED)
+    add_custom_command(OUTPUT "${program_object}"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -c "${VPP_AOT_SOURCE}"
+            -DVPP_AOT_VPP_RUNTIME=1 ${vpp_aot_asm_include_dirs}
+            -o "${program_object}"
+        DEPENDS "${VPP_AOT_SOURCE}"
+            "${VPP_AOT_ROOT}/scripts/ASM/common/vpp_aot_dynamic_runtime.inc"
+            "${VPP_AOT_ROOT}/scripts/ASM/common/vpp_aot_vpp_runtime.inc"
+        VERBATIM)
+    file(GLOB_RECURSE primitive_dependencies CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/*.inc"
+        "${VPP_AOT_ROOT}/scripts/ASM/*.S")
+    add_custom_command(OUTPUT "${primitives_object}"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/macos/vpp_aot_primitives_aarch64.S"
+            -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -o "${primitives_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/macos/vpp_aot_primitives_aarch64.S"
+            ${primitive_dependencies}
+        VERBATIM)
+    # Use only the assembler/linker driver. Enabling C/CXX here would also
+    # compile CMake's generated compiler-identification sources at configure.
+    set(executable "${CMAKE_CURRENT_BINARY_DIR}/bin/vpp-aot-program")
+    add_custom_command(OUTPUT "${executable}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/bin"
+        COMMAND "${VPP_AOT_ASSEMBLER}" "${program_object}" "${primitives_object}"
+            "${runtime_object}" -Wl,-dead_strip -o "${executable}"
+        DEPENDS "${program_object}" "${primitives_object}" "${runtime_object}"
+        VERBATIM)
+    add_custom_target(vpp-aot-program ALL DEPENDS "${executable}")
+    add_custom_command(TARGET vpp-aot-program POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy "${executable}" "${VPP_AOT_OUTPUT}"
+        VERBATIM)
+    return()
+endif()
 set(CMAKE_CXX_STANDARD 17)
 if (MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
@@ -16,13 +169,100 @@ else()
 endif()
 add_custom_command(OUTPUT "${object}"
     COMMAND "${VPP_AOT_ASSEMBLER}" -c "${VPP_AOT_SOURCE}"
-        "-I${VPP_AOT_ROOT}/scripts/ASM" -o "${object}"
+        ${vpp_aot_asm_include_dirs} -o "${object}"
     DEPENDS "${VPP_AOT_SOURCE}"
     VERBATIM)
 set_source_files_properties("${object}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
-add_executable(vpp-aot-program "${object}")
+set(vpp_aot_bootstrap_objects)
+if (WIN32)
+    add_library(vpp-aot-bootstrap-runtime OBJECT
+        "${VPP_AOT_ROOT}/src/runtime/native/vpp_aot_runtime.c")
+    target_compile_features(vpp-aot-bootstrap-runtime PRIVATE c_std_11)
+    if (MSVC)
+        target_compile_options(vpp-aot-bootstrap-runtime PRIVATE /utf-8)
+    endif()
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.obj")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/windows/aot_x86_64/*.inc"
+        "${VPP_AOT_ROOT}/scripts/ASM/common/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -target x86_64-pc-windows-msvc -c
+            -DVPP_WINDOWS_STAGE0=1 -DVPP_NATIVE_RUNTIME_STACK_ABI=0
+            "${VPP_AOT_ROOT}/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S"
+            -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+endif()
+if (NOT MSVC AND (APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    find_program(VPP_AOT_C_COMPILER NAMES clang cc REQUIRED)
+    set(bootstrap_runtime_object "${CMAKE_CURRENT_BINARY_DIR}/bootstrap-runtime.o")
+    add_custom_command(OUTPUT "${bootstrap_runtime_object}"
+        COMMAND "${VPP_AOT_C_COMPILER}" -std=c11 -c
+            "${VPP_AOT_ROOT}/src/runtime/native/vpp_aot_runtime.c"
+            -o "${bootstrap_runtime_object}"
+        DEPENDS "${VPP_AOT_ROOT}/src/runtime/native/vpp_aot_runtime.c"
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${bootstrap_runtime_object}")
+endif()
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/macos/aot_arm64/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_ASSEMBLER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/macos/vpp_aot_stage0_machine_aarch64.S"
+            ${vpp_aot_asm_include_dirs} -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/macos/vpp_aot_stage0_machine_aarch64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/common/posix/aot_x86_64/*.inc")
+    list(APPEND stage0_machine_includes
+        "${VPP_AOT_ROOT}/scripts/ASM/common/posix/vpp_vm_f64_primitives.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_C_COMPILER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_x86_64.S"
+            ${vpp_aot_asm_include_dirs} -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_x86_64.S"
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_linux_sha256_x86_64.S"
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/linux/aot_arm64/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_C_COMPILER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_aarch64.S"
+            ${vpp_aot_asm_include_dirs} -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_aarch64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+endif()
+set_source_files_properties(${vpp_aot_bootstrap_objects}
+    PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
+add_executable(vpp-aot-program "${object}" ${vpp_aot_bootstrap_objects})
+if (WIN32)
+    target_sources(vpp-aot-program PRIVATE $<TARGET_OBJECTS:vpp-aot-bootstrap-runtime>)
+endif()
 set_target_properties(vpp-aot-program PROPERTIES LINKER_LANGUAGE CXX
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Stage 0/1 bootstrap executables otherwise retain STT_FILE entries from
+    # temporary compiler objects. Strip only final ELF executables, not the
+    # relocatable objects used to link them.
+    target_link_options(vpp-aot-program PRIVATE "LINKER:--strip-all")
+endif()
 if (NOT DEFINED VPP_AOT_LIB_ROOT)
     set(VPP_AOT_LIB_ROOT "${VPP_AOT_ROOT}")
 endif()
@@ -82,7 +322,7 @@ endif()
 find_package(Threads REQUIRED)
 target_link_libraries(vpp-aot-program PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 if (WIN32)
-    target_link_libraries(vpp-aot-program PRIVATE ws2_32 bcrypt secur32 crypt32)
+    target_link_libraries(vpp-aot-program PRIVATE ws2_32 bcrypt secur32 crypt32 shell32)
 else()
     # Link the same ABI as the runtime archives selected by the AOT driver.
     # Machine-only executables must not gain a libffi dependency here.
@@ -98,8 +338,33 @@ else()
         find_library(VPP_AOT_CORE_FOUNDATION CoreFoundation REQUIRED)
         target_link_libraries(vpp-aot-program PRIVATE "${VPP_AOT_SECURITY}" "${VPP_AOT_CORE_FOUNDATION}")
     else()
+        # The stage2/stage3 convergence gate rejects a dynamically linked
+        # libcrypto. Keep Stage 0 OpenSSL symbols inside the executable so
+        # the bootstrap does not acquire a libcrypto.so dependency.
+        set(OPENSSL_USE_STATIC_LIBS TRUE)
         find_package(OpenSSL REQUIRED)
         target_link_libraries(vpp-aot-program PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+        # The parent configure records the static OpenSSL dependency closure.
+        # Match the V++ and bootstrap direct linkers when CMake is selected.
+        set(vpp_crypto_deps_cache)
+        if (EXISTS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt")
+            file(STRINGS "${VPP_AOT_LIB_ROOT}/CMakeCache.txt" vpp_crypto_deps_cache
+                REGEX "^VPP_OPENSSL_STATIC_DEPS:STRING=")
+        endif()
+        # Match the V++ and bootstrap drivers when the build cache is absent
+        # or predates the static closure key.
+        if ((NOT vpp_crypto_deps_cache OR
+             vpp_crypto_deps_cache STREQUAL "VPP_OPENSSL_STATIC_DEPS:STRING=") AND
+            EXISTS "${VPP_AOT_LIB_ROOT}/vpp-aot-link-flags.conf")
+            file(STRINGS "${VPP_AOT_LIB_ROOT}/vpp-aot-link-flags.conf" vpp_crypto_deps_cache
+                REGEX "^VPP_OPENSSL_STATIC_DEPS:STRING=")
+        endif()
+        foreach(entry IN LISTS vpp_crypto_deps_cache)
+            string(REGEX REPLACE "^VPP_OPENSSL_STATIC_DEPS:STRING=" "" deps "${entry}")
+            if (deps)
+                target_link_libraries(vpp-aot-program PRIVATE ${deps})
+            endif()
+        endforeach()
     endif()
 endif()
 add_custom_command(TARGET vpp-aot-program POST_BUILD

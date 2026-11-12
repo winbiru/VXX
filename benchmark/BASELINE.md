@@ -1,17 +1,81 @@
-# Benchmark baseline
+# V++ benchmark gate — tái lập baseline (31/10/2026)
 
-Baseline recorded on 12/09/2026 with a Release build on macOS 26.6.2 arm64,
-Apple Clang 21.0.0. These numbers are reference observations only; compare runs
-on the same machine and build mode before treating a change as a regression.
+Benchmark so sánh **hai bản Git đã commit** bằng hai binary Release được build
+riêng, trên **cùng host**, cùng benchmark harness. Runner thu mẫu bằng V++ và
+dùng comparator V++ trong `gói/kiểm thử/so sánh benchmark.vi`.
+Runner lấy năm tệp harness từ commit candidate và dùng cùng nội dung đó để
+build cả hai revision. Baseline vẫn giữ mã compiler/runtime của chính nó,
+kể cả khi baseline còn dùng harness-v2 và candidate đã chuyển sang harness-v3.
 
-| Benchmark | Iterations | Total | Per iteration |
-| --- | ---: | ---: | ---: |
-| VM dispatch | 250 | 3.396 ms | 13,585.7 ns |
-| Lexer | 5,000 | 29.519 ms | 5,903.8 ns |
-| Compiler pipeline | 250 | 9.999 ms | 39,995.0 ns |
-| Native HTTP helpers (historical; helper removed) | 100,000 | 297.695 ms | 2,976.9 ns |
+## Chạy thử
 
-The HTTP row is retained only as historical evidence from the 12/09/2026 harness; the
-corresponding native helper no longer exists. The current benchmark executable covers
-VM verification/dispatch/end-to-end, compiler stages, package/module resolution and GC
-collection, and prints machine-readable `benchmark_meta=` / `benchmark=` records.
+Tại root repo, cần CMake, trình biên dịch C++17, dependency build V++ và CLI
+V++ được build từ working tree hiện tại. Chỉ định baseline/candidate bằng SHA
+commit; kết quả lưu vào **thư mục mới**, không tự ghi đè kết quả cũ.
+
+```bash
+cmake -S . -B build-benchmark-gate-cli -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
+cmake --build build-benchmark-gate-cli --parallel 2 --target vpp-cli
+
+export VPP_EXEC="$PWD/build-benchmark-gate-cli/bin/vpp-cli"
+export VPP_GATE_CASES=vm_verify,vm_dispatch_preverified,compiler_pipeline,gc_burst_collect_reuse
+export VPP_GATE_SAMPLES=40 VPP_GATE_WARMUPS=3 VPP_GATE_TARGET_MS=50
+BASELINE_SHA=f89c2c9 CANDIDATE_SHA=634b3d6  # thay bằng hai commit muốn đo
+bash scripts/quality/run_benchmark_gate.sh "$BASELINE_SHA" "$CANDIDATE_SHA" \
+  "$PWD/build-benchmark-evidence-001"
+```
+
+Để thử nhanh **collector**, dùng `VPP_GATE_CASES=vm_verify`,
+`VPP_GATE_SAMPLES=10`, `VPP_GATE_TARGET_MS=10` (không dùng 10 samples để
+kết luận GC p95). Runner mặc định đo toàn bộ case, có giới hạn 10–200 process
+độc lập/case và ít nhất ba warmup mỗi phía. Phép đo xen kẽ thứ tự hai binary
+để giảm ảnh hưởng drift. Số iteration mỗi tiến trình được chọn sau hai pilot.
+
+## Ngưỡng cố định và mã thoát
+
+| Điều kiện | Quyết định |
+| --- | --- |
+| Median `ns_per_iteration` tăng **>10%** | `FAIL` |
+| Median peak RSS hoặc allocation metric tăng **>15%** | `FAIL` |
+| GC pause p95 tăng **>15%** | `FAIL` nếu có >=40 process độc lập |
+| MAD / median **>5%**, hoặc GC case <40 process | `INCONCLUSIVE` |
+| Dữ liệu thiếu/sai, flags instrumentation, checksum khác, hai build không dùng cùng harness | `INVALID` |
+
+Mã thoát: **0** PASS, **1** FAIL, **2** INCONCLUSIVE, **3** INVALID.
+`INCONCLUSIVE`/`INVALID` phải dừng merge như FAIL. Nhiễu máy CI công cộng
+có thể gây INCONCLUSIVE dù code không thay đổi; chạy lại trên host chuyên
+dụng trước khi đánh giá kết quả. Khi harness thay đổi, cả hai revision được đo
+lại bằng harness candidate; không so trực tiếp kết quả cũ từ định nghĩa case
+khác. Nếu harness không biên dịch được với API baseline, build phải dừng để
+chọn một baseline tương thích; không bỏ case hoặc thay mã runtime baseline.
+
+Job `benchmark-smoke` đo cùng một binary hai lần để kiểm tra collector và tính
+hợp lệ của evidence. Job này chấp nhận `PASS` hoặc `INCONCLUSIVE`, lưu mẫu nhiễu
+trong artifact và vẫn dừng khi `FAIL` hoặc `INVALID`. Workflow
+`benchmark-regression.yml` so sánh hai bản Git tiếp tục yêu cầu `PASS`; ngưỡng
+nhiễu 5% và các mã thoát của comparator giữ nguyên.
+
+## Bằng chứng và phạm vi
+
+Runner xuất `identities.txt`, `baseline-build.log`, `candidate-build.log`,
+`pilots.jsonl`, `samples.jsonl`, `report.json`, `comparison.json`,
+`decision.json` và `collection.log`. Report chứa SHA commit, SHA-256 archive
+Git **thực sự được giải nén để build**, SHA-256 binary, fingerprint harness,
+SHA-256 mã collector, comparator và CLI, cùng OS/CPU được dùng để đo.
+`harness.tar` và `harness.sha256` lưu harness dùng chung cùng hash từng tệp.
+`baseline-source.tar`/`candidate-source.tar` lưu mã thực sự dùng để build sau
+khi áp harness; hash của chúng nằm trong `sources.*.snapshot_sha256`.
+Hash archive Git nguyên gốc được giữ riêng ở `revision_snapshot_sha256`;
+`harness_source_commit` và `harness_archive_sha256` ghi nguồn harness.
+Khi lưu kết quả cần giữ cả thư mục và đối chiếu phiên bản toolchain trong
+metadata build. Các binary trong scratch bị xóa
+sau chạy; có hash để đối chiếu nhưng không được đóng gói trong evidence.
+
+Kiểm thử cục bộ ngày 31/10/2026 tại `build-benchmark-gate-e2e-verified/`:
+`f89c2c9` so `634b3d6`, case `vm_verify` với 10 process,
+PASS; binary SHA-256 hai bản **giống nhau**, median khoảng 52.644 ns và
+53.422 ns (chênh +1,5%). Kết quả này chứng minh luồng runner, **không** chứng minh tăng
+hiệu năng. Trước khi chốt 1.0 phải chạy trên candidate SHA thực, corpus đầy
+đủ, nhiều host, kiểm thử CI tạo regression đỏ và kiểm chứng các case còn
+thiếu theo `plans/release-1.0-execution-checklist.md`.

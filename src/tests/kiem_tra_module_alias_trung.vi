@@ -1,7 +1,7 @@
 // Hai đường import tới cùng math phải dùng chung initializer/function ID,
 // nhưng cả hai tên api.số.cộng và toán.cộng đều gọi được tại runtime.
-nhập fixtures/compiler_oracle/lib/feature như api;
-nhập fixtures/compiler_oracle/lib/math như toán;
+nhập fixtures.compiler_oracle.lib.feature.* như api;
+nhập fixtures.compiler_oracle.lib.math.* như toán;
 
 hàm chính() {
     in api.tính();

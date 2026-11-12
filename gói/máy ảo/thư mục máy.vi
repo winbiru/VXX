@@ -1,0 +1,193 @@
+// Directory policy and getdents/dirent decoding are V++; ASM owns OS pointers.
+hàm vm_utf8_valid(raw, count) {
+    biến at = 0;
+    khi (at < count) {
+        biến first = máy đọc byte(raw + at);
+        nếu (first < 128) { at = at + 1; bỏ qua; };
+        biến width = 0; biến low = 128; biến high = 191;
+        nếu (first >= 194 && first <= 223) { width = 2; };
+        nếu (first >= 224 && first <= 239) {
+            width = 3;
+            nếu (first == 224) { low = 160; };
+            nếu (first == 237) { high = 159; };
+        };
+        nếu (first >= 240 && first <= 244) {
+            width = 4;
+            nếu (first == 240) { low = 144; };
+            nếu (first == 244) { high = 143; };
+        };
+        nếu (width == 0 || width > count - at) { trả về 0; };
+        biến second = máy đọc byte(raw + at + 1);
+        nếu (second < low || second > high) { trả về 0; };
+        lặp(j = 2; j < width; j++) {
+            biến byte = máy đọc byte(raw + at + j);
+            nếu (byte < 128 || byte > 191) { trả về 0; };
+        };
+        at = at + width;
+    };
+    trả về 1;
+};
+hàm vm_dir_path(path) {
+    nếu (vm_tag(path) != 3) { vm_error(2); trả về -1; };
+    nếu (vm_get(path, 1) < 1) { vm_error(2); trả về -1; };
+    nếu (vm_utf8_valid(vm_get(path, 2), vm_get(path, 1)) == 0) { vm_error(2); trả về -1; };
+    nếu (vm_get(path, 1) > 4095) {
+        lặp(i = 0; i < vm_get(path, 1); i++) {
+            nếu (máy đọc byte(vm_get(path, 2) + i) == 0) { vm_error(2); trả về -1; };
+        };
+        trả về -2; // Valid string, but OS path copy cannot fit PATH_MAX.
+    };
+    trả về vm_path_handle(path);
+};
+hàm vm_dir_long_path_error() {
+    nếu (vm_get(4198464, 8) == 1) { trả về 36; }; // Linux ENAMETOOLONG
+    trả về 63; // Darwin ENAMETOOLONG
+};
+hàm vm_dir_pair(a, b) {
+    biến pair = vm_vector(4); nếu (pair == 0) { trả về 0; };
+    vm_append(pair, a); vm_append(pair, b); trả về pair;
+};
+hàm vm_dir_result(status, error) {
+    biến result = vm_vector(4); biến kind = 0;
+    nếu (result == 0) { trả về 0; };
+    nếu (error != 0) { kind = 3; };
+    nếu (error == 17) { kind = 1; };
+    nếu (error == 2) { kind = 2; };
+    vm_append(result, vm_int(status)); vm_append(result, vm_int(kind));
+    vm_append(result, vm_int(error)); trả về result;
+};
+hàm vm_dir_mutate(path, remove) {
+    biến handle = vm_dir_path(path);
+    nếu (handle == -2) { trả về vm_dir_result(-1, vm_dir_long_path_error()); };
+    nếu (handle < 0) { trả về 0; };
+    biến raw = thực thi nội dung đệm(thực thi các byte ô nhớ(handle));
+    biến status = 0;
+    biến error = 0;
+    nếu (remove == 0) {
+        status = máy thư mục thô(4, raw, 0);
+        nếu (status < 0) { error = 0 - status; };
+    } hoặc {
+        status = máy xóa(raw);
+        nếu (status < 0) { error = máy lỗi(); };
+    };
+    // unlink removes a symlink itself; only an actual directory needs rmdir.
+    nếu (remove == 1 && (error == 1 || error == 21)) {
+        status = máy thư mục thô(3, raw, 0);
+        error = 0; nếu (status < 0) { error = 0 - status; };
+    };
+    byte hủy(handle);
+    nếu (error != 0) { status = -1; } hoặc { status = 0; };
+    trả về vm_dir_result(status, error);
+};
+hàm vm_dir_open(state, path) {
+    biến handle = vm_dir_path(path);
+    nếu (handle == -2) { trả về vm_dir_pair(vm_int(0), vm_int(vm_dir_long_path_error())); };
+    nếu (handle < 0) { trả về 0; };
+    // State slot 11 roots live resources. Reuse empty slots, never tokens.
+    biến table = vm_get(state, 11);
+    nếu (table == 0) {
+        table = vm_vector(4);
+        nếu (table == 0) { byte hủy(handle); trả về 0; };
+        vm_set(state, 11, table);
+    };
+    biến index = 0;
+    khi (index < vm_get(table, 1)) { nếu (vm_at(table, index) == 0) { thoát; }; index++; };
+    nếu (index == vm_get(table, 1)) { vm_append(table, 0); };
+    biến resource = vm_alloc(32, 1);
+    biến control = vm_alloc(16, 0);
+    biến buffer = vm_alloc(8192, 0);
+    nếu (vm_get(4198464, 1) != 0) { byte hủy(handle); trả về 0; };
+    biến token = vm_get(4198464, 29);
+    nếu (token == 0) { token = 1073741824; };
+    nếu (token >= 2147483520) { byte hủy(handle); trả về vm_error(3); };
+    biến status = máy thư mục thô(0, thực thi nội dung đệm(thực thi các byte ô nhớ(handle)), control);
+    byte hủy(handle);
+    nếu (status < 0) { trả về vm_dir_pair(vm_int(0), vm_int(0 - status)); };
+    // File tokens always have low 7 bits >=64. Directory tokens use tag 0
+    // so even long-running generation counters cannot alias a live file.
+    token = token + 128;
+    vm_set(4198464, 29, token); // Process-wide namespace, separate from file handles.
+    vm_set(resource, 0, token); vm_set(resource, 1, control); vm_set(resource, 2, buffer);
+    vm_put(table, index, resource);
+    trả về vm_dir_pair(vm_int(token), vm_int(0));
+};
+hàm vm_dir_find(state, token) {
+    nếu (vm_tag(token) != 1 || vm_number(token) <= 0) { vm_error(2); trả về -1; };
+    biến table = vm_get(state, 11);
+    nếu (table != 0) {
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            biến resource = vm_at(table, i);
+            nếu (resource != 0) { nếu (vm_get(resource, 0) == vm_number(token)) { trả về i; }; };
+        };
+    };
+    vm_error(2); trả về -1;
+};
+// Return record length, 0 for malformed framing, -1 for invalid UTF-8.
+// info receives [name address, byte length]; no OS pointer escapes into V++.
+hàm vm_dir_record(raw, available, linux, info) {
+    biến start = 21;
+    nếu (linux == 1) { start = 19; };
+    nếu (available <= start) { trả về 0; };
+    biến size = máy đọc byte(raw + 16) + máy đọc byte(raw + 17) * 256;
+    nếu (size <= start || size > available) { trả về 0; };
+    biến count = 0;
+    khi (count < size - start) {
+        nếu (máy đọc byte(raw + start + count) == 0) { thoát; };
+        count++;
+    };
+    nếu (count == 0 || count == size - start) { trả về 0; };
+    nếu (linux == 0) {
+        biến declared = máy đọc byte(raw + 18) + máy đọc byte(raw + 19) * 256;
+        nếu (count != declared) { trả về 0; };
+    };
+    nếu (vm_utf8_valid(raw + start, count) == 0) { trả về -1; };
+    vm_set(info, 0, raw + start); vm_set(info, 1, count);
+    trả về size;
+};
+hàm vm_dir_next(state, token) {
+    biến index = vm_dir_find(state, token); nếu (index < 0) { trả về 0; };
+    biến resource = vm_at(vm_get(state, 11), index);
+    nếu (vm_get(resource, 5) == 1) { trả về vm_dir_pair(vm_int(0), vm_literal("")); };
+    khi (vm_get(resource, 3) == vm_get(resource, 4)) {
+        biến got = máy thư mục thô(1, vm_get(resource, 1), vm_get(resource, 2));
+        nếu (got == -4) { bỏ qua; };
+        nếu (got < 0) { trả về vm_dir_pair(vm_int(got), vm_literal("")); };
+        nếu (got == 0) {
+            vm_set(resource, 5, 1);
+            trả về vm_dir_pair(vm_int(0), vm_literal(""));
+        };
+        nếu (got > 8192) { trả về vm_dir_pair(vm_int(-5), vm_literal("")); };
+        vm_set(resource, 3, got); vm_set(resource, 4, 0);
+    };
+    biến used = vm_get(resource, 3); biến offset = vm_get(resource, 4);
+    biến size = vm_dir_record(vm_get(resource, 2) + offset, used - offset,
+        vm_get(4198464, 8), resource + 24);
+    nếu (size < 0) { trả về vm_error(2); };
+    nếu (size == 0) { trả về vm_dir_pair(vm_int(-5), vm_literal("")); };
+    biến name = vm_string(vm_get(resource, 7)); nếu (name == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(resource, 7); i++) {
+        máy ghi byte(vm_get(name, 2) + i, máy đọc byte(vm_get(resource, 6) + i));
+    };
+    vm_set(resource, 4, offset + size);
+    trả về vm_dir_pair(vm_int(1), name);
+};
+hàm vm_dir_close(state, token) {
+    biến index = vm_dir_find(state, token); nếu (index < 0) { trả về 0; };
+    biến table = vm_get(state, 11); biến resource = vm_at(table, index);
+    vm_put(table, index, 0); // Revoke before OS close, including failures.
+    biến status = máy thư mục thô(2, vm_get(resource, 1), 0);
+    biến error = 0; nếu (status < 0) { error = 0 - status; status = -1; };
+    trả về vm_dir_pair(vm_int(status), vm_int(error));
+};
+hàm vm_dir_close_all(state) {
+    nếu (state == 0) { trả về 0; };
+    biến table = vm_get(state, 11); nếu (table == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến resource = vm_at(table, i);
+        nếu (resource != 0) {
+            vm_put(table, i, 0);
+            máy thư mục thô(2, vm_get(resource, 1), 0);
+        };
+    };
+    trả về 0;
+};

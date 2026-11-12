@@ -21,10 +21,10 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp chạy --compiler=vpp <file.vi>\n"
     "  vpp chạy --artifact <output.vbc>\n"
     "  vpp kiểm thử [<tệp-hoặc-thư-mục>]\n"
-    "  vpp dựng <file.vi>\n"
-    "  vpp dựng --compiler=vpp <file.vi> [-o output.vbc]\n"
+    "  vpp biên dịch <file.vi>\n"
+    "  vpp biên dịch --compiler=vpp <file.vi> [--đầu-ra output.vbc]\n"
     "  vpp --list-targets\n"
-    "  vpp dựng --target <triple> <file.vi>  (AOT chưa hỗ trợ)\n"
+    "  vpp biên dịch --target <triple> <file.vi>  (AOT chưa hỗ trợ)\n"
     "  vpp --giải-mã <file.vi>\n"
     "  vpp --dump-ast <file.vi>\n"
     "  vpp --dump-ir <file.vi>\n"
@@ -58,9 +58,9 @@ inline constexpr std::string_view kCliDoctorPackageCount = "  số_gói: {0}\n";
 
 inline constexpr std::string_view kCliFileOpenFailed = "Không thể mở tệp: {0}";
 inline constexpr std::string_view kCliRunMissingFile = "chạy: thiếu đường dẫn tệp";
-inline constexpr std::string_view kCliBuildMissingFile = "dựng: thiếu đường dẫn tệp";
+inline constexpr std::string_view kCliBuildMissingFile = "biên dịch: thiếu đường dẫn tệp";
 inline constexpr std::string_view kCliBuildSucceeded =
-    "Đã dựng thành công {0}: {1} lệnh bytecode, {2} hàm.\n";
+    "Đã biên dịch thành công {0}: {1} lệnh bytecode, {2} hàm.\n";
 inline constexpr std::string_view kCliTestPathMissing =
     "kiểm thử: không tìm thấy tệp hoặc thư mục: {0}";
 inline constexpr std::string_view kCliTestNoFiles =

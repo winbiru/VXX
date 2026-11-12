@@ -2,7 +2,7 @@
 // Map MVP: literal và indexing là primitive VM; policy mặc định/thứ tự key
 // được triển khai bằng V++. Chỉ xóa key và liệt kê key còn cần native mutation.
 
-nhập gói/bộ sưu tập/danh sách;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Tiện Ích Từ Điển {
@@ -40,22 +40,30 @@ lớp công khai Tiện Ích Từ Điển {
     };
 };
 
+// API hàm cấp mô-đun dùng trực tiếp primitive để tránh tạo instance tạm
+// mỗi lần tra/cập nhật map. Giữ ngữ nghĩa đồng bộ với các method bên trên.
 hàm công khai lấy từ điển(bảng, khóa, mặc định) {
-    trả về Tiện Ích Từ Điển().lấy từ điển(bảng, khóa, mặc định);
+    nếu (!máy ảo có khóa từ điển(bảng, khóa)) {
+        trả về mặc định;
+    };
+    trả về bảng[khóa];
 };
 
 hàm công khai đặt từ điển(bảng, khóa, giá trị) {
-    trả về Tiện Ích Từ Điển().đặt từ điển(bảng, khóa, giá trị);
+    bảng[khóa] = giá trị;
+    trả về rỗng;
 };
 
 hàm công khai có khóa(bảng, khóa) {
-    trả về Tiện Ích Từ Điển().có khóa(bảng, khóa);
+    trả về máy ảo có khóa từ điển(bảng, khóa);
 };
 
 hàm công khai xóa khóa(bảng, khóa) {
-    trả về Tiện Ích Từ Điển().xóa khóa(bảng, khóa);
+    trả về máy ảo xóa khóa từ điển(bảng, khóa);
 };
 
 hàm công khai khóa từ điển(bảng) {
-    trả về Tiện Ích Từ Điển().khóa từ điển(bảng);
+    khóa = máy ảo liệt kê khóa từ điển(bảng);
+    sắp xếp(khóa);
+    trả về khóa;
 };

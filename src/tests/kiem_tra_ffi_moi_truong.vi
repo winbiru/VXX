@@ -1,4 +1,4 @@
-nhập gói/hệ thống/môi trường;
+nhập gói.hệ thống.môi trường.*;
 
 hàm chính() {
     in đọc biến môi trường("VPP_FFI_ENV_TEST", "không có");

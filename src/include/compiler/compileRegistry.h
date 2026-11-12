@@ -14,6 +14,10 @@
 namespace vietvm { namespace compiler {
     struct CompilationRegistryState;
 
+    // Named selections opt into isolated linking; bare/wildcard-only graphs
+    // preserve legacy runtime names and name-based bytecode exactly.
+    bool hasSelectiveImports(const CompilationRegistryState &state);
+
     // Trả tập file import của registry được truyền tường minh; production compiler dùng overload này để không phụ thuộc active context ẩn.
     std::unordered_set<std::string> &importedFileSet(CompilationRegistryState &state);
     // Trả tập đường dẫn file đã import trong compilation registry; compiler dùng tập này để ngăn import cùng source lặp lại.

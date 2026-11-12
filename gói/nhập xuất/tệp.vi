@@ -3,10 +3,36 @@
 // Đa nền tảng: bộ đệm V++ trên primitive tệp thô của hệ điều hành.
 // Đường dẫn phải là UTF-8 hợp lệ tại VM primitive boundary.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
 
-nhập gói/nhập xuất/bộ đệm tệp;
+nhập gói.nhập xuất.bộ đệm tệp.*;
+
+// Opaque VM file tokens keep handles private and close them on VM teardown.
+// V++ chooses lock paths, retry policy and the scope of cache transactions.
+// Closing the token releases the OS lock, including after process failure.
+hàm công khai thử khóa tệp(đường) {
+    mã = máy tệp mở(tệp chuẩn hóa đường dẫn(đường), 2);
+    nếu (mã == rỗng) { trả về 0; };
+    thử {
+        khi (máy tệp khóa(mã) != 0) {
+            nếu (máy tệp lỗi(0) != máy tệp lỗi(1)) {
+                máy tệp đóng(mã);
+                trả về 0;
+            };
+        };
+        trả về mã;
+    } bắt lỗi(e) {
+        máy tệp đóng(mã);
+        ném e;
+    };
+};
+
+hàm công khai mở khóa tệp(mã) {
+    nếu (mã != 0) { máy tệp đóng(mã); };
+    trả về 0;
+};
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Hệ Tệp {
@@ -40,7 +66,7 @@ lớp công khai Hệ Tệp {
         tệp = Bộ Đệm Tệp(đường, "đọc", 4096, thao tác);
         kết quả = [];
         thử {
-            lặp(vòng = 0; đúng; vòng++) {
+            khi (đúng) {
                 khối = tệp.đọc các byte(4096);
                 nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
                 lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };
@@ -92,7 +118,13 @@ lớp công khai Hệ Tệp {
     hàm công khai ghi tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
         văn bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), sai, "ghi tệp");
+        tệp = Bộ Đệm Tệp(đường, "ghi", 4096, "ghi tệp");
+        thử { tệp.ghi(văn bản); } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
+            ném e;
+        };
+        tệp.đóng();
+        trả về 1;
     };
 
     // Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
@@ -100,7 +132,13 @@ lớp công khai Hệ Tệp {
     hàm công khai ghi nối tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
         văn bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), đúng, "ghi nối tệp");
+        tệp = Bộ Đệm Tệp(đường, "nối", 4096, "ghi nối tệp");
+        thử { tệp.ghi(văn bản); } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
+            ném e;
+        };
+        tệp.đóng();
+        trả về 1;
     };
 
     // Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là
@@ -184,6 +222,26 @@ hàm công khai tệp yêu cầu các byte(các byte) {
 hàm công khai đọc tệp(đường dẫn) {
     bộ chuyển tiếp = Hệ Tệp();
     trả về bộ chuyển tiếp.đọc tệp(đường dẫn);
+};
+
+// OS chỉ cung cấp phép thao tác nguyên tử. V++ chịu trách nhiệm quyết định
+// lúc nào được ghi, sao chép, tạo liên kết hoặc công bố một sản phẩm biên dịch.
+hàm công khai đổi tên tệp(nguồn, đích) {
+    kết quả = máy tệp đổi tên(tệp chuẩn hóa đường dẫn(nguồn), tệp chuẩn hóa đường dẫn(đích));
+    nếu (kết quả != 0) { ném "đổi tên tệp: errno=" + máy tệp lỗi(0); };
+    trả về 1;
+};
+
+hàm công khai sao chép tệp(nguồn, đích) {
+    kết quả = máy tệp sao chép(tệp chuẩn hóa đường dẫn(nguồn), tệp chuẩn hóa đường dẫn(đích));
+    nếu (kết quả != 0) { ném "sao chép tệp: errno=" + máy tệp lỗi(0); };
+    trả về 1;
+};
+
+// Returns false if another writer has already published this immutable key.
+// The caller may then reuse the published object after validating it.
+hàm công khai thử liên kết cứng(nguồn, đích) {
+    trả về máy tệp liên kết cứng(tệp chuẩn hóa đường dẫn(nguồn), tệp chuẩn hóa đường dẫn(đích)) == 0;
 };
 
 hàm công khai ghi tệp(đường dẫn, nội dung) {

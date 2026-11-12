@@ -1,0 +1,32 @@
+// Mach-O writer harness: use production modules without the CLI main.
+nhập phân tích từ vựng.*;
+nhập từ tố.*;
+nhập phân tích cú pháp.*;
+nhập chương trình.*;
+nhập sinh mã.*;
+nhập mã máy x86 64.*;
+nhập sinh mã chương trình.*;
+nhập đối tượng.*;
+nhập đối tượng mô đun.*;
+nhập trình liên kết macho.*;
+nhập định dạng elf 64.*;
+nhập định dạng coff 64.*;
+nhập nạp mô đun.*;
+nhập biên dịch mô đun.*;
+nhập bộ nhớ đệm.*;
+nhập assembler.*;
+nhập trình xuất đối tượng.*;
+
+hàm chính() {
+    biến đường vào = đối số lấy(1);
+    biến đường ra = đối số lấy(2);
+    biến kho = byte mới();
+    nếu (kho <= 0) { trả về 2; };
+    nếu (elf bản địa đọc tệp(đường vào, kho) != 0) { trả về 2; };
+    biến trạng thái = ghi macho hợp nhất(kho, đường ra, đường vào);
+    byte hủy(kho);
+    byte hủy(đường vào);
+    byte hủy(đường ra);
+    nếu (trạng thái != 0) { trả về 1; };
+    trả về 0;
+};

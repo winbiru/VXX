@@ -1,0 +1,213 @@
+// Hồi quy bảng phân loại byte của lexer V++, chạy được cả native.
+nhập gói.biên dịch.từ vựng.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.bảng mã.ký tự unicode;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit độ dài đoạn;
+
+hàm xác nhận(điều kiện đúng, thông báo) {
+    nếu (!điều kiện đúng) { ném thông báo; };
+};
+
+hàm kiểm tra ASCII() {
+    toán tử = [33, 37, 38, 42, 43, 45, 47, 60, 61, 62, 94, 124, 126];
+    dấu câu = [40, 41, 44, 58, 59, 91, 93, 123, 125];
+    lặp(i = 0; i < 128; i++) {
+        nếu (i == 34 || i == 39) { bỏ qua; };
+        loại = "";
+        lặp(j = 0; j < độ dài(toán tử); j++) {
+            nếu (i == toán tử[j]) { loại = "toán tử"; };
+        };
+        lặp(j = 0; j < độ dài(dấu câu); j++) {
+            nếu (i == dấu câu[j]) { loại = "dấu câu"; };
+        };
+        c = ký tự unicode(i);
+        t = biên dịch từ tố hóa thô("a" + c + "b");
+        nếu (i == 32 || (i >= 9 && i <= 13)) {
+            xác nhận(độ dài(t) == 2, "khoảng trắng");
+        } hoặc nếu (loại != "") {
+            xác nhận(độ dài(t) == 3, "phân cách");
+            xác nhận(lấy từ điển(t[1], "loại", "") == loại, "loại dấu");
+            xác nhận(lấy từ điển(t[1], "giá trị", "") == c, "giá trị dấu");
+            xác nhận(lấy từ điển(t[1], "vị trí", -1) == 1, "vị trí dấu");
+        } hoặc {
+            xác nhận(độ dài(t) == 1, "byte thường");
+            xác nhận(lấy từ điển(t[0], "giá trị", "") == "a" + c + "b", "giá trị byte thường");
+        };
+    };
+};
+
+hàm kiểm tra loại() {
+    t = biên dịch từ tố hóa thô("= == != <= >= && || ++ -- += -= *= /= %= &= |= ^= << >> <<= >>= : ( ) { } [ ] ; , ~");
+    xác nhận(độ dài(t) == 31, "số toán tử");
+    lặp(i = 0; i < 21; i++) {
+        xác nhận(lấy từ điển(t[i], "loại", "") == "toán tử", "toán tử dài");
+    };
+    lặp(i = 21; i < 30; i++) {
+        xác nhận(lấy từ điển(t[i], "loại", "") == "dấu câu", "dấu câu");
+    };
+    xác nhận(lấy từ điển(t[30], "loại", "") == "toán tử", "toán tử cuối tệp");
+    t = biên dịch từ tố hóa thô(". .1 1. 12 1..2 1à 1e10 \"Việt\" '🌿' hàm");
+    loại = ["số thực", "số thực", "số thực", "số nguyên", "định danh", "định danh", "định danh", "chuỗi", "chuỗi", "từ khóa"];
+    xác nhận(độ dài(t) == độ dài(loại), "số literal");
+    lặp(i = 0; i < độ dài(loại); i++) {
+        xác nhận(lấy từ điển(t[i], "loại", "") == loại[i], "loại literal");
+    };
+};
+
+// Oracle độc lập: chọn toán tử dài nhất từ danh sách chính tả hợp lệ.
+hàm kiểm tra hậu tố toán tử(nguồn, kỳ vọng) {
+    thô = biên dịch từ tố hóa thô(nguồn);
+    gọn = biên dịch từ tố hóa gọn(nguồn)["token"];
+    xác nhận(độ dài(thô) == độ dài(kỳ vọng), "số toán tử: " + nguồn);
+    xác nhận(độ dài(gọn) == độ dài(kỳ vọng), "số token gọn: " + nguồn);
+    đầu = 0;
+    lặp(k = 0; k < độ dài(kỳ vọng); k++) {
+        phép = kỳ vọng[k];
+        cuối = đầu + độ dài(phép);
+        xác nhận(thô[k]["giá trị"] == phép, "giá trị: " + nguồn);
+        xác nhận(thô[k]["loại"] == "toán tử", "loại: " + nguồn);
+        xác nhận(thô[k]["vị trí"] == đầu && thô[k]["kết thúc"] == cuối, "span: " + nguồn);
+        xác nhận(gọn[k][1] == phép && gọn[k][10] == 6, "giá trị gọn: " + nguồn);
+        xác nhận(gọn[k][4] == đầu && gọn[k][5] == cuối, "byte gọn: " + nguồn);
+        xác nhận(gọn[k][7] == đầu && gọn[k][8] == cuối, "ký tự gọn: " + nguồn);
+        xác nhận(gọn[k][11] == biên dịch mã cú pháp từ tố(thô[k]), "ID: " + nguồn);
+        đầu = cuối;
+    };
+};
+
+hàm kiểm tra các hậu tố() {
+    đơn = ["!", "%", "&", "*", "+", "-", "/", "<", "=", ">", "^", "|", "~"];
+    kép = ["!=", "%=", "&=", "*=", "+=", "-=", "/=", "<=", "==", ">=", "^=", "|=", "&&", "++", "--", "<<", ">>", "||"];
+    lặp(i = 0; i < độ dài(đơn); i++) {
+        a = đơn[i];
+        kiểm tra hậu tố toán tử(a, [a]);
+        lặp(j = 0; j < độ dài(đơn); j++) {
+            b = đơn[j];
+            nếu (a == "/" && (b == "/" || b == "*")) { bỏ qua; };
+            nguồn = a + b;
+            khớp = sai;
+            lặp(k = 0; k < độ dài(kép); k++) {
+                nếu (nguồn == kép[k]) { khớp = đúng; };
+            };
+            nếu (khớp) { kiểm tra hậu tố toán tử(nguồn, [nguồn]); }
+            hoặc { kiểm tra hậu tố toán tử(nguồn, [a, b]); };
+        };
+    };
+    kiểm tra hậu tố toán tử("<<=", ["<<="]);
+    kiểm tra hậu tố toán tử(">>=", [">>="]);
+    kiểm tra hậu tố toán tử("~==", ["~", "=="]);
+    kiểm tra hậu tố toán tử("===", ["==", "="]);
+    kiểm tra hậu tố toán tử("<<<", ["<<", "<"]);
+    kiểm tra hậu tố toán tử(">>>=", [">>", ">="]);
+    kiểm tra hậu tố toán tử("++=", ["++", "="]);
+    kiểm tra hậu tố toán tử("&&=", ["&&", "="]);
+    t = biên dịch từ tố hóa gọn("<<=x // >>=\n/* += */~é")["token"];
+    xác nhận(độ dài(t) == 4, "ưu tiên chú thích và định danh");
+    xác nhận(t[0][1] == "<<=" && t[1][1] == "x", "hậu tố trước định danh");
+    xác nhận(t[2][1] == "~" && t[3][1] == "é", "toán tử sau chú thích");
+};
+
+hàm kiểm tra UTF tám() {
+    t = biên dịch từ tố hóa("à🌿<<=b /* Việt\n */ trả về");
+    xác nhận(độ dài(t) == 4, "số token Unicode");
+    xác nhận(lấy từ điển(t[1], "giá trị", "") == "<<=", "dịch trái");
+    xác nhận(lấy từ điển(t[1], "vị trí", -1) == 6, "byte đầu");
+    xác nhận(lấy từ điển(t[1], "kết thúc", -1) == 9, "byte cuối");
+    xác nhận(lấy từ điển(t[1], "vị trí ký tự", -1) == 2, "ký tự đầu");
+    xác nhận(lấy từ điển(t[1], "kết thúc ký tự", -1) == 5, "ký tự cuối");
+    xác nhận(lấy từ điển(t[3], "giá trị", "") == "trả về", "từ khóa ghép");
+    xác nhận(lấy từ điển(t[3], "dòng", -1) == 2, "dòng sau chú thích");
+    xác nhận(lấy từ điển(t[3], "cột", -1) == 5, "cột sau chú thích");
+};
+
+hàm kiểm tra lỗi(nguồn) {
+    lỗi = sai;
+    thử { biên dịch từ tố hóa thô(nguồn); }
+    bắt lỗi(e) { lỗi = đúng; };
+    xác nhận(lỗi, "lexer phải báo lỗi");
+};
+
+hàm kiểm tra con trỏ UTF tám() {
+    t = biên dịch từ tố hóa thô("/*🌿\r\né*/\tα");
+    xác nhận(độ dài(t) == 1, "token sau CRLF");
+    xác nhận(lấy từ điển(t[0], "vị trí", -1) == 13, "byte sau CRLF");
+    xác nhận(lấy từ điển(t[0], "kết thúc", -1) == 15, "byte cuối Alpha");
+    xác nhận(lấy từ điển(t[0], "vị trí ký tự", -1) == 9, "code point sau CRLF");
+    xác nhận(lấy từ điển(t[0], "dòng", -1) == 2, "dòng CRLF");
+    xác nhận(lấy từ điển(t[0], "cột", -1) == 6, "cột byte CRLF");
+    xác nhận(lấy từ điển(t[0], "cột ký tự", -1) == 5, "cột code point CRLF");
+
+    t = biên dịch từ tố hóa thô("\"\\🌿\" x");
+    xác nhận(độ dài(t) == 2, "escape code point");
+    xác nhận(lấy từ điển(t[0], "kết thúc", -1) == 7, "byte cuối chuỗi escape");
+    xác nhận(lấy từ điển(t[0], "kết thúc ký tự", -1) == 4, "code point cuối chuỗi escape");
+    xác nhận(lấy từ điển(t[1], "cột", -1) == 9, "cột byte sau escape");
+    xác nhận(lấy từ điển(t[1], "cột ký tự", -1) == 6, "cột code point sau escape");
+
+    t = biên dịch từ tố hóa thô("\"\\\n\" x");
+    xác nhận(lấy từ điển(t[1], "dòng", -1) == 1, "giữ quy tắc LF được escape");
+    xác nhận(lấy từ điển(t[1], "cột", -1) == 6, "cột sau LF được escape");
+
+    thông báo = "";
+    thử { biên dịch từ tố hóa thô("/* chưa đóng*"); }
+    bắt lỗi(e) { thông báo = e; };
+    xác nhận(thông báo == "biên dịch từ vựng: chú thích khối chưa đóng tại dòng 1, cột 1", "lỗi khối cuối tệp");
+    thông báo = "";
+    thử { biên dịch từ tố hóa thô("\"\n" + chuỗi từ byte máy ảo([255])); }
+    bắt lỗi(e) { thông báo = e; };
+    xác nhận(thông báo == "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ", "ưu tiên UTF-8 lỗi trước lỗi cú pháp");
+};
+
+// Compare the lexer's validity-only fast path with the shared UTF-8 decoder.
+hàm kiểm tra biên UTF tám() {
+    đầu = [128, 191, 192, 193, 194, 195, 223, 224, 225, 236, 237, 238, 239, 240, 241, 243, 244, 245, 255];
+    tiếp = [0, 127, 128, 143, 144, 159, 160, 191, 192, 255];
+    lặp(i = 0; i < độ dài(đầu); i++) {
+        b = đầu[i];
+        lặp(j = 0; j < độ dài(tiếp); j++) {
+            bytes = [b, tiếp[j]];
+            nếu (b >= 224 && b <= 244) { máy ảo thêm cuối danh sách(bytes, 128); };
+            nếu (b >= 240 && b <= 244) { máy ảo thêm cuối danh sách(bytes, 128); };
+            nguồn = chuỗi từ byte máy ảo(bytes);
+            dài = bảng mã unicode tám bit độ dài đoạn(bytes, 0);
+            nếu (dài == độ dài(bytes)) {
+                t = biên dịch từ tố hóa gọn(nguồn)["token"];
+                xác nhận(độ dài(t) == 1, "Unicode scalar hợp lệ");
+                xác nhận(t[0][1] == nguồn && t[0][4] == 0, "nguồn Unicode nguyên vẹn");
+                xác nhận(t[0][5] == dài && t[0][8] == 1, "span scalar");
+            } hoặc { kiểm tra lỗi(nguồn); };
+        };
+    };
+    // Validate all continuation positions, including truncation and bad tails.
+    byte lỗi = [[224, 160], [240, 144, 128], [225, 128, 127],
+                [240, 144, 192, 128], [244, 143, 128, 192]];
+    lặp(i = 0; i < độ dài(byte lỗi); i++) {
+        kiểm tra lỗi(chuỗi từ byte máy ảo(byte lỗi[i]));
+    };
+    t = biên dịch từ tố hóa gọn("aé🌿z+đàβ;")["token"];
+    xác nhận(độ dài(t) == 4, "token hỗn hợp ASCII Unicode");
+    xác nhận(t[0][1] == "aé🌿z" && t[0][5] == 8 && t[0][8] == 4, "span hỗn hợp");
+    xác nhận(t[1][4] == 8 && t[1][7] == 4, "dấu sau hỗn hợp");
+    xác nhận(t[2][4] == 9 && t[2][5] == 15 && t[2][7] == 5 && t[2][8] == 8, "span định danh tiếp theo");
+};
+
+hàm chính() {
+    kiểm tra ASCII();
+    kiểm tra loại();
+    kiểm tra các hậu tố();
+    kiểm tra UTF tám();
+    kiểm tra con trỏ UTF tám();
+    kiểm tra biên UTF tám();
+    kiểm tra lỗi("\"");
+    kiểm tra lỗi("'");
+    kiểm tra lỗi("/*");
+    // Byte ngoài ASCII không thể đứng riêng; kiểm tra cả 128 giá trị.
+    lặp(i = 128; i < 256; i++) {
+        kiểm tra lỗi(chuỗi từ byte máy ảo([i]));
+    };
+    kiểm tra lỗi(chuỗi từ byte máy ảo([192, 128])); // overlong
+    kiểm tra lỗi(chuỗi từ byte máy ảo([237, 160, 128])); // surrogate
+    kiểm tra lỗi(chuỗi từ byte máy ảo([240, 159, 140])); // thiếu byte
+    kiểm tra lỗi(chuỗi từ byte máy ảo([244, 144, 128, 128])); // > U+10FFFF
+    in "LEXER BYTE TABLE OK";
+};

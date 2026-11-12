@@ -1,0 +1,242 @@
+// Self-hosted OS/cache transactions. The host only supplies executable
+// location, target ABI, output capture and the lifetime guard for a child.
+nhập gói.biên dịch.trình điều khiển AOT.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.nhập xuất.tệp.thử khóa tệp;
+nhập gói.nhập xuất.tệp.mở khóa tệp;
+nhập gói.nhập xuất.tệp.ghi nối tệp;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
+nhập gói.văn bản.chuỗi.bắt đầu bằng;
+nhập gói.lõi.toán học.làm tròn xuống;
+
+hàm công khai biên dịch AOT chọn gốc(thư mục chương trình, bắt buộc) {
+    tên = ["VPP_AOT_ROOT", "VPP_HOME"];
+    lặp(i = 0; i < độ dài(tên); i++) {
+        gốc = đọc biến môi trường(tên[i], "");
+        nếu (gốc != "") { trả về đường dẫn tuyệt đối(gốc); };
+    };
+    nếu (thư mục chương trình != "") {
+        dựng = đường dẫn cha(thư mục chương trình);
+        lặp(i = 0; i < 2; i++) {
+            gốc = đường dẫn cha(dựng);
+            nếu (là tệp(đường dẫn nối(gốc, "gói/biên dịch/dòng lệnh máy.vi")) &&
+                là thư mục(đường dẫn nối(gốc, "scripts/quality/native_aot_link"))) { trả về gốc; };
+            dựng = đường dẫn cha(dựng);
+        };
+    };
+    nếu (bắt buộc) { ném "Native AOT: set VPP_HOME to the installed toolchain"; };
+    trả về "";
+};
+
+hàm công khai biên dịch AOT gốc gói(gốc) {
+    nhà = đọc biến môi trường("VPP_HOME", "");
+    nếu (nhà != "") { trả về đường dẫn tuyệt đối(nhà); };
+    trả về gốc;
+};
+
+hàm công khai biên dịch AOT chuẩn hóa yêu cầu(kế hoạch) {
+    nếu (kế hoạch[0] == "message") { trả về kế hoạch; };
+    nguồn = đường dẫn chuẩn(kế hoạch[1]);
+    nếu (kế hoạch[2] != "") {
+        đích = đường dẫn tuyệt đối(kế hoạch[2]);
+        nếu (đường dẫn chuẩn(đích) == nguồn) { ném "Native AOT: output must not overwrite source"; };
+        nếu (đường dẫn tồn tại(đích)) {
+            nếu (đường dẫn cùng tệp(đích, nguồn)) { ném "Native AOT: output must not overwrite source"; };
+        };
+        kế hoạch[2] = đích;
+    };
+    kế hoạch[1] = nguồn;
+    nếu (kế hoạch[5] != "") { kế hoạch[5] = đường dẫn chuẩn(kế hoạch[5]); };
+    trả về kế hoạch;
+};
+
+hàm riêng tư AOT phiên đánh dấu(các pha, pha, trước) {
+    đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+    hồ sơ = đọc biến môi trường("VPP_NATIVE_PROFILE", "") == "1";
+    nếu (!hồ sơ && đường đo == "") { trả về 0; };
+    bây giờ = thời gian đơn điệu mili giây();
+    nếu (hồ sơ) { máy ảo thêm cuối danh sách(các pha, [pha, "" + làm tròn xuống(bây giờ - trước)]); };
+    nếu (đường đo != "") {
+        thử {
+            ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING " + pha + " " +
+                "" + làm tròn xuống(bây giờ - trước) + " ms\n");
+        } bắt lỗi(e) {};
+    };
+    trả về bây giờ;
+};
+
+// Workspace allocation, plan execution and final publication all belong to
+// V++. Profiling records are returned to the host's diagnostic stream.
+hàm công khai biên dịch AOT lắp ráp(asm, đích, gốc, phiên, bộ ba, ffi, thư mục chương trình) {
+    đích = đường dẫn tuyệt đối(đích);
+    tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(đích));
+    thử {
+        trước = thời gian đơn điệu mili giây(); các pha = [];
+        thư viện = biên dịch AOT chọn gốc thư viện(gốc, thư mục chương trình, thư mục hiện tại());
+        dấu = biên dịch AOT chữ ký liên kết(biên dịch AOT đầu vào dấu liên kết(gốc, thư viện));
+        kế hoạch = biên dịch AOT kế hoạch(asm, [gốc, thư viện, tạm, đích, bộ ba, ffi, phiên, dấu]);
+        trước = AOT phiên đánh dấu(các pha, "driver-aot-vpp", trước);
+        lặp(i = 0; i < độ dài(kế hoạch); i++) {
+            bước = kế hoạch[i];
+            nếu (bước[0] == "mark") {
+                trước = AOT phiên đánh dấu(các pha, bước[1], trước);
+            } hoặc {
+                kết quả = biên dịch AOT thực hiện bước(bước);
+                nếu (bước[0] == "run") {
+                    nếu (bước[2] != "") {
+                        trước = AOT phiên đánh dấu(các pha, bước[2], trước);
+                    };
+                };
+                nếu (bước[0] == "object" && kết quả == 2) {
+                    trước = AOT phiên đánh dấu(các pha, "reuse-aot-object", trước);
+                };
+            };
+        };
+        biên dịch AOT dọn thư mục tạm(tạm);
+        trả về các pha;
+    } bắt lỗi(e) {
+        thử { biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+};
+
+hàm riêng tư AOT phiên đường cache(asm, gốc, thư mục chương trình) {
+    hiện tại = thư mục hiện tại();
+    thư viện = biên dịch AOT chọn gốc thư viện(gốc, thư mục chương trình, hiện tại);
+    trường = biên dịch AOT đầu vào cache thực thi(asm, gốc, thư viện, hiện tại, thư mục chương trình);
+    nếu (độ dài(trường) == 0) { trả về ""; };
+    trả về biên dịch AOT đường cache thực thi(trường, hiện tại);
+};
+
+// Optional cache timing for normal runs. Unlike the compiler profiler, this
+// leaves source-index and executable cache behavior enabled.
+hàm riêng tư AOT phiên đo cache(đường đo, pha, trước) {
+    nếu (đường đo == "") { trả về 0; };
+    bây giờ = thời gian đơn điệu mili giây();
+    thử {
+        ghi nối tệp(đường đo, "VPP_AOT_CACHE_TIMING " + pha + " " +
+            "" + làm tròn xuống(bây giờ - trước) + " ms\n");
+    } bắt lỗi(e) {};
+    trả về bây giờ;
+};
+
+hàm công khai biên dịch AOT tìm cache nguồn(nguồn, gói, gốc, thư mục chương trình) {
+    nếu (!biên dịch AOT dùng chỉ mục nguồn()) { trả về ["", ""]; };
+    đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+    trước = 0;
+    nếu (đường đo != "") { trước = thời gian đơn điệu mili giây(); };
+    chỉ mục = AOT phiên đường cache("source-index-v3:" + nguồn + "\n" + gói, gốc, thư mục chương trình);
+    trước = AOT phiên đo cache(đường đo, "source.index.key", trước);
+    nếu (chỉ mục == "") { trả về ["", ""]; };
+    executable = biên dịch AOT đọc cache nguồn(chỉ mục);
+    trước = AOT phiên đo cache(đường đo, "source.index.validate", trước);
+    nếu (executable != "" && biên dịch AOT cache thực thi hợp lệ(executable)) {
+        biên dịch AOT ghi theo dõi cache("FAST-HIT", executable);
+        AOT phiên đo cache(đường đo, "source.index.hit", trước);
+        trả về [chỉ mục, executable];
+    };
+    trả về [chỉ mục, ""];
+};
+
+// Release the build lock before launching user code. Every cache failure
+// falls back to the private executable; no partial artifact is published.
+hàm công khai biên dịch AOT chuẩn bị chạy(asm, gốc, phiên, bộ ba, ffi, thư mục chương trình, chỉ mục, bộ đệm) {
+    tạm = biên dịch AOT tạo thư mục tạm("");
+    khóa = 0;
+    thử {
+        tên = "program";
+        nếu (tên nền tảng() == "windows") { tên = "program.exe"; };
+        executable = đường dẫn nối(tạm, tên); chạy = executable; các pha = [];
+        đường đo = đọc biến môi trường("VPP_AOT_CACHE_TIMING_FILE", "");
+        trước = 0;
+        nếu (đường đo != "") { trước = thời gian đơn điệu mili giây(); };
+        đích = AOT phiên đường cache(asm, gốc, thư mục chương trình);
+        trước = AOT phiên đo cache(đường đo, "executable.key", trước);
+        nếu (đích != "") {
+            khóa = thử khóa tệp(đích + ".lock");
+            nếu (biên dịch AOT cache thực thi hợp lệ(đích)) {
+                biên dịch AOT ghi theo dõi cache("HIT", đích); chạy = đích;
+            } hoặc {
+                các pha = biên dịch AOT lắp ráp(asm, executable, gốc, phiên, bộ ba, ffi, thư mục chương trình);
+                nếu (khóa != 0) {
+                    thử {
+                        nếu (biên dịch AOT công bố cache tự quản(executable, đích) &&
+                            biên dịch AOT cache thực thi hợp lệ(đích)) { chạy = đích; };
+                    } bắt lỗi(lỗi cache) {};
+                };
+                biên dịch AOT ghi theo dõi cache("MISS", đích);
+            };
+            mở khóa tệp(khóa); khóa = 0;
+        } hoặc {
+            các pha = biên dịch AOT lắp ráp(asm, executable, gốc, phiên, bộ ba, ffi, thư mục chương trình);
+        };
+        trước = AOT phiên đo cache(đường đo, "executable.prepare", trước);
+        nếu (chỉ mục != "" && chạy != executable) {
+            thử {
+                khóa = thử khóa tệp(chỉ mục + ".lock");
+                nếu (khóa != 0 && biên dịch AOT cache thực thi hợp lệ(chạy)) {
+                    biên dịch AOT công bố cache nguồn tự quản(chỉ mục, chạy, bộ đệm);
+                };
+            } bắt lỗi(lỗi cache) {};
+            mở khóa tệp(khóa); khóa = 0;
+        };
+        AOT phiên đo cache(đường đo, "source.index.publish", trước);
+        trả về [chạy, tạm, các pha];
+    } bắt lỗi(e) {
+        mở khóa tệp(khóa);
+        thử { biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+};
+
+// Batch path/environment policy is V++; the host captures output and times.
+hàm công khai biên dịch AOT chuẩn bị batch(đối số) {
+    i = 0;
+    nếu (độ dài(đối số) > 0) {
+        nếu (đối số[0] == "--compiler=vpp") { i = 1; }
+        hoặc nếu (bắt đầu bằng(đối số[0], "--compiler=")) {
+            ném "Native AOT: batch supports only --compiler=vpp";
+        };
+    };
+    nếu (độ dài(đối số) < i + 2) { ném "Native AOT: batch requires output directory and sources"; };
+    nếu (bắt đầu bằng(đối số[i], "--")) {
+        ném "Native AOT: unknown batch option before output directory";
+    };
+    thư mục = đường dẫn tuyệt đối(đối số[i]);
+    biên dịch AOT chuẩn bị thư mục batch(thư mục);
+    nguồn = [];
+    lặp(j = i + 1; j < độ dài(đối số); j++) {
+        đường = đường dẫn chuẩn(đối số[j]); cha = đường dẫn cha(đường);
+        tên = đường dẫn thân(đường);
+        máy ảo thêm cuối danh sách(nguồn, [đường, cha, tên,
+            đường dẫn nối(cha, "expected/" + tên + ".expected")]);
+    };
+    bộ đệm = rỗng;
+    nếu (đọc biến môi trường("VPP_NATIVE_NO_CACHE", "") != "1") {
+        bộ đệm = {"thân": {}, "byte": 0, "trúng": 0, "trượt": 0};
+    };
+    trả về [thư mục hiện tại(), thư mục,
+        đọc biến môi trường("VPP_NATIVE_GOLDEN_FAIL_FAST", "") == "1", bộ đệm, nguồn];
+};
+
+hàm công khai biên dịch AOT đổi thư mục(đường) {
+    trả về đặt thư mục hiện tại(đường);
+};
+
+hàm công khai biên dịch AOT chuẩn bị nhúng(gốc nhập, thư mục chương trình) {
+    nếu (gốc nhập == "") { gốc nhập = "."; };
+    thư mục = đường dẫn tuyệt đối(gốc nhập);
+    nếu (!là thư mục(thư mục)) { ném "Native AOT: embedded base is not a directory: " + thư mục; };
+    compiler = đọc biến môi trường("VPP_NATIVE_COMPILER", "");
+    nếu (compiler != "") {
+        compiler = đường dẫn tuyệt đối(compiler);
+    } hoặc {
+        tên = "vpp-native";
+        nếu (tên nền tảng() == "windows") { tên = "vpp-native.exe"; };
+        compiler = đường dẫn nối(biên dịch AOT chọn gốc(thư mục chương trình, đúng), "bin/" + tên);
+    };
+    nếu (!là tệp(compiler)) { ném "Native AOT: missing native V++ compiler: " + compiler; };
+    trả về [thư mục, compiler];
+};

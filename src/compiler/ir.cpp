@@ -70,7 +70,9 @@ bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexce
             return expressionCount != 1 || statement.children.empty();
 
         case AstStatementKind::Loop:
-            return expressionCount != 3 || statement.children.empty();
+            return expressionCount != (statement.loopForm ==
+                vietvm::frontend::AstLoopForm::WhileBlock ? 1u : 3u) ||
+                statement.children.empty();
 
         case AstStatementKind::Switch: {
             if (statement.switchForm != vietvm::frontend::AstSwitchForm::Structured ||

@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     // Chuỗi UTF-8 phải tính/reverse theo code point, không theo byte.

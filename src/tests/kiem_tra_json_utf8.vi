@@ -1,0 +1,35 @@
+// Kiểm tra JSON từ chối UTF-8 sai chuẩn, ký tự điều khiển và giữ Unicode hợp lệ.
+nhập gói.dữ liệu.json.json.*;
+
+hàm chính() {
+    mẫu sai = [
+        [128],                     // Byte tiếp diễn đứng một mình.
+        [255],                     // Byte đầu ngoài UTF-8.
+        [192, 175],                // Mã hóa quá dài (overlong).
+        [226, 130],                // Chuỗi ba byte bị cắt.
+        [237, 160, 128],           // Surrogate U+D800.
+        [244, 144, 128, 128],      // Vượt U+10FFFF.
+        [226, 40, 161],            // Byte tiếp diễn sai.
+        [240, 159, 154],           // Emoji bị cắt.
+        [65, 128, 66],             // Byte không hợp lệ giữa chuỗi.
+        [0]                        // UTF-8 hợp lệ, nhưng JSON cấm ký tự NUL chưa thoát.
+    ];
+    số bị từ chối = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(mẫu sai); i++) {
+        dữ liệu = chuỗi từ byte máy ảo([34]) + chuỗi từ byte máy ảo(mẫu sai[i]) + chuỗi từ byte máy ảo([34]);
+        thử {
+            json phân tích(dữ liệu);
+        } bắt lỗi(lỗi) {
+            số bị từ chối += 1;
+        };
+    };
+    in số bị từ chối == máy ảo lấy độ dài(mẫu sai);
+
+    in json phân tích("\"Tiếng Việt 🚀\"") == "Tiếng Việt 🚀";
+    in json phân tích("{\"lồng\":[{\"emoji\":\"🚀\"}, [1,2,3]]}")["lồng"][0]["emoji"] == "🚀";
+    in json phân tích("\"\\uD83D\\uDE80\"") == "🚀";
+
+    dài = "";
+    lặp(i = 0; i < 200; i++) { dài += "á"; };
+    in json phân tích("\"" + dài + "\"") == dài;
+};

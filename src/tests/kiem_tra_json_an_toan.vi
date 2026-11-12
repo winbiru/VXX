@@ -1,6 +1,6 @@
-nhập gói/dữ liệu/json/chính;
-nhập gói/mạng/rest;
-nhập gói/nhập xuất/tệp;
+nhập gói.dữ liệu.json.chính.*;
+nhập gói.mạng.http.dịch vụ tài nguyên.*;
+nhập gói.nhập xuất.tệp.*;
 
 hàm chính() {
     in json chuỗi("xin");
@@ -9,6 +9,20 @@ hàm chính() {
     ghi tệp(".tmp_json_escape.txt", "dòng \"một\" \\ đường\ndòng hai");
     in json thoát(đọc tệp(".tmp_json_escape.txt"));
     in json thoát("a\0b");
+
+    // Đường nhanh giữ nguyên Unicode; đường escape ghép lại theo đoạn byte,
+    // không được cắt giữa một ký tự UTF-8 nhiều byte.
+    in json thoát("Việt 🚀𠮷") == "Việt 🚀𠮷";
+    in json thoát("á\"🚀\\𠮷\nβ") == "á\\\"🚀\\\\𠮷\\nβ";
+    in json phân tích(json chuỗi("đầu\"中\\cuối")) == "đầu\"中\\cuối";
+    in json thoát(chuỗi từ byte máy ảo([1, 7, 15, 16, 31])) ==
+        "\\u0001\\u0007\\u000f\\u0010\\u001f";
+    in json thoát(chuỗi từ byte máy ảo([8, 9, 10, 12, 13])) == "\\b\\t\\n\\f\\r";
+    lỗi utf8 = sai;
+    thử {
+        json thoát(chuỗi từ byte máy ảo([195, 169, 169]));
+    } bắt lỗi (lỗi) { lỗi utf8 = đúng; };
+    in lỗi utf8;
 
     dataJson = json đối tượng một chuỗi("id", "req-1");
     in dịch vụ tài nguyên json thành công an toàn("hoàn tất", dataJson);

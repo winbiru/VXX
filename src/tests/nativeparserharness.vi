@@ -19,15 +19,15 @@ hàm test_int_buffer() {
     nếu (byte hủy(b) != 0) { trả về 25; };
     nếu (byte đẩy số nguyên ba mươi hai bit(b, 1) != -1) { trả về 26; };
     biến full = "x";
-    lặp (i = 0; i < 20; i++) {
+    lặp (i = 0; i < 21; i++) {
         nếu (byte nối(full, full) != 0) { trả về 27; };
     };
-    nếu (byte dài(full) != 1048576) { trả về 28; };
+    nếu (byte dài(full) != 2097152) { trả về 28; };
     nếu (byte đẩy số nguyên ba mươi hai bit(full, 9) != -1) { trả về 29; };
-    nếu (byte ghi số nguyên ba mươi hai bit(full, 1048573, 9) != -1) { trả về 29; };
-    nếu (byte ghi số nguyên ba mươi hai bit(full, 1048572, -1) != 0) { trả về 29; };
-    nếu (byte đọc số nguyên ba mươi hai bit(full, 1048572) != -1) { trả về 29; };
-    nếu (byte dài(full) != 1048576) { trả về 29; };
+    nếu (byte ghi số nguyên ba mươi hai bit(full, 2097149, 9) != -1) { trả về 29; };
+    nếu (byte ghi số nguyên ba mươi hai bit(full, 2097148, -1) != 0) { trả về 29; };
+    nếu (byte đọc số nguyên ba mươi hai bit(full, 2097148) != -1) { trả về 29; };
+    nếu (byte dài(full) != 2097152) { trả về 29; };
     nếu (byte hủy(full) != 0) { trả về 29; };
     trả về 0;
 };

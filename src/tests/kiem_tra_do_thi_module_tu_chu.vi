@@ -1,11 +1,13 @@
 // Mọi phép dựng graph dưới đây đều dùng parser + DFS thuần V++.
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.đồ thị mô đun.*;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm chính() {
     nguồn = {
-        "app/main": "nhập ../lib/util như công_cụ; nhập ../lib/feature; " +
-                    "nhập ../lib/util; hàm chính() { in 1; };",
+        "app/main": "nhập ..lib.util.* như công_cụ; nhập ..lib.feature.*; " +
+                    "nhập ..lib.util.*; hàm chính() { in 1; };",
         "lib/util": "nhập common; hàm tiện() { trả về 1; };",
         "lib/feature": "công khai nhập common như chung; hàm f() {};",
         "lib/common": "hàm cơ_sở() { trả về 2; };"
@@ -36,7 +38,7 @@ hàm chính() {
     lỗi = sai;
     thử {
         biên dịch dựng đồ thị nguồn thuần("app/main", {
-            "app/main": "nhập ../lib/a;",
+            "app/main": "nhập ..lib.a.*;",
             "lib/a": "nhập b;", "lib/b": "nhập a;"
         });
     } bắt lỗi(e) {
@@ -64,7 +66,7 @@ hàm chính() {
     in lỗi;
     lỗi = sai;
     thử {
-        biên dịch dựng đồ thị nguồn thuần("a/main", {"a/main": "nhập ../../ngoài;"});
+        biên dịch dựng đồ thị nguồn thuần("a/main", {"a/main": "nhập .....ngoài.*;"});
     } bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "thoát khỏi gốc"); };
     in lỗi;
 
@@ -72,16 +74,16 @@ hàm chính() {
     in biên dịch đồ thị chuẩn đường("a/./b/../c") == "a/c";
     in biên dịch đồ thị đích nhập("app/main", "../lib/common") == "lib/common";
     cây = biên dịch phân tích chương trình thuần(
-        "công khai nhập lib/util như công_cụ; nhập lib/feature;");
+        "công khai nhập lib.util.* như công_cụ; nhập lib.feature.*;");
     in cây["câu lệnh"][0]["tái xuất"] == đúng;
     in cây["câu lệnh"][0]["bí danh"] == "công_cụ";
     in cây["câu lệnh"][1]["tái xuất"] == sai;
     lỗi = sai;
-    thử { biên dịch phân tích chương trình thuần("nhập lib/util như;"); }
+    thử { biên dịch phân tích chương trình thuần("nhập lib.util.* như;"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch phân tích chương trình thuần("nhập lib/util.vi;"); }
+    thử { biên dịch phân tích chương trình thuần("nhập lib.util.vi;"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
 };

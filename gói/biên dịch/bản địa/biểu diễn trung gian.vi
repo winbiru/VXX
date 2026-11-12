@@ -64,6 +64,10 @@ hàm biểu diễn trung gian run(biểu diễn trung gian) {
                             nếu (đỉnh < 1) { thoát; };
                             biến một ngôi giá trị đang xét = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
                             byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, 0 - một ngôi giá trị đang xét);
+                        } hoặc nếu (mã phép toán == 35) {
+                            nếu (đỉnh < 1 || đối số != 0) { thoát; };
+                            biến giá trị bit = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
+                            byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, ~giá trị bit);
                         } hoặc nếu (mã phép toán == 25) {
                             nếu (đỉnh < 1) { thoát; };
                             biến luận lý toán hạng = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
@@ -71,7 +75,17 @@ hàm biểu diễn trung gian run(biểu diễn trung gian) {
                             nếu (luận lý toán hạng == 0) { đã chuẩn hóa = 1; };
                             byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, đã chuẩn hóa);
                         } hoặc {
-                            nếu (mã phép toán == 9) {
+                            nếu (mã phép toán == 28) {
+                                nếu (đỉnh < 1) { thoát; };
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                nếu (byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4) == 0) { pc = đối số - 8; }
+                                hoặc { đỉnh = đỉnh - 1; };
+                            } hoặc nếu (mã phép toán == 29) {
+                                nếu (đỉnh < 1) { thoát; };
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                nếu (byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4) != 0) { pc = đối số - 8; }
+                                hoặc { đỉnh = đỉnh - 1; };
+                            } hoặc nếu (mã phép toán == 9) {
                                 nếu (đỉnh < 1) { thoát; };
                                 nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
                                 đỉnh = đỉnh - 1;
@@ -89,6 +103,11 @@ hàm biểu diễn trung gian run(biểu diễn trung gian) {
                                 nếu (mã phép toán == 5) { giá trị đang xét = a - b; }
                                 hoặc {
                                     nếu (mã phép toán == 6) { giá trị đang xét = a * b; }
+                                    hoặc nếu (mã phép toán == 30) { giá trị đang xét = a & b; }
+                                    hoặc nếu (mã phép toán == 31) { giá trị đang xét = a | b; }
+                                    hoặc nếu (mã phép toán == 32) { giá trị đang xét = a ^ b; }
+                                    hoặc nếu (mã phép toán == 33) { giá trị đang xét = a << b; }
+                                    hoặc nếu (mã phép toán == 34) { giá trị đang xét = a >> b; }
                                     hoặc nếu (mã phép toán == 26) {
                                         nếu (b == 0) { thoát; };
                                         giá trị đang xét = máy chia số nguyên ba mươi hai bit(a, b);

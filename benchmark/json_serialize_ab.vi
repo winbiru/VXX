@@ -1,0 +1,77 @@
+// Benchmark JSON parser/serializer AOT, excludes input construction and startup.
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.dữ liệu.json.json.*;
+
+hàm thực hiện(tên, nguồn, dữ liệu) {
+    nếu (tên == "parse_nested") {
+        đọc = json phân tích(nguồn);
+        trả về máy ảo lấy độ dài(lấy từ điển(đọc, "rows", []));
+    };
+    nếu (tên == "parse_long" || tên == "parse_very_long" || tên == "parse_huge") {
+        trả về máy ảo lấy độ dài(json phân tích(nguồn));
+    };
+    nếu (tên == "serialize_nested" || tên == "serialize_long" || tên == "serialize_very_long" || tên == "serialize_huge") {
+        trả về độ dài(json tạo(dữ liệu));
+    };
+    ném "unknown JSON benchmark";
+};
+
+hàm chính() {
+    tên = đọc biến môi trường("BENCH_CASE", "serialize_nested");
+    n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "16"));
+    nếu (n < 1 || n > 100000) { ném "invalid iterations"; };
+    nguồn = "";
+    nếu (tên == "serialize_long" || tên == "serialize_very_long" || tên == "serialize_huge" ||
+        tên == "parse_long" || tên == "parse_very_long" || tên == "parse_huge") {
+        số phần tử = 384;
+        nếu (tên == "serialize_very_long" || tên == "parse_very_long") { số phần tử = 4096; };
+        nếu (tên == "serialize_huge" || tên == "parse_huge") { số phần tử = 16384; };
+        số phần tử = thành số nguyên(đọc biến môi trường("BENCH_ARRAY_SIZE", thành chuỗi(số phần tử)));
+        nếu (số phần tử < 1 || số phần tử > 65536) { ném "invalid array size"; };
+        nguồn = "[";
+        lặp(i = 0; i < số phần tử; i++) {
+            nếu (i > 0) { nguồn += ","; };
+            nguồn += thành chuỗi(i);
+        };
+        nguồn += "]";
+    } hoặc {
+        nguồn = "{\"rows\":[";
+        lặp(i = 0; i < 64; i++) {
+            nếu (i > 0) { nguồn += ","; };
+            nguồn += "{\"t\":\"Tiếng Việt 🌿𠮷\",\"i\":" + thành chuỗi(i) + ",\"a\":[1,2,3,4,5,6]}";
+        };
+        nguồn += "],\"meta\":{\"info\":\"utf8\",\"note\":\"ok\"}}";
+    };
+    dữ liệu = json phân tích(nguồn);
+    // Full-content preflight: equal lengths alone cannot detect wrong JSON.
+    // Array inputs are canonical; nested objects must round-trip canonically.
+    nếu (tên == "serialize_long" || tên == "serialize_very_long" || tên == "serialize_huge" ||
+        tên == "parse_long" || tên == "parse_very_long" || tên == "parse_huge") {
+        nếu (json tạo(dữ liệu) != nguồn) { ném "serialized JSON content mismatch"; };
+        lặp(i = 0; i < máy ảo lấy độ dài(dữ liệu); i++) {
+            nếu (dữ liệu[i] != i) { ném "parsed JSON numeric content mismatch"; };
+        };
+    } hoặc {
+        chuẩn = json tạo(dữ liệu);
+        nếu (json tạo(json phân tích(chuẩn)) != chuẩn) { ném "JSON canonical roundtrip mismatch"; };
+    };
+    dự kiến = thực hiện(tên, nguồn, dữ liệu);
+    // Verify stable output and prevent benchmark from measuring only construction.
+    checksum = 0;
+    lặp(i = 0; i < 2; i++) {
+        kiểm = 0;
+        lặp(j = 0; j < n; j++) { kiểm += thực hiện(tên, nguồn, dữ liệu); };
+        nếu (kiểm != dự kiến * n) { ném "warmup checksum mismatch"; };
+    };
+    bắt đầu = thời gian đơn điệu mili giây();
+    lặp(i = 0; i < n; i++) { checksum += thực hiện(tên, nguồn, dữ liệu); };
+    thời gian = thời gian đơn điệu mili giây() - bắt đầu;
+    nếu (checksum != dự kiến * n || thời gian <= 0) { ném "benchmark checksum mismatch"; };
+    in thời gian;
+    in checksum;
+    in dự kiến;
+};

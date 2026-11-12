@@ -2,11 +2,14 @@
 // Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
 // File I/O vẫn là VM primitive; toàn bộ parsing và chuyển kiểu nằm ở V++.
 
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/văn bản/chuỗi;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tồn tại;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
 
 hàm riêng tư cấu hình là khoảng trắng(c) {
     trả về c == " " || c == "\t" || c == "\r" || c == "\n";
@@ -16,7 +19,7 @@ hàm riêng tư cấu hình cắt khoảng trắng(s) {
     đầu = 0;
     cuối = máy ảo lấy độ dài(s);
     đang cắt = đúng;
-    lặp(i = 0; i < cuối && đang cắt; i++) {
+    khi (đầu < cuối && đang cắt) {
         nếu (cấu hình là khoảng trắng(s[đầu])) {
             đầu = đầu + 1;
             nếu (đầu == cuối) { đang cắt = sai; };
@@ -25,7 +28,7 @@ hàm riêng tư cấu hình cắt khoảng trắng(s) {
         };
     };
     đang cắt = đúng;
-    lặp(i = 0; i < cuối - đầu && đang cắt; i++) {
+    khi (cuối > đầu && đang cắt) {
         nếu (cấu hình là khoảng trắng(s[cuối - 1])) {
             cuối = cuối - 1;
         } hoặc {
@@ -76,7 +79,7 @@ hàm riêng tư cấu hình là số nguyên(s) {
     nếu (s[0] == "+" || s[0] == "-") { i = 1; };
     nếu (i >= n) { trả về sai; };
     hợp lệ = đúng;
-    lặp(vòng = 0; i < n && hợp lệ; vòng++) {
+    khi (i < n && hợp lệ) {
         nếu (!cấu hình là chữ số(s[i])) {
             hợp lệ = sai;
         };
@@ -100,7 +103,7 @@ hàm riêng tư cấu hình là số thực(s) {
     chữ số sau mũ = đúng;
     hợp lệ = đúng;
 
-    lặp(vòng = 0; i < n && hợp lệ; vòng++) {
+    khi (i < n && hợp lệ) {
         c = s[i];
         nếu (cấu hình là chữ số(c)) {
             có chữ số = đúng;

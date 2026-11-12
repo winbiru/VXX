@@ -1,0 +1,31 @@
+// Numeric-only resolver parity, entirely inside the standalone V++ VM.
+hàm yêu cầu phân giải(điều kiện) {
+    nếu (!điều kiện) { ném "V++ VM numeric resolver regression"; };
+};
+hàm chính() {
+    lặp(i = 0; i < 40; i++) {
+        v4 = máy bộ phân giải mở("127.0.0.1", "443", 0);
+        yêu cầu phân giải(v4 >= 1342177281);
+        yêu cầu phân giải(máy bộ phân giải tiếp(v4) == "127.0.0.1");
+        yêu cầu phân giải(máy bộ phân giải tiếp(v4) == rỗng);
+        yêu cầu phân giải(máy bộ phân giải đóng(v4) == 1);
+        v6 = máy bộ phân giải mở("2001:db8::1", "53", 1);
+        yêu cầu phân giải(v6 > v4);
+        yêu cầu phân giải(máy bộ phân giải tiếp(v6) == "2001:db8::1");
+        yêu cầu phân giải(máy bộ phân giải tiếp(v6) == rỗng);
+        yêu cầu phân giải(máy bộ phân giải đóng(v6) == 1);
+    };
+    đầy đủ = máy bộ phân giải mở("1:2:3:4:5:6:7:8", "", 0);
+    yêu cầu phân giải(máy bộ phân giải tiếp(đầy đủ) == "1:2:3:4:5:6:7:8");
+    yêu cầu phân giải(máy bộ phân giải đóng(đầy đủ) == 1);
+    lặp(j = 0; j < 4; j++) {
+        text = "::";
+        nếu (j == 1) { text = "::1"; };
+        nếu (j == 2) { text = "1::"; };
+        nếu (j == 3) { text = "1:2:3:4:5:6:7::"; };
+        entry = máy bộ phân giải mở(text, "", 0);
+        yêu cầu phân giải(máy bộ phân giải tiếp(entry) == text);
+        yêu cầu phân giải(máy bộ phân giải đóng(entry) == 1);
+    };
+    in "VM ASM RESOLVER OK";
+};

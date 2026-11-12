@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     // Use the configured loopback address. 127.0.0.2 may time out on macOS

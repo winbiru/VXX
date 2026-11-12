@@ -579,6 +579,35 @@ void testContextualKeywordInOrdinaryCall() {
     }
 }
 
+void testDirectLambdaReturnAndUnicodeLiteralIndex() {
+    using namespace vietvm::compiler;
+
+    CompilationContext context;
+    try {
+        const auto artifacts = compilePipeline(context,
+            "hàm tạo(n) { trả về hàm(bước = 1) { n += bước; trả về n; }; };\n"
+            "hàm chính() { in \"Tiếng Việt\"[1]; f = tạo(40); in f(); };\n",
+            keywordMap, false);
+        expect(artifacts.unsupportedDirectIrRegions == 0 &&
+                   analyzeDirectIrSupport(artifacts.ir).supported,
+               "lambda được trả về và chỉ số chuỗi UTF-8 hỗ trợ direct IR");
+
+        bool foundClosure = false;
+        bool foundStringIndex = false;
+        for (const auto &[id, instructions] : context.functionBytecode) {
+            (void)id;
+            for (const auto &instruction : instructions) {
+                foundClosure |= instruction.op == OP_TAO_DONG_BAO;
+                foundStringIndex |= instruction.op == OP_DOC_CHI_SO;
+            }
+        }
+        expect(foundClosure && foundStringIndex,
+               "direct codegen phát bytecode closure và Unicode index");
+    } catch (const std::exception &error) {
+        expect(false, std::string("direct IR lambda/index thất bại: ") + error.what());
+    }
+}
+
 void testPrimitivePipeline() {
     using namespace vietvm::compiler;
     using namespace vietvm::bytecode;
@@ -684,6 +713,7 @@ int main() {
     testBytecodeVerifierRejectsMalformedMetadata();
     testForeignFfiPipeline();
     testContextualKeywordInOrdinaryCall();
+    testDirectLambdaReturnAndUnicodeLiteralIndex();
     testPrimitivePipeline();
 
     if (failures != 0) {

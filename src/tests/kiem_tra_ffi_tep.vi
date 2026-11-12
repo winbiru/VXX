@@ -28,6 +28,25 @@ hàm chính() {
         bytes_unicode[1] == 10 && bytes_unicode[2] == 127 && bytes_unicode[3] == 255;
     in xóa đường dẫn(đường_unicode) == 1;
 
+    // Text writes cross raw byte boundaries, including inside UTF-8, and
+    // preserve pending bytes when callers mix the text and binary APIs.
+    đệm = Bộ Đệm Tệp(đường, "ghi", 7);
+    đệm.ghi các byte([65, 0]);
+    văn bản đệm = "🌿cà phê" + chuỗi từ byte máy ảo([0, 255]);
+    đệm.ghi(văn bản đệm);
+    đệm.ghi các byte([66]);
+    đệm.ghi("");
+    kỳ vọng đệm = "A" + chuỗi từ byte máy ảo([0]) + văn bản đệm + "B";
+    in đệm.vị trí() == độ dài(chuỗi thành byte máy ảo(kỳ vọng đệm));
+    đệm.đóng();
+    in đọc tệp(đường) == kỳ vọng đệm;
+    văn bản lớn = "🌿cà";
+    lặp(i = 0; i < 11; i++) { văn bản lớn += văn bản lớn; };
+    ghi tệp(đường, văn bản lớn);
+    ghi nối tệp(đường, văn bản đệm);
+    in đọc tệp(đường) == văn bản lớn + văn bản đệm;
+    xóa đường dẫn(đường);
+
     thử { đọc tệp(".tmp_ffi_file_does_not_exist"); }
     bắt lỗi(e) { in "chặn tệp thiếu"; };
     thử { ghi tệp(".tmp_ffi_file_bad" + chuỗi từ byte máy ảo([0]), "X"); }

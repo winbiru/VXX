@@ -1,6 +1,6 @@
 // Kiểm tra package mạng thống nhất: HTTP helpers, JSON, REST và helper request.
 nhập mạng;
-nhập gói/mạng/kiểm thử/giao diện lập trình;
+nhập gói.mạng.kiểm thử.giao diện lập trình.*;
 
 hàm chính() {
     in nối đường dẫn địa chỉ tài nguyên("https://example.test", "/health");

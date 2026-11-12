@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính( {
     nếu (

@@ -1,0 +1,83 @@
+hàm còn lượt(hộp) {
+    hộp[0] = hộp[0] + 1;
+    trả về hộp[0] <= 3;
+};
+
+hàm tìm() {
+    biến i = 0;
+    khi (i < 10) {
+        i++;
+        nếu (i == 3) { trả về i; };
+    };
+    trả về -1;
+};
+
+hàm chính() {
+    biến i = 0;
+    khi (i < 3) { in i; i++; }
+    in "sau:" + i;
+
+    khi (sai) { ném "thân vòng khi không được chạy"; };
+    khi (0) { ném "điều kiện số không phải sai"; };
+
+    biến tổng = 0;
+    i = 0;
+    khi (i < 10 && tổng < 100) {
+        i++;
+        nếu (i % 2 == 0) { bỏ qua; };
+        nếu (i == 7) { thoát; };
+        tổng += i;
+    };
+    in "tổng:" + tổng + ":" + i;
+
+    biến số = 0;
+    lặp (a = 0; a < 2; a++) {
+        biến b = 0;
+        khi (b < 4) {
+            b++;
+            nếu (b == 1) { bỏ qua; };
+            nếu (b == 4) { thoát; };
+            khi (đúng) { số++; thoát; };
+        };
+    };
+    in "lồng:" + số;
+
+    i = 0;
+    khi (i < 3) {
+        i++;
+        chọn (i) {
+            ca 1: { thoát; }
+            mặc định: { tổng++; }
+        };
+    };
+    in "chọn:" + tổng;
+
+    i = 0;
+    khi (đúng) {
+        thử {
+            i++;
+            nếu (i < 3) { bỏ qua; };
+            thoát;
+        } bắt lỗi (e) { ném "không được bắt"; };
+    };
+    in "thử:" + i;
+
+    biến hộp = [0];
+    khi (còn lượt(hộp)) {};
+    in "điều kiện:" + hộp[0];
+    in "trả về:" + tìm();
+
+    biến còn = 2;
+    khi (còn) { còn--; };
+    in "số:" + còn;
+
+    // Cùng mẫu điều khiển với parser regex: lặp khi cờ đúng,
+    // đánh giá lại cờ sau mỗi lượt và dừng khi nó chuyển sang sai.
+    biến tiếp = đúng;
+    biến số lượt = 0;
+    khi (tiếp) {
+        số lượt++;
+        nếu (số lượt == 3) { tiếp = sai; };
+    };
+    in "cờ:" + số lượt;
+};

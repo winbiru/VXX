@@ -1,21 +1,34 @@
 // Nạp nguồn và dựng đồ thị import tại tầng V++. CLI chỉ cung cấp đường
 // tuyệt đối của entrypoint và thư mục cài đặt; không phân tích nguồn đích.
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/hệ thống/nền tảng;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.liên kết.biên dịch liên kết đồ thị thuần;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị chuẩn đường;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị quét nhập;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị chu trình;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tên;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.là tệp;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.biên dịch.đo hiệu năng.*;
 
 // Các phép biến đổi không lưu trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch nguồn chuẩn đường(đường) {
-    văn bản = "";
-    lặp(i = 0; i < máy ảo lấy độ dài(đường); i++) {
-        c = đường[i];
-        nếu (c == "\\" && tên nền tảng() == "windows") { c = "/"; };
-        văn bản += c;
+    đường windows = tên nền tảng() == "windows";
+    nếu (máy ảo lấy độ dài(đường) > 1) {
+        nếu (đường[1] == ":" || (đường[0] == "\\" && đường[1] == "\\")) {
+            đường windows = đúng;
+        };
+    };
+    // Giữ nguyên chuỗi POSIX: ghép từng ký tự trên mọi đường dẫn import
+    // tạo nhiều bản sao không cần thiết khi dựng đồ thị nguồn lớn.
+    văn bản = đường;
+    nếu (đường windows) {
+        văn bản = máy ảo thay chuỗi chính xác(đường, "\\", "/");
     };
     gốc dữ liệu = "";
     bắt đầu = 0;
@@ -34,8 +47,13 @@ hàm công khai biên dịch nguồn chuẩn đường(đường) {
         gốc dữ liệu = văn bản[0] + ":/";
         bắt đầu = 3;
     };
-    đuôi = "";
-    lặp(i = bắt đầu; i < máy ảo lấy độ dài(văn bản); i++) { đuôi += văn bản[i]; };
+    // Joining a root with "/import.vi" produces C://import.vi (or ///...).
+    // Consume redundant root separators before the relative graph parser.
+    khi (bắt đầu < máy ảo lấy độ dài(văn bản)) {
+        nếu (văn bản[bắt đầu] != "/") { thoát; };
+        bắt đầu += 1;
+    };
+    đuôi = máy ảo cắt chuỗi(văn bản, bắt đầu, máy ảo lấy độ dài(văn bản) - bắt đầu);
     nếu (đuôi == "") { trả về gốc dữ liệu; };
     trả về gốc dữ liệu + biên dịch đồ thị chuẩn đường(đuôi);
 };
@@ -60,33 +78,48 @@ hàm riêng tư biên dịch nguồn tên gói(đích) {
     trả về lấy từ điển(bí danh, đích, đích);
 };
 
-hàm riêng tư biên dịch nguồn tìm gói(gốc, đích) {
+hàm riêng tư biên dịch nguồn ghi đường vắng(tệp, bộ đệm) {
+    nếu (bộ đệm != rỗng) {
+        máy ảo thêm cuối danh sách(bộ đệm["đường nhập vắng"], tệp);
+    };
+};
+
+hàm riêng tư biên dịch nguồn tìm gói(gốc, đích, bộ đệm = rỗng) {
     tên = biên dịch nguồn tên gói(đích);
     nền = gốc + "/gói/" + tên;
     // Package chính.vi được ưu tiên trước module cùng tên, như Stage 0.
     tệp = biên dịch nguồn chuẩn đường(nền + "/chính.vi");
     nếu (là tệp(tệp)) { trả về tệp; };
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
     tệp = biên dịch nguồn chuẩn đường(nền + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
-    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên + ".vi");
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+    // Stage 0 maps bare `nhập tùy chọn` to the persistent preferences API.
+    // The optional-value helpers are still reachable explicitly as
+    // `gói.lõi.tùy chọn`; preserve that distinction in the self-host compiler.
+    tên lõi = tên;
+    nếu (tên == "tùy chọn") { tên lõi = "tùy chọn bền vững"; };
+    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên lõi + ".vi");
     nếu (là tệp(tệp)) { trả về tệp; };
+    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
     trả về "";
 };
 
-hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện) {
+hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện, bộ đệm = rỗng) {
     // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
     // khi áp dụng bí danh và gói của toolchain.
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
+    khi (đúng) {
         tệp = biên dịch nguồn chuẩn đường(thư mục + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
+        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
         thư mục = cha;
     };
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
-        tệp = biên dịch nguồn tìm gói(thư mục, đích);
+    khi (đúng) {
+        tệp = biên dịch nguồn tìm gói(thư mục, đích, bộ đệm);
         nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
@@ -95,7 +128,8 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
     nếu (thư viện != "") {
         tệp = biên dịch nguồn chuẩn đường(thư viện + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
-        tệp = biên dịch nguồn tìm gói(thư viện, đích);
+        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+        tệp = biên dịch nguồn tìm gói(thư viện, đích, bộ đệm);
         nếu (tệp != "") { trả về tệp; };
     };
     ném "biên dịch nguồn: không tìm thấy import '" + đích + "' từ '" + mô đun nhập + "'";
@@ -104,15 +138,30 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
 // Mỗi lần dựng đồ thị sở hữu bảng đã thăm, ngăn đệ quy và thứ tự khởi tạo.
 // Lớp gom trạng thái giúp thuật toán duyệt chỉ truyền thông tin về cạnh.
 lớp công khai Bộ Nạp Nguồn {
-    hàm công khai khởi tạo(thư viện) {
+    hàm công khai khởi tạo(thư viện, bộ đệm = rỗng) {
         mình.thư viện = thư viện;
+        mình.bộ đệm = bộ đệm;
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
-            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": thư viện};
+            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": thư viện,
+            "đích theo yêu cầu": {}};
     };
 
     hàm công khai duyệt(mô đun nhập, spec) {
         trạng thái = mình.trạng thái;
-        đích = biên dịch nguồn đích(mô đun nhập, spec["đích"], trạng thái["thư viện"]);
+        // Cùng một importer có thể gặp lại cùng spec nhiều lần. Giữ kết quả
+        // tìm tệp cho riêng lượt dựng hiện tại, tránh lặp probe filesystem.
+        chỉ mục = trạng thái["đích theo yêu cầu"];
+        nếu (!máy ảo có khóa từ điển(chỉ mục, mô đun nhập)) {
+            chỉ mục[mô đun nhập] = {};
+        };
+        theo nguồn = chỉ mục[mô đun nhập];
+        yêu cầu = spec["đích"];
+        nếu (máy ảo có khóa từ điển(theo nguồn, yêu cầu)) {
+            đích = theo nguồn[yêu cầu];
+        } hoặc {
+            đích = biên dịch nguồn đích(mô đun nhập, yêu cầu, trạng thái["thư viện"], mình.bộ đệm);
+            theo nguồn[yêu cầu] = đích;
+        };
         mức = lấy từ điển(trạng thái["đã thăm"], đích, 0);
         nếu (mức == 1) {
             ném "biên dịch nguồn: import vòng " +
@@ -120,13 +169,15 @@ lớp công khai Bộ Nạp Nguồn {
         };
         hành động = "load";
         nếu (mức == 2) { hành động = "duplicate_no_op"; };
-        máy ảo thêm cuối danh sách(trạng thái["cạnh"], {"nguồn": mô đun nhập, "đích": đích,
+        cạnh nhập = {"nguồn": mô đun nhập, "đích": đích,
              "yêu cầu": spec["đích"], "bí danh": spec["bí danh"],
-             "tái xuất": spec["tái xuất"], "hành động": hành động});
+             "tái xuất": spec["tái xuất"], "hành động": hành động};
+        nếu (máy ảo có khóa từ điển(spec, "tên nhập")) { cạnh nhập["tên nhập"] = spec["tên nhập"]; };
+        máy ảo thêm cuối danh sách(trạng thái["cạnh"], cạnh nhập);
         nếu (mức == 2) { trả về đúng; };
         trạng thái["đã thăm"][đích] = 1;
         máy ảo thêm cuối danh sách(trạng thái["ngăn"], đích);
-        cây = biên dịch nguồn cây(đích);
+        cây = biên dịch nguồn cây(đích, mình.bộ đệm);
         máy ảo thêm cuối danh sách(trạng thái["mô đun"], {"định danh": đích, "cây": cây});
         các phần nhập = biên dịch đồ thị quét nhập(cây);
         lặp(i = 0; i < máy ảo lấy độ dài(các phần nhập); i++) {
@@ -143,11 +194,12 @@ lớp công khai Bộ Nạp Nguồn {
     hàm công khai đồ thị(điểm vào, mã nguồn = rỗng) {
         // Mỗi lần dựng bắt đầu bằng trạng thái riêng, kể cả khi tái dùng instance.
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
-            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư viện};
+            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư viện,
+            "đích theo yêu cầu": {}};
         gốc dữ liệu = biên dịch nguồn chuẩn đường(điểm vào);
         cây = rỗng;
         nếu (mã nguồn == rỗng) {
-            cây = biên dịch nguồn cây(gốc dữ liệu);
+            cây = biên dịch nguồn cây(gốc dữ liệu, mình.bộ đệm);
         } hoặc {
             cây = biên dịch phân tích chương trình thuần(mã nguồn);
         };
@@ -161,13 +213,72 @@ lớp công khai Bộ Nạp Nguồn {
         trả về {"loại": "đồ thị mô đun V++", "nguồn tệp": đúng,
             "điểm vào": gốc dữ liệu, "cây điểm vào": cây,
             "mô đun": trạng thái["mô đun"], "cạnh": trạng thái["cạnh"],
+            "đích theo yêu cầu": trạng thái["đích theo yêu cầu"],
             "thứ tự khởi tạo": trạng thái["thứ tự khởi tạo"]};
     };
 };
 
-hàm riêng tư biên dịch nguồn cây(tệp) {
+// AST là một đồ thị map/list có thể bị linker sửa (nhập chọn lọc, type
+// registry). Không chuyển tham chiếu của bản cache sang lần biên dịch khác.
+// Parser chỉ tạo map/list/scalar; sao chép từng nút, không giữ metadata phiên.
+hàm riêng tư biên dịch nguồn sao cây(nút, loại = "từ điển") {
+    // Scalar là giá trị immutable. Chỉ đệ quy cho container, giữ snapshot
+    // độc lập nhưng tránh tạo frame hàm cho mọi tên, literal và vị trí.
+    nếu (loại == "danh sách") {
+        kết quả = [];
+        n = máy ảo lấy độ dài(nút);
+        lặp(i = 0; i < n; i++) {
+            con = nút[i]; kiểu con = loại của(con);
+            nếu (kiểu con == "danh sách" || kiểu con == "từ điển") {
+                con = biên dịch nguồn sao cây(con, kiểu con);
+            };
+            máy ảo thêm cuối danh sách(kết quả, con);
+        };
+        trả về kết quả;
+    };
+    kết quả = {};
+    khóa = máy ảo liệt kê khóa từ điển(nút);
+    n = máy ảo lấy độ dài(khóa);
+    lặp(i = 0; i < n; i++) {
+        tên = khóa[i]; con = nút[tên]; kiểu con = loại của(con);
+        nếu (kiểu con == "danh sách" || kiểu con == "từ điển") {
+            con = biên dịch nguồn sao cây(con, kiểu con);
+        };
+        kết quả[tên] = con;
+    };
+    trả về kết quả;
+};
+
+// Cache thuộc phiên compiler, theo đường tuyệt đối và TOÀN BỘ nội dung nguồn.
+// Đọc lại trên mỗi lượt dựng graph để nhận đúng file edits, cả sau lỗi parse.
+// Giới hạn 128 module và 1 MiB nguồn, tránh giữ AST vô hạn trong batch CI.
+hàm riêng tư biên dịch nguồn cache(bộ đệm) {
+    nếu (bộ đệm == rỗng || loại của(bộ đệm) != "từ điển") { trả về rỗng; };
+    nếu (!máy ảo có khóa từ điển(bộ đệm, "cây nguồn")) {
+        bộ đệm["cây nguồn"] = {"mục": {}, "số mục": 0, "byte": 0,
+            "trúng": 0, "trượt": 0, "thay đổi": 0};
+    };
+    trả về bộ đệm["cây nguồn"];
+};
+
+hàm riêng tư biên dịch nguồn cây(tệp, bộ đệm = rỗng) {
     thử {
-        cây = biên dịch phân tích chương trình thuần(đọc tệp(tệp));
+        văn bản = đọc tệp(tệp);
+        cache = biên dịch nguồn cache(bộ đệm);
+        mục cache = rỗng;
+        nếu (cache != rỗng) {
+            bảng = cache["mục"];
+            nếu (máy ảo có khóa từ điển(bảng, tệp)) {
+                mục cache = bảng[tệp];
+                nếu (mục cache["nguồn"] == văn bản) {
+                    cache["trúng"] = cache["trúng"] + 1;
+                    trả về biên dịch nguồn sao cây(mục cache["cây"]);
+                };
+                cache["thay đổi"] = cache["thay đổi"] + 1;
+            };
+            cache["trượt"] = cache["trượt"] + 1;
+        };
+        cây = biên dịch phân tích chương trình thuần(văn bản);
         // Đồng bộ với Stage 0: một package entrypoint `chính.vi` tự
         // tái xuất các import không có bí danh. Biến đổi AST trước khi
         // dựng cạnh để registry và emitter dùng cùng một thuộc tính.
@@ -183,18 +294,71 @@ hàm riêng tư biên dịch nguồn cây(tệp) {
             };
             cây["câu lệnh"] = câu lệnh;
         };
+        nếu (cache != rỗng) {
+            dài = máy ảo lấy độ dài(văn bản);
+            số byte = cache["byte"];
+            nếu (mục cache != rỗng) {
+                số byte -= máy ảo lấy độ dài(mục cache["nguồn"]);
+            };
+            nếu (dài <= 196608 && số byte + dài <= 1048576 &&
+                (mục cache != rỗng || cache["số mục"] < 128)) {
+                cache["mục"][tệp] = {"nguồn": văn bản,
+                    "cây": biên dịch nguồn sao cây(cây)};
+                cache["byte"] = số byte + dài;
+                nếu (mục cache == rỗng) { cache["số mục"] = cache["số mục"] + 1; };
+            } hoặc nếu (mục cache != rỗng) {
+                // File lớn lên vượt hạn mức: bỏ snapshot cũ ngay.
+                máy ảo xóa khóa từ điển(cache["mục"], tệp);
+                cache["byte"] = số byte;
+                cache["số mục"] = cache["số mục"] - 1;
+            };
+        };
         trả về cây;
     }
     bắt lỗi(e) { ném "biên dịch nguồn '" + tệp + "': " + thành chuỗi(e); };
 };
 
-hàm công khai biên dịch nguồn đồ thị(điểm vào, thư viện) {
-    bộ nạp = Bộ Nạp Nguồn(thư viện);
+hàm công khai biên dịch nguồn đồ thị(điểm vào, thư viện, bộ đệm = rỗng) {
+    bộ nạp = Bộ Nạp Nguồn(thư viện, bộ đệm);
     trả về bộ nạp.đồ thị(điểm vào);
 };
 
-hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện) {
-    trả về biên dịch liên kết đồ thị thuần(biên dịch nguồn đồ thị(điểm vào, thư viện));
+hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện, số worker = rỗng, bộ đệm = rỗng) {
+    đường hồ sơ = biên dịch hồ sơ đường();
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+    cache = biên dịch nguồn cache(bộ đệm);
+    // Giao cho host danh sách nguồn THỰC TẾ của lần dựng đồ thị hiện tại.
+    // Host chỉ dùng danh sách này để tái dùng executable khi toàn bộ nguồn
+    // vẫn giống hệt; import thay đổi trong cùng batch phải biên dịch lại.
+    nếu (bộ đệm != rỗng) {
+        bộ đệm["phụ thuộc thực tế"] = [];
+        bộ đệm["đường nhập vắng"] = [];
+    };
+    cũ trúng = 0;
+    cũ trượt = 0;
+    nếu (cache != rỗng) {
+        cũ trúng = cache["trúng"];
+        cũ trượt = cache["trượt"];
+    };
+    đồ thị = biên dịch nguồn đồ thị(điểm vào, thư viện, bộ đệm);
+    nếu (bộ đệm != rỗng) {
+        các tệp = [đồ thị["điểm vào"]];
+        các mô đun = đồ thị["mô đun"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
+            máy ảo thêm cuối danh sách(các tệp, các mô đun[i]["định danh"]);
+        };
+        bộ đệm["phụ thuộc thực tế"] = các tệp;
+    };
+    biên dịch hồ sơ ghi(đường hồ sơ, "source.graph", bắt đầu);
+    nếu (cache != rỗng) {
+        biên dịch hồ sơ ghi số(đường hồ sơ, "source.ast.hits", cache["trúng"] - cũ trúng);
+        biên dịch hồ sơ ghi số(đường hồ sơ, "source.ast.misses", cache["trượt"] - cũ trượt);
+        biên dịch hồ sơ ghi số(đường hồ sơ, "source.ast.bytes", cache["byte"]);
+    };
+    bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+    sản phẩm = biên dịch liên kết đồ thị thuần(đồ thị, số worker);
+    biên dịch hồ sơ ghi(đường hồ sơ, "source.link", bắt đầu);
+    trả về sản phẩm;
 };
 
 // Preserve the importer's directory without creating a .vi file beside it.

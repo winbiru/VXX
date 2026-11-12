@@ -14,6 +14,10 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/biểu diễn trung gian.vi"
     "src/tests/nativeparserharness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
+    # This harness is deliberately flattened into one unit. Imports in the
+    # original modules would be interpreted as statements inside that unit.
+    string(REGEX REPLACE "(^|\n)[ \t]*nhập[^\n]*;[ \t]*(\n|$)" "\\1"
+        contents "${contents}")
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/native-parser-input.vi"

@@ -1,16 +1,24 @@
 // Native-codegen bootstrap bằng V++: chuyển IR stack-based thành opcode VM.
 // Trả cả string pool/slots và function ID cho hàm có tên; chưa thay CLI.
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/mã lệnh;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/biên dịch/nội tại;
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/biên dịch/kiểu mô đun;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch IR tách thành viên;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR thuần;
+nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.biên dịch.nội tại.*;
+nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
+nhập gói.biên dịch.sổ đăng ký.*;
+nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu cây hạ IR;
+nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu lớp chạy;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị tìm đích;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.ký tự unicode;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Phát Bytecode {
@@ -47,6 +55,11 @@ lớp công khai Bộ Phát Bytecode {
         nếu (toán tử == "<") { trả về biên dịch mã thao tác("OP_NHO_HON"); };
         nếu (toán tử == ">=") { trả về biên dịch mã thao tác("OP_LON_HON_HOAC_BANG"); };
         nếu (toán tử == "<=") { trả về biên dịch mã thao tác("OP_NHO_HON_HOAC_BANG"); };
+        nếu (toán tử == "&") { trả về biên dịch mã thao tác("OP_BIT_VA"); };
+        nếu (toán tử == "|") { trả về biên dịch mã thao tác("OP_BIT_HOAC"); };
+        nếu (toán tử == "^") { trả về biên dịch mã thao tác("OP_BIT_XOR"); };
+        nếu (toán tử == "<<") { trả về biên dịch mã thao tác("OP_DICH_TRAI"); };
+        nếu (toán tử == ">>") { trả về biên dịch mã thao tác("OP_DICH_PHAI"); };
         nếu (toán tử == "%") { trả về biên dịch mã thao tác("OP_MODULO"); };
         ném "biên dịch phát mã: toán tử không hợp lệ '" + toán tử + "'";
     };
@@ -58,6 +71,11 @@ lớp công khai Bộ Phát Bytecode {
         nếu (toán tử == "-=") { trả về biên dịch mã thao tác("OP_TRU"); };
         nếu (toán tử == "*=") { trả về biên dịch mã thao tác("OP_NHAN"); };
         nếu (toán tử == "/=") { trả về biên dịch mã thao tác("OP_CHIA"); };
+        nếu (toán tử == "&=") { trả về biên dịch mã thao tác("OP_BIT_VA"); };
+        nếu (toán tử == "|=") { trả về biên dịch mã thao tác("OP_BIT_HOAC"); };
+        nếu (toán tử == "^=") { trả về biên dịch mã thao tác("OP_BIT_XOR"); };
+        nếu (toán tử == "<<=") { trả về biên dịch mã thao tác("OP_DICH_TRAI"); };
+        nếu (toán tử == ">>=") { trả về biên dịch mã thao tác("OP_DICH_PHAI"); };
         nếu (toán tử == "%=") { trả về biên dịch mã thao tác("OP_MODULO"); };
         ném "biên dịch phát mã: gán kết hợp không hợp lệ '" + toán tử + "'";
     };
@@ -66,20 +84,39 @@ lớp công khai Bộ Phát Bytecode {
         máy ảo thêm cuối danh sách(thô, [mã phép toán, toán hạng, chỉ số, giá trị]);
     };
 
-    hàm riêng tư biên dịch phát mã ô nhớ(trạng thái, tên) {
+    // Keep the first slot for each key, as the original linear scan did.
+    // New entries in the parallel key list are indexed only once, including
+    // slots introduced by the module predeclaration phase.
+    hàm riêng tư biên dịch phát mã đồng bộ khóa ô nhớ(trạng thái) {
         các ô nhớ = trạng thái["slots"];
         khóa = trạng thái["khóa slots"];
-        // SymbolId đã có khóa riêng; fallback văn bản dành cho tên chưa phân giải.
-        // Danh sách khóa song song giữ ID ổn định mà không đổi ABI `slots`.
+        // Most LOAD/STORE instructions see no new predeclared slots. Avoid
+        // entering two empty loops and probing the index map in that case.
+        nếu (trạng thái["số khóa đã tra"] == máy ảo lấy độ dài(các ô nhớ) &&
+            máy ảo lấy độ dài(khóa) == máy ảo lấy độ dài(các ô nhớ)) {
+            trả về;
+        };
+        chỉ mục = trạng thái["chỉ mục khóa slots"];
         lặp(i = máy ảo lấy độ dài(khóa); i < máy ảo lấy độ dài(các ô nhớ); i++) {
             máy ảo thêm cuối danh sách(khóa, các ô nhớ[i]);
         };
-        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
-            nếu (khóa[i] == tên) { trả về i; };
+        lặp(i = trạng thái["số khóa đã tra"]; i < máy ảo lấy độ dài(khóa); i++) {
+            nếu (!máy ảo có khóa từ điển(chỉ mục, khóa[i])) { chỉ mục[khóa[i]] = i; };
         };
+        trạng thái["số khóa đã tra"] = máy ảo lấy độ dài(khóa);
+    };
+
+    hàm riêng tư biên dịch phát mã ô nhớ(trạng thái, tên) {
+        mình.biên dịch phát mã đồng bộ khóa ô nhớ(trạng thái);
+        các ô nhớ = trạng thái["slots"];
+        khóa = trạng thái["khóa slots"];
+        chỉ mục khóa = trạng thái["chỉ mục khóa slots"];
+        nếu (máy ảo có khóa từ điển(chỉ mục khóa, tên)) { trả về chỉ mục khóa[tên]; };
         chỉ số = máy ảo lấy độ dài(các ô nhớ);
         máy ảo thêm cuối danh sách(các ô nhớ, tên);
         máy ảo thêm cuối danh sách(khóa, tên);
+        chỉ mục khóa[tên] = chỉ số;
+        trạng thái["số khóa đã tra"] = máy ảo lấy độ dài(khóa);
         trả về chỉ số;
     };
 
@@ -87,38 +124,45 @@ lớp công khai Bộ Phát Bytecode {
     // với function ID, local của hàm khác hoặc biến của catch lồng nhau.
     hàm riêng tư biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, tên, mục ký hiệu) {
         nếu (mục ký hiệu < 0) { trả về mình.biên dịch phát mã ô nhớ(trạng thái, tên); };
+        // Các SymbolId trong một phiên là duy nhất. Tra trực tiếp ID đã
+        // phân giải để tránh quét lại toàn bộ slots ở mỗi LOAD/STORE của IR.
+        // Cache là metadata nội bộ, không làm đổi thứ tự hay nội dung slots.
+        chỉ mục = trạng thái["chỉ mục symbol slots"];
+        nếu (máy ảo có khóa từ điển(chỉ mục, mục ký hiệu)) {
+            trả về chỉ mục[mục ký hiệu];
+        };
+        // Synchronization is needed only for a previously unseen SymbolId.
+        // Existing symbol IDs keep their slot even when later functions add
+        // predeclared slots to the shared state.
+        mình.biên dịch phát mã đồng bộ khóa ô nhớ(trạng thái);
         các ô nhớ = trạng thái["slots"];
         khóa = trạng thái["khóa slots"];
-        lặp(i = máy ảo lấy độ dài(khóa); i < máy ảo lấy độ dài(các ô nhớ); i++) {
-            máy ảo thêm cuối danh sách(khóa, các ô nhớ[i]);
-        };
         tên khóa = "symbol:" + thành chuỗi(mục ký hiệu);
-        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
-            nếu (khóa[i] == tên khóa) { trả về i; };
+        chỉ mục khóa = trạng thái["chỉ mục khóa slots"];
+        nếu (máy ảo có khóa từ điển(chỉ mục khóa, tên khóa)) {
+            chỉ mục[mục ký hiệu] = chỉ mục khóa[tên khóa];
+            trả về chỉ mục[mục ký hiệu];
         };
         chỉ số = máy ảo lấy độ dài(các ô nhớ);
         máy ảo thêm cuối danh sách(các ô nhớ, tên);
         máy ảo thêm cuối danh sách(khóa, tên khóa);
+        chỉ mục khóa[tên khóa] = chỉ số;
+        trạng thái["số khóa đã tra"] = máy ảo lấy độ dài(khóa);
+        chỉ mục[mục ký hiệu] = chỉ số;
         trả về chỉ số;
     };
 
     hàm riêng tư biên dịch phát mã lưu chuỗi(trạng thái, văn bản) {
         // StringPool trong VM đánh địa chỉ bằng số nguyên.
         vùng chứa = trạng thái["chuỗi"];
-        // Dùng chung index với registry, kể cả khi nhập module lồng nhau.
-        nếu (máy ảo có khóa từ điển(trạng thái, "chỉ mục chuỗi")) {
-            tra cứu = trạng thái["chỉ mục chuỗi"];
-            nếu (máy ảo có khóa từ điển(tra cứu, văn bản)) { trả về tra cứu[văn bản]; };
-            chỉ số = máy ảo lấy độ dài(vùng chứa);
-            máy ảo thêm cuối danh sách(vùng chứa, văn bản);
-            tra cứu[văn bản] = chỉ số;
-            trả về chỉ số;
-        };
-        lặp(i = 0; i < máy ảo lấy độ dài(vùng chứa); i++) {
-            nếu (vùng chứa[i] == văn bản) { trả về i; };
-        };
+        // Trạng thái luôn khởi tạo chỉ mục từ registry ở đầu mỗi module.
+        // Tránh tra key trên trạng thái và nhánh fallback quét tuyến tính
+        // mỗi lần phát hằng chuỗi hoặc tên hàm.
+        tra cứu = trạng thái["chỉ mục chuỗi"];
+        nếu (máy ảo có khóa từ điển(tra cứu, văn bản)) { trả về tra cứu[văn bản]; };
         chỉ số = máy ảo lấy độ dài(vùng chứa);
         máy ảo thêm cuối danh sách(vùng chứa, văn bản);
+        tra cứu[văn bản] = chỉ số;
         trả về chỉ số;
     };
 
@@ -126,9 +170,24 @@ lớp công khai Bộ Phát Bytecode {
     // `mô_đun.hàm` tiếp tục đi theo bộ giải tên của linker.
     hàm riêng tư biên dịch phát mã tìm receiver(trạng thái, tên) {
         các ô nhớ = trạng thái["slots"];
-        lặp(i = 0; i < máy ảo lấy độ dài(các ô nhớ); i++) {
-            nếu (các ô nhớ[i] == tên) { trả về i; };
+        chỉ mục = trạng thái["chỉ mục receiver"];
+        bắt đầu = trạng thái["số receiver đã tra"];
+        // Một slot hiện có có thể được predeclare rồi cập nhật tên.
+        // Khi đó xây lại chỉ mục để luôn chọn vị trí xuất hiện đầu tiên.
+        nếu (bắt đầu < 0) {
+            chỉ mục = {};
+            trạng thái["chỉ mục receiver"] = chỉ mục;
+            bắt đầu = 0;
         };
+        số ô nhớ = máy ảo lấy độ dài(các ô nhớ);
+        lặp(i = bắt đầu; i < số ô nhớ; i++) {
+            tên ô nhớ = các ô nhớ[i];
+            nếu (!máy ảo có khóa từ điển(chỉ mục, tên ô nhớ)) {
+                chỉ mục[tên ô nhớ] = i;
+            };
+        };
+        trạng thái["số receiver đã tra"] = số ô nhớ;
+        nếu (máy ảo có khóa từ điển(chỉ mục, tên)) { trả về chỉ mục[tên]; };
         trả về -1;
     };
 
@@ -140,38 +199,35 @@ lớp công khai Bộ Phát Bytecode {
     };
 
     hàm công khai biên dịch phát mã tách chuỗi(từ tố) {
-        n = máy ảo lấy độ dài(từ tố);
-        nếu (n < 2 || !((từ tố[0] == "\"" && từ tố[n - 1] == "\"") ||
-                        (từ tố[0] == "'" && từ tố[n - 1] == "'"))) {
+        // Copy the source bytes once; repeated Unicode indexing and immutable
+        // string concatenation make long literals quadratic in the VM.
+        nguồn = chuỗi thành byte máy ảo(từ tố);
+        n = máy ảo lấy độ dài(nguồn);
+        nếu (n < 2 || !((nguồn[0] == 34 && nguồn[n - 1] == 34) ||
+                        (nguồn[0] == 39 && nguồn[n - 1] == 39))) {
             ném "biên dịch phát mã: literal chuỗi không hợp lệ";
         };
+        // Empty quoted literals have no bytes to decode or append.
+        nếu (n == 2) { trả về ""; };
         // Trùng src/frontend/lexer.cpp::stripQuotes: giải mã một lần rồi mới
         // lưu StringPool hoặc escape tiếp khi đóng gói list/map literal.
         // Escape không nhận diện: C++ giữ ký tự sau dấu gạch chéo.
-        văn bản = "";
+        kết quả = [];
         i = 1;
-        lặp(vòng = 0; i < n - 1; vòng++) {
-            c = từ tố[i];
-            nếu (c == "\\" && i + 1 < n - 1) {
+        khi (i < n - 1) {
+            c = nguồn[i];
+            nếu (c == 92 && i + 1 < n - 1) {
                 i += 1;
-                dấu thoát = từ tố[i];
-                nếu (dấu thoát == "n") { văn bản += "\n"; }
-                hoặc {
-                    nếu (dấu thoát == "r") { văn bản += "\r"; }
-                    hoặc {
-                        nếu (dấu thoát == "t") { văn bản += "\t"; }
-                        hoặc {
-                            nếu (dấu thoát == "0") { văn bản += ký tự unicode(0); }
-                            hoặc { văn bản += dấu thoát; };
-                        };
-                    };
-                };
-            } hoặc {
-                văn bản += c;
+                c = nguồn[i];
+                nếu (c == 110) { c = 10; }
+                hoặc nếu (c == 114) { c = 13; }
+                hoặc nếu (c == 116) { c = 9; }
+                hoặc nếu (c == 48) { c = 0; };
             };
+            máy ảo thêm cuối danh sách(kết quả, c);
             i += 1;
         };
-        trả về văn bản;
+        trả về chuỗi từ byte máy ảo(kết quả);
     };
 
     // encodeDefaultValue của emitter C++: literal scalar hoặc số nguyên âm.
@@ -210,28 +266,33 @@ lớp công khai Bộ Phát Bytecode {
     hàm riêng tư biên dịch phát mã ngăn trường() { trả về ký tự unicode(31); };
 
     hàm riêng tư biên dịch phát mã ký tự thoát trường(s) {
-        kết quả = "";
-        lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
-            c = s[i];
-            nếu (c == "\\") { kết quả += "\\\\"; }
-            hoặc {
-                nếu (c == "\n") { kết quả += "\\n"; }
-                hoặc {
-                    nếu (c == "\r") { kết quả += "\\r"; }
-                    hoặc {
-                        nếu (c == "\t") { kết quả += "\\t"; }
-                        hoặc {
-                            nếu (c == mình.biên dịch phát mã ngăn bản ghi()) { kết quả += "\\e"; }
-                            hoặc {
-                                nếu (c == mình.biên dịch phát mã ngăn trường()) { kết quả += "\\f"; }
-                                hoặc { kết quả += c; };
-                            };
-                        };
-                    };
-                };
+        // The wire escape alphabet is ASCII. Preserve UTF-8 bytes verbatim,
+        // and append to a byte vector instead of copying the growing string.
+        nguồn = chuỗi thành byte máy ảo(s);
+        kết quả = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+            c = nguồn[i];
+            mã_escape = 0;
+            nếu (c == 92) { mã_escape = 92; }
+            hoặc nếu (c == 10) { mã_escape = 110; }
+            hoặc nếu (c == 13) { mã_escape = 114; }
+            hoặc nếu (c == 9) { mã_escape = 116; }
+            hoặc nếu (c == 30) { mã_escape = 101; }
+            hoặc nếu (c == 31) { mã_escape = 102; };
+            nếu (mã_escape != 0) {
+                máy ảo thêm cuối danh sách(kết quả, 92);
+                c = mã_escape;
             };
+            máy ảo thêm cuối danh sách(kết quả, c);
         };
-        trả về kết quả;
+        trả về chuỗi từ byte máy ảo(kết quả);
+    };
+
+    hàm riêng tư biên dịch phát mã thêm byte chuỗi(kết quả, văn bản) {
+        các byte = chuỗi thành byte máy ảo(văn bản);
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            máy ảo thêm cuối danh sách(kết quả, các byte[i]);
+        };
     };
 
     hàm riêng tư biên dịch phát mã khóa từ điển(nút) {
@@ -278,33 +339,73 @@ lớp công khai Bộ Phát Bytecode {
     // Opcode static lưu payload không có type tag của collection ngoài cùng.
     hàm riêng tư biên dịch phát mã chuỗi tập hợp(nút) {
         loại = lấy từ điển(nút, "loại", "");
-        kết quả = "";
+        kết quả = [];
         nếu (loại == "danh sách") {
             phần tử = lấy từ điển(nút, "phần tử", []);
             lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
-                nếu (i > 0) { kết quả += mình.biên dịch phát mã ngăn bản ghi(); };
-                kết quả += mình.biên dịch phát mã mã hóa tập hợp(phần tử[i]);
+                nếu (i > 0) { máy ảo thêm cuối danh sách(kết quả, 30); };
+                mình.biên dịch phát mã thêm byte chuỗi(kết quả, mình.biên dịch phát mã mã hóa tập hợp(phần tử[i]));
             };
-            trả về kết quả;
+            trả về chuỗi từ byte máy ảo(kết quả);
         };
         nếu (loại == "từ điển") {
             mục = lấy từ điển(nút, "mục", []);
             lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
-                nếu (i > 0) { kết quả += mình.biên dịch phát mã ngăn bản ghi(); };
-                kết quả += mình.biên dịch phát mã ký tự thoát trường(
-                    mình.biên dịch phát mã khóa từ điển(mục[i]["khóa"])) +
-                    mình.biên dịch phát mã ngăn trường() +
-                    mình.biên dịch phát mã mã hóa tập hợp(mục[i]["giá trị"]);
+                nếu (i > 0) { máy ảo thêm cuối danh sách(kết quả, 30); };
+                mình.biên dịch phát mã thêm byte chuỗi(kết quả, mình.biên dịch phát mã ký tự thoát trường(
+                    mình.biên dịch phát mã khóa từ điển(mục[i]["khóa"])));
+                máy ảo thêm cuối danh sách(kết quả, 31);
+                mình.biên dịch phát mã thêm byte chuỗi(kết quả, mình.biên dịch phát mã mã hóa tập hợp(mục[i]["giá trị"]));
             };
-            trả về kết quả;
+            trả về chuỗi từ byte máy ảo(kết quả);
         };
         ném "biên dịch phát mã: chỉ nhận danh sách hoặc từ điển tĩnh";
+    };
+
+    hàm riêng tư phát hàm ẩn danh(khai, trạng thái, thô) {
+        sổ = trạng thái["sổ hàm"];
+        mã định danh = máy ảo lấy độ dài(sổ["hàm"]);
+        // Hàm ẩn danh không tạo tên xuất hay ô biến dành cho tên hàm.
+        máy ảo thêm cuối danh sách(sổ["hàm"], {"id": mã định danh, "tên": "",
+            "tên index": -1, "tên chạy": "", "tên index runtime": -1,
+            "mô đun": trạng thái["mô đun"], "ẩn danh": đúng});
+        các hàm = trạng thái["hàm ẩn danh"];
+        vị trí = máy ảo lấy độ dài(các hàm);
+        máy ảo thêm cuối danh sách(các hàm, rỗng);
+        con = {};
+        khóa = khóa từ điển(trạng thái);
+        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) { con[khóa[i]] = trạng thái[khóa[i]]; };
+        // Không để return/break/try của closure làm đổi khung điều khiển bên ngoài.
+        khung = ["nhánh nếu", "chọn", "thử", "gọi thành viên", "gán thành viên", "lặp", "phạm vi thoát"];
+        lặp(i = 0; i < máy ảo lấy độ dài(khung); i++) { con[khung[i]] = []; };
+        con["độ sâu khối"] = 0;
+        con["độ sâu thử"] = 0;
+        thân = mình.biên dịch phát mã thân phương thức(khai, con);
+        các hàm[vị trí] = {"id": mã định danh, "tên": "", "tên index": -1,
+            "bytecode": thân, "ẩn danh": đúng};
+        bắt giữ = khai["bắt giữ"];
+        lặp(i = 0; i < máy ảo lấy độ dài(bắt giữ); i++) {
+            ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, bắt giữ[i]["tên"], bắt giữ[i]["id"]);
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_ID"), 0, ô nhớ, 0);
+        };
+        nếu (máy ảo lấy độ dài(bắt giữ) == 0) {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"), mã định danh, 0, 0);
+        } hoặc {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TAO_DONG_BAO"),
+                mã định danh, máy ảo lấy độ dài(bắt giữ), 0);
+        };
+        trả về đúng;
     };
 
     hàm riêng tư biên dịch phát mã IR một(mục, trạng thái, thô) {
         mã = lấy từ điển(mục, "mã", "");
         giá trị = lấy từ điển(mục, "giá trị", "");
         mục ký hiệu = lấy từ điển(mục, "symbol", -1);
+        nếu (mã == "hàm ẩn danh") { trả về mình.phát hàm ẩn danh(giá trị, trạng thái, thô); };
+        nếu (mã == "gọi giá trị") {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), giá trị, 0, 0);
+            trả về đúng;
+        };
         nếu (mã == "danh sách tĩnh" || mã == "từ điển tĩnh") {
             dây = mình.biên dịch phát mã chuỗi tập hợp(giá trị);
             chỉ số = mình.biên dịch phát mã lưu chuỗi(trạng thái, dây);
@@ -350,8 +451,14 @@ lớp công khai Bộ Phát Bytecode {
         };
         nếu (mã == "đọc tên") {
             tách = biên dịch IR tách thành viên(giá trị);
-            nếu (tách != rỗng && mục ký hiệu < 0) {
-                nhận ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tách["nhận"]);
+            nếu (tách != rỗng) {
+                nhận ô nhớ = -1;
+                nếu (mục ký hiệu >= 0) {
+                    nhận ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(
+                        trạng thái, tách["nhận"], mục ký hiệu);
+                } hoặc {
+                    nhận ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tách["nhận"]);
+                };
                 nếu (nhận ô nhớ >= 0) {
                     tên chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, tách["tên"]);
                     mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, nhận ô nhớ, 0);
@@ -364,20 +471,27 @@ lớp công khai Bộ Phát Bytecode {
                 mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, ô nhớ, 0);
                 trả về đúng;
             };
-            danh sách hàm đã khai = trạng thái["hàm đã khai"];
-            lặp(i = 0; i < máy ảo lấy độ dài(danh sách hàm đã khai); i++) {
-                nếu (danh sách hàm đã khai[i] == giá trị) {
-                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
-                                         trạng thái["hàm các mã định danh"][i], 0, 0);
-                    trả về đúng;
-                };
+            // Function names are stable after predeclaration. Keep the first
+            // ID for duplicate names, matching the previous linear lookup.
+            chỉ mục hàm = trạng thái["chỉ mục hàm đã khai"];
+            nếu (máy ảo có khóa từ điển(chỉ mục hàm, giá trị)) {
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
+                                     chỉ mục hàm[giá trị], 0, 0);
+                trả về đúng;
             };
             nếu (lấy từ điển(trạng thái, "liên mô đun", sai)) {
-                thấy = trạng thái["hàm nhìn thấy"];
-                lặp(i = 0; i < máy ảo lấy độ dài(thấy); i++) {
-                    nếu (thấy[i]["tên"] == giá trị) {
+                chỉ mục thấy = trạng thái["chỉ mục hàm nhìn thấy"];
+                nếu (máy ảo có khóa từ điển(chỉ mục thấy, giá trị)) {
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
+                                         chỉ mục thấy[giá trị], 0, 0);
+                    trả về đúng;
+                };
+                duy nhất = lấy từ điển(trạng thái["sổ hàm"], "chỉ mục tên duy nhất", {});
+                nếu (máy ảo có khóa từ điển(duy nhất, giá trị)) {
+                    đích duy nhất = duy nhất[giá trị];
+                    nếu (đích duy nhất >= 0) {
                         mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
-                                             thấy[i]["id"], 0, 0);
+                                             đích duy nhất, 0, 0);
                         trả về đúng;
                     };
                 };
@@ -491,32 +605,49 @@ lớp công khai Bộ Phát Bytecode {
                 mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), số đối số, 0, 0);
                 trả về đúng;
             };
-            danh sách hàm đã khai = trạng thái["hàm đã khai"];
-            lặp(i = 0; i < máy ảo lấy độ dài(danh sách hàm đã khai); i++) {
-                nếu (danh sách hàm đã khai[i] == tên) {
+            // Lời gọi không ghi receiver trong thân lớp chỉ được tra trong
+            // các phương thức đã đăng ký của chính lớp hiện tại. Không dùng
+            // bảng tên ngắn toàn cục vì có thể bỏ qua phạm vi riêng tư.
+            nếu (mã == "gọi tên" && lấy từ điển(trạng thái, "lớp hiện tại", "") != "") {
+                phương thức lớp = lấy từ điển(trạng thái, "phương thức lớp", {});
+                nếu (máy ảo có khóa từ điển(phương thức lớp, tên)) {
                     mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
-                                         số đối số, trạng thái["hàm các mã định danh"][i], 0);
+                                         số đối số, phương thức lớp[tên], 0);
                     trả về đúng;
                 };
             };
+            chỉ mục hàm = trạng thái["chỉ mục hàm đã khai"];
+            nếu (máy ảo có khóa từ điển(chỉ mục hàm, tên)) {
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
+                                     số đối số, chỉ mục hàm[tên], 0);
+                trả về đúng;
+            };
             nếu (lấy từ điển(trạng thái, "liên mô đun", sai)) {
-                thấy = trạng thái["hàm nhìn thấy"];
-                lặp(i = 0; i < máy ảo lấy độ dài(thấy); i++) {
-                    nếu (thấy[i]["tên"] == tên) {
+                chỉ mục thấy = trạng thái["chỉ mục hàm nhìn thấy"];
+                nếu (máy ảo có khóa từ điển(chỉ mục thấy, tên)) {
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
+                                         số đối số, chỉ mục thấy[tên], 0);
+                    trả về đúng;
+                };
+                // Bootstrap cũ cho các mô-đun dùng chung bảng hàm. Khi tên
+                // chỉ có đúng một khai báo trong toàn phiên, đích gọi đã được
+                // chứng minh và có thể bỏ lookup động theo chuỗi.
+                duy nhất = lấy từ điển(trạng thái["sổ hàm"], "chỉ mục tên duy nhất", {});
+                nếu (máy ảo có khóa từ điển(duy nhất, tên)) {
+                    đích duy nhất = duy nhất[tên];
+                    nếu (đích duy nhất >= 0) {
                         mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
-                                             số đối số, thấy[i]["id"], 0);
+                                             số đối số, đích duy nhất, 0);
                         trả về đúng;
                     };
                 };
             };
             nếu (mã == "gọi tên") {
-                các ô nhớ = trạng thái["slots"];
-                lặp(i = 0; i < máy ảo lấy độ dài(các ô nhớ); i++) {
-                    nếu (các ô nhớ[i] == tên) {
-                        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, i, 0);
-                        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), số đối số, 0, 0);
-                        trả về đúng;
-                    };
+                ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tên);
+                nếu (ô nhớ >= 0) {
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, ô nhớ, 0);
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), số đối số, 0, 0);
+                    trả về đúng;
                 };
             };
             // Binding lexical có thể chưa có symbol ID ở đường tương thích.
@@ -527,7 +658,7 @@ lớp công khai Bộ Phát Bytecode {
                     nếu (số đối số != máy ảo lấy độ dài(các ngoại[i]["tham số"])) {
                         ném "biên dịch phát mã: sai số đối số ngoại hàm '" + tên + "'";
                     };
-                    mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_FFI_CALL"),
+                    mình.biên dịch phát mã lệnh(thô, 156,
                         số đối số, các ngoại[i]["id"], 0);
                     trả về đúng;
                 };
@@ -535,6 +666,15 @@ lớp công khai Bộ Phát Bytecode {
             nếu (nội tại != rỗng) {
                 nếu (số đối số != nội tại[1]) { ném "biên dịch phát mã: sai số đối số nội tại '" + tên + "'"; };
                 mình.biên dịch phát mã lệnh(thô, nội tại[0], 0, 0, 0);
+                trả về đúng;
+            };
+            abi lõi = biên dịch ABI lõi bản địa(tên);
+            nếu (abi lõi != rỗng) {
+                nếu (số đối số != abi lõi["arity"]) {
+                    ném "biên dịch phát mã: sai số đối số hàm lõi '" + tên + "'";
+                };
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_LOI_BAN_DIA"),
+                    số đối số, abi lõi["id"], 0);
                 trả về đúng;
             };
             nếu (lấy từ điển(trạng thái, "liên mô đun", sai)) {
@@ -704,9 +844,11 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo xóa vị trí danh sách(phạm vi, máy ảo lấy độ dài(phạm vi) - 1);
             trả về đúng;
         };
-        nếu (mã == "bắt đầu lặp") {
-            ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, giá trị, mục ký hiệu);
-            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_KHOI_TAO"), 0, ô nhớ, 0);
+        nếu (mã == "bắt đầu lặp" || mã == "bắt đầu khi") {
+            nếu (mã == "bắt đầu lặp") {
+                ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, giá trị, mục ký hiệu);
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_KHOI_TAO"), 0, ô nhớ, 0);
+            };
             máy ảo thêm cuối danh sách(trạng thái["lặp"], {"điều kiện": -1, "nhảy ra": -1,
                                      "khối": trạng thái["độ sâu khối"],
                                      "thử": trạng thái["độ sâu thử"],
@@ -860,6 +1002,52 @@ lớp công khai Bộ Phát Bytecode {
         };
     };
 
+    // C++ emitFunctionBody cấp trước và khởi tạo các slot được StoreName
+    // gán trong thân hàm, kể cả ở nhánh điều kiện chưa thực thi.
+    // Chỉ xét gán biểu thức: gán đi kèm khai báo là DeclareVariable.
+    hàm riêng tư biên dịch phát mã khởi tạo biến gán(các lệnh, trạng thái, thân, bắt giữ) {
+        các slot = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(các lệnh); i++) {
+            mục = các lệnh[i];
+            mã = mục["mã"];
+            nếu ((mã == "gán tên" && !lấy từ điển(mục, "từ khai báo", sai)) ||
+                mã == "++" || mã == "--") {
+                mã định danh = lấy từ điển(mục, "symbol", -1);
+                nếu (mã định danh >= 0) {
+                    // A store to a resolved module binding must update that
+                    // binding, rather than initialize a new local with zero.
+                    nếu (lấy từ điển(mục, "symbol toàn cục", sai)) { bỏ qua; };
+                    // Closure dùng chung ô nhớ của binding bên ngoài. OP_KHOI_TAO
+                    // sẽ tạo ô mới và cắt đứt phép gán theo tham chiếu.
+                    là bắt giữ = sai;
+                    lặp(k = 0; k < máy ảo lấy độ dài(bắt giữ); k++) {
+                        nếu (bắt giữ[k]["id"] == mã định danh) { là bắt giữ = đúng; thoát; };
+                    };
+                    nếu (là bắt giữ) { bỏ qua; };
+                    ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, mục["giá trị"], mã định danh);
+                    đã có = sai;
+                    lặp(j = 0; j < máy ảo lấy độ dài(các slot); j++) {
+                        nếu (các slot[j] == ô nhớ) { đã có = đúng; thoát; };
+                    };
+                    nếu (!đã có) { máy ảo thêm cuối danh sách(các slot, ô nhớ); };
+                };
+            };
+        };
+        // Opcode phải theo thứ tự slot tăng dần như std::sort trong C++.
+        lặp(i = 1; i < máy ảo lấy độ dài(các slot); i++) {
+            mục = các slot[i];
+            j = i;
+            khi (j > 0 && các slot[j - 1] > mục) {
+                các slot[j] = các slot[j - 1];
+                j -= 1;
+            };
+            các slot[j] = mục;
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(các slot); i++) {
+            mình.biên dịch phát mã lệnh(thân, biên dịch mã thao tác("OP_KHOI_TAO"), 0, các slot[i], 0);
+        };
+    };
+
     // Emitter C++ biên dịch module phụ thuộc ngay tại câu lệnh import, dùng
     // chung StringPool. Không thể phát toàn bộ initializer theo postorder
     // trước vì như vậy index của literal xen kẽ import sẽ bị thay đổi.
@@ -868,33 +1056,56 @@ lớp công khai Bộ Phát Bytecode {
         cạnh = đồ thị["cạnh"];
         dùng = phiên["cạnh dùng"];
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
-            e = cạnh[i];
+        cạnh nguồn = lấy từ điển(phiên["cạnh theo nguồn"], tên mô đun, []);
+        lặp(i = 0; i < máy ảo lấy độ dài(cạnh nguồn); i++) {
+            chỉ số cạnh = cạnh nguồn[i];
+            e = cạnh[chỉ số cạnh];
             nếu (e["nguồn"] == tên mô đun && e["đích"] == đích &&
                 e["bí danh"] == mục["bí danh"] &&
-                e["tái xuất"] == mục["tái xuất"]) {
-                có = sai;
-                lặp(j = 0; j < máy ảo lấy độ dài(dùng); j++) {
-                    nếu (dùng[j] == i) { có = đúng; };
+                    e["tái xuất"] == mục["tái xuất"] &&
+                    lấy từ điển(e, "tên nhập", "") == lấy từ điển(mục, "tên nhập", "")) {
+                nếu (!máy ảo có khóa từ điển(dùng, chỉ số cạnh)) {
+                    vị trí = chỉ số cạnh;
+                    thoát;
                 };
-                nếu (!có && vị trí == -1) { vị trí = i; };
             };
         };
         nếu (vị trí == -1) {
             ném "biên dịch phát mã: không khớp cạnh nhập '" + tên mô đun + "' -> '" + đích + "'";
         };
-        máy ảo thêm cuối danh sách(dùng, vị trí);
+        dùng[vị trí] = đúng;
         e = cạnh[vị trí];
         nếu (e["hành động"] == "duplicate_no_op") { trả về đúng; };
         nếu (e["hành động"] != "load") {
             ném "biên dịch phát mã: hành động nhập không hỗ trợ";
         };
 
-        phụ thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], đích);
-        cây = biên dịch kiểu cây(sổ, đồ thị, đích);
-        biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng);
+        phụ thuộc = biên dịch sổ tìm mô đun(sổ, đích);
+        nếu (máy ảo có khóa từ điển(phiên, "IR đã chuẩn bị")) {
+            cache = phiên["IR đã chuẩn bị"];
+            nếu (!máy ảo có khóa từ điển(cache, đích)) {
+                ném "biên dịch worker: thiếu IR của mô-đun '" + đích + "'";
+            };
+            biểu diễn trung gian = cache[đích];
+        } hoặc {
+            đã kiểm tra = lấy từ điển(phiên, "ngữ nghĩa đã kiểm tra", sai);
+            cây = biên dịch kiểu cây hạ IR(sổ, đồ thị, đích, đã kiểm tra);
+            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng, đã kiểm tra);
+        };
         phần = mình.biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian, sổ, phụ thuộc, đồ thị, phiên);
         máy ảo thêm cuối danh sách(phiên["đã phát"], {"định danh": đích, "phần": phần});
+        phiên["đã phát theo tên"][đích] = phần;
+
+        tên chọn = lấy từ điển(e, "tên nhập", "");
+        nếu (tên chọn != "" && tên chọn != "*") {
+            // Hidden helpers may share names across selectively imported modules.
+            // Calls use stable IDs; keep their runtime names module-qualified.
+            trực tiếp = phụ thuộc["trực tiếp"];
+            lặp(i = 0; i < máy ảo lấy độ dài(trực tiếp); i++) {
+                biên dịch sổ đổi tên chạy(sổ, trực tiếp[i]["id"], đích + "::" + trực tiếp[i]["tên"]);
+            };
+            trả về đúng;
+        };
 
         // C++ đặt tên runtime của các hàm sau khi compile xong module.
         bí danh = e["bí danh"];
@@ -931,6 +1142,8 @@ lớp công khai Bộ Phát Bytecode {
     hàm riêng tư biên dịch phát mã thân phương thức(danh sách hàm biểu diễn trung gian, trạng thái) {
         thân = [];
         mình.biên dịch phát mã lệnh(thân, biên dịch mã thao tác("OP_MO_KHOI"), 0, 0, 0);
+        mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân,
+            lấy từ điển(danh sách hàm biểu diễn trung gian, "bắt giữ", []));
         nhận = lấy từ điển(danh sách hàm biểu diễn trung gian, "nhận ngầm", []);
         nhận các mã định danh = lấy từ điển(danh sách hàm biểu diễn trung gian, "nhận symbol", []);
         lặp(j = 0; j < máy ảo lấy độ dài(nhận); j++) {
@@ -1005,26 +1218,42 @@ lớp công khai Bộ Phát Bytecode {
             cha chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, kiểu lớp cha) + 1;
         };
         mình.biên dịch phát mã lệnh(đỉnh, biên dịch mã thao tác("OP_TAO_LOP"), 0, tên chỉ mục, cha chỉ mục);
+        trạng thái["lớp hiện tại"] = tên lớp;
+        trạng thái["phương thức lớp"] = {};
         phương thức = khai lớp["phương thức"];
+        // Giữ ID của các phương thức khai báo sau cho lời gọi tiến, nhưng
+        // C++ chỉ cấp StringPool và function slot khi phát từng phương thức.
+        // Hoãn tên để không đẩy methodNameIndex của phương thức trước đi xa.
+        hoãn chuỗi trước = lấy từ điển(sổ, "hoãn chuỗi", sai);
+        sổ["hoãn chuỗi"] = đúng;
         lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
-            danh sách hàm biểu diễn trung gian = biểu diễn trung gian["hàm"][phương thức[i]];
-            tên hàm = danh sách hàm biểu diễn trung gian["tên"];
+            khai hàm = biểu diễn trung gian["hàm"][phương thức[i]];
+            tên hàm = khai hàm["tên"];
             mã định danh = -1;
             nếu (lấy từ điển(phiên, "đa mô đun", sai)) {
                 mã định danh = biên dịch sổ tìm hàm trực tiếp(sổ, trạng thái["mô đun"], tên hàm);
             } hoặc {
                 mã định danh = biên dịch sổ cấp hàm(sổ, "", tên hàm);
             };
+            trạng thái["phương thức lớp"][khai hàm["tên ngắn"]] = mã định danh;
+        };
+        sổ["hoãn chuỗi"] = hoãn chuỗi trước;
+        lặp(i = 0; i < máy ảo lấy độ dài(phương thức); i++) {
+            danh sách hàm biểu diễn trung gian = biểu diễn trung gian["hàm"][phương thức[i]];
+            tên hàm = danh sách hàm biểu diễn trung gian["tên"];
+            mã định danh = trạng thái["phương thức lớp"][danh sách hàm biểu diễn trung gian["tên ngắn"]];
+            trạng thái["số receiver đã tra"] = -1;
+            // Tương đương allocateFunction() ngay trước emitFunction() của C++:
+            // slot của receiver ở method đầu tiên phải được cấp trước khi
+            // function ID của method kế tiếp được đưa vào bảng slot.
             các ô nhớ = trạng thái["slots"];
             lặp(j = máy ảo lấy độ dài(các ô nhớ); j <= mã định danh; j++) { máy ảo thêm cuối danh sách(các ô nhớ, ""); };
             các ô nhớ[mã định danh] = tên hàm;
             tên hàm chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, tên hàm);
-            nếu (lấy từ điển(sổ, "hoãn chuỗi", sai)) {
-                bản ghi = sổ["hàm"][mã định danh];
-                bản ghi["tên index"] = tên hàm chỉ mục;
-                bản ghi["tên index runtime"] = tên hàm chỉ mục;
-                sổ["hàm"][mã định danh] = bản ghi;
-            };
+            bản ghi = sổ["hàm"][mã định danh];
+            bản ghi["tên index"] = tên hàm chỉ mục;
+            bản ghi["tên index runtime"] = tên hàm chỉ mục;
+            sổ["hàm"][mã định danh] = bản ghi;
             thân = mình.biên dịch phát mã thân phương thức(danh sách hàm biểu diễn trung gian, trạng thái);
             máy ảo thêm cuối danh sách(các hàm, {"tên": tên hàm, "id": mã định danh,
                            "tên index": tên hàm chỉ mục, "bytecode": thân,
@@ -1043,6 +1272,8 @@ lớp công khai Bộ Phát Bytecode {
                 };
             };
         };
+        trạng thái["lớp hiện tại"] = "";
+        trạng thái["phương thức lớp"] = {};
         trả về đúng;
     };
 
@@ -1119,7 +1350,27 @@ lớp công khai Bộ Phát Bytecode {
         lặp(i = 0; i < máy ảo lấy độ dài(lấy từ điển(biểu diễn trung gian, "lớp", [])); i++) {
             máy ảo thêm cuối danh sách(kiểu lớp đã khai, biểu diễn trung gian["lớp"][i]["tên"]);
         };
-        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chuỗi": sổ["chuỗi"],
+        // Index the stable local/visible function declarations once. Preserve
+        // the first matching declaration and the original lookup precedence.
+        chỉ mục hàm đã khai = {};
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách hàm đã khai); i++) {
+            tên hàm = danh sách hàm đã khai[i];
+            nếu (!máy ảo có khóa từ điển(chỉ mục hàm đã khai, tên hàm)) {
+                chỉ mục hàm đã khai[tên hàm] = danh sách hàm các mã định danh[i];
+            };
+        };
+        danh sách nhìn thấy = lấy từ điển(mô đun, "nhìn thấy", []);
+        chỉ mục hàm nhìn thấy = {};
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách nhìn thấy); i++) {
+            tên hàm = danh sách nhìn thấy[i]["tên"];
+            nếu (!máy ảo có khóa từ điển(chỉ mục hàm nhìn thấy, tên hàm)) {
+                chỉ mục hàm nhìn thấy[tên hàm] = danh sách nhìn thấy[i]["id"];
+            };
+        };
+        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chỉ mục symbol slots": {},
+                      "chỉ mục khóa slots": {}, "số khóa đã tra": 0, "chuỗi": sổ["chuỗi"],
+                      "chỉ mục receiver": {}, "số receiver đã tra": 0,
+                      "sổ hàm": sổ, "hàm ẩn danh": [],
                       "chỉ mục chuỗi": lấy từ điển(sổ, "chỉ mục chuỗi", {}),
                       "mô đun": tên mô đun,
                       "ngoại": ngoại cục bộ,
@@ -1128,7 +1379,9 @@ lớp công khai Bộ Phát Bytecode {
                       "lớp đã khai": kiểu lớp đã khai, "lớp đã phát": [],
                       "lớp nhập": biên dịch kiểu lớp chạy(sổ, mô đun),
                       "hàm đã khai": danh sách hàm đã khai, "hàm các mã định danh": danh sách hàm các mã định danh,
-                      "hàm nhìn thấy": lấy từ điển(mô đun, "nhìn thấy", []),
+                      "chỉ mục hàm đã khai": chỉ mục hàm đã khai,
+                      "hàm nhìn thấy": danh sách nhìn thấy,
+                      "chỉ mục hàm nhìn thấy": chỉ mục hàm nhìn thấy,
                       "liên mô đun": tên mô đun != "",
                       "lặp": [], "phạm vi thoát": [],
                       "độ sâu khối": 0, "độ sâu thử": 0};
@@ -1155,6 +1408,7 @@ lớp công khai Bộ Phát Bytecode {
                 danh sách hàm biểu diễn trung gian = các hàm biểu diễn trung gian[local mã định danh];
                 thân = [];
                 mình.biên dịch phát mã lệnh(thân, biên dịch mã thao tác("OP_MO_KHOI"), 0, 0, 0);
+                mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân, []);
                 tham số = lấy từ điển(danh sách hàm biểu diễn trung gian, "tham số", []);
                 mặc định = lấy từ điển(danh sách hàm biểu diễn trung gian, "mặc định tham số", []);
                 tham số các mã định danh = lấy từ điển(danh sách hàm biểu diễn trung gian, "tham số symbol", []);
@@ -1199,6 +1453,21 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo lấy độ dài(trạng thái["chọn"]) != 0 || máy ảo lấy độ dài(trạng thái["thử"]) != 0 ||
             máy ảo lấy độ dài(trạng thái["lặp"]) != 0 || máy ảo lấy độ dài(trạng thái["phạm vi thoát"]) != 0) {
             ném "biên dịch phát mã: khối điều khiển chưa đóng trong chương trình";
+        };
+        ẩn danh = trạng thái["hàm ẩn danh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(ẩn danh); i++) { máy ảo thêm cuối danh sách(các hàm, ẩn danh[i]); };
+        nếu (máy ảo lấy độ dài(ẩn danh) > 0) {
+            // Closure lồng nhau được cấp ID trước khi phát xong thân hàm ngoài.
+            lặp(i = 1; i < máy ảo lấy độ dài(các hàm); i++) {
+                mục = các hàm[i];
+                j = i;
+                khi (j > 0) {
+                    nếu (các hàm[j - 1]["id"] < mục["id"]) { thoát; };
+                    các hàm[j] = các hàm[j - 1];
+                    j -= 1;
+                };
+                các hàm[j] = mục;
+            };
         };
         // Giống compilePipeline(..., emitEntryPointCall=false) trong snapshot C++:
         // opcode 44 (halt) và lời gọi entrypoint thuộc bước linker cuối cùng.

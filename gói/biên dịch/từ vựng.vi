@@ -1,9 +1,11 @@
 // Lexer viết bằng V++: bước đầu của compiler tự lưu trữ.
 // Vị trí/cột dùng byte UTF-8 như SourceSpan của compiler bootstrap.
 // Cả vị trí theo Unicode code point được giữ trong các trường "... ký tự".
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Mỗi phiên giữ nguồn và cache token thô/token đã hợp nhất riêng.
 // Các phương thức nhận nguồn trực tiếp bên dưới vẫn giữ API cũ.
@@ -19,6 +21,20 @@ lớp công khai Bộ Tách Từ Vựng {
         mình.nguồn = mã nguồn;
         mình.từ tố thô = rỗng;
         mình.từ tố đã ghép = rỗng;
+        // Mã loại nội bộ ổn định; API cũ vẫn trả tên loại.
+        mình.tên loại từ tố = ["", "định danh", "từ khóa", "số nguyên", "số thực", "chuỗi", "toán tử", "dấu câu", "hết"];
+        // A token is classified many times per source, so reuse one keyword
+        // index instead of checking every keyword with sequential compares.
+        mình.bảng từ khóa = {
+            "nếu": 320, "hoặc": 321, "lặp": 322, "khi": 323, "hàm": 324,
+            "gọi": 325, "biến": 326, "in": 327, "dừng": 328, "thoát": 329,
+            "chọn": 330, "ca": 331, "đúng": 332, "sai": 333, "rỗng": 334,
+            "ném": 335, "thử": 336, "nhập": 337, "lớp": 338, "chuyển": 339,
+            "mặc định": 340, "trả về": 341, "bỏ qua": 342, "khởi tạo": 343, "điều kiện": 344,
+            "cập nhật": 345, "kiểm tra sau": 346, "bắt lỗi": 347, "trường hợp": 348, "giao diện": 349,
+            "kế thừa": 350, "triển khai": 351, "công khai": 352, "riêng tư": 353, "bảo vệ": 354,
+            "ngoại thư viện": 355, "ngoại hàm": 356, "ký hiệu": 357, "khả năng": 358
+        };
         trả về mình;
     };
 
@@ -36,89 +52,24 @@ lớp công khai Bộ Tách Từ Vựng {
         trả về mình.từ tố đã ghép;
     };
 
-    hàm riêng tư biên dịch từ vựng ký tự(các ký tự, vị trí) {
-        nếu (vị trí < 0 || vị trí >= máy ảo lấy độ dài(các ký tự)) { trả về ""; };
-        trả về các ký tự[vị trí];
-    };
-
-    hàm riêng tư biên dịch từ vựng trắng(c) {
-        // Chuỗi escape \v / \f không được V++ diễn giải thành ký tự điều khiển:
-        // dùng code point để tránh nuốt nhầm chữ 'v' và 'f' của định danh.
-        nếu (c == " " || c == "\n" || c == "\r" || c == "\t") { trả về đúng; };
-        mã = mã điểm unicode(c);
-        trả về mã == 11 || mã == 12;
-    };
-
-    hàm riêng tư biên dịch từ vựng ngăn cách(c) {
-        trả về c == "\"" || c == "'" || c == "+" || c == "-" ||
-            c == "*" || c == "/" || c == "(" || c == ")" ||
-            c == "{" || c == "}" || c == "[" || c == "]" ||
-            c == ";" || c == "," || c == "<" || c == ">" ||
-            c == "=" || c == "!" || c == ":";
-    };
-
-    hàm riêng tư biên dịch từ vựng hai toán tử(s) {
-        trả về s == "==" || s == "!=" || s == "<=" || s == ">=" ||
-            s == "&&" || s == "||" || s == "++" || s == "--" ||
-            s == "+=" || s == "-=" || s == "*=" || s == "/=" || s == "%=";
-    };
-
-    hàm riêng tư biên dịch từ vựng chữ số(c) {
-        nếu (c == "") { trả về sai; };
-        mã = mã điểm unicode(c);
-        trả về mã >= 48 && mã <= 57;
-    };
-
-    hàm riêng tư biên dịch từ vựng số(s) {
-        nếu (s == "") { trả về ""; };
+    // Dùng span byte đã quét, không cấp phát chuỗi con cho từng chữ số.
+    hàm riêng tư biên dịch từ vựng số(các byte, đầu, cuối) {
         dấu chấm = 0;
-        lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
-            c = s[i];
-            nếu (c == ".") {
+        lặp(j = đầu; j < cuối; j++) {
+            c = các byte[j];
+            nếu (c == 46) {
                 dấu chấm += 1;
-            } hoặc {
-                nếu (!mình.biên dịch từ vựng chữ số(c)) { trả về ""; };
-            };
+                nếu (dấu chấm > 1) { trả về 0; };
+            } hoặc nếu (c < 48 || c > 57) { trả về 0; };
         };
-        nếu (dấu chấm == 0) { trả về "số nguyên"; };
-        nếu (dấu chấm == 1) { trả về "số thực"; };
-        trả về "";
-    };
-
-    hàm riêng tư biên dịch từ vựng phân loại(s) {
-        n = máy ảo lấy độ dài(s);
-        nếu (n >= 2) {
-            nếu ((s[0] == "\"" && s[n - 1] == "\"") ||
-                (s[0] == "'" && s[n - 1] == "'")) { trả về "chuỗi"; };
-        };
-        số = mình.biên dịch từ vựng số(s);
-        nếu (số != "") { trả về số; };
-        nếu (mình.biên dịch từ vựng hai toán tử(s) || s == "+" || s == "-" ||
-            s == "*" || s == "/" || s == "%" || s == "=" ||
-            s == "!" || s == "<" || s == ">") { trả về "toán tử"; };
-        nếu (s == "(" || s == ")" || s == "{" || s == "}" ||
-            s == "[" || s == "]" || s == ";" || s == "," || s == ":") {
-            trả về "dấu câu";
-        };
-        nếu (s == "nếu" || s == "hoặc" || s == "lặp" || s == "hàm" ||
-            s == "gọi" || s == "biến" || s == "in" || s == "dừng" ||
-            s == "thoát" || s == "chọn" || s == "ca" || s == "đúng" ||
-            s == "sai" || s == "rỗng" || s == "ném" || s == "thử" ||
-            s == "nhập" || s == "lớp" || s == "chuyển" || s == "mặc định" ||
-            s == "trả về" || s == "bỏ qua" ||
-            s == "khởi tạo" || s == "điều kiện" || s == "cập nhật" ||
-            s == "kiểm tra sau" || s == "bắt lỗi" || s == "trường hợp" ||
-            s == "giao diện" || s == "kế thừa" || s == "triển khai" ||
-            s == "công khai" || s == "riêng tư" || s == "bảo vệ" ||
-            s == "ngoại thư viện" || s == "ngoại hàm" || s == "ký hiệu" ||
-            s == "khả năng") { trả về "từ khóa"; };
-        trả về "định danh";
+        nếu (dấu chấm == 0) { trả về 3; };
+        trả về 4;
     };
 
     hàm riêng tư biên dịch từ vựng từ tố(giá trị, dòng, cột, bắt đầu, kết thúc,
-                               cột ký tự, bắt đầu ký tự, kết thúc ký tự) {
+                               cột ký tự, bắt đầu ký tự, kết thúc ký tự, loại đã biết) {
         trả về {
-            "loại": mình.biên dịch từ vựng phân loại(giá trị),
+            "loại": mình.tên loại từ tố[loại đã biết],
             "giá trị": giá trị,
             "dòng": dòng,
             "cột": cột,
@@ -130,6 +81,30 @@ lớp công khai Bộ Tách Từ Vựng {
         };
     };
 
+    // Bản ghi parser: [loại, giá trị, dòng, cột, byte đầu, byte cuối,
+    // cột ký tự, ký tự đầu, ký tự cuối, ID ký hiệu, mã loại, mã cú pháp]. ID -1 là literal/toán tử.
+    // Giữ chuỗi canonical ngay trong record để parser không phải tra pool mỗi lần nhìn.
+    hàm riêng tư biên dịch từ vựng từ tố gọn(giá trị, dòng, cột, bắt đầu, kết thúc,
+                               cột ký tự, bắt đầu ký tự, kết thúc ký tự, loại đã biết, mã cú pháp) {
+        mã ký hiệu = -1;
+        // This private constructor receives only classified kinds 1..7.
+        nếu (loại đã biết <= 2) {
+            // Map indexing returns rỗng for absent keys, including native/JIT.
+            // ID 0 is valid and distinct from rỗng.
+            đã intern = mình.chỉ mục ký hiệu[giá trị];
+            nếu (đã intern != rỗng) {
+                mã ký hiệu = đã intern;
+                giá trị = mình.ký hiệu[mã ký hiệu];
+            } hoặc {
+                mã ký hiệu = máy ảo lấy độ dài(mình.ký hiệu);
+                mình.chỉ mục ký hiệu[giá trị] = mã ký hiệu;
+                máy ảo thêm cuối danh sách(mình.ký hiệu, giá trị);
+            };
+        };
+        trả về [mình.tên loại từ tố[loại đã biết], giá trị, dòng, cột, bắt đầu, kết thúc,
+            cột ký tự, bắt đầu ký tự, kết thúc ký tự, mã ký hiệu, loại đã biết, mã cú pháp];
+    };
+
     hàm riêng tư biên dịch từ vựng lỗi(loại lỗi, dòng, cột) {
         ném "biên dịch từ vựng: " + loại lỗi + " tại dòng " +
             thành chuỗi(dòng) + ", cột " + thành chuỗi(cột);
@@ -138,142 +113,251 @@ lớp công khai Bộ Tách Từ Vựng {
     // Lex UTF-8 bằng các code point: không tách đôi ký tự tiếng Việt.
     // Chưa dùng trong bootstrap C++; API này là pass độc lập có thể kiểm thử.
     hàm công khai biên dịch từ tố hóa thô(mã nguồn) {
+        trả về mình.quét từ tố(mã nguồn, sai);
+    };
+
+    hàm riêng tư quét từ tố(mã nguồn, gọn) {
         nếu (loại của(mã nguồn) != "chuỗi") {
             ném "biên dịch từ vựng: mã nguồn phải là chuỗi";
         };
-        // Không lấy chỉ số Unicode từ đầu chuỗi cho từng ký tự: cách đó phải
-        // quét lại toàn bộ prefix và làm thời gian lexer tăng theo bình phương.
-        // Duyệt UTF-8 đúng một lượt rồi giữ bảng code point cho các pass sau.
+        // Kiểm tra UTF-8 toàn nguồn trước khi tách token để giữ thứ tự báo lỗi.
+        // Sau đó duyệt bằng con trỏ byte và chỉ số code point; không tạo chuỗi
+        // hoặc bảng offset cho từng ký tự.
         các byte = chuỗi thành byte máy ảo(mã nguồn);
-        ký tự = [];
-        mã ký tự cơ bản = [];
-        lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(mã ký tự cơ bản, chuỗi từ byte máy ảo([i])); };
-        vị trí byte = [0];
-        cột byte = [1];
-        cột hiện tại = 1;
+        // The source byte length is immutable throughout tokenization.
+        số byte = máy ảo lấy độ dài(các byte);
+        từ khóa = mình.bảng từ khóa;
+        dấu = rỗng;
+        nếu (gọn) { dấu = mình.bảng dấu; };
+        // 0 = ordinary (including UTF-8), 1 = whitespace, 2 = operator,
+        // 3 = punctuation, 4 = quote. Dot remains ordinary for numeric tokens.
+        bảng phân loại ASCII = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            1, 2, 4, 0, 0, 2, 2, 4, 3, 3, 2, 2, 3, 2, 0, 2,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 2, 2, 2, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 3, 2, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 3, 2, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ];
+        // Operator suffix bits: 1 = '=', 2 = repeated byte, 4 = shift assignment.
+        // Only ASCII operator bytes index this table.
+        hậu tố toán tử = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 0, 0, 0, 1, 3, 0, 0, 0, 1, 3, 0, 3, 0, 1,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1, 7, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0
+        ];
+        // Validate once, before lexical errors, including bytes in comments.
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
-            bước = 1;
-            c = "";
-            nếu (các byte[vị trí] < 128) {
-                c = mã ký tự cơ bản[các byte[vị trí]];
-            } hoặc {
-                bước = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
-                nếu (bước < 1) { ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ"; };
-                đoạn = [];
-                lặp(j = 0; j < bước; j++) { máy ảo thêm cuối danh sách(đoạn, các byte[vị trí + j]); };
-                c = chuỗi từ byte máy ảo(đoạn);
+        khi (vị trí < số byte) {
+            b0 = các byte[vị trí];
+            nếu (b0 < 128) { vị trí += 1; }
+            hoặc {
+                // Lexer chỉ cần valid/invalid, không cần maximal invalid prefix.
+                // Giữ nguyên chẩn đoán trước khi xử lý bất kỳ token nào.
+                bước = 0;
+                nếu (b0 >= 194 && b0 <= 223) { bước = 2; }
+                hoặc nếu (b0 >= 224 && b0 <= 239) { bước = 3; }
+                hoặc nếu (b0 >= 240 && b0 <= 244) { bước = 4; };
+                nếu (bước == 0 || vị trí + bước > số byte) {
+                    ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ";
+                };
+                b1 = các byte[vị trí + 1];
+                nếu ((b1 & 192) != 128 ||
+                    (b0 == 224 && b1 < 160) || (b0 == 237 && b1 > 159) ||
+                    (b0 == 240 && b1 < 144) || (b0 == 244 && b1 > 143)) {
+                    ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ";
+                };
+                nếu (bước >= 3) {
+                    b2 = các byte[vị trí + 2];
+                    nếu ((b2 & 192) != 128) { ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ"; };
+                    nếu (bước == 4) {
+                        b3 = các byte[vị trí + 3];
+                        nếu ((b3 & 192) != 128) { ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ"; };
+                    };
+                };
+                vị trí += bước;
             };
-            máy ảo thêm cuối danh sách(ký tự, c);
-            vị trí += bước;
-            nếu (c == "\n") { cột hiện tại = 1; }
-            hoặc { cột hiện tại += bước; };
-            máy ảo thêm cuối danh sách(vị trí byte, vị trí);
-            máy ảo thêm cuối danh sách(cột byte, cột hiện tại);
         };
-        n = máy ảo lấy độ dài(ký tự);
+
         kết quả = [];
         i = 0;
+        chỉ số ký tự = 0;
         dòng = 1;
         cột = 1;
-        lặp(vòng = 0; i < n; vòng++) {
-            c = ký tự[i];
-            tiếp = "";
-            nếu (i + 1 < n) { tiếp = ký tự[i + 1]; };
-            nếu (mình.biên dịch từ vựng trắng(c)) {
-                nếu (c == "\n") { dòng += 1; cột = 1; }
-                hoặc { cột += 1; };
+        đầu byte dòng = 0;
+        khi (i < số byte) {
+            mã ASCII = các byte[i];
+            loại ASCII = bảng phân loại ASCII[mã ASCII];
+            tiếp = -1;
+            // Only slash can introduce a comment. The sentinel excludes all other bytes.
+            nếu (mã ASCII == 47) {
+                nếu (i + 1 < số byte) { tiếp = các byte[i + 1]; };
+            };
+            nếu (loại ASCII == 1) {
+                nếu (mã ASCII == 10) {
+                    dòng += 1; cột = 1;
+                    đầu byte dòng = i + 1;
+                } hoặc { cột += 1; };
                 i += 1;
-            } hoặc {
-                nếu (c == "/" && tiếp == "/") {
-                    i += 2;
-                    cột += 2;
-                    lặp(j = 0; i < n; j++) {
-                        nếu (ký tự[i] == "\n") { thoát; };
-                        i += 1;
-                        cột += 1;
+                chỉ số ký tự += 1;
+            } hoặc nếu (tiếp == 47) {
+                i += 2; cột += 2; chỉ số ký tự += 2;
+                khi (i < số byte) {
+                    a = các byte[i];
+                    nếu (a == 10) { thoát; };
+                    bước = 1;
+                    nếu (a >= 128) {
+                        bước = 2;
+                        nếu (a >= 224) { bước = 3; };
+                        nếu (a >= 240) { bước = 4; };
                     };
-                } hoặc {
-                    nếu (c == "/" && tiếp == "*") {
-                        đầu dòng = dòng;
-                        đầu cột = cột;
-                        i += 2;
-                        cột += 2;
-                        đóng = sai;
-                        lặp(j = 0; i < n && !đóng; j++) {
-                            a = ký tự[i];
-                            b = "";
-                            nếu (i + 1 < n) { b = ký tự[i + 1]; };
-                            nếu (a == "*" && b == "/") {
-                                i += 2;
-                                cột += 2;
-                                đóng = đúng;
-                            } hoặc {
-                                nếu (a == "\n") { dòng += 1; cột = 1; }
-                                hoặc { cột += 1; };
-                                i += 1;
-                            };
-                        };
-                        nếu (!đóng) { mình.biên dịch từ vựng lỗi("chú thích khối chưa đóng", đầu dòng, đầu cột); };
+                    i += bước; cột += 1; chỉ số ký tự += 1;
+                };
+            } hoặc nếu (tiếp == 42) {
+                đầu dòng = dòng;
+                đầu cột = cột;
+                i += 2; cột += 2; chỉ số ký tự += 2;
+                đóng = sai;
+                khi (i < số byte && !đóng) {
+                    a = các byte[i];
+                    kết thúc khối = sai;
+                    nếu (a == 42 && i + 1 < số byte) {
+                        kết thúc khối = các byte[i + 1] == 47;
+                    };
+                    nếu (kết thúc khối) {
+                        i += 2; cột += 2; chỉ số ký tự += 2;
+                        đóng = đúng;
                     } hoặc {
-                        đầu = i;
-                        đầu dòng = dòng;
-                        đầu cột = cột;
-                        giá trị = "";
-                        nếu (c == "\"" || c == "'") {
-                            nháy = c;
-                            giá trị = c;
-                            i += 1;
-                            cột += 1;
-                            đóng = sai;
-                            lặp(j = 0; i < n && !đóng; j++) {
-                                a = ký tự[i];
-                                b = "";
-                                nếu (i + 1 < n) { b = ký tự[i + 1]; };
-                                nếu (a == "\n") {
-                                    mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột);
-                                };
-                                nếu (a == "\\" && i + 1 < n) {
-                                    giá trị = giá trị + a + b;
-                                    i += 2;
-                                    cột += 2;
-                                } hoặc {
-                                    giá trị = giá trị + a;
-                                    i += 1;
-                                    cột += 1;
-                                    nếu (a == nháy) { đóng = đúng; };
-                                };
+                        bước = 1;
+                        nếu (a >= 128) {
+                            bước = 2;
+                            nếu (a >= 224) { bước = 3; };
+                            nếu (a >= 240) { bước = 4; };
+                        };
+                        nếu (a == 10) {
+                            dòng += 1; cột = 1;
+                            đầu byte dòng = i + 1;
+                        } hoặc { cột += 1; };
+                        i += bước; chỉ số ký tự += 1;
+                    };
+                };
+                nếu (!đóng) { mình.biên dịch từ vựng lỗi("chú thích khối chưa đóng", đầu dòng, đầu cột); };
+            } hoặc {
+                đầu = i;
+                đầu ký tự = chỉ số ký tự;
+                đầu dòng = dòng;
+                đầu cột = cột;
+                loại đã biết = 0;
+                nếu (loại ASCII == 4) {
+                    loại đã biết = 5;
+                    nháy = mã ASCII;
+                    i += 1; cột += 1; chỉ số ký tự += 1;
+                    đóng = sai;
+                    khi (i < số byte && !đóng) {
+                        a = các byte[i];
+                        nếu (a == 10) {
+                            mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột);
+                        };
+                        nếu (a == 92 && i + 1 < số byte) {
+                            // Preserve the historical escape rule: consume the
+                            // next complete code point, including escaped LF.
+                            i += 1; cột += 1; chỉ số ký tự += 1;
+                            a = các byte[i];
+                            bước = 1;
+                            nếu (a >= 128) {
+                                bước = 2;
+                                nếu (a >= 224) { bước = 3; };
+                                nếu (a >= 240) { bước = 4; };
                             };
-                            nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột); };
+                            i += bước; cột += 1; chỉ số ký tự += 1;
                         } hoặc {
-                            ghép = c + tiếp;
-                            nếu (mình.biên dịch từ vựng hai toán tử(ghép)) {
-                                giá trị = ghép;
-                                i += 2;
-                                cột += 2;
-                            } hoặc {
-                                nếu (mình.biên dịch từ vựng ngăn cách(c)) {
-                                    giá trị = c;
-                                    i += 1;
-                                    cột += 1;
-                                } hoặc {
-                                    lặp(j = 0; i < n; j++) {
-                                        a = ký tự[i];
-                                        nếu (mình.biên dịch từ vựng trắng(a) || mình.biên dịch từ vựng ngăn cách(a)) {
-                                            thoát;
-                                        };
-                                        giá trị = giá trị + a;
-                                        i += 1;
-                                        cột += 1;
-                                    };
-                                };
+                            bước = 1;
+                            nếu (a >= 128) {
+                                bước = 2;
+                                nếu (a >= 224) { bước = 3; };
+                                nếu (a >= 240) { bước = 4; };
+                            };
+                            i += bước; cột += 1; chỉ số ký tự += 1;
+                            nếu (a == nháy) { đóng = đúng; };
+                        };
+                    };
+                    nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột); };
+                } hoặc nếu (loại ASCII != 0) {
+                    bước = 1;
+                    loại đã biết = 6;
+                    nếu (loại ASCII == 3) { loại đã biết = 7; }
+                    hoặc nếu (i + 1 < số byte) {
+                        mã sau = các byte[i + 1];
+                        cờ = hậu tố toán tử[mã ASCII];
+                        nếu (mã sau == 61 && (cờ & 1) != 0) { bước = 2; }
+                        hoặc nếu (mã sau == mã ASCII && (cờ & 2) != 0) {
+                            bước = 2;
+                            nếu ((cờ & 4) != 0 && i + 2 < số byte) {
+                                nếu (các byte[i + 2] == 61) { bước = 3; };
                             };
                         };
-                        máy ảo thêm cuối danh sách(kết quả, mình.biên dịch từ vựng từ tố(
-                            giá trị, đầu dòng, cột byte[đầu],
-                            vị trí byte[đầu], vị trí byte[i], đầu cột, đầu, i
-                        ));
                     };
+                    i += bước; cột += bước; chỉ số ký tự += bước;
+                } hoặc {
+                    // First byte is already classified as ordinary. Advance it
+                    // before reading the next byte; accumulate code point column once.
+                    mã quét = mã ASCII;
+                    số ký tự = 0;
+                    khi (đúng) {
+                        bước = 1;
+                        nếu (mã quét >= 128) {
+                            bước = 2;
+                            nếu (mã quét >= 224) { bước = 3; };
+                            nếu (mã quét >= 240) { bước = 4; };
+                        };
+                        i += bước; số ký tự += 1;
+                        nếu (i >= số byte) { thoát; };
+                        mã quét = các byte[i];
+                        nếu (bảng phân loại ASCII[mã quét] != 0) { thoát; };
+                    };
+                    cột += số ký tự; chỉ số ký tự += số ký tự;
+                };
+                giá trị = máy ảo cắt chuỗi theo byte(mã nguồn, đầu, i - đầu);
+                mã cú pháp = 0;
+                nếu (loại đã biết == 0) {
+                    nếu (mã ASCII == 46 || (mã ASCII >= 48 && mã ASCII <= 57)) {
+                        loại đã biết = mình.biên dịch từ vựng số(các byte, đầu, i);
+                    };
+                    nếu (loại đã biết == 0) {
+                        loại đã biết = 1;
+                        mã từ khóa = từ khóa[giá trị];
+                        nếu (mã từ khóa != rỗng) {
+                            loại đã biết = 2;
+                            mã cú pháp = mã từ khóa;
+                        };
+                    };
+                };
+                nếu (gọn) {
+                    nếu (loại đã biết >= 6) {
+                        mã cú pháp = dấu[giá trị];
+                    } hoặc nếu (mã ASCII == 46) { mã cú pháp = 300; };
+                    máy ảo thêm cuối danh sách(kết quả, mình.biên dịch từ vựng từ tố gọn(
+                        giá trị, đầu dòng, đầu - đầu byte dòng + 1,
+                        đầu, i, đầu cột, đầu ký tự, chỉ số ký tự, loại đã biết, mã cú pháp));
+                } hoặc {
+                    máy ảo thêm cuối danh sách(kết quả, mình.biên dịch từ vựng từ tố(
+                        giá trị, đầu dòng, đầu - đầu byte dòng + 1,
+                        đầu, i, đầu cột, đầu ký tự, chỉ số ký tự, loại đã biết));
                 };
             };
         };
@@ -286,39 +370,110 @@ lớp công khai Bộ Tách Từ Vựng {
         trả về mình.hợp nhất từ tố(thô);
     };
 
-    hàm riêng tư hợp nhất từ tố(thô) {
+    // Mỗi lần quét có pool riêng; không tái sử dụng ID giữa các nguồn.
+    hàm công khai biên dịch từ tố hóa gọn(mã nguồn) {
+        mình.bảng dấu = {
+            "=": 16, "+=": 17, "-=": 18, "*=": 19, "/=": 20,
+            "%=": 21, "&=": 22, "|=": 23, "^=": 24, "<<=": 25,
+            ">>=": 26, "||": 32, "&&": 48, "|": 64, "^": 80,
+            "&": 96, "==": 112, "!=": 113, "<": 128, ">": 129,
+            "<=": 130, ">=": 131, "<<": 144, ">>": 145, "+": 160,
+            "-": 161, "*": 176, "/": 177, "%": 178, "!": 1,
+            "~": 2, "++": 3, "--": 4, "(": 200, ")": 201,
+            "[": 202, "]": 203, "{": 204, "}": 205, ",": 206,
+            ":": 207, ";": 208
+        };
+        mình.chỉ mục ký hiệu = {};
+        mình.ký hiệu = [];
+        thô = mình.quét từ tố(mã nguồn, đúng);
+        đã ghép = mình.hợp nhất từ tố(thô, đúng);
+        trả về {"token": đã ghép, "ký hiệu": mình.ký hiệu};
+    };
+
+    hàm riêng tư hợp nhất từ tố(thô, gọn = sai) {
+        // [âm tiết 2, cụm 2, âm tiết 2 của cụm 3, âm tiết 3, cụm 3].
+        tiền tố = {
+            "mặc": ["định", "mặc định", "", "", ""],
+            "trả": ["về", "trả về", "", "", ""],
+            "bỏ": ["qua", "bỏ qua", "", "", ""],
+            "khởi": ["tạo", "khởi tạo", "", "", ""],
+            "điều": ["kiện", "điều kiện", "", "", ""],
+            "cập": ["nhật", "cập nhật", "", "", ""],
+            "bắt": ["lỗi", "bắt lỗi", "", "", ""],
+            "trường": ["hợp", "trường hợp", "", "", ""],
+            "giao": ["diện", "giao diện", "", "", ""],
+            "kế": ["thừa", "kế thừa", "", "", ""],
+            "triển": ["khai", "triển khai", "", "", ""],
+            "công": ["khai", "công khai", "", "", ""],
+            "riêng": ["tư", "riêng tư", "", "", ""],
+            "bảo": ["vệ", "bảo vệ", "", "", ""],
+            "ngoại": ["hàm", "ngoại hàm", "thư", "viện", "ngoại thư viện"],
+            "ký": ["hiệu", "ký hiệu", "", "", ""],
+            "khả": ["năng", "khả năng", "", "", ""],
+            "kiểm": ["", "", "tra", "sau", "kiểm tra sau"]
+        };
+        n = máy ảo lấy độ dài(thô);
+        // Danh sách gọn thuộc riêng lần quét này. Ghi đè phần đã đọc,
+        // giữ thứ tự intern và chỉ xóa đuôi sau khi hợp nhất xong.
+        nếu (gọn) {
+            i = 0;
+            ghi = 0;
+            khi (i < n) {
+                đầu = thô[i];
+                bước = 1;
+                nếu (đầu[10] == 1 && i + 1 < n) {
+                    cụm = tiền tố[đầu[1]];
+                    nếu (cụm != rỗng) {
+                        thứ hai = thô[i + 1][1];
+                        chuỗi ghép = "";
+                        nếu (cụm[4] != "" && thứ hai == cụm[2] && i + 2 < n) {
+                            nếu (thô[i + 2][1] == cụm[3]) {
+                                chuỗi ghép = cụm[4]; bước = 3;
+                            };
+                        };
+                        nếu (bước == 1 && cụm[1] != "" && thứ hai == cụm[0]) {
+                            chuỗi ghép = cụm[1]; bước = 2;
+                        };
+                        nếu (bước != 1) {
+                            cuối = thô[i + bước - 1];
+                            đầu = mình.biên dịch từ vựng từ tố gọn(
+                                chuỗi ghép, đầu[2], đầu[3], đầu[4], cuối[5],
+                                đầu[6], đầu[7], cuối[8], 2, mình.bảng từ khóa[chuỗi ghép]);
+                        };
+                    };
+                };
+                nếu (ghi != i || bước != 1) { thô[ghi] = đầu; };
+                ghi += 1;
+                i += bước;
+            };
+            khi (n > ghi) {
+                n -= 1;
+                máy ảo xóa vị trí danh sách(thô, n);
+            };
+            trả về thô;
+        };
+        // API map giữ nguyên danh sách thô được cache bởi bộ tách.
         kết quả = [];
-        cụm ba = ["kiểm tra sau", "ngoại thư viện"];
-        cụm hai = ["mặc định", "trường hợp", "trả về", "bỏ qua",
-            "khởi tạo", "điều kiện", "cập nhật", "bắt lỗi", "giao diện",
-            "kế thừa", "triển khai", "công khai", "riêng tư", "bảo vệ",
-            "ngoại hàm", "ký hiệu", "khả năng"];
-        tiền tố = {"kiểm": đúng, "ngoại": đúng, "mặc": đúng,
-            "trường": đúng, "trả": đúng, "bỏ": đúng, "khởi": đúng,
-            "điều": đúng, "cập": đúng, "bắt": đúng, "giao": đúng,
-            "kế": đúng, "triển": đúng, "công": đúng, "riêng": đúng,
-            "bảo": đúng, "ký": đúng, "khả": đúng};
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(thô); vòng++) {
+        khi (i < n) {
             đầu = thô[i];
             chuỗi ghép = lấy từ điển(đầu, "giá trị", "");
             bước = 1;
-            nếu (máy ảo có khóa từ điển(tiền tố, chuỗi ghép) && i + 2 < máy ảo lấy độ dài(thô)) {
-                lượt thử ba = chuỗi ghép + " " + lấy từ điển(thô[i + 1], "giá trị", "") +
-                    " " + lấy từ điển(thô[i + 2], "giá trị", "");
-                lặp(j = 0; j < máy ảo lấy độ dài(cụm ba); j++) {
-                    nếu (lượt thử ba == cụm ba[j]) { chuỗi ghép = lượt thử ba; bước = 3; thoát; };
+            cụm = rỗng;
+            nếu (i + 1 < n) { cụm = tiền tố[chuỗi ghép]; };
+            nếu (cụm != rỗng) {
+                thứ hai = lấy từ điển(thô[i + 1], "giá trị", "");
+                nếu (cụm[4] != "" && thứ hai == cụm[2] && i + 2 < n) {
+                    thứ ba = lấy từ điển(thô[i + 2], "giá trị", "");
+                    nếu (thứ ba == cụm[3]) {
+                        chuỗi ghép = cụm[4]; bước = 3;
+                    };
                 };
-            };
-            nếu (bước == 1 && máy ảo có khóa từ điển(tiền tố, chuỗi ghép) && i + 1 < máy ảo lấy độ dài(thô)) {
-                lượt thử hai = chuỗi ghép + " " + lấy từ điển(thô[i + 1], "giá trị", "");
-                lặp(j = 0; j < máy ảo lấy độ dài(cụm hai); j++) {
-                    nếu (lượt thử hai == cụm hai[j]) { chuỗi ghép = lượt thử hai; bước = 2; thoát; };
+                nếu (bước == 1 && cụm[1] != "" && thứ hai == cụm[0]) {
+                    chuỗi ghép = cụm[1]; bước = 2;
                 };
             };
             nếu (bước == 1) {
-                // Token thô đã có phân loại và span chính xác. Giữ nguyên
-                // bản ghi để khỏi tạo map và phân loại lại mỗi token.
                 máy ảo thêm cuối danh sách(kết quả, đầu);
             } hoặc {
                 cuối = thô[i + bước - 1];
@@ -326,9 +481,8 @@ lớp công khai Bộ Tách Từ Vựng {
                     chuỗi ghép,
                     lấy từ điển(đầu, "dòng", 1), lấy từ điển(đầu, "cột", 1),
                     lấy từ điển(đầu, "vị trí", 0), lấy từ điển(cuối, "kết thúc", 0),
-                    lấy từ điển(đầu, "cột ký tự", 1),
-                    lấy từ điển(đầu, "vị trí ký tự", 0),
-                    lấy từ điển(cuối, "kết thúc ký tự", 0)
+                    lấy từ điển(đầu, "cột ký tự", 1), lấy từ điển(đầu, "vị trí ký tự", 0),
+                    lấy từ điển(cuối, "kết thúc ký tự", 0), 2
                 ));
             };
             i += bước;
@@ -346,4 +500,236 @@ hàm công khai biên dịch từ tố hóa thô(mã nguồn) {
 hàm công khai biên dịch từ tố hóa(mã nguồn) {
     bộ tách = Bộ Tách Từ Vựng(mã nguồn);
     trả về bộ tách.từ tố();
+};
+
+// Parser hỗ trợ cả record gọn và token map truyền từ API cũ.
+hàm công khai biên dịch trường từ tố(từ tố, chỉ số, khóa, mặc định) {
+    nếu (máy ảo lấy loại(từ tố) == "danh sách") { trả về từ tố[chỉ số]; };
+    trả về lấy từ điển(từ tố, khóa, mặc định);
+};
+
+hàm công khai biên dịch từ tố hóa gọn(mã nguồn) {
+    bộ tách = Bộ Tách Từ Vựng(mã nguồn);
+    trả về bộ tách.biên dịch từ tố hóa gọn(mã nguồn);
+};
+
+// Fast path cho token mới; vẫn nhận list mười trường và map từ caller cũ.
+hàm công khai biên dịch mã loại từ tố(từ tố) {
+    nếu (máy ảo lấy loại(từ tố) == "danh sách") {
+        nếu (máy ảo lấy độ dài(từ tố) > 10) { trả về từ tố[10]; };
+        tên loại = từ tố[0];
+    } hoặc { tên loại = lấy từ điển(từ tố, "loại", ""); };
+    nếu (tên loại == "định danh") { trả về 1; };
+    nếu (tên loại == "từ khóa") { trả về 2; };
+    nếu (tên loại == "số nguyên") { trả về 3; };
+    nếu (tên loại == "số thực") { trả về 4; };
+    nếu (tên loại == "chuỗi") { trả về 5; };
+    nếu (tên loại == "toán tử") { trả về 6; };
+    nếu (tên loại == "dấu câu") { trả về 7; };
+    nếu (tên loại == "hết") { trả về 8; };
+    trả về 0;
+};
+
+
+// Mã cú pháp cố định độc lập với ID intern theo nguồn.
+// 16..191: mức ưu tiên ở các bit cao (>> 4); 200..208: dấu câu;
+// 300: giá trị bắt đầu bằng dấu chấm; 320..358: từ khóa.
+hàm công khai biên dịch mã cú pháp từ tố(từ tố) {
+    nếu (máy ảo lấy loại(từ tố) == "danh sách") {
+        nếu (máy ảo lấy độ dài(từ tố) > 11) { trả về từ tố[11]; };
+        s = từ tố[1];
+    } hoặc { s = lấy từ điển(từ tố, "giá trị", ""); };
+    nếu (s == "") { trả về 0; };
+    đầu = s[0];
+    nếu (đầu == ".") { trả về 300; };
+    nếu (đầu == "n") {
+        nếu (s == "nếu") { trả về 320; };
+        nếu (s == "ném") { trả về 335; };
+        nếu (s == "nhập") { trả về 337; };
+        nếu (s == "ngoại thư viện") { trả về 355; };
+        nếu (s == "ngoại hàm") { trả về 356; };
+        trả về 0;
+    };
+    nếu (đầu == "h") {
+        nếu (s == "hoặc") { trả về 321; };
+        nếu (s == "hàm") { trả về 324; };
+        trả về 0;
+    };
+    nếu (đầu == "l") {
+        nếu (s == "lặp") { trả về 322; };
+        nếu (s == "lớp") { trả về 338; };
+        trả về 0;
+    };
+    nếu (đầu == "k") {
+        nếu (s == "khi") { trả về 323; };
+        nếu (s == "khởi tạo") { trả về 343; };
+        nếu (s == "kiểm tra sau") { trả về 346; };
+        nếu (s == "kế thừa") { trả về 350; };
+        nếu (s == "ký hiệu") { trả về 357; };
+        nếu (s == "khả năng") { trả về 358; };
+        trả về 0;
+    };
+    nếu (đầu == "g") {
+        nếu (s == "gọi") { trả về 325; };
+        nếu (s == "giao diện") { trả về 349; };
+        trả về 0;
+    };
+    nếu (đầu == "b") {
+        nếu (s == "biến") { trả về 326; };
+        nếu (s == "bỏ qua") { trả về 342; };
+        nếu (s == "bắt lỗi") { trả về 347; };
+        nếu (s == "bảo vệ") { trả về 354; };
+        trả về 0;
+    };
+    nếu (đầu == "i") {
+        nếu (s == "in") { trả về 327; };
+        trả về 0;
+    };
+    nếu (đầu == "d") {
+        nếu (s == "dừng") { trả về 328; };
+        trả về 0;
+    };
+    nếu (đầu == "t") {
+        nếu (s == "thoát") { trả về 329; };
+        nếu (s == "thử") { trả về 336; };
+        nếu (s == "trả về") { trả về 341; };
+        nếu (s == "trường hợp") { trả về 348; };
+        nếu (s == "triển khai") { trả về 351; };
+        trả về 0;
+    };
+    nếu (đầu == "c") {
+        nếu (s == "chọn") { trả về 330; };
+        nếu (s == "ca") { trả về 331; };
+        nếu (s == "chuyển") { trả về 339; };
+        nếu (s == "cập nhật") { trả về 345; };
+        nếu (s == "công khai") { trả về 352; };
+        trả về 0;
+    };
+    nếu (đầu == "đ") {
+        nếu (s == "đúng") { trả về 332; };
+        nếu (s == "điều kiện") { trả về 344; };
+        trả về 0;
+    };
+    nếu (đầu == "s") {
+        nếu (s == "sai") { trả về 333; };
+        trả về 0;
+    };
+    nếu (đầu == "r") {
+        nếu (s == "rỗng") { trả về 334; };
+        nếu (s == "riêng tư") { trả về 353; };
+        trả về 0;
+    };
+    nếu (đầu == "m") {
+        nếu (s == "mặc định") { trả về 340; };
+        trả về 0;
+    };
+    nếu (đầu == "=") {
+        nếu (s == "=") { trả về 16; };
+        nếu (s == "==") { trả về 112; };
+        trả về 0;
+    };
+    nếu (đầu == "+") {
+        nếu (s == "+=") { trả về 17; };
+        nếu (s == "+") { trả về 160; };
+        nếu (s == "++") { trả về 3; };
+        trả về 0;
+    };
+    nếu (đầu == "-") {
+        nếu (s == "-=") { trả về 18; };
+        nếu (s == "-") { trả về 161; };
+        nếu (s == "--") { trả về 4; };
+        trả về 0;
+    };
+    nếu (đầu == "*") {
+        nếu (s == "*=") { trả về 19; };
+        nếu (s == "*") { trả về 176; };
+        trả về 0;
+    };
+    nếu (đầu == "/") {
+        nếu (s == "/=") { trả về 20; };
+        nếu (s == "/") { trả về 177; };
+        trả về 0;
+    };
+    nếu (đầu == "%") {
+        nếu (s == "%=") { trả về 21; };
+        nếu (s == "%") { trả về 178; };
+        trả về 0;
+    };
+    nếu (đầu == "&") {
+        nếu (s == "&=") { trả về 22; };
+        nếu (s == "&&") { trả về 48; };
+        nếu (s == "&") { trả về 96; };
+        trả về 0;
+    };
+    nếu (đầu == "|") {
+        nếu (s == "|=") { trả về 23; };
+        nếu (s == "||") { trả về 32; };
+        nếu (s == "|") { trả về 64; };
+        trả về 0;
+    };
+    nếu (đầu == "^") {
+        nếu (s == "^=") { trả về 24; };
+        nếu (s == "^") { trả về 80; };
+        trả về 0;
+    };
+    nếu (đầu == "<") {
+        nếu (s == "<<=") { trả về 25; };
+        nếu (s == "<") { trả về 128; };
+        nếu (s == "<=") { trả về 130; };
+        nếu (s == "<<") { trả về 144; };
+        trả về 0;
+    };
+    nếu (đầu == ">") {
+        nếu (s == ">>=") { trả về 26; };
+        nếu (s == ">") { trả về 129; };
+        nếu (s == ">=") { trả về 131; };
+        nếu (s == ">>") { trả về 145; };
+        trả về 0;
+    };
+    nếu (đầu == "!") {
+        nếu (s == "!=") { trả về 113; };
+        nếu (s == "!") { trả về 1; };
+        trả về 0;
+    };
+    nếu (đầu == "~") {
+        nếu (s == "~") { trả về 2; };
+        trả về 0;
+    };
+    nếu (đầu == "(") {
+        nếu (s == "(") { trả về 200; };
+        trả về 0;
+    };
+    nếu (đầu == ")") {
+        nếu (s == ")") { trả về 201; };
+        trả về 0;
+    };
+    nếu (đầu == "[") {
+        nếu (s == "[") { trả về 202; };
+        trả về 0;
+    };
+    nếu (đầu == "]") {
+        nếu (s == "]") { trả về 203; };
+        trả về 0;
+    };
+    nếu (đầu == "{") {
+        nếu (s == "{") { trả về 204; };
+        trả về 0;
+    };
+    nếu (đầu == "}") {
+        nếu (s == "}") { trả về 205; };
+        trả về 0;
+    };
+    nếu (đầu == ",") {
+        nếu (s == ",") { trả về 206; };
+        trả về 0;
+    };
+    nếu (đầu == ":") {
+        nếu (s == ":") { trả về 207; };
+        trả về 0;
+    };
+    nếu (đầu == ";") {
+        nếu (s == ";") { trả về 208; };
+        trả về 0;
+    };
+    trả về 0;
 };

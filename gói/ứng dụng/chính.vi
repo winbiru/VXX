@@ -1,5 +1,5 @@
 // Gói ứng dụng: helper vòng đời chung, tùy chọn.
 // It intentionally does not pull HTTP, web, data, or API-project code.
-nhập gói/ứng dụng/vòng đời;
-nhập gói/ứng dụng/giao diện;
-nhập gói/ứng dụng/bộ điều khiển;
+nhập gói.ứng dụng.vòng đời.*;
+nhập gói.ứng dụng.giao diện.*;
+nhập gói.ứng dụng.bộ điều khiển.*;

@@ -1,5 +1,8 @@
 // Thông số phân trang thuộc từng instance; helper gốc vẫn là API hàm.
-nhập gói/dữ liệu/phân trang;
+nhập gói.dữ liệu.phân trang.trang hợp lệ;
+nhập gói.dữ liệu.phân trang.kích thước hợp lệ;
+nhập gói.dữ liệu.phân trang.độ dời dữ liệu;
+nhập gói.dữ liệu.phân trang.tổng số trang;
 
 lớp công khai Bộ Phân Trang {
     hàm công khai khởi tạo(trang = 0, kích thước = 20) {

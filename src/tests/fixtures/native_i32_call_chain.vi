@@ -1,0 +1,20 @@
+// Chuỗi i32 thuần dùng BL lồng nhau và lời gọi không tham số.
+hàm hằng() { trả về 3; };
+hàm nhân đôi(a) { trả về a * 2 + 1; };
+hàm tầng hai(a) { trả về nhân đôi(a) + hằng(); };
+hàm tầng ba(a, b) { trả về tầng hai(a) + nhân đôi(b); };
+hàm tầng bốn(a) { trả về tầng ba(a, 1) + 5; };
+
+// Lời gọi có hiệu ứng phụ phải tiếp tục đi qua runtime động.
+hàm có hiệu ứng(a) { in "tác dụng"; trả về a + 1; };
+
+hàm chính() {
+    in tầng ba(3, 4);
+    in tầng bốn(2);
+    x = 7;
+    in tầng ba(x, 1);
+    x = 1.5;
+    in tầng hai(x);
+    in tầng ba(1, x);
+    in có hiệu ứng(2);
+};

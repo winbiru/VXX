@@ -360,6 +360,45 @@ static bool executeVmPrimitive(Opcode opcode,
             result = make_list_value(std::move(bytes));
             return true;
         }
+        case OP_VM_STRING_SLICE: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *start = std::get_if<int>(&args[1]);
+            const auto *count = std::get_if<int>(&args[2]);
+            if (!source || !start || !count || *start < 0 || *count < 0) {
+                err = fn + ": cần chuỗi và hai chỉ số nguyên không âm";
+                return true;
+            }
+            result = make_string_value(vietvm::core::utf8CodePointSlice(
+                *source, static_cast<std::size_t>(*start), static_cast<std::size_t>(*count)));
+            return true;
+        }
+        case OP_VM_STRING_BYTE_SLICE: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *start = std::get_if<int>(&args[1]);
+            const auto *count = std::get_if<int>(&args[2]);
+            if (!source || !start || !count || *start < 0 || *count < 0) {
+                err = fn + ": cần chuỗi và hai chỉ số nguyên không âm";
+                return true;
+            }
+            const auto begin = static_cast<std::size_t>(*start);
+            const auto length = static_cast<std::size_t>(*count);
+            result = make_string_value(begin >= source->size() || length == 0
+                ? std::string{}
+                : source->substr(begin, length));
+            return true;
+        }
+        case OP_VM_STRING_REPLACE_EXACT: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *pattern = std::get_if<std::string>(&args[1]);
+            const auto *replacement = std::get_if<std::string>(&args[2]);
+            if (!source || !pattern || !replacement) {
+                err = fn + ": cần ba giá trị chuỗi";
+                return true;
+            }
+            result = make_string_value(vietvm::core::utf8ReplaceExact(
+                *source, *pattern, *replacement));
+            return true;
+        }
         case OP_VM_STRING_FROM_BYTES:
         case OP_VM_FLOAT_FROM_BITS: {
             ListHandle list;
@@ -866,6 +905,11 @@ void VM::runJitCompiled() {
                 case OP_SAI_GIA_TRI:
                     program.emplace_back([this]() { stack.push_back(make_int_value(0)); });
                     break;
+                case OP_BIT_VA:
+                case OP_BIT_HOAC:
+                case OP_BIT_XOR:
+                case OP_DICH_TRAI:
+                case OP_DICH_PHAI:
                 case OP_CONG:
                 case OP_TRU:
                 case OP_NHAN:
@@ -1280,6 +1324,44 @@ void VM::invokeFunction(int argc,
                     if (resolved != hamBytecodeMap.end()) {
                         it = resolved;
                         break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Legacy class-qualified calls (Class.method(...)) are also used by
+    // exported V++ modules. Resolve them through the runtime class table so
+    // inherited methods and member visibility use the same rules as instance
+    // dispatch. A class-qualified invocation has no instance receiver; code
+    // that needs `mình` must be called on an instance instead.
+    if (it == hamBytecodeMap.end() && hamIdOrName < 0) {
+        const int nameIndex = -(hamIdOrName + 1);
+        if (nameIndex >= 0 &&
+            nameIndex < static_cast<int>(stringPool.size())) {
+            const std::string &qualified = stringPool[static_cast<std::size_t>(nameIndex)];
+            const std::size_t dot = qualified.rfind('.');
+            if (dot != std::string::npos) {
+                const auto klass = classTable.find(qualified.substr(0, dot));
+                if (klass != classTable.end()) {
+                    const std::string methodName = qualified.substr(dot + 1);
+                    const auto method = vietvm::runtime::resolveMethod(
+                        klass->second, methodName);
+                    if (method.has_value()) {
+                        const ClassHandle callerClass = callStack.empty()
+                            ? nullptr : callStack.back().methodOwnerClass;
+                        if (!canAccessRuntimeMethod(
+                                method->visibility, callerClass, method->owner)) {
+                            throw runtime_error_op(
+                                runtimeMethodAccessMessage(method->visibility, methodName),
+                                op, curPc,
+                                vietvm::runtime::runtimeMemberFacts(
+                                    methodName, true, true, true, true, false));
+                        }
+                        it = hamBytecodeMap.find(method->functionId);
+                        if (it != hamBytecodeMap.end()) {
+                            methodOwnerClass = method->owner;
+                        }
                     }
                 }
             }
@@ -2159,6 +2241,11 @@ void VM::executeValueOpcode(const Instruction& instr) {
             stack.push_back(evaluateModuloOperator(a, b, instr.op, static_cast<int>(pc)));
             return;
         }
+        case OP_BIT_VA:
+        case OP_BIT_HOAC:
+        case OP_BIT_XOR:
+        case OP_DICH_TRAI:
+        case OP_DICH_PHAI:
         case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
         case OP_Logic_VA: case OP_Logic_HOAC:
         case OP_SO_SANH_BANG: case OP_KHAC_BANG:
@@ -2843,6 +2930,9 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             StackValue top = stack.back(); stack.pop_back();
             const int delta = instr.op == OP_CONG_MOT ? 1 : -1;
             auto pushResult = [&](int value) { stack.push_back(make_int_value(value)); };
+            const auto updatedValue = [delta](int current) {
+                return wrapRuntimeInt32(static_cast<std::int64_t>(current) + delta);
+            };
             if (std::holds_alternative<int>(top)) {
                 const int idOrVal = std::get<int>(top);
                 bool updated = false;
@@ -2851,23 +2941,26 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                     const auto captured = frame.capturedCells.find(idOrVal);
                     if (captured != frame.capturedCells.end() && captured->second != nullptr) {
                         const int current = as_int(captured->second->value, instr.op, pc);
-                        captured->second->value = make_int_value(current + delta);
-                        pushResult(current + delta);
+                        const int next = updatedValue(current);
+                        captured->second->value = make_int_value(next);
+                        pushResult(next);
                         updated = true;
                     }
                     if (!updated && frame.localsIndexed) {
                         if (frame.hasIndexedLocal(idOrVal)) {
                             const int current = as_int(frame.localsVec[idOrVal], instr.op, pc);
-                            frame.localsVec[idOrVal] = make_int_value(current + delta);
-                            pushResult(current + delta);
+                            const int next = updatedValue(current);
+                            frame.localsVec[idOrVal] = make_int_value(next);
+                            pushResult(next);
                             updated = true;
                         }
                     } else if (!updated) {
                         auto itLoc = frame.localsMap.find(idOrVal);
                         if (itLoc != frame.localsMap.end()) {
                             const int current = as_int(itLoc->second, instr.op, pc);
-                            itLoc->second = make_int_value(current + delta);
-                            pushResult(current + delta);
+                            const int next = updatedValue(current);
+                            itLoc->second = make_int_value(next);
+                            pushResult(next);
                             updated = true;
                         }
                     }
@@ -2875,14 +2968,15 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                 if (!updated) {
                     const int current = variables.count(idOrVal)
                         ? as_int(variables[idOrVal], instr.op, pc) : 0;
-                    variables[idOrVal] = make_int_value(current + delta);
-                    pushResult(current + delta);
+                    const int next = updatedValue(current);
+                    variables[idOrVal] = make_int_value(next);
+                    pushResult(next);
                 }
                 return;
             }
             if (instr.op == OP_CONG_MOT && std::holds_alternative<std::string>(top)) {
                 try {
-                    pushResult(std::stoi(std::get<std::string>(top)) + 1);
+                    pushResult(updatedValue(std::stoi(std::get<std::string>(top))));
                     return;
                 } catch (...) {
                     throw runtime_error_op(vietvm::messages::formatMessage(
@@ -3478,6 +3572,9 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MAP_REMOVE:
             case OP_VM_MAP_KEYS:
             case OP_VM_STRING_BYTES:
+            case OP_VM_STRING_SLICE:
+            case OP_VM_STRING_REPLACE_EXACT:
+            case OP_VM_STRING_BYTE_SLICE:
             case OP_VM_STRING_FROM_BYTES:
             case OP_VM_FLOAT_FROM_BITS:
             case OP_VM_MACHINE_FILE_OPEN:
@@ -3488,6 +3585,9 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MACHINE_FILE_TELL:
             case OP_VM_MACHINE_FILE_ERROR:
             case OP_VM_MACHINE_FILE_REMOVE:
+            case OP_VM_MACHINE_FILE_RENAME:
+            case OP_VM_MACHINE_FILE_COPY:
+            case OP_VM_MACHINE_FILE_LINK:
             case OP_VM_MACHINE_PROCESS_PID:
             case OP_VM_MACHINE_PROCESS_PPID:
             case OP_VM_MACHINE_PROCESS_UID:
@@ -3506,6 +3606,15 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MACHINE_DIR_NEXT:
             case OP_VM_MACHINE_DIR_CLOSE:
             case OP_VM_MACHINE_PATH_KIND:
+            case OP_VM_MACHINE_PATH_STAT:
+            case OP_VM_MACHINE_PATH_ABSOLUTE:
+            case OP_VM_MACHINE_PATH_CANONICAL:
+            case OP_VM_MACHINE_PATH_EQUIVALENT:
+            case OP_VM_MACHINE_PATH_CURRENT:
+            case OP_VM_MACHINE_PATH_SET_CURRENT:
+            case OP_VM_MACHINE_PATH_TEMP:
+            case OP_VM_MACHINE_PATH_EXECUTABLE:
+            case OP_VM_MACHINE_FILE_LOCK:
             case OP_VM_MACHINE_SOCKET_KIND:
             case OP_VM_MACHINE_SOCKET_CLOSE:
             case OP_VM_MACHINE_SOCKET_TIMEOUT:
@@ -3543,6 +3652,11 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
             case OP_BIEN_SO:
             case OP_TEN_BIEN_ID:
+            case OP_BIT_VA:
+            case OP_BIT_HOAC:
+            case OP_BIT_XOR:
+            case OP_DICH_TRAI:
+            case OP_DICH_PHAI:
             case OP_MODULO:
             case OP_CONG:
             case OP_TRU:

@@ -1,5 +1,6 @@
 #include "vpp/compiler/codegen.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <initializer_list>
@@ -59,12 +60,14 @@ int parseI32Literal(std::string_view token, bool negated = false) {
 bool isBinaryOperator(const std::string &op) noexcept {
     return op == "+" || op == "-" || op == "*" || op == "/" || op == "%" ||
            op == "==" || op == "!=" || op == "<" || op == ">" ||
-           op == "<=" || op == ">=" || op == "&&" || op == "||";
+           op == "<=" || op == ">=" || op == "&&" || op == "||" ||
+           op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>";
 }
 
 // Kiểm tra điều kiện của `isCompoundAssignment`.
 bool isCompoundAssignment(const std::string &op) noexcept {
-    return op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=";
+    return op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=" ||
+           op == "&=" || op == "|=" || op == "^=" || op == "<<=" || op == ">>=";
 }
 
 // Tách runtime thành viên tên; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
@@ -419,14 +422,14 @@ bool isDirectIndexBase(const IrValue *value) noexcept {
             value->opcode == IrValueOpcode::Index);
 }
 
-// Reading an index also accepts a temporary collection returned by a call.
-// emitValue leaves each call result on the VM stack, immediately followed by
-// the index operand, as required by OP_DOC_CHI_SO. The nested supportsValue
-// check still validates the callee, arguments and call target independently.
+// Reading an index also accepts a string literal or a temporary collection
+// returned by a call. emitValue pushes the base followed by the index operand,
+// as required by OP_DOC_CHI_SO. Nested validation checks both independently.
 bool isDirectIndexReadBase(const IrValue *value) noexcept {
     if (isDirectIndexBase(value)) return true;
     if (value == nullptr) return false;
     switch (value->opcode) {
+        case IrValueOpcode::ConstString:
         case IrValueOpcode::Call:
         case IrValueOpcode::Intrinsic:
         case IrValueOpcode::ForeignCall:
@@ -441,6 +444,7 @@ enum class ValueContext {
     Nested,
     ExpressionStatementRoot,
     OtherStatementRoot,
+    ReturnStatementRoot,
     DedicatedCallStatementRoot,
     SimpleAssignmentRhs,
 };
@@ -619,7 +623,7 @@ bool supportsValue(const IrProgram &program,
 
         case IrValueOpcode::Unary:
             if (value->operands.size() != 1) break;
-            if (value->text == "!" || value->text == "+" || value->text == "-") {
+            if (value->text == "!" || value->text == "+" || value->text == "-" || value->text == "~") {
                 supported = supportsValue(program, sourceOwner, context,
                                           value->operands.front(),
                                           ValueContext::Nested, visiting);
@@ -819,7 +823,8 @@ bool supportsValue(const IrProgram &program,
         }
 
         case IrValueOpcode::Lambda: {
-            if (valueContext != ValueContext::SimpleAssignmentRhs ||
+            if ((valueContext != ValueContext::SimpleAssignmentRhs &&
+                 valueContext != ValueContext::ReturnStatementRoot) ||
                 value->lambdaId == kInvalidIrLambdaId) {
                 break;
             }
@@ -1022,6 +1027,23 @@ bool supportsInstruction(const IrProgram &program,
         return true;
     }
     if (instruction.opcode == IrOpcode::Loop) {
+        if (instruction.loopForm == vietvm::frontend::AstLoopForm::WhileBlock) {
+            if (instruction.expressionRoots.size() != 1 ||
+                instruction.children.size() != 1 ||
+                instruction.children.front().opcode != IrOpcode::Block) {
+                return false;
+            }
+            const IrValue *condition = program.value(instruction.expressionRoots.front());
+            if (condition == nullptr || condition->opcode == IrValueOpcode::StoreName ||
+                condition->opcode == IrValueOpcode::MapLiteral) {
+                return false;
+            }
+            std::unordered_set<IrValueId> visiting;
+            return supportsValue(program, sourceOwner, context, condition->id,
+                                 ValueContext::Nested, visiting) &&
+                supportsInstruction(program, instruction.children.front(), sourceOwner,
+                                    context, insideFunction, true, switchDepth + 1, false);
+        }
         if (instruction.loopForm != vietvm::frontend::AstLoopForm::ForBlock ||
             instruction.expressionRoots.size() != 3 ||
             instruction.children.size() != 1 ||
@@ -1191,7 +1213,7 @@ bool supportsInstruction(const IrProgram &program,
         if (root == nullptr || root->opcode == IrValueOpcode::StoreName) return false;
         std::unordered_set<IrValueId> visiting;
         return supportsValue(program, sourceOwner, context, root->id,
-                             ValueContext::OtherStatementRoot, visiting);
+                             ValueContext::ReturnStatementRoot, visiting);
     }
     if (instruction.opcode != IrOpcode::Print &&
         instruction.opcode != IrOpcode::Statement) {
@@ -1261,6 +1283,11 @@ Opcode binaryOpcode(const std::string &op) {
     if (op == "-") return OP_TRU;
     if (op == "*") return OP_NHAN;
     if (op == "/") return OP_CHIA;
+    if (op == "&") return OP_BIT_VA;
+    if (op == "|") return OP_BIT_HOAC;
+    if (op == "^") return OP_BIT_XOR;
+    if (op == "<<") return OP_DICH_TRAI;
+    if (op == ">>") return OP_DICH_PHAI;
     if (op == "%") return OP_MODULO;
     if (op == "==") return OP_SO_SANH_BANG;
     if (op == "!=") return OP_KHAC_BANG;
@@ -1279,6 +1306,11 @@ Opcode compoundOpcode(const std::string &op) {
     if (op == "-=") return OP_TRU;
     if (op == "*=") return OP_NHAN;
     if (op == "/=") return OP_CHIA;
+    if (op == "&=") return OP_BIT_VA;
+    if (op == "|=") return OP_BIT_HOAC;
+    if (op == "^=") return OP_BIT_XOR;
+    if (op == "<<=") return OP_DICH_TRAI;
+    if (op == ">>=") return OP_DICH_PHAI;
     if (op == "%=") return OP_MODULO;
     throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedCompoundAssignment));
 }
@@ -1523,6 +1555,7 @@ struct Emitter {
         slots.emplace(instruction.declarationName, functionId);
         registry.functionBytecode[functionId] = {};
         registry.setFunctionNameIndex(functionId, nameIndex);
+        registry.functionModuleIdentities[functionId] = registry.currentSemanticModuleIdentity;
         if (functionId >= nextSlot) nextSlot = functionId + 1;
     }
 
@@ -1621,6 +1654,9 @@ struct Emitter {
         }
         DebugRangeGuard debugGuard(*this, output, value->span);
 
+        // Preserve bytecode parity with the self-hosted V++ compiler.
+        // Folded IR annotations are consumed by the native lowering paths;
+        // changing these opcodes would change the public compiler oracle.
         switch (value->opcode) {
             case IrValueOpcode::ConstInt:
                 output.push_back({OP_BIEN_SO, parseI32Literal(value->text), 0, 0});
@@ -1754,6 +1790,9 @@ struct Emitter {
                 emitValue(value->operands.front(), output);
                 if (value->text == "!") {
                     output.push_back({OP_PHU_DINH, 0, 0, 0});
+                } else if (value->text == "~") {
+                    output.push_back({OP_BIEN_SO, -1, 0, 0});
+                    output.push_back({OP_BIT_XOR, 0, 0, 0});
                 } else if (value->text != "+") {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrUnsupportedValue));
@@ -1845,6 +1884,12 @@ struct Emitter {
                     validateCallableAccess(registry, resolvedName);
                     target = resolveFunctionIdByName(
                         registry, resolvedName, slots, false);
+                    // Imported module functions are linked by ID before their
+                    // runtime names are made private to the module.
+                    if (target < 0 && hasSelectiveImports(registry) &&
+                        !registry.currentSemanticModuleIdentity.empty()) {
+                        target = function->second;
+                    }
                 }
 
                 emitCallArguments(*value, output);
@@ -1944,6 +1989,15 @@ struct Emitter {
                 emitCallArguments(*value, output);
                 const int argumentCount =
                     static_cast<int>(value->operands.size() - 1);
+
+                if (value->callTarget == CallTargetKind::ImportedFunction &&
+                    hasSelectiveImports(registry)) {
+                    const auto imported = registry.importedFunctionAliases.find(value->text);
+                    if (imported != registry.importedFunctionAliases.end()) {
+                        output.push_back({OP_GOI, argumentCount, imported->second, 0});
+                        return;
+                    }
+                }
 
                 // Indirect calls bind to the exact parameter/local symbol,
                 // even when a global function has the same spelling.
@@ -2121,24 +2175,28 @@ struct Emitter {
                 return;
             }
             case IrOpcode::Loop: {
-                const IrValue *init = program.value(
-                    instruction.expressionRoots[0]);
-                const IrValue *target = init == nullptr || init->operands.empty()
-                    ? nullptr
-                    : program.value(init->operands.front());
-                if (target == nullptr) {
-                    throw std::logic_error(std::string(
-                        messages::kInternalDirectIrLoopMissingInitializerTarget));
+                const bool isWhile = instruction.loopForm ==
+                    vietvm::frontend::AstLoopForm::WhileBlock;
+                if (!isWhile) {
+                    const IrValue *init = program.value(
+                        instruction.expressionRoots[0]);
+                    const IrValue *target = init == nullptr || init->operands.empty()
+                        ? nullptr
+                        : program.value(init->operands.front());
+                    if (target == nullptr) {
+                        throw std::logic_error(std::string(
+                            messages::kInternalDirectIrLoopMissingInitializerTarget));
+                    }
+                    const int initSlot = slotForSymbol(target->symbolId, target->text);
+                    // The legacy loop wrapper emits KHỞI_TẠO on every loop,
+                    // including when the textual slot already exists.
+                    output.push_back({OP_KHOI_TAO, 0, initSlot, 0});
+                    emitValue(init->id, output);
                 }
-                const int initSlot = slotForSymbol(target->symbolId, target->text);
-                // The legacy loop wrapper emits KHỞI_TẠO on every loop,
-                // including when the textual slot already exists.
-                output.push_back({OP_KHOI_TAO, 0, initSlot, 0});
-                emitValue(init->id, output);
                 output.push_back({OP_LAP, 0, 0, 0});
                 const int conditionTarget = static_cast<int>(output.size());
                 output.push_back({OP_DIEU_KIEN, 0, 0, 0});
-                emitValue(instruction.expressionRoots[1], output);
+                emitValue(instruction.expressionRoots[isWhile ? 0 : 1], output);
                 const std::size_t exitJump = output.size();
                 output.push_back({OP_JUMP_IF_FALSE, 0, 0, 0});
                 breakScopes.push_back({true, emittedBlockDepth, emittedTryDepth, {}});
@@ -2146,7 +2204,7 @@ struct Emitter {
                 BreakScope loopScope = std::move(breakScopes.back());
                 breakScopes.pop_back();
                 output.push_back({OP_CAP_NHAT, 0, 0, 0});
-                emitValue(instruction.expressionRoots[2], output);
+                if (!isWhile) emitValue(instruction.expressionRoots[2], output);
                 output.push_back({OP_JUMP, conditionTarget, 0, 0});
                 output[exitJump].operand = static_cast<int>(output.size());
                 for (const std::size_t jump : loopScope.pendingJumps) {
@@ -2288,6 +2346,37 @@ struct Emitter {
     std::vector<Instruction> emitFunctionBody(
         const IrInstruction &instruction,
         std::vector<vietvm::runtime::RuntimeSourceLocation> &functionDebugInfo) {
+        // A function's implicitly assigned locals need frame slots before any
+        // statement executes. Otherwise OP_GAN can see a same-numbered global
+        // slot from an importing module and overwrite that global instead.
+        // Collect the slots up front so assignments inside conditional paths
+        // are also protected even when another branch executes first.
+        std::unordered_set<int> assignedLocals;
+        const auto scanValue = [&](const auto &self, IrValueId id) -> void {
+            const IrValue *value = program.value(id);
+            if (value == nullptr) return;
+            if (value->opcode == IrValueOpcode::StoreName &&
+                !value->operands.empty()) {
+                const IrValue *target = program.value(value->operands.front());
+                if (target != nullptr && isLexicalSlotSymbol(target->symbolId)) {
+                    assignedLocals.insert(slotForSymbol(target->symbolId, target->text));
+                }
+            }
+            for (IrValueId child : value->operands) self(self, child);
+        };
+        const auto scanStatement = [&](const auto &self, const IrInstruction &body) -> void {
+            for (IrValueId root : body.expressionRoots) scanValue(scanValue, root);
+            for (const IrInstruction &child : body.children) {
+                if (child.opcode != IrOpcode::DefineFunction &&
+                    child.opcode != IrOpcode::DefineClass) {
+                    self(self, child);
+                }
+            }
+        };
+        scanStatement(scanStatement, instruction.children.front());
+        std::vector<int> localSlots(assignedLocals.begin(), assignedLocals.end());
+        std::sort(localSlots.begin(), localSlots.end());
+
         std::vector<Instruction> functionBytecode;
         auto *previousDebugInfo = activeDebugInfo;
         const std::string previousFunctionName = activeFunctionName;
@@ -2301,6 +2390,9 @@ struct Emitter {
         emittedTryDepth = 0;
         DebugRangeGuard functionGuard(*this, functionBytecode, instruction.span);
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+        for (int slot : localSlots) {
+            functionBytecode.push_back({OP_KHOI_TAO, 0, slot, 0});
+        }
         for (std::size_t index = 0;
              index < instruction.implicitReceiverNames.size(); ++index) {
             const int receiverSlot = slotForSymbol(
@@ -2527,6 +2619,14 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
             ++support.unsupportedRegions;
             if (!instruction.declarationName.empty())
                 support.unsupportedNames.push_back(instruction.declarationName);
+            else if (instruction.opcode == IrOpcode::Import) {
+                std::string label = "import: " + instruction.importSpec.target +
+                    " form=" + std::to_string(static_cast<int>(instruction.importForm));
+                for (const auto &token : instruction.tokens) label += " " + token.lexeme;
+                support.unsupportedNames.push_back(std::move(label));
+            }
+            else
+                support.unsupportedNames.push_back(irOpcodeName(instruction.opcode));
         }
     }
     return support;

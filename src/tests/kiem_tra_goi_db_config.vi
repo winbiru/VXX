@@ -1,4 +1,4 @@
-nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
+nhập gói.dữ liệu.kết nối cơ sở dữ liệu.*;
 
 hàm chính() {
     mysql = cơ sở dữ liệu phân tích cấu hình(

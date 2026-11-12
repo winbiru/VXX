@@ -1,0 +1,25 @@
+// Cùng kết quả trên frontend C++, frontend V++, VM và hai runtime AOT.
+hàm tính bit(a, b) { trả về (~a & b) | (a ^ b); };
+hàm vế phải() { in "gọi vế phải"; trả về 3; };
+hàm chính() {
+    biến a = 13; biến b = 7;
+    in a&b; in a|b; in a^b; in ~a;
+    in a<<2; in -16>>2;
+    in 1<<31; in 13<<32; in -16>>-1;
+    a&=7; a|=8; a^=3; a<<=2; a>>=1;
+    in a;
+    in 1|2&4; in 8>>1+1; in ~1+3; in 1==2<3;
+    in 13%5;
+    in tính bit(-2147483648, 2147483647);
+    // Mỗi vế của phép bit được đánh giá đúng một lần.
+    a = 7; a &= vế phải();
+    in a;
+    // Các phép gán mới cũng dùng được ở bước cập nhật của vòng lặp.
+    tổng = 0;
+    lặp(i = 1; i < 16; i <<= 1) { tổng += i; };
+    in tổng;
+    tổng = 0;
+    lặp(i = 8; i > 0; i >>= 1) { tổng += i; };
+    in tổng;
+    in "Toán tử bit đúng";
+};

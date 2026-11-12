@@ -1,10 +1,11 @@
 // Thay stdio của libc bằng V++: đệm, EOF, partial I/O và cursor logic.
 // Native chỉ giữ open/read/write/seek/tell/close của OS và token thuộc VM.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
+nhập gói.lõi.giao diện tài nguyên.*;
 
-nhập gói/nhập xuất/tệp thô;
+nhập gói.nhập xuất.tệp thô.*;
 
 lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     hàm công khai khởi tạo(đường, chế độ, kích thước = 4096, thao tác = "luồng tệp") {
@@ -34,7 +35,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
         mình.đã đóng = đúng;
         mình.lỗi gián đoạn = tệp thô lỗi gián đoạn();
         mã tài nguyên = rỗng;
-        lặp(vòng = 0; đúng; vòng++) {
+        khi (đúng) {
             mã tài nguyên = tệp thô mở(đường, mã);
             nếu (mã tài nguyên != rỗng) { thoát; };
             nếu (tệp thô mã lỗi() != mình.lỗi gián đoạn) {
@@ -69,7 +70,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             ném "luồng tệp: số byte phải trong 0..65536";
         };
         kết quả = [];
-        lặp(vòng = 0; máy ảo lấy độ dài(kết quả) < đếm; vòng++) {
+        khi (máy ảo lấy độ dài(kết quả) < đếm) {
             nếu (mình.vị trí đọc == mình.số đọc) {
                 nếu (mình.hết tệp) { thoát; };
                 nếu (máy ảo lấy độ dài(mình.đệm đọc) == 0) {
@@ -97,7 +98,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
 
     hàm công khai đọc hết() {
         kết quả = [];
-        lặp(vòng = 0; đúng; vòng++) {
+        khi (đúng) {
             khối = mình.đọc các byte(4096);
             nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
             lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };
@@ -124,20 +125,44 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     };
 
     hàm công khai ghi(nội dung) {
-        trả về mình.ghi các byte(chuỗi thành byte máy ảo(thành chuỗi(nội dung)));
+        mình.yêu cầu mở();
+        nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
+        văn bản = thành chuỗi(nội dung);
+        vị trí ghi = 0;
+        khi (đúng) {
+            còn = mình.kích thước - máy ảo lấy độ dài(mình.đệm ghi);
+            nếu (còn == 0) { mình.đẩy đệm(); còn = mình.kích thước; };
+            // The representation primitive produces valid bytes. Transfer a
+            // whole bounded chunk instead of validating/copying every byte
+            // through dynamic V++ calls and instance-field lookups.
+            khối = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí ghi, còn));
+            n = máy ảo lấy độ dài(khối);
+            nếu (n == 0) { thoát; };
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == 0) {
+                mình.đệm ghi = khối;
+            } hoặc {
+                lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(mình.đệm ghi, khối[i]); };
+            };
+            vị trí ghi += n;
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { mình.đẩy đệm(); };
+        };
+        trả về 1;
     };
 
     hàm công khai đẩy đệm() {
         mình.yêu cầu mở();
         nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
         // Preserve the accepted prefix across errors to avoid duplicate writes.
-        lặp(vòng = 0; mình.đã ghi < máy ảo lấy độ dài(mình.đệm ghi); vòng++) {
+        khi (mình.đã ghi < máy ảo lấy độ dài(mình.đệm ghi)) {
             đệm = mình.đệm ghi;
             nếu (mình.đã ghi > 0) {
                 đệm = [];
                 lặp(i = mình.đã ghi; i < máy ảo lấy độ dài(mình.đệm ghi); i++) { máy ảo thêm cuối danh sách(đệm, mình.đệm ghi[i]); };
             };
-            n = tệp thô ghi(mình.mã tài nguyên, đệm, máy ảo lấy độ dài(đệm));
+            // Accepted byte lists were validated by ghi các byte; text
+            // chunks came from the representation primitive. The raw OS
+            // boundary also validates its buffer, so no second V++ byte scan.
+            n = máy tệp ghi(mình.mã tài nguyên, đệm, máy ảo lấy độ dài(đệm));
             nếu (n < 0 && tệp thô mã lỗi() == mình.lỗi gián đoạn) { bỏ qua; };
             nếu (n <= 0 || n > máy ảo lấy độ dài(đệm)) {
                 mình.báo lỗi("ghi", "FILE_WRITE_FAILED", "không thể ghi tệp");

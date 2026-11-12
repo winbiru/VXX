@@ -4,9 +4,9 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 for candidate in \
-  "$SCRIPT_DIR/bin/vpp-cli" \
-  "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" \
   "$SCRIPT_DIR/build/bin/vpp-cli" \
+  "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" \
+  "$SCRIPT_DIR/bin/vpp-cli" \
   "$SCRIPT_DIR/build/bin/vietvm-cli"; do
   if [ -x "$candidate" ]; then
     exec "$candidate" "$@"

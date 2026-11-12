@@ -1,5 +1,5 @@
-nhập gói/lõi/chính;
-nhập gói/nhập xuất/tệp;
+nhập gói.lõi.chính.*;
+nhập gói.nhập xuất.tệp.*;
 
 hàm chính() {
     đường = ".tmp_oop_logger.txt";

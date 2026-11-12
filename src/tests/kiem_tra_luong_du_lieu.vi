@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     gọi_map = 0;
@@ -76,7 +76,7 @@ hàm chính() {
         số_lần_dọn += 1;
         ném "CLEANUP_FAIL";
     };
-    khi đóng luồng(s_lỗi, cleanup_lỗi);
+    gọi khi đóng luồng(s_lỗi, cleanup_lỗi);
     consumer_lỗi = hàm(x) {
         nếu (x == 2) {
             ném "ITEM_FAIL";
@@ -95,7 +95,7 @@ hàm chính() {
     số_lần_đóng = 0;
     s_đóng = luồng([9]);
     cleanup_đóng = hàm() { số_lần_đóng += 1; };
-    khi đóng luồng(s_đóng, cleanup_đóng);
+    gọi khi đóng luồng(s_đóng, cleanup_đóng);
     đóng luồng(s_đóng);
     đóng luồng(s_đóng);
     in số_lần_đóng;

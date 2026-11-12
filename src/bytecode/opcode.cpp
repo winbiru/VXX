@@ -52,6 +52,11 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_TEN_BIEN_GIA_TRI:
         case OP_JUMP_IF_FALSE:
         case OP_JUMP:
+        case OP_BIT_VA:
+        case OP_BIT_HOAC:
+        case OP_BIT_XOR:
+        case OP_DICH_TRAI:
+        case OP_DICH_PHAI:
         case OP_MODULO:
         case OP_CHUOI:
         case OP_PHU_DINH:
@@ -137,6 +142,10 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_VM_MAP_REMOVE:
         case OP_VM_MAP_KEYS:
         case OP_VM_STRING_BYTES:
+        case OP_VM_STRING_SLICE:
+        case OP_VM_STRING_REPLACE_EXACT:
+        case OP_VM_STRING_BYTE_SLICE:
+        case OP_GOI_LOI_BAN_DIA:
         case OP_VM_STRING_FROM_BYTES:
         case OP_VM_FLOAT_FROM_BITS:
         case OP_VM_MACHINE_FILE_OPEN:
@@ -147,6 +156,9 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_VM_MACHINE_FILE_TELL:
         case OP_VM_MACHINE_FILE_ERROR:
         case OP_VM_MACHINE_FILE_REMOVE:
+        case OP_VM_MACHINE_FILE_RENAME:
+        case OP_VM_MACHINE_FILE_COPY:
+        case OP_VM_MACHINE_FILE_LINK:
         case OP_VM_MACHINE_PROCESS_PID:
         case OP_VM_MACHINE_PROCESS_PPID:
         case OP_VM_MACHINE_PROCESS_UID:
@@ -165,6 +177,15 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_VM_MACHINE_DIR_NEXT:
         case OP_VM_MACHINE_DIR_CLOSE:
         case OP_VM_MACHINE_PATH_KIND:
+        case OP_VM_MACHINE_PATH_STAT:
+        case OP_VM_MACHINE_PATH_ABSOLUTE:
+        case OP_VM_MACHINE_PATH_CANONICAL:
+        case OP_VM_MACHINE_PATH_EQUIVALENT:
+        case OP_VM_MACHINE_PATH_CURRENT:
+        case OP_VM_MACHINE_PATH_SET_CURRENT:
+        case OP_VM_MACHINE_PATH_TEMP:
+        case OP_VM_MACHINE_PATH_EXECUTABLE:
+        case OP_VM_MACHINE_FILE_LOCK:
         case OP_VM_MACHINE_SOCKET_KIND:
         case OP_VM_MACHINE_SOCKET_CLOSE:
         case OP_VM_MACHINE_SOCKET_TIMEOUT:
@@ -209,6 +230,11 @@ std::string opcodeName(int rawOpcode) {
         case OP_TRU: return "OP_TRU";
         case OP_NHAN: return "OP_NHAN";
         case OP_CHIA: return "OP_CHIA";
+        case OP_BIT_VA: return "OP_BIT_VA";
+        case OP_BIT_HOAC: return "OP_BIT_HOAC";
+        case OP_BIT_XOR: return "OP_BIT_XOR";
+        case OP_DICH_TRAI: return "OP_DICH_TRAI";
+        case OP_DICH_PHAI: return "OP_DICH_PHAI";
         case OP_MODULO: return "OP_MODULO";
         case OP_JUMP: return "OP_JUMP";
         case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE";
@@ -338,6 +364,10 @@ std::string opcodeName(int rawOpcode) {
         case OP_VM_MAP_REMOVE: return "OP_VM_MAP_REMOVE";
         case OP_VM_MAP_KEYS: return "OP_VM_MAP_KEYS";
         case OP_VM_STRING_BYTES: return "OP_VM_STRING_BYTES";
+        case OP_VM_STRING_SLICE: return "OP_VM_STRING_SLICE";
+        case OP_VM_STRING_REPLACE_EXACT: return "OP_VM_STRING_REPLACE_EXACT";
+        case OP_VM_STRING_BYTE_SLICE: return "OP_VM_STRING_BYTE_SLICE";
+        case OP_GOI_LOI_BAN_DIA: return "OP_GOI_LOI_BAN_DIA";
         case OP_VM_STRING_FROM_BYTES: return "OP_VM_STRING_FROM_BYTES";
         case OP_VM_FLOAT_FROM_BITS: return "OP_VM_FLOAT_FROM_BITS";
         case OP_VM_MACHINE_FILE_OPEN: return "OP_VM_MACHINE_FILE_OPEN";
@@ -348,6 +378,9 @@ std::string opcodeName(int rawOpcode) {
         case OP_VM_MACHINE_FILE_TELL: return "OP_VM_MACHINE_FILE_TELL";
         case OP_VM_MACHINE_FILE_ERROR: return "OP_VM_MACHINE_FILE_ERROR";
         case OP_VM_MACHINE_FILE_REMOVE: return "OP_VM_MACHINE_FILE_REMOVE";
+        case OP_VM_MACHINE_FILE_RENAME: return "OP_VM_MACHINE_FILE_RENAME";
+        case OP_VM_MACHINE_FILE_COPY: return "OP_VM_MACHINE_FILE_COPY";
+        case OP_VM_MACHINE_FILE_LINK: return "OP_VM_MACHINE_FILE_LINK";
         case OP_VM_MACHINE_PROCESS_PID: return "OP_VM_MACHINE_PROCESS_PID";
         case OP_VM_MACHINE_PROCESS_PPID: return "OP_VM_MACHINE_PROCESS_PPID";
         case OP_VM_MACHINE_PROCESS_UID: return "OP_VM_MACHINE_PROCESS_UID";
@@ -366,6 +399,15 @@ std::string opcodeName(int rawOpcode) {
         case OP_VM_MACHINE_DIR_NEXT: return "OP_VM_MACHINE_DIR_NEXT";
         case OP_VM_MACHINE_DIR_CLOSE: return "OP_VM_MACHINE_DIR_CLOSE";
         case OP_VM_MACHINE_PATH_KIND: return "OP_VM_MACHINE_PATH_KIND";
+        case OP_VM_MACHINE_PATH_STAT: return "OP_VM_MACHINE_PATH_STAT";
+        case OP_VM_MACHINE_PATH_ABSOLUTE: return "OP_VM_MACHINE_PATH_ABSOLUTE";
+        case OP_VM_MACHINE_PATH_CANONICAL: return "OP_VM_MACHINE_PATH_CANONICAL";
+        case OP_VM_MACHINE_PATH_EQUIVALENT: return "OP_VM_MACHINE_PATH_EQUIVALENT";
+        case OP_VM_MACHINE_PATH_CURRENT: return "OP_VM_MACHINE_PATH_CURRENT";
+        case OP_VM_MACHINE_PATH_SET_CURRENT: return "OP_VM_MACHINE_PATH_SET_CURRENT";
+        case OP_VM_MACHINE_PATH_TEMP: return "OP_VM_MACHINE_PATH_TEMP";
+        case OP_VM_MACHINE_PATH_EXECUTABLE: return "OP_VM_MACHINE_PATH_EXECUTABLE";
+        case OP_VM_MACHINE_FILE_LOCK: return "OP_VM_MACHINE_FILE_LOCK";
         case OP_VM_MACHINE_SOCKET_KIND: return "OP_VM_MACHINE_SOCKET_KIND";
         case OP_VM_MACHINE_SOCKET_CLOSE: return "OP_VM_MACHINE_SOCKET_CLOSE";
         case OP_VM_MACHINE_SOCKET_TIMEOUT: return "OP_VM_MACHINE_SOCKET_TIMEOUT";

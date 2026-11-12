@@ -3,6 +3,11 @@
 // primitives provide these symbols. Leave the old implementation here for
 // bootstrap/fallback builds, but compile none of it into a V++ runtime binary.
 // This also retires the former hybrid C cache/link services on that path.
+#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+// Stage 0 compiles this file as strict C11. Request POSIX.1-2008 before
+// including libc headers so lstat, mkstemp, fdopen and readlink are declared.
+#define _POSIX_C_SOURCE 200809L
+#endif
 #if !defined(VPP_NATIVE_VPP_RUNTIME)
 #include <inttypes.h>
 #include <errno.h>
@@ -13,23 +18,57 @@
 #include <ctype.h>
 #include <string.h>
 #include <stddef.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#include <wchar.h>
+#else
 #include <fcntl.h>
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
 #include <crt_externs.h>
 #include <mach-o/dyld.h>
+#define CC_SHA256_Cleanup(ctx) ((void)(ctx))
 #elif defined(__linux__)
-#include <openssl/sha.h>
-// Use the same SHA-256 cache format on both POSIX native hosts.
-#define CC_SHA256_CTX SHA256_CTX
-#define CC_SHA256_DIGEST_LENGTH SHA256_DIGEST_LENGTH
-#define CC_SHA256_Init SHA256_Init
-#define CC_SHA256_Update SHA256_Update
-#define CC_SHA256_Final SHA256_Final
+#include <openssl/evp.h>
+// OpenSSL 3 deprecates SHA256_Init/Update/Final. Keep the cache's SHA-256
+// digest and streaming format while using the supported EVP interface.
+typedef EVP_MD_CTX *CC_SHA256_CTX;
+#define CC_SHA256_DIGEST_LENGTH 32
+static int vpp_sha256_init(CC_SHA256_CTX *ctx) {
+    *ctx = EVP_MD_CTX_new();
+    if (!*ctx) return 0;
+    if (EVP_DigestInit_ex(*ctx, EVP_sha256(), NULL) == 1) return 1;
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+    return 0;
+}
+static int vpp_sha256_update(CC_SHA256_CTX *ctx, const void *data, size_t size) {
+    return *ctx && EVP_DigestUpdate(*ctx, data, size) == 1;
+}
+static int vpp_sha256_final(unsigned char *hash, CC_SHA256_CTX *ctx) {
+    if (!*ctx) return 0;
+    unsigned int length = 0;
+    int ok = EVP_DigestFinal_ex(*ctx, hash, &length) == 1 &&
+             length == CC_SHA256_DIGEST_LENGTH;
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+    return ok;
+}
+static void vpp_sha256_cleanup(CC_SHA256_CTX *ctx) {
+    EVP_MD_CTX_free(*ctx);
+    *ctx = NULL;
+}
+#define CC_SHA256_Init vpp_sha256_init
+#define CC_SHA256_Update vpp_sha256_update
+#define CC_SHA256_Final vpp_sha256_final
+#define CC_SHA256_Cleanup vpp_sha256_cleanup
 #define CC_LONG size_t
 #endif
 
@@ -89,7 +128,7 @@ int32_t vpp_native_read_status(void) {
 // exposed through the current signed-i32 Machine IR ABI.
 #define VPP_NATIVE_BYTES_SLOTS 64
 #define VPP_NATIVE_FILE_SLOTS 64
-#define VPP_NATIVE_BYTES_MAX (1024u * 1024u)
+#define VPP_NATIVE_BYTES_MAX (2u * 1024u * 1024u)
 #define VPP_NATIVE_PATH_MAX 4096u
 #define VPP_NATIVE_IO_CHUNK 4096u
 
@@ -182,7 +221,7 @@ static vpp_native_file_slot *vpp_native_find_file(int32_t handle) {
 #endif
 
 // Reserve enough space for additional bytes plus a trailing NUL. Do not
-// mutate the buffer on allocation failure or exceed the fixed 1 MiB cap.
+// mutate the buffer on allocation failure or exceed the fixed 2 MiB cap.
 static int vpp_native_bytes_reserve(vpp_native_bytes_slot *slot, size_t additional) {
     if (!slot || additional > VPP_NATIVE_BYTES_MAX - slot->length) return -1;
 #ifdef VPP_NATIVE_VPP_RUNTIME
@@ -383,7 +422,17 @@ static int32_t vpp_native_file_open(int32_t path_handle, const char *mode) {
         if (slot->id != 0) continue;
         // A full handle table must not truncate/create a file.
         if (vpp_native_next_handle == INT32_MAX) return -1;
+#ifdef _WIN32
+        // Windows' narrow CRT uses the active code page, not UTF-8.
+        // Convert explicitly so Vietnamese paths survive the Stage 0 bridge.
+        wchar_t wide_path[VPP_NATIVE_PATH_MAX + 1];
+        int converted = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+            (const char *)path->data, -1, wide_path, VPP_NATIVE_PATH_MAX + 1);
+        if (converted == 0) return -1;
+        FILE *stream = _wfopen(wide_path, mode[0] == 'r' ? L"rb" : L"wb");
+#else
         FILE *stream = fopen((const char *)path->data, mode);
+#endif
         if (!stream) return -1;
         const int32_t id = vpp_native_allocate_handle();
         slot->id = id;
@@ -469,6 +518,12 @@ int32_t vpp_native_argc(void) {
     if (count >= 0 && last != 0) ++count;
     if (fclose(file) != 0) return -1;
     return count;
+#elif defined(_WIN32)
+    int count = 0;
+    wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (!args) return -1;
+    LocalFree(args);
+    return count;
 #else
     return -1;
 #endif
@@ -523,10 +578,51 @@ int32_t vpp_native_argv(int32_t index) {
         return -1;
     }
     return handle;
+#elif defined(_WIN32)
+    int count = 0;
+    wchar_t **args = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (!args) return -1;
+    int32_t handle = -1;
+    if (index >= 0 && index < count) {
+        int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+            args[index], -1, NULL, 0, NULL, NULL);
+        if (length > 0 && (size_t)(length - 1) <= VPP_NATIVE_BYTES_MAX) {
+            handle = vpp_native_bytes_new();
+            vpp_native_bytes_slot *slot = vpp_native_find_bytes(handle);
+            if (!slot || vpp_native_bytes_reserve(slot, (size_t)(length - 1)) != 0 ||
+                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, args[index], -1,
+                    (char *)slot->data, length, NULL, NULL) != length) {
+                if (handle > 0) vpp_native_bytes_free(handle);
+                handle = -1;
+            } else {
+                slot->length = (size_t)(length - 1);
+            }
+        }
+    }
+    LocalFree(args);
+    return handle;
 #else
     (void)index;
     return -1;
 #endif
+}
+
+// Stage 0 uses the owned argv byte handle above. Keep raw OS pointers behind
+// this i32 ABI so the same callers work when Stage 1 switches to ASM.
+int32_t vpp_native_os_argument_length(int32_t index) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t length = vpp_native_bytes_length(handle);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return length;
+}
+
+int32_t vpp_native_os_argument_byte(int32_t index, int32_t offset) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t value = vpp_native_bytes_get(handle, offset);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return value;
 }
 #endif
 
@@ -544,6 +640,12 @@ static void vpp_native_cache_report(void) {
     if (stats && strcmp(stats, "1") == 0)
         fprintf(stderr, "native cache: hits=%lu misses=%lu writes=%lu\n",
                 vpp_cache_hits, vpp_cache_misses, vpp_cache_writes);
+}
+
+// Điểm vào C dùng bởi primitive ASM đăng ký atexit ở Stage 0. Runtime V++
+// tự host cung cấp cùng ABI này từ mã V++, còn bootstrap C chỉ chuyển tiếp.
+void vpp_native_cache_report_entry(void) {
+    vpp_native_cache_report();
 }
 
 static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
@@ -564,15 +666,20 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
         FILE *file = fopen(executable, "rb");
         if (!file) return -1;
         CC_SHA256_CTX digest;
-        CC_SHA256_Init(&digest);
+        if (!CC_SHA256_Init(&digest)) { fclose(file); return -1; }
         unsigned char block[16384];
         size_t count;
+        int failed = 0;
         while ((count = fread(block, 1, sizeof block, file)) != 0)
-            CC_SHA256_Update(&digest, block, (CC_LONG)count);
-        int failed = ferror(file);
+            if (!CC_SHA256_Update(&digest, block, (CC_LONG)count)) {
+                failed = 1;
+                break;
+            }
+        if (ferror(file)) failed = 1;
         if (fclose(file) != 0) failed = 1;
+        if (!failed && !CC_SHA256_Final(vpp_cache_compiler, &digest)) failed = 1;
+        CC_SHA256_Cleanup(&digest);
         if (failed) return -1;
-        CC_SHA256_Final(vpp_cache_compiler, &digest);
         vpp_cache_initialized = 1;
         atexit(vpp_native_cache_report);
     }
@@ -584,10 +691,13 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
     if (lstat(directory, &info) != 0 || !S_ISDIR(info.st_mode)) return -1;
     unsigned char hash[CC_SHA256_DIGEST_LENGTH];
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, vpp_cache_compiler, sizeof vpp_cache_compiler);
-    CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length);
-    CC_SHA256_Final(hash, &digest);
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, vpp_cache_compiler,
+                                         sizeof vpp_cache_compiler) &&
+                         CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length) &&
+                         CC_SHA256_Final(hash, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed) return -1;
     char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
 #ifdef VPP_NATIVE_VPP_RUNTIME
     // The native boundary computes SHA-256; V++ owns its byte-to-hex
@@ -604,6 +714,13 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
     int length = snprintf(path, capacity, "%s/%s.cache", directory, hex);
     return length >= 0 && (size_t)length < capacity ? 0 : -1;
 }
+#endif
+
+#ifdef _WIN32
+// The legacy cache is advisory and disabled on Windows until the same atomic
+// cache implementation is available there. The machine boundary registers
+// this callback through atexit even when cache reads/writes are disabled.
+void vpp_native_cache_report_entry(void) {}
 #endif
 
 // 1 = hit, 0 = miss/disabled/unavailable, -1 = invalid handles. A miss leaves
@@ -660,12 +777,14 @@ int32_t vpp_native_cache_read(int32_t key_handle, int32_t data_handle) {
         fread(data->data, 1, data_size, file) != data_size ||
         fgetc(file) != EOF || ferror(file)) goto cache_read_done;
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, header, 16);
-    CC_SHA256_Update(&digest, saved_key, key_size);
-    CC_SHA256_Update(&digest, data->data, data_size);
-    CC_SHA256_Final(hash, &digest);
-    if (memcmp(hash, header + 16, sizeof hash) != 0) goto cache_read_done;
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, header, 16) &&
+                         CC_SHA256_Update(&digest, saved_key, key_size) &&
+                         CC_SHA256_Update(&digest, data->data, data_size) &&
+                         CC_SHA256_Final(hash, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed || memcmp(hash, header + 16, sizeof hash) != 0)
+        goto cache_read_done;
     data->length = data_size;
     data->data[data_size] = 0;
     hit = 1;
@@ -708,11 +827,13 @@ int32_t vpp_native_cache_write(int32_t key_handle, int32_t data_handle) {
     FILE *file = fdopen(fd, "wb");
     if (!file) { close(fd); unlink(temporary); return -1; }
     CC_SHA256_CTX digest;
-    CC_SHA256_Init(&digest);
-    CC_SHA256_Update(&digest, header, 16);
-    CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length);
-    CC_SHA256_Update(&digest, data->data, (CC_LONG)data->length);
-    CC_SHA256_Final(header + 16, &digest);
+    int hashed = CC_SHA256_Init(&digest);
+    if (hashed) hashed = CC_SHA256_Update(&digest, header, 16) &&
+                         CC_SHA256_Update(&digest, key->data, (CC_LONG)key->length) &&
+                         CC_SHA256_Update(&digest, data->data, (CC_LONG)data->length) &&
+                         CC_SHA256_Final(header + 16, &digest);
+    CC_SHA256_Cleanup(&digest);
+    if (!hashed) { fclose(file); unlink(temporary); return -1; }
     int failed = fwrite(header, 1, sizeof header, file) != sizeof header ||
         fwrite(key->data, 1, key->length, file) != key->length ||
         fwrite(data->data, 1, data->length, file) != data->length;
@@ -736,7 +857,7 @@ static int vpp_native_runtime_file(const char *relative, char *target, size_t ca
     // V++ resolves only the trusted runtime paths. C retains the final OS
     // regular-file check before passing a discovered path to clang.
     int32_t kind = -1;
-    if (strcmp(relative, "scripts/ASM/vpp_aot_primitives_aarch64.S") == 0)
+    if (strcmp(relative, "scripts/ASM/macos/vpp_aot_primitives_aarch64.S") == 0)
         kind = 1;
     else if (strcmp(relative, "src/runtime/native/vpp_aot_runtime.c") == 0)
         kind = 2;
@@ -780,23 +901,66 @@ static int vpp_native_runtime_file(const char *relative, char *target, size_t ca
         }
     }
 #endif
+#elif defined(_WIN32)
+    // Runtime discovery must accept Unicode checkout paths and Windows drive
+    // roots. Find files under VPP_HOME, then the current directory's parents.
+    wchar_t wide_relative[VPP_NATIVE_PATH_MAX + 1];
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, relative, -1,
+            wide_relative, VPP_NATIVE_PATH_MAX + 1)) return -1;
+    wchar_t directory[VPP_NATIVE_PATH_MAX + 1];
+    DWORD size = GetEnvironmentVariableW(L"VPP_HOME", directory,
+                                         VPP_NATIVE_PATH_MAX + 1);
+    if (size > 0 && size <= VPP_NATIVE_PATH_MAX) {
+        wchar_t path[VPP_NATIVE_PATH_MAX + 1];
+        int written = swprintf(path, VPP_NATIVE_PATH_MAX + 1, L"%ls\\%ls",
+                               directory, wide_relative);
+        if (written > 0 && (size_t)written <= VPP_NATIVE_PATH_MAX) {
+            DWORD attrs = GetFileAttributesW(path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                int converted = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                    path, -1, target, (int)capacity, NULL, NULL);
+                return converted > 0 ? 0 : -1;
+            }
+        }
+    }
+    size = GetCurrentDirectoryW(VPP_NATIVE_PATH_MAX + 1, directory);
+    if (size == 0 || size > VPP_NATIVE_PATH_MAX) return -1;
+    for (;;) {
+        wchar_t path[VPP_NATIVE_PATH_MAX + 1];
+        int written = swprintf(path, VPP_NATIVE_PATH_MAX + 1, L"%ls\\%ls",
+                               directory, wide_relative);
+        if (written > 0 && (size_t)written <= VPP_NATIVE_PATH_MAX) {
+            DWORD attrs = GetFileAttributesW(path);
+            if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                int converted = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                    path, -1, target, (int)capacity, NULL, NULL);
+                return converted > 0 ? 0 : -1;
+            }
+        }
+        wchar_t *slash = wcsrchr(directory, L'\\');
+        if (!slash || slash == directory ||
+            (slash == directory + 2 && directory[1] == L':')) break;
+        *slash = L'\0';
+    }
 #else
     (void)relative; (void)target; (void)capacity;
 #endif
     return -1;
 }
 
+#if defined(__APPLE__) || defined(__linux__)
 static int vpp_native_runtime_source(char *target, size_t capacity) {
     return vpp_native_runtime_file("src/runtime/native/vpp_aot_runtime.c", target, capacity);
 }
+#endif
 
 #ifndef VPP_NATIVE_VPP_RUNTIME
 int32_t vpp_native_runtime_module_path(void) {
     char path[VPP_NATIVE_PATH_MAX + 1];
-    // The C/POSIX runtime supplies every native ABI symbol on both Linux and
-    // bootstrap macOS. Loading runtime.vi here would duplicate the runtime
+    // The C bootstrap and machine object supply every native ABI symbol.
+    // Loading the full V++ runtime here would duplicate the runtime
     // and introduce unresolved máy_* assembly primitive references.
-    const char *module = "gói/biên dịch/native/runtime_c.vi";
+    const char *module = "gói/biên dịch/bản địa/môi trường thực thi c.vi";
     if (vpp_native_runtime_file(module, path, sizeof path) != 0)
         return -1;
     const size_t length = strlen(path);
@@ -1079,7 +1243,7 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
         position += length;
     }
 #ifdef VPP_NATIVE_VPP_RUNTIME
-    if (vpp_native_runtime_file("scripts/ASM/vpp_aot_primitives_aarch64.S",
+    if (vpp_native_runtime_file("scripts/ASM/macos/vpp_aot_primitives_aarch64.S",
                                 primitive_path, sizeof primitive_path) != 0)
         goto cleanup_modules;
     if (needs_services && vpp_native_runtime_source(runtime_path, sizeof runtime_path) != 0)

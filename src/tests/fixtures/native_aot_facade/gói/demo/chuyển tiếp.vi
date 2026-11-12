@@ -1,2 +1,2 @@
 // Mô-đun thông thường chỉ tái xuất khi có `công khai nhập`.
-công khai nhập gói/demo/phép cộng;
+công khai nhập gói.demo.phép cộng.*;

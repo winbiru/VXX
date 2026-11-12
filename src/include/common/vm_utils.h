@@ -9,6 +9,7 @@
 #include <sstream>
 #include <utility>
 #include "../vm/instruction.h"
+#include "bit_ops.h"
 #include "vpp/bytecode/opcode.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/runtime/error.h"
@@ -249,6 +250,13 @@ inline StackValue evaluateBinaryOperator(int op,
     const bool boxedInteger = std::holds_alternative<AbiInteger>(a) ||
                               std::holds_alternative<AbiInteger>(b);
     switch (op) {
+        case OP_BIT_VA: case OP_BIT_HOAC: case OP_BIT_XOR:
+        case OP_DICH_TRAI: case OP_DICH_PHAI:
+            if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b)) {
+                throw runtime_error_op("toán tử bit chỉ nhận số nguyên i32", op, pc,
+                                       runtime_binary_facts(a, b));
+            }
+            return make_int_value(evaluateI32Bits(op, std::get<int>(a), std::get<int>(b)));
         case OP_CONG:
             if (isNumeric(a) && isNumeric(b)) {
                 if (boxedInteger) {

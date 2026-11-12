@@ -1,7 +1,7 @@
 // Dùng API từ gói mới, đảm bảo không phụ thuộc đường nhập lõi cũ.
-nhập gói/biên dịch/chính;
-nhập gói/biên dịch/phụ thuộc;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.chính.*;
+nhập gói.biên dịch.phụ thuộc.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     nguồn = "hàm cộng(a, b) { trả về a + b; }; hàm nhân(a, b) { trả về a * b; };";

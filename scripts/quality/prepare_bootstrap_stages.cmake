@@ -83,7 +83,7 @@ list(SORT modules)
 
 get_filename_component(out_dir "${VPP_STAGE1_SOURCE}" DIRECTORY)
 file(MAKE_DIRECTORY "${out_dir}")
-file(WRITE "${VPP_STAGE1_SOURCE}" "// Bootstrap: source graph prepared by CMake, compiled in V++.\nnhập gói/biên dịch/sản phẩm biên dịch;\nnhập gói/biên dịch/liên kết;\n\n")
+file(WRITE "${VPP_STAGE1_SOURCE}" "// Bootstrap: source graph prepared by CMake, compiled in V++.\nnhập gói.biên dịch.sản phẩm biên dịch.*;\nnhập gói.biên dịch.liên kết.*;\n\n")
 set(assignments "    nguồn = {};\n")
 set(index 0)
 foreach(module IN LISTS modules)

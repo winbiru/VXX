@@ -1,9 +1,10 @@
 // Một phiên phân tích giữ snapshot dùng chung cho mọi phép truy vấn.
 // Mỗi phiên phân tích một lần; API hàm tự do ở chính.vi vẫn tương thích.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/biên dịch/kết quả;
-nhập gói/biên dịch/cây cú pháp;
-nhập gói/biên dịch/nút cú pháp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.biên dịch.kết quả.biên dịch snapshot nội bộ;
+nhập gói.biên dịch.mã lệnh.biên dịch thống kê mã thao tác từ mã trung gian;
+nhập gói.biên dịch.cây cú pháp.Bộ Chỉ Mục Khai Báo;
+nhập gói.biên dịch.nút cú pháp.*;
 
 lớp công khai Bộ Biên Dịch {
     hàm công khai khởi tạo(mã nguồn, thư mục) {

@@ -17,6 +17,7 @@ if (NOT DEFINED VPP_CLI)
 endif()
 foreach(required_file IN ITEMS
         "${VPP_EXEC}" "${VPP_CLI}"
+        "${VPP_INSTALL_ROOT}/bin/vpp-native${CMAKE_EXECUTABLE_SUFFIX}"
         "${VPP_INSTALL_ROOT}/gói/chuẩn/chính.vi"
         "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_calls.vi"
         "${VPP_SOURCE_ROOT}/scripts/quality/native_calls_smoke.c")
@@ -24,6 +25,14 @@ foreach(required_file IN ITEMS
         message(FATAL_ERROR "Installation or smoke fixture is missing: ${required_file}")
     endif()
 endforeach()
+if (VPP_TARGET MATCHES "-linux-gnu$")
+    if (NOT EXISTS "${VPP_INSTALL_ROOT}/vpp-aot-link-flags.conf")
+        message(FATAL_ERROR "Installed Linux V++ is missing static OpenSSL linker metadata")
+    endif()
+    if (EXISTS "${VPP_INSTALL_ROOT}/CMakeCache.txt")
+        message(FATAL_ERROR "Installed native smoke must run without the build-tree CMakeCache.txt")
+    endif()
+endif()
 
 enable_testing()
 # Keep the fixture outside the source checkout so package resolution must
@@ -66,6 +75,33 @@ if (VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$" OR
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-stdio-vpp"
             -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
     set_tests_properties(installed-native-stdio-vpp PROPERTIES TIMEOUT 180)
+
+    # Embedded compiler errors must remain catchable by native V++ code.
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_kich_ban_loi.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-native-kich-ban-loi.vi" COPYONLY)
+    add_test(NAME installed-native-embedded-error
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-native-kich-ban-loi.vi"
+            "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_kich_ban_loi.expected"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-kich-ban-loi"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+    set_tests_properties(installed-native-embedded-error PROPERTIES TIMEOUT 180)
+
+    # The self-host OOP emitter must preserve the C++ oracle's instruction
+    # operands and function metadata without invoking legacy compiler intrinsic 98.
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_oop_snapshot.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-native-oop-snapshot.vi" COPYONLY)
+    add_test(NAME installed-native-oop-snapshot
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-native-oop-snapshot.vi"
+            "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_oop_snapshot.expected"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-oop-snapshot"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+    set_tests_properties(installed-native-oop-snapshot PROPERTIES TIMEOUT 180)
 endif()
 
 # These native fixtures cover anonymous closure metadata, captured exceptions,

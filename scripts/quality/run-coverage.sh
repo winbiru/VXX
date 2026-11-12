@@ -46,6 +46,7 @@ echo '[coverage] Configure instrumented C++ build'
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Debug \
   -DVPP_ENABLE_COVERAGE=ON \
+  -DVPP_BUILD_NATIVE_CLI=OFF \
   -DBUILD_TESTS=ON \
   -DBUILD_BENCHMARKS=OFF
 report_duration
@@ -59,18 +60,26 @@ report_duration
 # files also makes repeated local runs deterministic after source/flag changes.
 find "$BUILD_DIR" -type f -name '*.gcda' -delete
 
-# Native compiler, machine-code, and self-hosting checks run against the
-# uninstrumented Release toolchain in the mandatory build/ARM64 jobs. Running
-# them against an instrumented Stage 0 triggers repeated native linking and
-# bootstrap while providing little usable C++ coverage.
+# Native compiler, V++ tool fixtures, machine-code and self-hosting checks run
+# against the uninstrumented Release toolchain in the mandatory build/ARM64
+# jobs. Match the ASan/UBSan exclusions: instrumented Stage 0 makes these
+# fixtures prohibitively slow without providing useful C++ coverage.
+# The dependency-derived native-toolchain label excludes all consumers of
+# those fixtures, including compiler workers and future non-native names.
+# Selective imports also builds the ASM VM and needs both native fixtures.
 # The instrumented HTTP fixture compiles its network modules before listening.
+# Full V++ self-hosted integration and quantum validation run in the normal
+# regression jobs; they execute ASM outside the C++ coverage instrumentation
+# and are intentionally excluded here to avoid duplicate work and a missing
+# native-cli-compiler bootstrap when its fixture is filtered out.
 STAGE="ctest"
 STAGE_STARTED=$SECONDS
 echo '[coverage] Run instrumented CTest suite'
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
   ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
     --output-on-failure --no-tests=error --output-log "$BUILD_DIR/ctest.log" \
-    -E '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$)'
+    --label-exclude native-toolchain \
+    -E '^(vpp-native-|vpp-bit-operators$|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$|vpp-quantum-validation$|vpp-integration$)'
 report_duration
 
 STAGE="capture"
@@ -78,8 +87,11 @@ STAGE_STARTED=$SECONDS
 echo '[coverage] Capture gcov counters'
 # LCOV/GCC can enumerate thousands of system headers. Preserve the complete
 # logs in CI artifacts, and print their final diagnostics if either step fails.
+# GCC 15 may report an executed std::variant header line with an unhit inline
+# function; ignore only LCOV's inconsistent hit-count diagnostic during capture.
 lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \
+  --ignore-errors inconsistent \
   --output-file "$BUILD_DIR/coverage.raw.info" \
   >"$BUILD_DIR/coverage.capture.log" 2>&1
 report_duration

@@ -1,20 +1,6 @@
-hàm bản địa đọc nguồn đầu vào(đường tệp, nguồn đầu vào) {
-    biến tệp dữ liệu = tệp mở đọc(đường tệp);
-    nếu (tệp dữ liệu <= 0) { trả về -1; };
-    biến hoàn thành = 0;
-    lặp (i = 0; i < 300; i++) {
-        biến số phần tử = tệp đọc khối(tệp dữ liệu, nguồn đầu vào);
-        nếu (số phần tử < 0) { thoát; };
-        nếu (số phần tử == 0) { hoàn thành = 1; thoát; };
-    };
-    nếu (tệp đóng(tệp dữ liệu) != 0) { trả về -1; };
-    nếu (hoàn thành != 1) { trả về -1; };
-    trả về byte dài(nguồn đầu vào);
-};
-
-// The self-host executable discovers Linux from procfs. This works for the
-// Stage 0 bootstrap and every later generation without a VM/platform API.
-hàm bản địa là linux() {
+// Nhận diện Linux qua procfs cho cả Stage 0 và các thế hệ tự biên dịch.
+hàm chạy trên linux() {
+    nếu (thực thi máy đích windows() == 1) { trả về 0; };
     biến đường tệp = "/proc/self/exe";
     biến mã tài nguyên = tệp mở đọc(đường tệp);
     byte hủy(đường tệp);
@@ -23,8 +9,37 @@ hàm bản địa là linux() {
     trả về 1;
 };
 
-hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable đường tệp) {
-    biến linux = bản địa là linux();
+// Cross-compile AMD64 COFF and PE32+ executable for supported sources.
+hàm biên dịch đích windows() {
+    biến đích = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_TARGET");
+    nếu (đích <= 0) { trả về thực thi máy đích windows(); };
+    biến tên = "windows-x86_64";
+    biến windows = thực thi các byte bằng nhau(đích, tên);
+    byte hủy(tên);
+    byte hủy(đích);
+    trả về windows;
+};
+
+// Chế độ 0: tệp chạy; 1: object nguồn; 2: object kèm runtime V++.
+hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đường tệp, chế độ xuất) {
+    biến linux = chạy trên linux();
+    biến windows = biên dịch đích windows();
+    biến x86 = 0;
+    nếu (linux == 1) { x86 = 1; };
+    nếu (windows == 1) { x86 = 1; };
+    biến hợp nhất macho = 0;
+    biến chạy macho = 0;
+    nếu (linux == 0) {
+        hợp nhất macho = bật hợp nhất macho bản địa();
+        chạy macho = bật macho executable bản địa();
+    };
+    biến pe runtime đường = thực thi bộ nhớ đệm giá trị môi trường("VPP_WINDOWS_RUNTIME_OBJECT");
+    biến pe runtime = 0;
+    nếu (pe runtime đường > 0) {
+        nếu (byte dài(pe runtime đường) > 0) { pe runtime = 1; };
+        byte hủy(pe runtime đường);
+    };
+    nếu (windows == 1) { linux = 0; };
     biến nguồn đầu vào = byte mới();
     biến biểu diễn trung gian = byte mới();
     biến các hàm = byte mới();
@@ -37,24 +52,29 @@ hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable �
     biến các phần nhập = byte mới();
     biến đối tượng kho lưu trữ = byte mới();
     biến đơn vị nguồn đầu vào = byte mới();
-    nếu (nguồn đầu vào <= 0) { trả về 11; };
-    nếu (biểu diễn trung gian <= 0) { trả về 11; };
-    nếu (các hàm <= 0) { trả về 11; };
-    nếu (mã máy <= 0) { trả về 11; };
-    nếu (đối tượng <= 0) { trả về 11; };
-    nếu (ngoại các lời gọi <= 0) { trả về 11; };
-    nếu (sổ đăng ký <= 0) { trả về 11; };
-    nếu (mô đun ends <= 0) { trả về 11; };
-    nếu (các điểm bắt đầu <= 0) { trả về 11; };
-    nếu (các phần nhập <= 0) { trả về 11; };
-    nếu (đối tượng kho lưu trữ <= 0) { trả về 11; };
-    nếu (đơn vị nguồn đầu vào <= 0) { trả về 11; };
-
     biến mã trạng thái = 0;
+    // Kể cả khi cấp phát giữa chừng thất bại, đi qua một đường giải phóng.
+    nếu (nguồn đầu vào <= 0) { mã trạng thái = 11; };
+    nếu (biểu diễn trung gian <= 0) { mã trạng thái = 11; };
+    nếu (các hàm <= 0) { mã trạng thái = 11; };
+    nếu (mã máy <= 0) { mã trạng thái = 11; };
+    nếu (đối tượng <= 0) { mã trạng thái = 11; };
+    nếu (ngoại các lời gọi <= 0) { mã trạng thái = 11; };
+    nếu (sổ đăng ký <= 0) { mã trạng thái = 11; };
+    nếu (mô đun ends <= 0) { mã trạng thái = 11; };
+    nếu (các điểm bắt đầu <= 0) { mã trạng thái = 11; };
+    nếu (các phần nhập <= 0) { mã trạng thái = 11; };
+    nếu (đối tượng kho lưu trữ <= 0) { mã trạng thái = 11; };
+    nếu (đơn vị nguồn đầu vào <= 0) { mã trạng thái = 11; };
     biến điểm vào mã định danh = -1;
-    nếu (nạp mô đun chuẩn bị(nguồn đầu vào đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = 12; };
+    biến số đơn vị runtime = 0;
+    biến số đối tượng runtime = 0;
     nếu (mã trạng thái == 0) {
-        điểm vào mã định danh = biên dịch mô đun biên dịch các mô đun(nguồn đầu vào, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) - 1;
+        số đơn vị runtime = nạp mô đun chuẩn bị(nguồn đầu vào đường tệp, nguồn đầu vào);
+        nếu (số đơn vị runtime <= 0) { mã trạng thái = 12; };
+    };
+    nếu (mã trạng thái == 0) {
+        điểm vào mã định danh = biên dịch các mô đun(nguồn đầu vào, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) - 1;
         nếu (điểm vào mã định danh < 0) { mã trạng thái = 14; };
     };
     nếu (mã trạng thái == 0) {
@@ -68,27 +88,36 @@ hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable �
             nếu (cuối cùng > đầu tiên) {
                 biến định dạng xuất = 2;
                 nếu (linux == 1) { định dạng xuất = 3; };
+                nếu (windows == 1) { định dạng xuất = 4; };
                 biến khóa tra cứu = bộ nhớ đệm biên dịch khóa tra cứu(định dạng xuất, đơn vị nguồn đầu vào, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh);
                 biến đã có bộ nhớ đệm = 0;
                 nếu (khóa tra cứu > 0) { đã có bộ nhớ đệm = bộ nhớ đệm đọc(khóa tra cứu, đối tượng); };
                 nếu (đã có bộ nhớ đệm != 1) {
                     biến đã sinh mã = -1;
-                    nếu (linux == 1) {
-                        đã sinh mã = sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, ngoại các lời gọi);
+                    nếu (x86 == 1) {
+                        đã sinh mã = sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, ngoại các lời gọi, windows);
                     } hoặc {
                         đã sinh mã = sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, ngoại các lời gọi);
                     };
                     nếu (đã sinh mã <= 0) {
                         mã trạng thái = 15;
-                    }
-                    hoặc {
+                    } hoặc {
                         biến đã phát mã = -1;
-                        nếu (linux == 1) {
+                        nếu (windows == 1) {
+                            đã phát mã = coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
+                        } hoặc nếu (linux == 1) {
                             đã phát mã = elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
                         } hoặc {
-                            đã phát mã = đối tượng mô đun macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
+                            đã phát mã = tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
                         };
                         nếu (đã phát mã <= 0) {
+                            nếu (windows == 1) {
+                                thực thi liên kết báo lỗi("V++ COFF: failed to emit a source unit\n");
+                            } hoặc nếu (linux == 1) {
+                                thực thi liên kết báo lỗi("V++ ELF: failed to emit a source unit\n");
+                            } hoặc {
+                                thực thi liên kết báo lỗi("V++ Mach-O: failed to emit a source unit\n");
+                            };
                             mã trạng thái = 16;
                         };
                     };
@@ -98,15 +127,116 @@ hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable �
                 };
                 nếu (khóa tra cứu > 0) { byte hủy(khóa tra cứu); };
                 nếu (mã trạng thái != 0) { thoát; };
-                nếu (byte đẩy số nguyên ba mươi hai bit(đối tượng kho lưu trữ, byte dài(đối tượng)) != 0) { mã trạng thái = 16; thoát; };
-                nếu (byte nối(đối tượng kho lưu trữ, đối tượng) != 0) { mã trạng thái = 16; thoát; };
+                // Object mode exports source units; runtime-object exports
+                // implicit units. A PE platform boundary enables full builds
+                // with the V++ runtime in the same bounded 2 MiB archive.
+                biến lưu đối tượng = 0;
+                nếu (windows != 1) { lưu đối tượng = 1; };
+                nếu (chế độ xuất == 0) {
+                    nếu (pe runtime == 1) { lưu đối tượng = 1; };
+                    nếu (đơn vị / 4 >= số đơn vị runtime) { lưu đối tượng = 1; };
+                };
+                nếu (chế độ xuất == 1) {
+                    nếu (đơn vị / 4 >= số đơn vị runtime) { lưu đối tượng = 1; };
+                };
+                nếu (chế độ xuất == 2) {
+                    nếu (đơn vị / 4 < số đơn vị runtime) { lưu đối tượng = 1; };
+                };
+                nếu (lưu đối tượng == 1) {
+                    nếu (byte đẩy số nguyên ba mươi hai bit(đối tượng kho lưu trữ, byte dài(đối tượng)) != 0) {
+                        thực thi liên kết báo lỗi("V++: failed to archive source unit length\n");
+                        mã trạng thái = 16; thoát;
+                    };
+                    nếu (byte nối(đối tượng kho lưu trữ, đối tượng) != 0) {
+                        thực thi liên kết báo lỗi("V++: archive exceeds available byte-buffer capacity\n");
+                        mã trạng thái = 16; thoát;
+                    };
+                    // Import-only runtime source units produce no object entry.
+                    nếu (đơn vị / 4 < số đơn vị runtime) { số đối tượng runtime = số đối tượng runtime + 1; };
+                };
             };
             đầu tiên = cuối cùng;
         };
         nếu (byte dài(đối tượng kho lưu trữ) <= 0) { mã trạng thái = 16; };
     };
     nếu (mã trạng thái == 0) {
-        nếu (liên kết đối tượng(đối tượng kho lưu trữ, executable đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 17; };
+        nếu (chế độ xuất == 2) {
+            nếu (windows == 1) {
+                nếu (ghi coff hợp nhất(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 19; };
+            } hoặc nếu (hợp nhất macho == 1) {
+                nếu (ghi macho hợp nhất(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 19; };
+            } hoặc {
+                nếu (thực thi liên kết các mô đun theo chế độ(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp, 2) != 0) { mã trạng thái = 19; };
+            };
+        } hoặc nếu (chế độ xuất == 1) {
+            // Omit every implicit runtime unit, including its imported linker.
+            biến nguồn bắt đầu = 0;
+            lặp (i = 0; i < số đối tượng runtime; i++) {
+                biến dài runtime = đọc đối tượng kho theo đích(đối tượng kho lưu trữ, nguồn bắt đầu, windows);
+                nếu (dài runtime <= 0) {
+                    thực thi liên kết báo lỗi("V++ object: invalid implicit runtime module count\n");
+                    mã trạng thái = 19;
+                    thoát;
+                };
+                nguồn bắt đầu = nguồn bắt đầu + dài runtime + 4;
+            };
+            biến chỉ nguồn = -1;
+            nếu (mã trạng thái == 0) {
+                chỉ nguồn = byte cắt(đối tượng kho lưu trữ, nguồn bắt đầu, byte dài(đối tượng kho lưu trữ) - nguồn bắt đầu);
+                nếu (chỉ nguồn <= 0) {
+                    thực thi liên kết báo lỗi("V++ object: failed to extract source modules\n");
+                    mã trạng thái = 19;
+                };
+            };
+            nếu (mã trạng thái == 0) {
+                biến dài nguồn = đọc đối tượng kho theo đích(chỉ nguồn, 0, windows);
+                nếu (dài nguồn + 4 == byte dài(chỉ nguồn)) {
+                    nếu (ghi tệp đối tượng(chỉ nguồn, 0, kết xuất đường tệp, nguồn đầu vào đường tệp, windows) != 0) {
+                        thực thi liên kết báo lỗi("V++ object: failed to publish object\n");
+                        mã trạng thái = 19;
+                    };
+                } hoặc nếu (windows == 1) {
+                    nếu (ghi coff hợp nhất(chỉ nguồn, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 19; };
+                } hoặc nếu (hợp nhất macho == 1) {
+                    nếu (ghi macho hợp nhất(chỉ nguồn, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 19; };
+                } hoặc {
+                    // Mode 2 merges exactly the provided objects, without host ASM.
+                    nếu (thực thi liên kết các mô đun theo chế độ(chỉ nguồn, kết xuất đường tệp, nguồn đầu vào đường tệp, 2) != 0) { mã trạng thái = 19; };
+                };
+            };
+            nếu (chỉ nguồn > 0) { byte hủy(chỉ nguồn); };
+        } hoặc {
+            nếu (windows == 1) {
+                nếu (ghi pe executable(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 17; };
+            } hoặc nếu (chạy macho == 1) {
+                // A platform object enables full runtime linking. With no
+                // platform object retain the freestanding source-only path.
+                biến runtime đường = thực thi bộ nhớ đệm giá trị môi trường("VPP_MACOS_RUNTIME_OBJECT");
+                biến nguồn chạy bắt đầu = 0;
+                biến không có runtime = 1;
+                nếu (runtime đường > 0) {
+                    nếu (byte dài(runtime đường) > 0) { không có runtime = 0; };
+                };
+                nếu (không có runtime == 1) {
+                    lặp (i = 0; i < số đối tượng runtime; i++) {
+                        biến kích thước = thực thi đối tượng kho lưu trữ điểm vào(đối tượng kho lưu trữ, nguồn chạy bắt đầu);
+                        nếu (kích thước <= 0) { mã trạng thái = 17; thoát; };
+                        nguồn chạy bắt đầu = nguồn chạy bắt đầu + kích thước + 4;
+                    };
+                };
+                nếu (runtime đường > 0) { byte hủy(runtime đường); };
+                nếu (mã trạng thái == 0) {
+                    biến chỉ nguồn chạy = byte cắt(đối tượng kho lưu trữ, nguồn chạy bắt đầu, byte dài(đối tượng kho lưu trữ) - nguồn chạy bắt đầu);
+                    nếu (chỉ nguồn chạy <= 0) { mã trạng thái = 17; }
+                    hoặc {
+                        nếu (ghi macho executable(chỉ nguồn chạy, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 17; };
+                        byte hủy(chỉ nguồn chạy);
+                    };
+                };
+            } hoặc {
+                nếu (liên kết đối tượng(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 17; };
+            };
+        };
     };
 
     byte hủy(nguồn đầu vào);
@@ -124,29 +254,240 @@ hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable �
     trả về mã trạng thái;
 };
 
-hàm chính() {
-    nếu (đối số đếm() != 5) { trả về 2; };
-    biến lệnh = đối số lấy(1);
-    biến nguồn đầu vào = đối số lấy(2);
-    biến tùy chọn = đối số lấy(3);
-    biến kết xuất = đối số lấy(4);
-    nếu (lệnh <= 0) { trả về 2; };
-    nếu (nguồn đầu vào <= 0) { trả về 2; };
-    nếu (tùy chọn <= 0) { trả về 2; };
-    nếu (kết xuất <= 0) { trả về 2; };
-    biến bản dựng hằng văn bản = "build";
-    biến tùy chọn hằng văn bản = "-o";
-    biến đạt = 1;
-    nếu (byte bằng(lệnh, bản dựng hằng văn bản) != 1) { đạt = 0; };
-    nếu (byte bằng(tùy chọn, tùy chọn hằng văn bản) != 1) { đạt = 0; };
-    biến kết quả trả về = 2;
-    nếu (đạt == 1) { kết quả trả về = bản địa bản dựng(nguồn đầu vào, kết xuất); };
-    byte hủy(bản dựng hằng văn bản);
-    byte hủy(tùy chọn hằng văn bản);
-    byte hủy(lệnh);
+// Kiểm tra nguồn, mô đun và IR hoàn toàn trong V++; không cần liên kết.
+hàm kiểm tra nguồn(nguồn đầu vào đường tệp) {
+    biến nguồn đầu vào = byte mới();
+    biến biểu diễn trung gian = byte mới();
+    biến các hàm = byte mới();
+    biến sổ đăng ký = byte mới();
+    biến mô đun ends = byte mới();
+    biến mã trạng thái = 0;
+    nếu (nguồn đầu vào <= 0) { mã trạng thái = 11; };
+    nếu (biểu diễn trung gian <= 0) { mã trạng thái = 11; };
+    nếu (các hàm <= 0) { mã trạng thái = 11; };
+    nếu (sổ đăng ký <= 0) { mã trạng thái = 11; };
+    nếu (mô đun ends <= 0) { mã trạng thái = 11; };
+    nếu (mã trạng thái == 0) {
+        nếu (nạp mô đun chuẩn bị(nguồn đầu vào đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = 12; };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (biên dịch các mô đun(nguồn đầu vào, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) <= 0) {
+            mã trạng thái = 14;
+        };
+    };
     byte hủy(nguồn đầu vào);
-    byte hủy(tùy chọn);
-    byte hủy(kết xuất);
-    trả về kết quả trả về;
+    byte hủy(biểu diễn trung gian);
+    byte hủy(các hàm);
+    byte hủy(sổ đăng ký);
+    byte hủy(mô đun ends);
+    trả về mã trạng thái;
 };
 
+// CLI native tự xuất hướng dẫn, không cần khởi động CLI C++.
+hàm hiện trợ giúp() {
+    biến nội dung = "V++ - trình biên dịch i32 (Mach-O/ELF/COFF)\nLệnh:\n  kiểm tra <nguồn.vi>\n  biên dịch <nguồn.vi> [--đầu-ra <tệp>]\n  đối tượng <nguồn.vi> [--đầu-ra <tệp.o>]\n  assemble <nguồn.s> -o <tệp.o> (Linux x86-64)\n  xuất đối tượng <nguồn.vi> [--đầu-ra <tệp.o>]\n  biên dịch --đầu-ra <tệp> <nguồn.vi>\n  trợ giúp | phiên bản\nTương thích: check, build, dựng, object, -o, --help, --version\nVPP_NATIVE_TARGET=windows-x86_64: cross-compile COFF object, including multiple source modules\n";
+    biến kết quả = byte in(nội dung);
+    byte hủy(nội dung);
+    nếu (kết quả < 0) { trả về 11; };
+    trả về 0;
+};
+
+hàm hiện phiên bản() {
+    biến nội dung = "V++ - trình biên dịch i32 (Mach-O/ELF)\n";
+    biến kết quả = byte in(nội dung);
+    byte hủy(nội dung);
+    nếu (kết quả < 0) { trả về 11; };
+    trả về 0;
+};
+
+// Không ghi đè nguồn: tên mặc định lấy từ nguồn.vi hoặc thêm hậu tố.
+// Bên gọi có trách nhiệm giải phóng bộ đệm kết quả.
+hàm tạo tên đầu ra(nguồn, chế độ xuất) {
+    biến chiều dài = byte dài(nguồn);
+    nếu (chiều dài <= 0) { trả về -1; };
+    biến đầu ra = byte mới();
+    nếu (đầu ra <= 0) { trả về -1; };
+    biến có đuôi vi = 0;
+    nếu (chiều dài > 3) {
+        biến đuôi = byte cắt(nguồn, chiều dài - 3, 3);
+        biến tên đuôi = ".vi";
+        nếu (đuôi > 0) {
+            nếu (byte bằng(đuôi, tên đuôi) == 1) { có đuôi vi = 1; };
+            byte hủy(đuôi);
+        };
+        byte hủy(tên đuôi);
+    };
+    biến số byte = chiều dài;
+    nếu (có đuôi vi == 1) { số byte = chiều dài - 3; };
+    biến phần tên = byte cắt(nguồn, 0, số byte);
+    nếu (phần tên <= 0) { byte hủy(đầu ra); trả về -1; };
+    biến trạng thái = byte nối(đầu ra, phần tên);
+    byte hủy(phần tên);
+    biến hậu tố = ".o";
+    nếu (chế độ xuất == 0) {
+        nếu (có đuôi vi == 1) { byte hủy(hậu tố); hậu tố = ""; }
+        hoặc { byte hủy(hậu tố); hậu tố = ".out"; };
+    };
+    nếu (trạng thái == 0) { trạng thái = byte nối(đầu ra, hậu tố); };
+    byte hủy(hậu tố);
+    nếu (trạng thái != 0) { byte hủy(đầu ra); trả về -1; };
+    trả về đầu ra;
+};
+
+// Giá trị 0: biên dịch, 1: đối tượng, 2: kiểm tra, 3: trợ giúp,
+// 4: phiên bản, 5: object kèm runtime, 6: hợp dịch Linux x86-64. Mọi lệnh CLI được phân tích trong V++.
+hàm loại lệnh(đầu lệnh) {
+    nếu (byte bằng(đầu lệnh, "assemble") == 1) { trả về 6; };
+    nếu (byte bằng(đầu lệnh, "hợp dịch") == 1) { trả về 6; };
+    nếu (byte bằng(đầu lệnh, "build") == 1) { trả về 0; };
+    nếu (byte bằng(đầu lệnh, "biên dịch") == 1) { trả về 0; };
+    nếu (byte bằng(đầu lệnh, "dựng") == 1) { trả về 0; };
+    nếu (byte bằng(đầu lệnh, "object") == 1) { trả về 1; };
+    nếu (byte bằng(đầu lệnh, "runtime-object") == 1) { trả về 5; };
+    nếu (byte bằng(đầu lệnh, "đối tượng") == 1) { trả về 1; };
+    nếu (byte bằng(đầu lệnh, "check") == 1) { trả về 2; };
+    nếu (byte bằng(đầu lệnh, "kiểm tra") == 1) { trả về 2; };
+    nếu (byte bằng(đầu lệnh, "--help") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "-h") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "help") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "trợ giúp") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "--trợ-giúp") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "giúp đỡ") == 1) { trả về 3; };
+    nếu (byte bằng(đầu lệnh, "--version") == 1) { trả về 4; };
+    nếu (byte bằng(đầu lệnh, "--phiên-bản") == 1) { trả về 4; };
+    nếu (byte bằng(đầu lệnh, "-v") == 1) { trả về 4; };
+    nếu (byte bằng(đầu lệnh, "version") == 1) { trả về 4; };
+    nếu (byte bằng(đầu lệnh, "phiên bản") == 1) { trả về 4; };
+    trả về -1;
+};
+
+hàm loại lệnh ghép(đầu lệnh, từ thứ hai) {
+    nếu (byte bằng(đầu lệnh, "kiểm") == 1) {
+        nếu (byte bằng(từ thứ hai, "tra") == 1) { trả về 2; };
+    };
+    nếu (byte bằng(đầu lệnh, "biên") == 1) {
+        nếu (byte bằng(từ thứ hai, "dịch") == 1) { trả về 0; };
+    };
+    nếu (byte bằng(đầu lệnh, "xuất") == 1) {
+        nếu (byte bằng(từ thứ hai, "đối tượng") == 1) { trả về 1; };
+    };
+    nếu (byte bằng(đầu lệnh, "trợ") == 1) {
+        nếu (byte bằng(từ thứ hai, "giúp") == 1) { trả về 3; };
+    };
+    nếu (byte bằng(đầu lệnh, "giúp") == 1) {
+        nếu (byte bằng(từ thứ hai, "đỡ") == 1) { trả về 3; };
+    };
+    nếu (byte bằng(đầu lệnh, "phiên") == 1) {
+        nếu (byte bằng(từ thứ hai, "bản") == 1) { trả về 4; };
+    };
+    trả về -1;
+};
+
+hàm là tùy chọn đầu ra(tùy chọn) {
+    nếu (byte bằng(tùy chọn, "-o") == 1) { trả về 1; };
+    nếu (byte bằng(tùy chọn, "--đầu-ra") == 1) { trả về 1; };
+    trả về 0;
+};
+
+hàm dựng mặc định(nguồn, chế độ xuất) {
+    biến đầu ra = tạo tên đầu ra(nguồn, chế độ xuất);
+    nếu (đầu ra <= 0) { trả về 11; };
+    biến trạng thái = biên dịch tệp(nguồn, đầu ra, chế độ xuất);
+    byte hủy(đầu ra);
+    trả về trạng thái;
+};
+
+// Chỉ một nơi thực hiện lệnh, bất kể tên lệnh dùng tiếng Việt hay tiếng Anh.
+hàm chạy lệnh(nguồn, kết xuất, chế độ) {
+    nếu (chế độ == 6) {
+        nếu (kết xuất <= 0) { trả về 2; };
+        trả về as_assemble(nguồn, kết xuất);
+    };
+    nếu (chế độ == 5) {
+        nếu (kết xuất > 0) { trả về biên dịch tệp(nguồn, kết xuất, 2); };
+        trả về dựng mặc định(nguồn, 2);
+    };
+    nếu (chế độ == 2) {
+        nếu (kết xuất > 0) { trả về 2; };
+        trả về kiểm tra nguồn(nguồn);
+    };
+    nếu (chế độ == 0) {
+        nếu (kết xuất > 0) { trả về biên dịch tệp(nguồn, kết xuất, 0); };
+        trả về dựng mặc định(nguồn, 0);
+    };
+    nếu (chế độ == 1) {
+        nếu (kết xuất > 0) { trả về biên dịch tệp(nguồn, kết xuất, 1); };
+        trả về dựng mặc định(nguồn, 1);
+    };
+    trả về 2;
+};
+
+hàm chính() {
+    biến số đối số = đối số đếm();
+    nếu (số đối số == 1) { trả về hiện trợ giúp(); };
+    nếu (số đối số < 2) { trả về 2; };
+
+    biến lệnh đầu = đối số lấy(1);
+    nếu (lệnh đầu <= 0) { byte hủy(lệnh đầu); trả về 2; };
+    biến chế độ = loại lệnh(lệnh đầu);
+    biến vị trí nguồn = 2;
+    nếu (chế độ < 0) {
+        nếu (số đối số >= 3) {
+            biến từ ghép = đối số lấy(2);
+            nếu (từ ghép > 0) {
+                chế độ = loại lệnh ghép(lệnh đầu, từ ghép);
+                nếu (chế độ >= 0) { vị trí nguồn = 3; };
+            };
+            byte hủy(từ ghép);
+        };
+    };
+    byte hủy(lệnh đầu);
+
+    nếu (chế độ == 3) {
+        nếu (số đối số == vị trí nguồn) { trả về hiện trợ giúp(); };
+        trả về 2;
+    };
+    nếu (chế độ == 4) {
+        nếu (số đối số == vị trí nguồn) { trả về hiện phiên bản(); };
+        trả về 2;
+    };
+    nếu (chế độ < 0) { trả về 2; };
+
+    // Lệnh kiểm tra, biên dịch hoặc xuất object không chỉ định đường đầu ra.
+    nếu (số đối số == vị trí nguồn + 1) {
+        biến nguồn mặc định = đối số lấy(vị trí nguồn);
+        biến trạng thái mặc định = 2;
+        nếu (nguồn mặc định > 0) {
+            trạng thái mặc định = chạy lệnh(nguồn mặc định, -1, chế độ);
+        };
+        byte hủy(nguồn mặc định);
+        trả về trạng thái mặc định;
+    };
+
+    // Hỗ trợ cả: <nguồn> -o <đầu ra> và -o <đầu ra> <nguồn>.
+    nếu (số đối số == vị trí nguồn + 3) {
+        nếu (chế độ == 2) { trả về 2; };
+        biến đối số đầu = đối số lấy(vị trí nguồn);
+        biến đối số giữa = đối số lấy(vị trí nguồn + 1);
+        biến đối số cuối = đối số lấy(vị trí nguồn + 2);
+        biến trạng thái định tuyến = 2;
+        nếu (đối số đầu > 0) {
+            nếu (đối số giữa > 0) {
+                nếu (đối số cuối > 0) {
+                    nếu (là tùy chọn đầu ra(đối số giữa) == 1) {
+                        trạng thái định tuyến = chạy lệnh(đối số đầu, đối số cuối, chế độ);
+                    } hoặc {
+                        nếu (là tùy chọn đầu ra(đối số đầu) == 1) {
+                            trạng thái định tuyến = chạy lệnh(đối số cuối, đối số giữa, chế độ);
+                        };
+                    };
+                };
+            };
+        };
+        byte hủy(đối số đầu);
+        byte hủy(đối số giữa);
+        byte hủy(đối số cuối);
+        trả về trạng thái định tuyến;
+    };
+    trả về 2;
+};

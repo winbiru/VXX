@@ -1,15 +1,15 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
-    văn_bản = "a😀Việt";
+    văn_bản = "a𠮷Việt";
     in ký tự tại(văn_bản, 1);
     in con chuỗi(văn_bản, 1, 4);
     in tìm chuỗi chính xác(văn_bản, "Việt");
     in tìm chuỗi chính xác(văn_bản, "missing") == rỗng;
-    in bắt đầu bằng(văn_bản, "a😀");
+    in bắt đầu bằng(văn_bản, "a𠮷");
     in kết thúc bằng(văn_bản, "Việt");
-    in chứa chính xác(văn_bản, "😀V");
-    in thay chính xác("aba😀aba", "aba", "X");
+    in chứa chính xác(văn_bản, "𠮷V");
+    in thay chính xác("aba𠮷aba", "aba", "X");
     in thay chính xác("ab", "", "-");
 
     nbsp = ký tự unicode(160);
@@ -105,4 +105,32 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
+
+    // KMP trên byte phải giữ chỉ số code point và không khớp giữa UTF-8.
+    in tìm chuỗi chính xác("xxaab", "aab") == 2;
+    in tìm chuỗi chính xác("a𠮷Việt", "Việt", 2) == 2;
+    in tìm chuỗi chính xác("a𠮷Việt", "Việt", 3) == rỗng;
+    in tìm chuỗi chính xác("a𠮷", "", 2) == 2;
+    in tìm chuỗi chính xác("abc", "abc") == 0;
+    in thay chính xác("aaaaa", "aa", "X") == "XXa";
+    in thay chính xác("abababa", "aba", "X") == "XbX";
+    // So khớp theo khối i32 phải xử lý cả mẫu 1..4 byte và UTF-8 dài hơn.
+    in thay chính xác("aaaa", "a", "X") == "XXXX";
+    in thay chính xác("abcaba", "abc", "R") == "Raba";
+    in thay chính xác("aaaa", "aaaa", "R") == "R";
+    in thay chính xác("xViệtyViệt", "Việt", "V++") == "xV++yV++";
+    in thay chính xác("🚀🚀!", "🚀", "*") == "**!";
+    in thay chính xác("é🚀", "é🚀", "!") == "!";
+    in thay chính xác("", "", ":") == ":";
+    in thay chính xác("a𠮷", "", ":") == ":a:𠮷:";
+
+    byte sai = chuỗi từ byte máy ảo([169]);
+    văn bản sai = chuỗi từ byte máy ảo([195, 169, 169]);
+    in tìm chuỗi chính xác("é", byte sai) == rỗng;
+    in tìm chuỗi chính xác(văn bản sai, byte sai) == 1;
+    in thay chính xác(văn bản sai, byte sai, "X") == "éX";
+    byte thay = chuỗi thành byte máy ảo(thay chính xác(
+        chuỗi từ byte máy ảo([226, 130]), "", "-"));
+    in độ dài(byte thay) == 5 && byte thay[0] == 45 && byte thay[1] == 226 &&
+       byte thay[2] == 45 && byte thay[3] == 130 && byte thay[4] == 45;
 };

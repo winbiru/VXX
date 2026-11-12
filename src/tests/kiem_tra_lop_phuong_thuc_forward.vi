@@ -1,0 +1,16 @@
+// Cùng tên phương thức riêng tư ở hai lớp phải phân giải theo lớp chứa lời gọi.
+// Lời gọi trong chạy() xuất hiện trước khai báo phụ().
+lớp A {
+    hàm công khai chạy() { trả về phụ(); };
+    hàm riêng tư phụ() { trả về 7; };
+};
+
+lớp B {
+    hàm công khai chạy() { trả về phụ(); };
+    hàm riêng tư phụ() { trả về 9; };
+};
+
+hàm chính() {
+    in A.chạy();
+    in B.chạy();
+};

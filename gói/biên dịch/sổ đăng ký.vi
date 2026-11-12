@@ -1,8 +1,23 @@
 // Sổ hàm tự chủ. Function ID và StringPool dùng chung trên toàn phiên;
 // bảng slot là trạng thái riêng của từng emitter, không được nối giữa module.
 // API đồ thị lập symbol/exports cho emitter + linker V++; loader tại bộ nạp.vi.
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị tìm đích;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+
+// Selection changes the visible surface, independently of module load order.
+hàm công khai biên dịch sổ nhận nhập(cạnh, tên) {
+    tên chọn = lấy từ điển(cạnh, "tên nhập", "");
+    trả về tên chọn == "" || tên chọn == "*" || tên chọn == tên;
+};
+hàm công khai biên dịch sổ tên nhập(cạnh, tên) {
+    bí danh = lấy từ điển(cạnh, "bí danh", "");
+    nếu (bí danh == "") { trả về tên; };
+    tên chọn = lấy từ điển(cạnh, "tên nhập", "");
+    nếu (tên chọn != "" && tên chọn != "*") { trả về bí danh; };
+    trả về bí danh + "." + tên;
+};
 
 // Thuật toán không giữ trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch sổ lưu chuỗi(sổ, tên) {
@@ -56,10 +71,31 @@ hàm công khai biên dịch sổ cấp hàm(sổ, mô đun, tên) {
         // Khi có khai báo trùng, hàm tìm cũ luôn chọn ID đầu tiên.
         nếu (!máy ảo có khóa từ điển(theo mô đun, tên)) { theo mô đun[tên] = mã định danh; };
     };
+    // Tên duy nhất toàn phiên có thể gọi thẳng bằng function ID dù mô-đun
+    // bootstrap cũ chỉ gom phụ thuộc ở điểm vào. -1 đánh dấu tên mơ hồ.
+    nếu (máy ảo có khóa từ điển(sổ, "chỉ mục tên duy nhất")) {
+        duy nhất = sổ["chỉ mục tên duy nhất"];
+        nếu (!máy ảo có khóa từ điển(duy nhất, tên)) {
+            duy nhất[tên] = mã định danh;
+        } hoặc {
+            duy nhất[tên] = -1;
+        };
+    };
     trả về mã định danh;
 };
 
 hàm công khai biên dịch sổ tìm mô đun(các mô đun, định danh) {
+    // Chấp nhận cả sổ để tra cứu O(1); chữ ký nhận danh sách cũ vẫn hợp lệ.
+    nếu (loại của(các mô đun) == "từ điển") {
+        chỉ mục = lấy từ điển(các mô đun, "chỉ mục mô đun", rỗng);
+        nếu (chỉ mục != rỗng) {
+            nếu (máy ảo có khóa từ điển(chỉ mục, định danh)) {
+                trả về chỉ mục[định danh];
+            };
+            ném "biên dịch sổ: chưa đăng ký mô-đun phụ thuộc '" + định danh + "'";
+        };
+        các mô đun = các mô đun["mô đun"];
+    };
     lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
         nếu (các mô đun[i]["định danh"] == định danh) {
             trả về các mô đun[i];
@@ -72,12 +108,16 @@ hàm công khai biên dịch sổ cây mô đun(đồ thị, định danh) {
     nếu (định danh == đồ thị["điểm vào"]) {
         trả về đồ thị["cây điểm vào"];
     };
-    các mô đun = đồ thị["mô đun"];
-    lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
-        nếu (các mô đun[i]["định danh"] == định danh) {
-            trả về các mô đun[i]["cây"];
+    nếu (!máy ảo có khóa từ điển(đồ thị, "chỉ mục cây mô đun")) {
+        chỉ mục mới = {};
+        các mô đun = đồ thị["mô đun"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
+            chỉ mục mới[các mô đun[i]["định danh"]] = các mô đun[i]["cây"];
         };
+        đồ thị["chỉ mục cây mô đun"] = chỉ mục mới;
     };
+    chỉ mục = đồ thị["chỉ mục cây mô đun"];
+    nếu (máy ảo có khóa từ điển(chỉ mục, định danh)) { trả về chỉ mục[định danh]; };
     ném "biên dịch sổ: thiếu AST cho '" + định danh + "'";
 };
 
@@ -126,10 +166,8 @@ hàm riêng tư biên dịch sổ cấp lớp duyệt(sổ, định danh, câu l
 // thứ tự câu lệnh để method trước import được cấp ID trước hàm dependency.
 hàm công khai biên dịch sổ cấp hàm duyệt(sổ, đồ thị, định danh) {
     đã cấp = sổ["đã cấp"];
-    lặp(i = 0; i < máy ảo lấy độ dài(đã cấp); i++) {
-        nếu (đã cấp[i] == định danh) { trả về đúng; };
-    };
-    máy ảo thêm cuối danh sách(đã cấp, định danh);
+    nếu (máy ảo có khóa từ điển(đã cấp, định danh)) { trả về đúng; };
+    đã cấp[định danh] = đúng;
     cây = biên dịch sổ cây mô đun(đồ thị, định danh);
     câu lệnh = lấy từ điển(cây, "câu lệnh", []);
     lặp(i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
@@ -217,7 +255,10 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             biên dịch sổ thêm tên(trực tiếp, tên, mã định danh, định danh);
             biên dịch sổ thêm tên(nhìn thấy, tên, mã định danh, định danh);
             // Parser bootstrap hiện chỉ nhận hàm mặc định (public).
-            biên dịch sổ thêm tên(xuất, tên, mã định danh, định danh);
+            phạm vi = lấy từ điển(câu lệnh[i], "phạm vi", "");
+            nếu (phạm vi != "riêng tư" && phạm vi != "bảo vệ") {
+                biên dịch sổ thêm tên(xuất, tên, mã định danh, định danh);
+            };
         };
     };
 
@@ -225,12 +266,13 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
     lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
         e = cạnh[i];
         nếu (e["nguồn"] == định danh) {
-            phụ thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], e["đích"]);
+            phụ thuộc = biên dịch sổ tìm mô đun(sổ, e["đích"]);
             tên tiền tố = lấy từ điển(e, "bí danh", "");
             các mục xuất = phụ thuộc["xuất"];
             lặp(j = 0; j < máy ảo lấy độ dài(các mục xuất); j++) {
                 tên = các mục xuất[j]["tên"];
-                nếu (tên tiền tố != "") { tên = tên tiền tố + "." + tên; };
+                nếu (!biên dịch sổ nhận nhập(e, tên)) { bỏ qua; };
+                tên = biên dịch sổ tên nhập(e, tên);
                 mã định danh = các mục xuất[j]["id"];
                 biên dịch sổ thêm tên(nhìn thấy, tên, mã định danh, định danh);
                 nếu (lấy từ điển(e, "tái xuất", sai)) {
@@ -239,7 +281,8 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             };
             // Compiler C++ áp bí danh sau khi phát xong module phụ thuộc.
             // Metadata tên chạy tách khỏi tên khai báo/OP_HAM nguyên gốc.
-            nếu (tên tiền tố != "" && e["hành động"] == "load" &&
+            tên chọn = lấy từ điển(e, "tên nhập", "");
+            nếu (tên tiền tố != "" && (tên chọn == "" || tên chọn == "*") && e["hành động"] == "load" &&
                 !lấy từ điển(sổ, "hoãn chuỗi", sai)) {
                 trực phụ = phụ thuộc["trực tiếp"];
                 lặp(j = 0; j < máy ảo lấy độ dài(trực phụ); j++) {
@@ -253,8 +296,12 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             };
         };
     };
-    máy ảo thêm cuối danh sách(sổ["mô đun"], {"định danh": định danh, "trực tiếp": trực tiếp,
-                           "nhìn thấy": nhìn thấy, "xuất": xuất});
+    mục mới = {"định danh": định danh, "trực tiếp": trực tiếp,
+               "nhìn thấy": nhìn thấy, "xuất": xuất};
+    máy ảo thêm cuối danh sách(sổ["mô đun"], mục mới);
+    nếu (máy ảo có khóa từ điển(sổ, "chỉ mục mô đun")) {
+        sổ["chỉ mục mô đun"][định danh] = mục mới;
+    };
 };
 
 // Giữ hợp đồng hàm tự do để emitter/linker hiện có không phải thay đổi.
@@ -290,7 +337,7 @@ lớp công khai Bộ Đăng Ký Hàm {
 
     hàm riêng tư chuẩn bị IR() {
         mình.sổ = {"hàm": [], "chuỗi": [],
-                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {}};
+                    "chỉ mục hàm": {}, "chỉ mục tên duy nhất": {}, "chỉ mục chuỗi": {}};
         mình.các ô nhớ = [];
         mình.tên đã khai = [];
     };
@@ -332,8 +379,9 @@ lớp công khai Bộ Đăng Ký Hàm {
             ném "biên dịch sổ: cần đồ thị mô đun V++";
         };
         mình.sổ = {"loại": "sổ hàm V++", "hàm": [], "chuỗi": [],
-                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {},
-                    "mô đun": [], "đã cấp": [], "hoãn chuỗi": mình.hoãn chuỗi};
+                    "chỉ mục hàm": {}, "chỉ mục tên duy nhất": {}, "chỉ mục chuỗi": {},
+                    "mô đun": [], "chỉ mục mô đun": {},
+                    "đã cấp": {}, "hoãn chuỗi": mình.hoãn chuỗi};
         mình.các ô nhớ = [];
         mình.tên đã khai = [];
         thứ tự = đồ thị["thứ tự khởi tạo"];
@@ -355,7 +403,7 @@ lớp công khai Bộ Đăng Ký Hàm {
     };
 
     hàm công khai tìm mô đun(định danh) {
-        trả về biên dịch sổ tìm mô đun(mình.sổ["mô đun"], định danh);
+        trả về biên dịch sổ tìm mô đun(mình.sổ, định danh);
     };
 };
 

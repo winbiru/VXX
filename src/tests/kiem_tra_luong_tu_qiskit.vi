@@ -1,5 +1,5 @@
 nhập lượng tử;
-nhập gói / lượng tử / qiskit;
+nhập gói.lượng tử.qiskit.*;
 nhập kiểm thử;
 hàm chính() {
     // Validation phải kết thúc trước khi khởi chạy đường dẫn Python giả.
