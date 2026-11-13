@@ -20,6 +20,16 @@ hàm chính() {
     nếu (byte tìm(các byte, part) != 1) { trả về 16; };
     byte làm rỗng(các byte);
     nếu (byte đọc số nguyên ba mươi hai bit(part, 0) != -2147483648) { trả về 17; };
+    // Sao chép i32 lệch hàng, byte dư, đoạn rỗng và biên không hợp lệ.
+    byte thêm(part, 255);
+    byte thêm(các byte, 90);
+    nếu (byte nối(các byte, part) != 0 || byte dài(các byte) != 6) { trả về 53; };
+    nếu (byte lấy(các byte, 0) != 90 || byte đọc số nguyên ba mươi hai bit(các byte, 1) != -2147483648 || byte lấy(các byte, 5) != 255) { trả về 54; };
+    biến đoạn rỗng = byte cắt(các byte, 6, 0);
+    nếu (đoạn rỗng <= 0 || byte dài(đoạn rỗng) != 0) { trả về 55; };
+    nếu (byte nối(các byte, đoạn rỗng) != 0 || byte dài(các byte) != 6 || byte cắt(các byte, 5, 2) != -1) { trả về 56; };
+    byte hủy(đoạn rỗng);
+    byte làm rỗng(các byte);
     byte thêm(các byte, 90);
     lặp (i = 0; i < 21; i++) {
         nếu (byte nối(các byte, các byte) != 0) { trả về 18; };

@@ -89,8 +89,8 @@ hàm thực thi các byte thêm cuối(mã tài nguyên, giá trị đang xét) 
     trả về máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, chiều dài + 1);
 };
 
-// Sao chép một đoạn đã kiểm tra biên. Giữ đường dự phòng cho seed cũ
-// hoặc vùng nhớ mà primitive sao chép không hỗ trợ.
+// Sao chép một đoạn đã kiểm tra biên bằng ABI i32 của mọi seed.
+// Seed ELF cũ không nhận intrinsic máy sao chép vùng nhớ (82).
 hàm thực thi các byte nối đoạn(đích nhận, nguồn đầu vào, điểm bắt đầu, số phần tử) {
     biến nguồn văn bản = thực thi các byte ô nhớ(nguồn đầu vào);
     nếu (nguồn văn bản < 0) { trả về -1; };
@@ -102,10 +102,14 @@ hàm thực thi các byte nối đoạn(đích nhận, nguồn đầu vào, đi�
     biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + đích sao chép * 32);
     biến địa chỉ nguồn = thực thi nội dung đệm(nguồn văn bản) + điểm bắt đầu;
     biến địa chỉ đích = thực thi nội dung đệm(đích sao chép) + chiều dài;
-    nếu (máy sao chép vùng nhớ(địa chỉ đích, địa chỉ nguồn, số phần tử) != 0) {
-        lặp (i = 0; i < số phần tử; i++) {
-            máy ghi byte(địa chỉ đích + i, máy đọc byte(địa chỉ nguồn + i));
-        };
+    biến i = 0;
+    khi (i <= số phần tử - 4) {
+        máy ghi số nguyên ba mươi hai bit(địa chỉ đích + i, máy đọc số nguyên ba mươi hai bit(địa chỉ nguồn + i));
+        i = i + 4;
+    };
+    khi (i < số phần tử) {
+        máy ghi byte(địa chỉ đích + i, máy đọc byte(địa chỉ nguồn + i));
+        i = i + 1;
     };
     máy ghi byte(địa chỉ đích + số phần tử, 0);
     trả về máy ghi số nguyên ba mươi hai bit(32 + đích sao chép * 32, chiều dài + số phần tử);
