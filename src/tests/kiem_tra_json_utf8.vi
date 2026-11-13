@@ -32,4 +32,14 @@ hàm chính() {
     dài = "";
     lặp(i = 0; i < 200; i++) { dài += "á"; };
     in json phân tích("\"" + dài + "\"") == dài;
+    // Biên thấp/cao của các độ rộng UTF-8 hợp lệ.
+    biên = chuỗi từ byte máy ảo([194,128,223,191,224,160,128,237,159,191,240,144,128,128,244,143,191,191]);
+    in json phân tích("\"" + biên + "\"") == biên;
+    // Không được bỏ qua phần đuôi UTF-8 sai sau một giá trị JSON hợp lệ.
+    thử {
+        json phân tích("true" + chuỗi từ byte máy ảo([255]));
+        in 0;
+    } bắt lỗi(e) {
+        in e == "json phân tích: UTF-8 không hợp lệ";
+    };
 };

@@ -128,7 +128,7 @@ hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ
         };
     };
     nếu (trạng thái == 0) {
-        lặp (id = 0; id < 82; id++) {
+        lặp (id = 0; id < 85; id++) {
             nếu (có tham chiếu hàm(lời gọi lõi, id) == 1) {
                 nếu (coff thêm ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(id), 0, 0) != 0) { trạng thái = -1; thoát; };
             };
@@ -148,7 +148,7 @@ hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ
             nếu (vị trí lời gọi lõi < 0) { trạng thái = -1; thoát; };
             nếu (vị trí lời gọi lõi + 4 > n) { trạng thái = -1; thoát; };
             nếu (id < 0) { trạng thái = -1; thoát; };
-            nếu (id >= 82) { trạng thái = -1; thoát; };
+            nếu (id >= 85) { trạng thái = -1; thoát; };
             nếu (coff thêm tái định vị(các mục tái định vị, vị trí lời gọi lõi, chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, số hàm, id)) != 0) { trạng thái = -1; thoát; };
         };
     };

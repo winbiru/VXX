@@ -1,0 +1,17 @@
+nhập gói.chuẩn.chính.*;
+hàm tạo nguồn(i) { trả về "Việt𠮷" + thành chuỗi(i); };
+hàm chính() {
+    lặp(i = 0; i < 128; i++) {
+        a = tạo nguồn(i);
+        v = máy ảo xem byte chuỗi(tạo nguồn(i));
+        nếu (máy ảo lấy loại(v) != "tuple" || máy ảo lấy loại(a) != "chuỗi" || v[0] != 86) { ném "type/view"; };
+        nếu (!máy ảo kiểm tra utf8(a) || !máy ảo kiểm tra utf8("") || máy ảo kiểm tra utf8(chuỗi từ byte máy ảo([226,130]))) { ném "utf8"; };
+        nếu (máy ảo cắt chuỗi(a, 0, 4) != "Việt" || máy ảo cắt chuỗi theo byte(a, 0, 6) != "Việt" || máy ảo cắt chuỗi(a, 999, 1) != "") { ném "slice"; };
+        nếu (máy ảo thay chuỗi chính xác(tạo nguồn(i), "Việt", "V++") != "V++𠮷" + thành chuỗi(i)) { ném "replace"; };
+        nếu (máy ảo thay chuỗi chính xác("𠮷a", "", "-") != "-𠮷-a-") { ném "empty"; };
+        nếu (máy ảo cắt chuỗi theo byte(a, 6, 4) != "𠮷") { ném "byte slice"; };
+        r = [máy ảo cắt chuỗi(tạo nguồn(i), 0, 4), máy ảo thay chuỗi chính xác("abc", "b", ""), v];
+        nếu (r[0] != "Việt" || r[1] != "ac" || r[2][0] != 86) { ném "GC"; };
+    };
+    in "string intrinsics: PASS";
+};

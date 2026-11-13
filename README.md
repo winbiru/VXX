@@ -11,15 +11,36 @@ Viết chương trình bằng cú pháp gần gũi với tiếng Việt, nhưng 
 ngôn ngữ thực tế: semantic analysis, IR, bytecode verifier, tracing GC, module/package system,
 LSP, formatter, linter và bộ thư viện chuẩn.
 
-[![C/C++ CI](https://github.com/winbiru/VXX/actions/workflows/c-cpp.yml/badge.svg?branch=developer)](https://github.com/winbiru/VXX/actions/workflows/c-cpp.yml)
+[![V++ native CI](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml/badge.svg)](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml)
 [![Release](https://img.shields.io/github/v/release/winbiru/VXX?display_name=tag)](https://github.com/winbiru/VXX/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](CMakeLists.txt)
+[![V++/ASM](https://img.shields.io/badge/toolchain-V%2B%2B%2FASM-blue.svg)](CMakeLists.txt)
 
 [🚀 Cài đặt](#-cài-v-trong-vài-phút) · [✨ Xem cú pháp](#-v-trông-như-thế-nào) · [🧰 Tooling](#-tooling-đi-kèm) · [📊 Benchmark](#-benchmark) · [🗺️ Roadmap](plans/roadmap-1.0.md) · [🤝 Đóng góp](CONTRIBUTING.md)
 </div>
 
 ---
+
+## Build bản tự chủ hiện tại
+
+Nhánh này chỉ build compiler và runtime viết bằng V++/Assembly. Bootstrap đầy đủ hiện hỗ trợ macOS ARM64; các nền tảng khác và dịch vụ của CLI host cũ đang chờ chuyển đổi. Seed nằm trong `bootstrap/macos-arm64/`, được kiểm tra SHA-256, chữ ký và thư viện liên kết.
+
+```sh
+cmake -S . -B build-pure-vpp
+cmake --build build-pure-vpp --parallel
+ctest --test-dir build-pure-vpp --output-on-failure
+./VPP phiên bản
+./VPP build hello.vi -o hello
+./VPP run hello.vi
+make benchmark
+```
+
+Xem [hướng dẫn cài đặt](docs/installation.md) và [nguồn gốc seed](bootstrap/README.md). Các binary build cũ trong `build/`, `bin/` không được launcher mới sử dụng.
+
+`make benchmark` hiện đo sáu workload của V++ AOT trực tiếp; chưa tự build lại các ngôn ngữ đối chứng. Tệp `benchmark/languages/workloads.c` chỉ là nguồn đối chứng độc lập, không thuộc quy trình build V++. Bộ test native hiện tập trung vào smoke test; các fixture lịch sử được giữ để chuyển đổi dần.
+
+<details>
+<summary>Tài liệu và tính năng của kiến trúc trước khi loại bỏ host C++ (tham khảo lịch sử)</summary>
 
 ## V++ là gì?
 
@@ -418,3 +439,6 @@ Bản sắc V++ không có nghĩa là khép mình trước thế giới. Đó l�
 ## License
 
 V++ được phát hành theo giấy phép [MIT](LICENSE).
+
+
+</details>

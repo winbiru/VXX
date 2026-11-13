@@ -2,9 +2,15 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${1:-$ROOT_DIR/build/native-vpp-runtime}"
-SEED_COMPILER="${2:-$ROOT_DIR/build/nativedriver/vpp-native}"
+SEED_COMPILER="${2:-$ROOT_DIR/bootstrap/macos-arm64/vpp-i32}"
 case "$(uname -s)-$(uname -m)" in
-  Darwin-arm64|Linux-x86_64) ;;
+  Darwin-arm64) ;;
+  Linux-x86_64)
+    if [[ $# -lt 2 ]]; then
+      echo 'Linux requires an explicitly supplied native V++ i32 seed.' >&2
+      exit 2
+    fi
+    ;;
   *)
     echo 'The dynamic V++ AOT runtime currently supports macOS ARM64 or Linux x86-64.' >&2
     exit 2
@@ -55,6 +61,12 @@ if [[ "$(uname -s)" == Darwin ]]; then
     echo 'V++ runtime-object did not produce a Mach-O 64-bit arm64 relocatable.' >&2
     exit 1
   fi
+  # Prebuild the platform ABI once; the direct compiler needs no assembler
+  # for user programs or subsequent full compiler self-builds.
+  /usr/bin/clang -c "$ROOT_DIR/scripts/ASM/macos/vpp_aot_primitives_aarch64.S" \
+    -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -o "$OUTPUT_DIR/platform.o"
+  /usr/bin/clang -c "$ROOT_DIR/scripts/ASM/macos/vpp_aot_dynamic_bridge_aarch64.S" \
+    -o "$OUTPUT_DIR/dynamic-bridge.o"
 elif [[ "$(uname -s)" == Linux ]]; then
   # Linux runtime-object produces an ELF64 x86-64 relocatable. Verify the
   # machine format before a future freestanding link consumes this object.

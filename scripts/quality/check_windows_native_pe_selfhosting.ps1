@@ -21,11 +21,11 @@ $names = @('VPP_HOME', 'VPP_NATIVE_NO_CACHE', 'VPP_NATIVE_TARGET', 'VPP_WINDOWS_
 $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
-    $env:VPP_HOME = $root.Replace('\', '/')
+    $env:VPP_HOME = $root.Replace([char]92, [char]47)
     $env:VPP_NATIVE_NO_CACHE = '1'
     $env:VPP_NATIVE_TARGET = 'windows-x86_64'
-    $env:VPP_WINDOWS_RUNTIME_OBJECT = (Join-Path $out 'windows-runtime.obj').Replace('\', '/')
-    $source = (Join-Path $root 'gói/biên dịch/bản địa/bộ biên dịch.vi').Replace('\', '/')
+    $env:VPP_WINDOWS_RUNTIME_OBJECT = (Join-Path $out 'windows-runtime.obj').Replace([char]92, [char]47)
+    $source = (Join-Path $root 'gói/biên dịch/bản địa/bộ biên dịch.vi').Replace([char]92, [char]47)
     $compiler = $seed
     foreach ($stage in 1..3) {
         $exe = Join-Path $out "stage$stage.exe"
@@ -48,6 +48,16 @@ try {
     $hashes = @(1..3 | ForEach-Object { (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $out "stage$_.exe")).Hash })
     if (($hashes | Select-Object -Unique).Count -ne 1) { throw 'Windows PE compiler stages diverged.' }
     $hashes | Out-File -LiteralPath (Join-Path $out 'sha256.txt')
+    Push-Location -LiteralPath $root
+    try {
+        foreach ($relativeSource in @('gói/biên dịch/bản địa/bộ biên dịch.vi', '.\gói\biên dịch\bản địa\bộ biên dịch.vi')) {
+            & $compiler check $relativeSource
+            if ($LASTEXITCODE -ne 0) { throw "Windows relative module path check failed: $LASTEXITCODE" }
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Output 'WINDOWS_NATIVE_PE_RELATIVE_MODULE_PATH=PASS'
     $probe = Join-Path $out 'gói thử nghiệm 𠮷.vi'
     [IO.File]::WriteAllText($probe, 'hàm chính() { trả về 52; };' + "`n", [Text.UTF8Encoding]::new($false))
     $executable = Join-Path $out 'probe.exe'
@@ -74,13 +84,13 @@ try {
     [IO.File]::WriteAllBytes($preserved, $sentinel)
     $malformed = Join-Path $out 'malformed.obj'
     [IO.File]::WriteAllBytes($malformed, [Text.Encoding]::ASCII.GetBytes('bad COFF object'))
-    $env:VPP_WINDOWS_RUNTIME_OBJECT = $malformed.Replace('\', '/')
+    $env:VPP_WINDOWS_RUNTIME_OBJECT = $malformed.Replace([char]92, [char]47)
     try {
         & $compiler build $runtimeProbe -o $preserved 2>&1 |
             Out-File -LiteralPath (Join-Path $out 'rejected.log')
         $rejectedExit = $LASTEXITCODE
     } finally {
-        $env:VPP_WINDOWS_RUNTIME_OBJECT = (Join-Path $out 'windows-runtime.obj').Replace('\', '/')
+        $env:VPP_WINDOWS_RUNTIME_OBJECT = (Join-Path $out 'windows-runtime.obj').Replace([char]92, [char]47)
     }
     if ($rejectedExit -ne 17) { throw "Malformed COFF boundary returned $rejectedExit instead of 17." }
     if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($preserved)) -ne

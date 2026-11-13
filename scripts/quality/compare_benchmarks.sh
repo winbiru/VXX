@@ -3,7 +3,7 @@
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/../.." && pwd)
 report=$1
-cli=${VPP_EXEC:-"$root/build/bin/vpp-cli"}
+cli=${VPP_EXEC:-"$root/build-pure-vpp/bin/vpp"}
 out=$(mktemp -d "${TMPDIR:-/tmp}/vpp-benchmark-compare.XXXXXX")
 trap 'rm -rf "$out"' EXIT HUP INT TERM
 if ! cmake "-DVPP_EXEC=$cli" "-DVPP_ROOT=$root" "-DVPP_REPORT=$report" \

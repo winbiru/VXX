@@ -68,7 +68,7 @@ hàm riêng tư AOT đọc nếu có(đường) {
     trả về "";
 };
 
-// C++ holds the lifetime guard, but V++ chooses the name, requests the OS
+// V++ chooses the name, requests the OS
 // single-directory primitive and recursively removes its private workspace.
 // mkdir is exclusive: a pre-existing directory is never reused or removed.
 hàm công khai biên dịch AOT tạo thư mục tạm(cha) {
@@ -150,122 +150,28 @@ hàm công khai biên dịch AOT dùng chỉ mục nguồn() {
     trả về đọc biến môi trường("VPP_COMPILER_PROFILE_FILE", "") == "";
 };
 
-hàm riêng tư AOT giá trị cấu hình(cấu hình, khóa) {
-    // Scan bytes once; splitting at every newline repeatedly indexes the
-    // entire Unicode string and dominates short compilations on large caches.
-    byte nguồn = chuỗi thành byte máy ảo(cấu hình);
-    byte khóa = chuỗi thành byte máy ảo(khóa);
-    n = độ dài(byte nguồn); m = độ dài(byte khóa); i = 0;
-    khi (i < n) {
-        khớp = i + m <= n;
-        j = 0;
-        khi (khớp && j < m) {
-            nếu (byte nguồn[i + j] != byte khóa[j]) { khớp = sai; };
-            j += 1;
-        };
-        nếu (khớp) {
-            đầu = i + m; cuối = đầu;
-            khi (cuối < n) {
-                nếu (byte nguồn[cuối] == 10 || byte nguồn[cuối] == 13) { thoát; };
-                cuối += 1;
-            };
-            trả về máy ảo cắt chuỗi theo byte(cấu hình, đầu, cuối - đầu);
-        };
-        khi (i < n) {
-            b = byte nguồn[i]; i += 1;
-            nếu (b == 10) { thoát; };
-        };
+// The only supported runtime is the V++/ASM implementation.
+hàm công khai biên dịch AOT kiểm tra runtime(hệ) {
+    mặc định runtime = "vpp";
+    nếu (hệ == "linux") { mặc định runtime = "vpp-freestanding"; };
+    runtime = AOT công cụ("VPP_AOT_RUNTIME", mặc định runtime);
+    nếu (runtime != "vpp" && runtime != "vpp-freestanding") {
+        ném "Native AOT: only V++/ASM runtime is supported";
     };
-    trả về "";
-};
-
-hàm riêng tư AOT thư viện(tập thư viện, windows) {
-    kết quả = [];
-    tên = ["native-aot", "runtime-native", "compiler", "frontend", "bytecode", "core"];
-    thư mục = ["lib/Release", "lib64/Release", "lib", "lib64"];
-    lặp(i = 0; i < độ dài(tên); i++) {
-        tệp = "";
-        lặp(j = 0; j < độ dài(thư mục); j++) {
-            tên tệp = "libvpp-" + tên[i] + ".a";
-            nếu (windows) { tên tệp = "vpp-" + tên[i] + ".lib"; };
-            ứng viên = đường dẫn nối(đường dẫn nối(tập thư viện, thư mục[j]), tên tệp);
-            nếu (là tệp(ứng viên)) { tệp = ứng viên; thoát; };
-        };
-        nếu (tệp == "") { trả về []; };
-        máy ảo thêm cuối danh sách(kết quả, tệp);
+    nếu (runtime == "vpp-freestanding" && hệ != "linux") {
+        ném "Native AOT: freestanding runtime requires Linux x86-64";
     };
-    trả về kết quả;
-};
-
-// CMake writes CONFIGURE_DEPENDS paths into VerifyGlobs.cmake verbatim.
-// Win32 backslashes in -D values (D:\a\...) become invalid CMake escapes
-// such as \a on the next build. Keep native paths for OS operations, but
-// pass forward slashes to the CMake CLI on every host.
-hàm riêng tư AOT đường CMake(đường) {
-    trả về máy ảo thay chuỗi chính xác(đường, "\\", "/");
-};
-
-hàm riêng tư AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, executable) {
-    gốc = cảnh[0]; thư viện = cảnh[1]; thư mục = cảnh[6];
-    nếu (đọc biến môi trường("VPP_AOT_LINKER_CACHE", "1") == "0") {
-        thư mục = đường dẫn nối(cảnh[2], "linker");
-        máy ảo thêm cuối danh sách(bước, ["mkdir", thư mục]);
+    nếu (đọc biến môi trường("VPP_AOT_DIRECT_LINK", "1") == "0") {
+        ném "Native AOT: legacy linker route has been removed";
     };
-    dựng = đường dẫn nối(thư mục, "build");
-    nguồn liên kết = đường dẫn nối(thư mục, "program.S");
-    đầu ra = đường dẫn nối(thư mục, "program");
-    nếu (windows) { đầu ra += ".exe"; };
-    dấu = đường dẫn nối(thư mục, "configuration.stamp");
-    // Length-delimited fields keep paths/environment values unambiguous.
-    trường = ["vpp-aot-cmake-1", gốc, thư viện, cảnh[4], cấu hình, cảnh[7]];
-    các tên môi trường = ["VPP_AOT_RUNTIME", "VPP_AOT_VPP_OBJECT", "CMAKE_GENERATOR", "CC", "CXX",
-        "CMAKE_GENERATOR_PLATFORM", "CMAKE_GENERATOR_TOOLSET", "CFLAGS", "CXXFLAGS", "LDFLAGS",
-        "CMAKE_TOOLCHAIN_FILE", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET"];
-    lặp(i = 0; i < độ dài(các tên môi trường); i++) {
-        máy ảo thêm cuối danh sách(trường, đọc biến môi trường(các tên môi trường[i], ""));
-    };
-    máy ảo thêm cuối danh sách(trường, ffi);
-    chữ ký = "";
-    lặp(i = 0; i < độ dài(trường); i++) { chữ ký += "" + độ dài(trường[i]) + ":" + trường[i]; };
-    dùng lại = đọc biến môi trường("VPP_AOT_LINKER_CACHE", "1") != "0" &&
-        AOT đọc nếu có(dấu) == chữ ký;
-    máy ảo thêm cuối danh sách(bước, ["copy", nguồn, nguồn liên kết]);
-    // Every source needs a fresh object, even after reconfiguration or on a
-    // filesystem whose timestamps cannot distinguish two quick requests.
-    xóa = ["program.o", "program.obj", "bin/vpp-aot-program", "bin/vpp-aot-program.exe",
-        "bin/Release/vpp-aot-program.exe"];
-    lặp(i = 0; i < độ dài(xóa); i++) {
-        máy ảo thêm cuối danh sách(bước, ["remove", đường dẫn nối(dựng, xóa[i])]);
-    };
-    máy ảo thêm cuối danh sách(bước, ["remove", đầu ra]);
-    nếu (dùng lại) {
-        máy ảo thêm cuối danh sách(bước, ["mark", "reuse-native-linker"]);
-    } hoặc {
-        // CMake cannot switch generator, toolchain or cached find_library
-        // results in place. A different signature needs a fresh build tree.
-        máy ảo thêm cuối danh sách(bước, ["remove-tree", dựng]);
-        lệnh = ["cmake", "-S", AOT đường CMake(đường dẫn nối(gốc, "scripts/quality/native_aot_link")),
-            "-B", AOT đường CMake(dựng)];
-        nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DCMAKE_BUILD_TYPE=Release"); };
-        AOT thêm(lệnh, ["-DVPP_AOT_CONFIGURATION=Release", "-DVPP_AOT_ROOT=" + AOT đường CMake(gốc),
-            "-DVPP_AOT_LIB_ROOT=" + AOT đường CMake(thư viện),
-            "-DVPP_AOT_SOURCE=" + AOT đường CMake(nguồn liên kết),
-            "-DVPP_AOT_OUTPUT=" + AOT đường CMake(đầu ra)]);
-        nếu (!windows) { máy ảo thêm cuối danh sách(lệnh, "-DVPP_AOT_LINK_LEGACY_LIBFFI=" + ffi); };
-        AOT chạy(bước, "linker configuration", "configure-native-linker", lệnh);
-        // Publish the signature only after a successful configuration.
-        máy ảo thêm cuối danh sách(bước, ["write", dấu, chữ ký]);
-    };
-    AOT chạy(bước, "assembly/link", "assemble-and-link",
-        ["cmake", "--build", AOT đường CMake(dựng), "--config", "Release", "--parallel", "2"]);
-    máy ảo thêm cuối danh sách(bước, ["copy", đầu ra, executable]);
+    trả về runtime;
 };
 
 // Context v1: toolchain root, library root, temporary directory, destination,
-// host triple, legacy libffi ON/OFF, reusable linker directory, input metadata.
+// host triple, reserved compatibility field, reusable linker directory, input metadata.
 hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
     nếu (độ dài(cảnh) != 8) { ném "Native AOT: invalid driver context"; };
-    gốc = cảnh[0]; thư viện = cảnh[1]; tạm = cảnh[2]; ffi = cảnh[5];
+    gốc = cảnh[0]; tạm = cảnh[2];
     đích = biên dịch phân tích đích(cảnh[4]);
     hệ = đích["hệ điều hành"]; kiến trúc = đích["kiến trúc"];
     windows = hệ == "windows";
@@ -277,147 +183,51 @@ hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
     asm gốc = đường dẫn nối(gốc, "scripts/ASM");
     bao gồm = ["-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common")];
     phụ thuộc asm = [[asm gốc, [".S", ".s", ".inc", ".h"]]];
-    runtime = AOT công cụ("VPP_AOT_RUNTIME", "cpp");
-    nếu (runtime != "cpp" && runtime != "vpp" && runtime != "vpp-freestanding") {
-        ném "Native AOT: VPP_AOT_RUNTIME must be vpp, vpp-freestanding or cpp";
-    };
-    nếu (runtime == "vpp" && (hệ != "macos" || kiến trúc != "aarch64")) {
-        ném "Native AOT: V++ dynamic runtime requires macOS ARM64";
-    };
-    nếu (runtime == "vpp-freestanding" && (hệ != "linux" || kiến trúc != "x86_64")) {
-        ném "Native AOT: V++ freestanding runtime requires Linux x86-64";
+    bỏ kết quả = biên dịch AOT kiểm tra runtime(hệ);
+    nếu (!((hệ == "macos" && kiến trúc == "aarch64") ||
+        (hệ == "linux" && kiến trúc == "x86_64"))) {
+        ném "Native AOT: full V++ runtime requires macOS ARM64 or Linux x86-64";
     };
     bước = [["write", nguồn, asm], ["mark", "write-native-assembly"]];
-    cấu hình = AOT đọc nếu có(đường dẫn nối(thư viện, "CMakeCache.txt"));
-    // Installed V++ has no CMakeCache.txt. Retain the ordered static OpenSSL
-    // dependency flags generated by CMake for the target Linux machine.
-    nếu (AOT giá trị cấu hình(cấu hình, "VPP_OPENSSL_STATIC_DEPS:STRING=") == "") {
-        cấu hình += "\n" + AOT đọc nếu có(đường dẫn nối(thư viện, "vpp-aot-link-flags.conf"));
-    };
     công cụ = AOT công cụ("VPP_AOT_ASSEMBLER", "clang");
-    nếu (runtime != "cpp" && đọc biến môi trường("VPP_AOT_DIRECT_LINK", "1") != "0") {
-        runtime object = AOT công cụ("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"));
-        nếu (!đường dẫn là tuyệt đối(runtime object) || !là tệp(runtime object)) {
-            ném "Native AOT: V++ runtime object missing: " + runtime object;
-        };
-        lệnh = [công cụ];
-        nếu (hệ == "linux") { AOT thêm(lệnh, ["-target", "x86_64-unknown-linux-gnu"]); };
-        AOT thêm(lệnh, ["-c", nguồn, "-DVPP_AOT_VPP_RUNTIME=1"]);
-        AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", đối tượng]);
-        AOT chạy(bước, "V++ program assembly", "assemble-vpp-program", lệnh);
-        cache = đường dẫn nối(đường dẫn cha(runtime object), ".vpp-aot-link-cache");
-        liên kết = [công cụ, đối tượng];
-        nếu (hệ == "macos") {
-            primitives = đường dẫn nối(tạm, "primitives.o");
-            AOT đối tượng(bước, "V++ platform primitives assembly",
-                [công cụ, "-c", đường dẫn nối(asm gốc, "macos/vpp_aot_primitives_aarch64.S"),
-                 "-DVPP_NATIVE_RUNTIME_STACK_ABI=1", "-o", "%VPP_OBJECT%"],
-                primitives, cache, phụ thuộc asm, cảnh[4]);
-            AOT thêm(liên kết, [primitives, runtime object, "-Wl,-dead_strip", "-o", executable]);
-        } hoặc {
-            liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
-                "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
-                "-Wl,-z,noexecstack", đối tượng];
-            thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
-            lặp(i = 0; i < độ dài(thành phần); i++) {
-                phần = đường dẫn nối(tạm, thành phần[i] + ".o");
-                lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
-                    đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S")];
-                AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", "%VPP_OBJECT%"]);
-                AOT đối tượng(bước, "Linux " + thành phần[i] + " assembly", lệnh, phần, cache, phụ thuộc asm, cảnh[4]);
-                máy ảo thêm cuối danh sách(liên kết, phần);
-            };
-            AOT thêm(liên kết, [runtime object, "-o", executable]);
-        };
-        máy ảo thêm cuối danh sách(bước, ["mark", "prepare-vpp-runtime"]);
-        AOT chạy(bước, "V++ executable link", "link-vpp-executable", liên kết);
-        nếu (hệ == "linux") {
-            AOT chạy(bước, "freestanding ELF audit", "audit-linux-vpp-executable",
-                ["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable]);
-        };
+    runtime object = AOT công cụ("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"));
+    nếu (!đường dẫn là tuyệt đối(runtime object) || !là tệp(runtime object)) {
+        ném "Native AOT: V++ runtime object missing: " + runtime object;
+    };
+    lệnh = [công cụ];
+    nếu (hệ == "linux") { AOT thêm(lệnh, ["-target", "x86_64-unknown-linux-gnu"]); };
+    AOT thêm(lệnh, ["-c", nguồn, "-DVPP_AOT_VPP_RUNTIME=1"]);
+    AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", đối tượng]);
+    AOT chạy(bước, "V++ program assembly", "assemble-vpp-program", lệnh);
+    cache = đường dẫn nối(đường dẫn cha(runtime object), ".vpp-aot-link-cache");
+    liên kết = [công cụ, đối tượng];
+    nếu (hệ == "macos") {
+        primitives = đường dẫn nối(tạm, "primitives.o");
+        AOT đối tượng(bước, "V++ platform primitives assembly",
+            [công cụ, "-c", đường dẫn nối(asm gốc, "macos/vpp_aot_primitives_aarch64.S"),
+             "-DVPP_NATIVE_RUNTIME_STACK_ABI=1", "-o", "%VPP_OBJECT%"],
+            primitives, cache, phụ thuộc asm, cảnh[4]);
+        AOT thêm(liên kết, [primitives, runtime object, "-Wl,-dead_strip", "-o", executable]);
     } hoặc {
-        archives = AOT thư viện(thư viện, windows);
-        có instrumentation = máy ảo thay chuỗi chính xác(cấu hình, "VPP_ENABLE_COVERAGE:BOOL=ON", "") != cấu hình ||
-            máy ảo thay chuỗi chính xác(cấu hình, "-fsanitize=", "") != cấu hình;
-        trực tiếp = runtime == "cpp" && !có instrumentation && độ dài(archives) == 6 &&
-            đọc biến môi trường("VPP_AOT_DIRECT_LINK_CPP", "1") != "0";
-        nếu (windows) { trực tiếp = trực tiếp && đọc biến môi trường("VPP_AOT_WINDOWS_DIRECT_LINK", "0") == "1"; };
-        nếu (hệ == "macos" && kiến trúc != "aarch64") { trực tiếp = sai; };
-        nếu (!trực tiếp) {
-            AOT CMake(bước, cảnh, cấu hình, ffi, windows, nguồn, executable);
-        } hoặc {
-            cxx = AOT công cụ("CXX", "c++"); cc = AOT công cụ("VPP_AOT_C_COMPILER", "cc");
-            nếu (hệ == "macos") { cxx = AOT công cụ("CXX", "clang++"); cc = AOT công cụ("VPP_AOT_C_COMPILER", "clang"); };
-            công cụ = AOT công cụ("VPP_AOT_ASSEMBLER", cxx);
-            lệnh = [công cụ];
-            nếu (windows) { lệnh = [AOT công cụ("VPP_AOT_ASSEMBLER", "clang"), "-target", "x86_64-pc-windows-msvc"]; };
-            AOT thêm(lệnh, ["-c", nguồn]); AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", đối tượng]);
-            AOT chạy(bước, "Stage 0 program assembly", "assemble-stage0-program", lệnh);
-            runtime source = đường dẫn nối(gốc, "src/runtime/native/vpp_aot_runtime.c");
-            runtime object = đường dẫn nối(tạm, "bootstrap-runtime" + đuôi);
-            machine object = đường dẫn nối(tạm, "stage0-machine" + đuôi);
-            cache = đường dẫn nối(thư viện, "native-stage0-vpp-cache");
-            AOT đối tượng(bước, "bootstrap runtime compilation",
-                [cc, "-std=c11", "-O3", "-DNDEBUG", "-c", runtime source, "-o", "%VPP_OBJECT%"],
-                runtime object, cache, [[runtime source, []]], cảnh[4]);
-            machine source = "linux/vpp_aot_stage0_machine_" + kiến trúc + ".S";
-            nếu (hệ == "macos") { machine source = "macos/vpp_aot_stage0_machine_aarch64.S"; };
-            nếu (windows) {
-                // Replace the bootstrap step with the matching MSVC /MT CRT.
-                máy ảo xóa vị trí danh sách(bước, độ dài(bước) - 1);
-                AOT đối tượng(bước, "bootstrap runtime compilation",
-                    [AOT công cụ("VPP_AOT_MSVC_CL", "cl"), "/nologo", "/std:c11", "/O2", "/DNDEBUG", "/MT", "/c",
-                     runtime source, "/Fo%VPP_OBJECT%"], runtime object, cache, [[runtime source, []]], cảnh[4]);
-                machine source = "windows/vpp_aot_primitives_windows_x86_64.S";
-            };
-            lệnh = [cc, "-c", đường dẫn nối(asm gốc, machine source)];
-            nếu (windows) {
-                lệnh = [AOT công cụ("VPP_AOT_ASSEMBLER", "clang"), "-target", "x86_64-pc-windows-msvc", "-c",
-                    "-DVPP_WINDOWS_STAGE0=1", "-DVPP_NATIVE_RUNTIME_STACK_ABI=0", đường dẫn nối(asm gốc, machine source)];
-            };
+        liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
+            "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
+            "-Wl,-z,noexecstack", đối tượng];
+        thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+        lặp(i = 0; i < độ dài(thành phần); i++) {
+            phần = đường dẫn nối(tạm, thành phần[i] + ".o");
+            lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+                đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S")];
             AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", "%VPP_OBJECT%"]);
-            AOT đối tượng(bước, "machine primitives assembly", lệnh, machine object, cache, phụ thuộc asm, cảnh[4]);
-            máy ảo thêm cuối danh sách(bước, ["mark", "prepare-stage0-runtime"]);
-            liên kết = [cxx, đối tượng, runtime object, machine object];
-            nếu (windows) {
-                liên kết = [AOT công cụ("VPP_AOT_MSVC_LINK", "link"), "/NOLOGO", "/MACHINE:X64", "/SUBSYSTEM:CONSOLE",
-                    "/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF", "/OUT:" + executable, đối tượng, runtime object, machine object];
-            };
-            AOT thêm(liên kết, archives);
-            nếu (windows) {
-                AOT thêm(liên kết, ["ws2_32.lib", "bcrypt.lib", "secur32.lib", "crypt32.lib", "shell32.lib", "kernel32.lib",
-                    "user32.lib", "gdi32.lib", "winspool.lib", "ole32.lib", "oleaut32.lib", "uuid.lib", "comdlg32.lib", "advapi32.lib"]);
-            } hoặc {
-                nếu (ffi == "ON") {
-                    ffi archive = AOT giá trị cấu hình(cấu hình, "VPP_LIBFFI_STATIC_ARCHIVE:FILEPATH=");
-                    nếu (là tệp(ffi archive) && kết thúc bằng(ffi archive, ".a")) {
-                        máy ảo thêm cuối danh sách(liên kết, ffi archive);
-                    } hoặc { máy ảo thêm cuối danh sách(liên kết, "-lffi"); };
-                };
-                nếu (hệ == "macos") {
-                    AOT thêm(liên kết, ["-framework", "Security", "-framework", "CoreFoundation"]);
-                } hoặc {
-                    ssl = AOT giá trị cấu hình(cấu hình, "OPENSSL_SSL_LIBRARY:FILEPATH=");
-                    crypto = AOT giá trị cấu hình(cấu hình, "OPENSSL_CRYPTO_LIBRARY:FILEPATH=");
-                    // The parent CMake configure asks pkg-config for libcrypto's
-                    // static transitive dependencies (zlib, zstd, jitterentropy
-                    // on newer Linux distributions). Keep them after libcrypto.
-                    phụ thuộc crypto = tách hằng văn bản(
-                        AOT giá trị cấu hình(cấu hình, "VPP_OPENSSL_STATIC_DEPS:STRING="), ";");
-                    nếu (là tệp(ssl) && là tệp(crypto) && kết thúc bằng(ssl, ".a") && kết thúc bằng(crypto, ".a")) {
-                        AOT thêm(liên kết, [ssl, crypto]);
-                        máy ảo thêm cuối danh sách(liên kết, "-Wl,-Bstatic");
-                    } hoặc { AOT thêm(liên kết, ["-Wl,-Bstatic", "-lssl", "-lcrypto"]); };
-                    lặp(i = 0; i < độ dài(phụ thuộc crypto); i++) {
-                        nếu (phụ thuộc crypto[i] != "") { máy ảo thêm cuối danh sách(liên kết, phụ thuộc crypto[i]); };
-                    };
-                    máy ảo thêm cuối danh sách(liên kết, "-Wl,-Bdynamic");
-                    AOT thêm(liên kết, ["-Wl,--strip-all", "-pthread", "-ldl"]);
-                };
-                AOT thêm(liên kết, ["-o", executable]);
-            };
-            AOT chạy(bước, "Stage 0 executable link", "link-stage0-executable", liên kết);
+            AOT đối tượng(bước, "Linux " + thành phần[i] + " assembly", lệnh, phần, cache, phụ thuộc asm, cảnh[4]);
+            máy ảo thêm cuối danh sách(liên kết, phần);
         };
+        AOT thêm(liên kết, [runtime object, "-o", executable]);
+    };
+    máy ảo thêm cuối danh sách(bước, ["mark", "prepare-vpp-runtime"]);
+    AOT chạy(bước, "V++ executable link", "link-vpp-executable", liên kết);
+    nếu (hệ == "linux") {
+        AOT chạy(bước, "freestanding ELF audit", "audit-linux-vpp-executable",
+            ["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable]);
     };
     nếu (đọc biến môi trường("VPP_AOT_KEEP_ASM", "") != "") {
         máy ảo thêm cuối danh sách(bước, ["copy", nguồn, cảnh[3] + ".S"]);
@@ -677,7 +487,7 @@ hàm riêng tư AOT tệp phụ thuộc(các yêu cầu) {
 };
 
 // V++ decides which link/runtime/toolchain inputs affect executable reuse.
-// C++ is restricted to stat(path) and supplies length-framed size/mtime data
+// The OS supplies length-framed size/mtime data
 // for each F entry. Directory discovery, environment and ordering live here.
 hàm công khai biên dịch AOT đầu vào cache thực thi(assembly, gốc, thư viện, hiện tại, thư mục công cụ) {
     nếu (đọc biến môi trường("VPP_AOT_EXECUTABLE_CACHE_DIR", "") == "" ||
@@ -686,45 +496,35 @@ hàm công khai biên dịch AOT đầu vào cache thực thi(assembly, gốc, t
         đọc biến môi trường("VPP_NATIVE_PROFILE", "") == "1") { trả về []; };
     kết quả = [["S", assembly], ["S", gốc], ["S", thư viện], ["S", hiện tại]];
     môi trường = ["VPP_HOME", "VPP_AOT_ROOT", "VPP_COMPILER_WORKERS", "VPP_AOT_RUNTIME",
-        "VPP_AOT_VPP_OBJECT", "VPP_AOT_DIRECT_LINK", "VPP_AOT_ASM_DIRECT", "VPP_AOT_DIRECT_LINK_CPP",
-        "VPP_AOT_LINKER_CACHE", "VPP_AOT_LIB_ROOT", "VPP_AOT_WINDOWS_DIRECT_LINK",
-        "VPP_AOT_MSVC_CL", "VPP_AOT_MSVC_LINK", "VPP_AOT_ASSEMBLER", "VPP_AOT_C_COMPILER",
-        "VPP_AOT_FFI", "VPP_AOT_LIBRARY_DIRS", "VPP_AOT_LINK_LEGACY_LIBFFI",
-        "VPP_AOT_VPP_RUNTIME", "VPP_AOT_CONFIGURATION", "VPP_ENABLE_COVERAGE",
-        "VPP_LINUX_HOST_NO_CRT", "VPP_MACOS_DIRECT_LD", "VPP_MACOS_SDKROOT",
-        "VPP_NATIVE_CC", "VPP_NATIVE_DYNAMIC_RUNTIME", "VPP_NATIVE_ELF_LINK",
+        "VPP_AOT_VPP_OBJECT", "VPP_AOT_DIRECT_LINK", "VPP_AOT_ASM_DIRECT", "VPP_AOT_ASSEMBLER",
+        "VPP_AOT_PLATFORM_OBJECT", "VPP_AOT_DYNAMIC_BRIDGE_OBJECT", "VPP_AOT_NATIVE_MACHO_LINK",
+        "VPP_AOT_NATIVE_ARM64_OBJECT", "VPP_AOT_ASM_STREAM", "VPP_LINUX_HOST_NO_CRT",
+        "VPP_NATIVE_DYNAMIC_RUNTIME", "VPP_NATIVE_ELF_LINK",
         "VPP_NATIVE_MACHO_EXE_LINK", "VPP_NATIVE_MACHO_REL_LINK", "VPP_NATIVE_TARGET",
-        "VPP_NATIVE_VPP_RUNTIME", "VPP_NATIVE_RUNTIME_STACK_ABI", "PATH", "CC", "CXX",
-        "CFLAGS", "CXXFLAGS", "LDFLAGS", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET",
-        "CMAKE_GENERATOR", "CMAKE_TOOLCHAIN_FILE", "CMAKE_GENERATOR_PLATFORM", "CMAKE_GENERATOR_TOOLSET"];
+        "VPP_NATIVE_VPP_RUNTIME", "VPP_NATIVE_RUNTIME_STACK_ABI", "PATH", "SDKROOT",
+        "MACOSX_DEPLOYMENT_TARGET"];
     lặp(i = 0; i < độ dài(môi trường); i++) {
         tên = môi trường[i];
         máy ảo thêm cuối danh sách(kết quả, ["S", tên]);
         máy ảo thêm cuối danh sách(kết quả, ["S", đọc biến môi trường(tên, "")]);
     };
-    tệp = [đường dẫn nối(thư viện, "CMakeCache.txt"),
-        đường dẫn nối(thư viện, "vpp-aot-link-flags.conf"),
-        đường dẫn nối(gốc, "src/runtime/native/vpp_aot_runtime.c"),
-        đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o")];
-    đối tượng = đọc biến môi trường("VPP_AOT_VPP_OBJECT", "");
-    nếu (đối tượng != "") {
-        nếu (!đường dẫn là tuyệt đối(đối tượng)) { đối tượng = đường dẫn nối(hiện tại, đối tượng); };
-        máy ảo thêm cuối danh sách(tệp, đối tượng);
+    tệp = [đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"),
+        đường dẫn nối(gốc, "build/native-vpp-runtime/platform.o"),
+        đường dẫn nối(gốc, "build/native-vpp-runtime/dynamic-bridge.o")];
+    đối tượng môi trường = ["VPP_AOT_VPP_OBJECT", "VPP_AOT_PLATFORM_OBJECT", "VPP_AOT_DYNAMIC_BRIDGE_OBJECT", "VPP_AOT_ASSEMBLER"];
+    lặp(i = 0; i < độ dài(đối tượng môi trường); i++) {
+        đối tượng = đọc biến môi trường(đối tượng môi trường[i], "");
+        nếu (đối tượng != "") {
+            nếu (!đường dẫn là tuyệt đối(đối tượng)) { đối tượng = đường dẫn nối(hiện tại, đối tượng); };
+            máy ảo thêm cuối danh sách(tệp, đối tượng);
+        };
     };
     công cụ = ["vpp-native", "vpp-native.exe", "vpp-cli", "vpp-cli.exe"];
     lặp(i = 0; i < độ dài(công cụ); i++) {
         máy ảo thêm cuối danh sách(tệp, đường dẫn nối(thư mục công cụ, công cụ[i]));
     };
-    thư mục = [đường dẫn nối(thư viện, "lib"), đường dẫn nối(thư viện, "lib64"),
-        đường dẫn nối(gốc, "scripts/ASM"),
-        đường dẫn nối(gốc, "scripts/quality/native_aot_link")];
-    lặp(i = 0; i < độ dài(thư mục); i++) {
-        nếu (là thư mục(thư mục[i])) {
-            đuôi = [".a", ".so", ".dylib", ".lib", ".dll"];
-            nếu (i >= 2) { đuôi = [".S", ".s", ".inc", ".h", "CMakeLists.txt"]; };
-            AOT thêm(tệp, AOT tệp phụ thuộc([[thư mục[i], đuôi]]));
-        };
-    };
+    AOT thêm(tệp, AOT tệp phụ thuộc([[đường dẫn nối(gốc, "scripts/ASM"), [".S", ".s", ".inc", ".h"]]]));
+    máy ảo thêm cuối danh sách(tệp, đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"));
     // Keep the original order for explicit probes, and sort directory leaves
     // in the V++ collector, independently of platform directory ordering.
     lặp(i = 0; i < độ dài(tệp); i++) {

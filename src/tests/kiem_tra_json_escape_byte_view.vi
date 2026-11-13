@@ -1,0 +1,43 @@
+nhập gói.dữ liệu.json.json.*;
+nhập gói.lõi.chuyển kiểu.*;
+
+hàm kiểm chuỗi(nguồn, hợp lệ) {
+    thử {
+        mã hóa = json chuỗi(nguồn);
+        nếu (!hợp lệ || json phân tích(mã hóa) != nguồn) { trả về 0; };
+        trả về 1;
+    } bắt lỗi(e) {
+        trả về !hợp lệ && e == "bảng mã: cần đúng một ký tự Unicode";
+    };
+};
+hàm chính() {
+    tổng = 0;
+    lặp(i = 0; i < 256; i++) {
+        tổng += kiểm chuỗi(chuỗi từ byte máy ảo([i]), i < 128);
+    };
+    in tổng == 256;
+    biên đúng = [[194,128],[223,191],[224,160,128],[237,159,191],
+        [240,144,128,128],[244,143,191,191],[0,31,34,92,127]];
+    biên lỗi = [[128],[192,175],[193,191],[194],[223,127],[224,159,128],
+        [237,160,128],[239,191],[240,143,191,191],[244,144,128,128],
+        [245,128,128,128],[240,159,154],[255],[226,40,161]];
+    tổng = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(biên đúng); i++) {
+        nguồn = chuỗi từ byte máy ảo(biên đúng[i]);
+        tổng += kiểm chuỗi("Việt\"" + nguồn + "\\🚀", đúng);
+    };
+    in tổng == máy ảo lấy độ dài(biên đúng);
+    tổng = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(biên lỗi); i++) {
+        nguồn = chuỗi từ byte máy ảo(biên lỗi[i]);
+        tổng += kiểm chuỗi(nguồn + "Việt\"", sai);
+        tổng += kiểm chuỗi("Việt\"" + nguồn + "🚀", sai);
+        tổng += kiểm chuỗi("Việt\"" + nguồn, sai);
+    };
+    in tổng == 3 * máy ảo lấy độ dài(biên lỗi);
+    dài = "";
+    lặp(i = 0; i < 256; i++) { dài += "Việt\"🚀\\\n"; };
+    in kiểm chuỗi(dài, đúng);
+    in kiểm chuỗi(dài + chuỗi từ byte máy ảo([255]), sai);
+    in kiểm chuỗi("", đúng);
+};

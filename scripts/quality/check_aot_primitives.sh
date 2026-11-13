@@ -64,9 +64,9 @@ for arch in x86_64 aarch64; do
         > "$work/linux-stage0-${arch}-syms"
     for symbol in vpp_native_memory_bind vpp_native_memory_read_byte \
         vpp_native_memory_write_byte vpp_native_memory_read_i32 \
-        vpp_native_memory_write_i32 vpp_native_i32_div \
+        vpp_native_memory_write_i32 vpp_native_memory_copy vpp_native_memory_ascii_prefix vpp_native_i32_div \
         vpp_native_os_read vpp_native_os_write vpp_native_os_open \
-        vpp_native_os_close vpp_native_os_errno vpp_native_os_mkstemp \
+        vpp_native_os_close vpp_native_os_seek vpp_native_os_errno vpp_native_os_mkstemp \
         vpp_native_os_rename vpp_native_os_fchmod vpp_native_os_fstat \
         vpp_native_os_lstat vpp_native_os_stat vpp_native_os_access_exec \
         vpp_native_os_unlink vpp_native_os_mkdir vpp_native_os_spawn_clang \
@@ -103,7 +103,7 @@ VPP_LINUX_HOST_COMPILER= VPP_LINUX_HOST_ASSEMBLER="$compiler" \
 cmp "$work/linux-host-flat.o" "$work/linux-host-cpp.o"
 "$linux_stage0_nm" --defined-only "$work/linux-host-flat.o" \
     > "$work/linux-host-defined"
-for symbol in vpp_native_f64_parse vpp_native_f64_text; do
+for symbol in vpp_native_f64_parse vpp_native_f64_text vpp_native_memory_copy vpp_native_memory_ascii_prefix; do
     if ! grep -Eq "[[:space:]][TW][[:space:]]${symbol}\$" \
         "$work/linux-host-defined"; then
         printf 'FAIL Linux freestanding host missing %s\n' "$symbol" >&2

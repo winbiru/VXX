@@ -133,4 +133,48 @@ hàm chính() {
         chuỗi từ byte máy ảo([226, 130]), "", "-"));
     in độ dài(byte thay) == 5 && byte thay[0] == 45 && byte thay[1] == 226 &&
        byte thay[2] == 45 && byte thay[3] == 130 && byte thay[4] == 45;
+    // Vị trí khớp trên mọi lane của từ i32 và phần dư cuối nguồn.
+    in thay chính xác("abcVabcV", "V", "X") == "abcXabcX" &&
+       thay chính xác("Vabc", "V", "X") == "Xabc" &&
+       thay chính xác("aVbc", "V", "X") == "aXbc" &&
+       thay chính xác("abVc", "V", "X") == "abXc";
+    in thay chính xác("abcdefghijk", "Z", "X") == "abcdefghijk";
+    nul = chuỗi từ byte máy ảo([0]);
+    in thay chính xác("abcd" + nul + "é" + nul, nul, "X") == "abcdXéX";
+    // Không được dùng công thức cộng độ dài nếu hai byte lỗi ghép thành UTF-8.
+    ghép = thay chính xác(chuỗi từ byte máy ảo([195, 88, 169]), "X", "");
+    in ghép == "é" && độ dài(ghép) == 1;
+    in độ dài(chuỗi từ byte máy ảo([226, 130]) + "abcdefgh" + "🚀") == 11;
+    // Mọi byte ASCII, kể cả NUL/DEL, khớp sau một từ đầy byte lỗi.
+    // Kiểm tra cả lane trong từ i32 và đuôi ngắn hơn bốn byte.
+    đúng_tất_cả = đúng;
+    đệm = chuỗi từ byte máy ảo([255, 128, 195, 255, 128]);
+    lặp(b = 0; b < 128; b++) {
+        mẫu = chuỗi từ byte máy ảo([b]);
+        tiền = đệm;
+        lặp(lane = 0; lane < 4; lane++) {
+            nguồn = tiền + mẫu + đệm + mẫu;
+            nếu (thay chính xác(nguồn, mẫu, "R") != tiền + "R" + đệm + "R") {
+                đúng_tất_cả = sai;
+            };
+            nếu (thay chính xác(tiền, mẫu, "R") != tiền) { đúng_tất_cả = sai; };
+            tiền += chuỗi từ byte máy ảo([255]);
+        };
+    };
+    in đúng_tất_cả;
+    // Quét ASCII theo khối 16 byte và giữ biên UTF-8 khi thay chuỗi dài.
+    ascii dài = "0123456789abcdef";
+    lặp(i = 0; i < 9; i++) { ascii dài += ascii dài; };
+    in độ dài(ascii dài) == 8192;
+    in độ dài(ascii dài + "🚀x") == 8194;
+    lặp(i = 0; i < 16; i++) {
+        đầu = máy ảo cắt chuỗi theo byte(ascii dài, 0, i);
+        in độ dài(đầu + "🚀" + ascii dài) == i + 8193;
+    };
+    mẫu dài = "Việt 🚀";
+    lặp(i = 0; i < 8; i++) { mẫu dài += mẫu dài; };
+    in thay chính xác(mẫu dài + "!" + mẫu dài, mẫu dài, "X") == "X!X";
+    in thay chính xác(mẫu dài, mẫu dài, "X") == "X";
+    in thay chính xác("é", chuỗi từ byte máy ảo([195]), "X") == "é";
+    in thay chính xác(chuỗi từ byte máy ảo([195, 88, 169]), "X", "") == "é";
 };

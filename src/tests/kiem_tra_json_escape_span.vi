@@ -1,0 +1,16 @@
+nhập gói.dữ liệu.json.json.*;
+hàm chính() {
+    dài = "";
+    lặp(i = 0; i < 128; i++) { dài += "Việt 🚀"; };
+    dày = "";
+    lặp(i = 0; i < 64; i++) { dày += "\"\\\n\t"; };
+    tốt = [dài + "\"" + dài, dày, "\n" + dài, dài + "\n", dài + "\"" + dài + "\\" + dài, "🚀\n𠮷", "\"", "\n\t"];
+    lặp(i = 0; i < máy ảo lấy độ dài(tốt); i++) {
+        in json phân tích(json chuỗi(tốt[i])) == tốt[i];
+    };
+    in json phân tích("\"" + dài + "\\uD83D\\uDE80" + dài + "\"") == dài + "🚀" + dài;
+    mẫu lỗi = ["\"" + dài + "\\x\"", "\"" + dài + "\\", "\"" + dài + "\\n" + dài, "\"" + dài + "\\n" + dài + chuỗi từ byte máy ảo([11]) + "\"", "\"" + dài + "\\uD83D\\u0041\"", "\"" + dài + "\\uDE80\"", "\"" + dài + "\\n" + dài + "\\u12", "{\"" + dài + "\\n" + dài + "\\x\":0}"];
+    lặp(i = 0; i < máy ảo lấy độ dài(mẫu lỗi); i++) {
+        thử { json phân tích(mẫu lỗi[i]); in "unexpected success"; } bắt lỗi(e) { in e; };
+    };
+};

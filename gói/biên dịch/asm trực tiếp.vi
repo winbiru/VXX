@@ -21,7 +21,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
             // Mod cần W11 làm thương số tạm trước khi tính số dư.
             mình.lá = đúng;
             lệnh = máy["instructions"];
-            lặp(i = 0; i < độ dài(lệnh); i++) {
+            lặp(i = 0; i < độ dài(lệnh); i = i + 1) {
                 mã = lệnh[i]["opcode"];
                 nếu (mã == "Call" || (mã == "Mod" && mình.tổng > 9)) {
                     mình.lá = sai; thoát;
@@ -44,7 +44,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
             hoặc nếu (mình.ghi) { mình.khung = ((mình.tổng * 8 + 15) / 16) * 16; };
             mình.tham số = ["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"];
         };
-        lặp(i = 0; i < mình.tổng; i++) {
+        lặp(i = 0; i < mình.tổng; i = i + 1) {
             chỗ = "dword ptr [rbp - " + ((i + 1) * 4) + "]";
             nếu (mình.arm) {
                 chỗ = "[sp, #" + (i * 4) + "]";
@@ -53,7 +53,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                     nếu (i >= 9) { chỗ = "w" + (i + 2); };
                 } hoặc nếu (mình.ghi) { chỗ = "w" + (19 + i); };
             };
-            máy ảo thêm cuối danh sách(mình.vị trí, chỗ);
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, chỗ);
         };
     };
 
@@ -95,7 +95,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
     hàm riêng tư nhận tham số() {
         nếu (mình.động) { trả về mình.lưu(mình.tham số[0], 0); };
         ra = ""; thanh = độ dài(mình.tham số);
-        lặp(j = 0; j < mình.số tham số; j++) {
+        lặp(j = 0; j < mình.số tham số; j = j + 1) {
             nếu (j < thanh) { ra += mình.lưu(mình.tham số[j], j); }
             hoặc nếu (mình.arm) {
                 bước = 8; nếu (mình.mac) { bước = 4; };
@@ -167,9 +167,9 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
         byte = ((vượt * bước + bóng + 15) / 16) * 16;
         ra = "";
         // ARM loads register arguments before moving SP. x86 locals use RBP.
-        lặp(j = 0; j < trực; j++) { ra += mình.tải đối số(mình.tham số[j], j, đối số, từ); };
+        lặp(j = 0; j < trực; j = j + 1) { ra += mình.tải đối số(mình.tham số[j], j, đối số, từ); };
         ra += mình.ngăn xếp(byte, đúng);
-        lặp(j = trực; j < số; j++) {
+        lặp(j = trực; j < số; j = j + 1) {
             lệch = (j - thanh) * bước + bóng;
             nếu (!mình.arm) {
                 ra += mình.tải đối số("eax", j, đối số, từ) + "mov dword ptr [rsp + " + lệch + "], eax\n";
@@ -200,7 +200,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
             nếu (mình.lá) {
                 mở = ""; đóng = "ret\n";
             } hoặc nếu (mình.ghi) {
-                lặp(i = 0; i < mình.tổng; i++) {
+                lặp(i = 0; i < mình.tổng; i = i + 1) {
                     mở += "str x" + (19 + i) + ", [sp, #" + (i * 8) + "]\n";
                     đóng += "ldr x" + (19 + i) + ", [sp, #" + (i * 8) + "]\n";
                 };
@@ -209,7 +209,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
         };
         // Thân động nhận frame ID; thân chuyên biệt nhận parameterCount i32.
         mở += mình.nhận tham số();
-        máy ảo thêm cuối danh sách(phần, mở);
+        bỏ kết quả = máy ảo thêm cuối danh sách(phần, mở);
         phép arm = {"Add": "add", "Sub": "sub", "Mul": "mul", "BitAnd": "and",
             "BitOr": "orr", "BitXor": "eor", "ShiftLeft": "lsl", "ShiftRight": "asr"};
         phép x86 = {"Add": "add", "Sub": "sub", "Mul": "imul", "BitAnd": "and",
@@ -218,9 +218,13 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
             "Greater": "gt", "GreaterEqual": "ge"};
         so x86 = {"Equal": "e", "NotEqual": "ne", "Less": "l", "LessEqual": "le",
             "Greater": "g", "GreaterEqual": "ge"};
+        ngược arm = {"Equal": "ne", "NotEqual": "eq", "Less": "ge", "LessEqual": "gt",
+            "Greater": "le", "GreaterEqual": "lt"};
+        ngược x86 = {"Equal": "ne", "NotEqual": "e", "Less": "ge", "LessEqual": "g",
+            "Greater": "le", "GreaterEqual": "l"};
         lệnh = mình.máy["instructions"];
         nhãn = {}; số cạnh = {};
-        lặp(i = 0; i < độ dài(lệnh); i++) {
+        lặp(i = 0; i < độ dài(lệnh); i = i + 1) {
             v = lệnh[i];
             nếu (v["opcode"] == "Jump" || v["opcode"] == "BranchZero") {
                 nhãn[v["operand"]] = mình.nhãn + v["operand"];
@@ -233,7 +237,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
         // contract for ABI status checks. Test the return register directly;
         // the consumed status never needs an eval slot or a success label.
         gộp lỗi = {};
-        lặp(i = 0; i + 3 < độ dài(lệnh); i++) {
+        lặp(i = 0; i + 3 < độ dài(lệnh); i = i + 1) {
             nếu (lệnh[i]["opcode"] != "Call") { bỏ qua; };
             điều kiện = lệnh[i + 1]; nhảy = lệnh[i + 2];
             nếu (điều kiện["opcode"] == "BranchZero" && điều kiện["operand"] == i + 3 &&
@@ -244,8 +248,8 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
             };
         };
         các nhãn = máy ảo liệt kê khóa từ điển(nhãn);
-        lặp(i = 0; i < độ dài(các nhãn); i++) {
-            nếu (số cạnh[các nhãn[i]] == 0) { máy ảo xóa khóa từ điển(nhãn, các nhãn[i]); };
+        lặp(i = 0; i < độ dài(các nhãn); i = i + 1) {
+            nếu (số cạnh[các nhãn[i]] == 0) { bỏ kết quả = máy ảo xóa khóa từ điển(nhãn, các nhãn[i]); };
         };
         i = 0;
         khi (i < độ dài(lệnh)) {
@@ -263,7 +267,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                     nếu (j > i && máy ảo có khóa từ điển(nhãn, j)) { thoát; };
                     mục = lệnh[j];
                     nếu (mục["opcode"] != "LoadSlot" && mục["opcode"] != "PushConstant") { thoát; };
-                    máy ảo thêm cuối danh sách(đối số, mục); j += 1;
+                    bỏ kết quả = máy ảo thêm cuối danh sách(đối số, mục); j += 1;
                 };
                 nếu (j < độ dài(lệnh)) {
                     mục = lệnh[j];
@@ -271,13 +275,28 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                         !máy ảo có khóa từ điển(nhãn, j)) {
                         lỗi = ""; bước = 1;
                         nếu (máy ảo có khóa từ điển(gộp lỗi, j)) { lỗi = gộp lỗi[j]; bước = 3; };
-                        máy ảo thêm cuối danh sách(phần, ra + mình.gọi(mục, đối số, lỗi));
+                        bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra + mình.gọi(mục, đối số, lỗi));
                         i = j + bước; bỏ qua;
                     };
                 };
             };
             a = "eax"; b = "ecx";
             nếu (mình.arm) { a = "w9"; b = "w10"; };
+            // AST native và thân i32 AOT dùng cùng Machine IR. Khi kết quả
+            // so sánh chỉ dùng để rẽ nhánh, giữ flags của CMP thay vì tạo
+            // boolean, ghi/nạp eval slot rồi kiểm tra lại. Không gộp qua
+            // một điểm vào CFG độc lập hoặc làm thay đổi giá trị boolean.
+            nếu (máy ảo có khóa từ điển(so arm, mã) && i + 1 < độ dài(lệnh)) {
+                sau = lệnh[i + 1];
+                nếu (sau["opcode"] == "BranchZero" && sau["depthBefore"] == v["depthBefore"] - 1 &&
+                    !máy ảo có khóa từ điển(nhãn, i + 1)) {
+                    nếu (mình.lá) { a = mình.vị trí[sâu - 2]; b = mình.vị trí[sâu - 1]; }
+                    hoặc { ra += mình.tải(a, sâu - 2) + mình.tải(b, sâu - 1); };
+                    nếu (mình.arm) { ra += "cmp " + a + ", " + b + "\nb." + ngược arm[mã] + " " + mình.nhãn + sau["operand"] + "\n"; }
+                    hoặc { ra += "cmp eax, ecx\nj" + ngược x86[mã] + " " + mình.nhãn + sau["operand"] + "\n"; };
+                    bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra); i += 2; bỏ qua;
+                };
+            };
             bước = 1;
             chọn(mã) {
                 ca "PushConstant": {
@@ -363,10 +382,10 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                     ra += mình.lưu(a, sâu - 2);
                 }
             };
-            máy ảo thêm cuối danh sách(phần, ra);
+            bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra);
             i += bước;
         };
-        nếu (!mình.arm) { máy ảo thêm cuối danh sách(phần, ".att_syntax prefix\n"); };
+        nếu (!mình.arm) { bỏ kết quả = máy ảo thêm cuối danh sách(phần, ".att_syntax prefix\n"); };
         trả về biên dịch lắp ráp nối các phần(phần);
     };
 };

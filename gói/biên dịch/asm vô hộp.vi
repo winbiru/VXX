@@ -157,7 +157,7 @@ hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham s
     trả về {"ô": tham số, "máy": p.máy(), "dùng": dùng, "ascii": sai};
 };
 
-hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii) {
+hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii, đã chứng minh = rỗng) {
     n = độ dài(nguồn);
     nếu (n < 4 || n > 256) { trả về rỗng; };
     nếu (biên dịch asm tên mã vô hộp(bảng, nguồn[0][0]) != "OP_MO_KHOI") { trả về rỗng; };
@@ -252,6 +252,22 @@ hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii)
         nếu (tên == "OP_TRA_VE") {
             nếu (sâu != 1) { trả về rỗng; }; nếu (kiểu[0] != 0) { trả về rỗng; };
             phát.phát("Return"); kiểu = []; bỏ qua;
+        };
+        // Nối thân hàm có vòng lặp/nhánh với backend native i32. Chỉ gọi
+        // callee đã chứng minh trả số nguyên, không đọc globals/capture,
+        // không có default/receiver hoặc tác dụng phụ. Chu trình chưa được
+        // chứng minh và đối số động tiếp tục dùng đường runtime gốc.
+        nếu (tên == "OP_GOI") {
+            nếu (ascii || đã chứng minh == rỗng || v[1] < 0 || sâu < v[1]) { trả về rỗng; };
+            con = lấy từ điển(đã chứng minh, "" + v[2], rỗng);
+            nếu (con == rỗng) { trả về rỗng; };
+            nếu (độ dài(con["ô"]) != v[1]) { trả về rỗng; };
+            lặp(j = sâu - v[1]; j < sâu; j++) {
+                nếu (kiểu[j] != 0) { trả về rỗng; };
+            };
+            phát.phát("Call", 0, v[1], "vpp_aot_i32_" + v[2]);
+            lặp(j = 0; j < v[1]; j++) { máy ảo xóa vị trí danh sách(kiểu, độ dài(kiểu) - 1); };
+            máy ảo thêm cuối danh sách(kiểu, 0); bỏ qua;
         };
         nếu (tên == "OP_KHONG" || tên == "OP_PHU_DINH") {
             nếu (sâu < 1) { trả về rỗng; }; nếu (kiểu[sâu - 1] != 0) { trả về rỗng; };

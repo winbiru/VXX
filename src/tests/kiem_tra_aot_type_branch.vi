@@ -1,0 +1,39 @@
+nhập gói.chuẩn.chính.*;
+lớp Hộp { hàm khởi tạo(n) { mình.n = n; }; };
+hàm f() { trả về 1; };
+hàm kiểm(v, expected) {
+    n = 0;
+    nếu (máy ảo lấy loại(v) == "rỗng") { n += 1; };
+    nếu (máy ảo lấy loại(v) == "số nguyên") { n += 2; };
+    nếu (máy ảo lấy loại(v) == "số thực") { n += 4; };
+    nếu (máy ảo lấy loại(v) == "chuỗi") { n += 8; };
+    nếu (máy ảo lấy loại(v) == "danh sách") { n += 16; };
+    nếu (máy ảo lấy loại(v) == "từ điển") { n += 32; };
+    nếu (máy ảo lấy loại(v) == "tuple") { n += 64; };
+    nếu (máy ảo lấy loại(v) == "hàm") { n += 128; };
+    nếu (máy ảo lấy loại(v) == "lớp") { n += 256; };
+    nếu (máy ảo lấy loại(v) == "đối tượng") { n += 512; };
+    nếu (máy ảo lấy loại(v) != "invalid") { n += 1024; };
+    nếu (máy ảo lấy loại(v) != "chuỗi") { n += 2048; };
+    nếu (n != expected) { in n; in expected; ném "type branch"; };
+};
+hàm chính() {
+    c = 5;
+    đóng = hàm() { trả về c; };
+    ds = [rỗng, 1, 1.5, "x", [], {}, bộ([1]), đóng, Hộp, Hộp(3), máy ảo xem byte chuỗi("a"), đúng, f];
+    tên = ["rỗng", "số nguyên", "số thực", "chuỗi", "danh sách", "từ điển", "tuple", "hàm", "lớp", "đối tượng"];
+    mã = [1,2,4,8,16,32,64,128,256,512];
+    lặp(i=0; i < độ dài(ds); i++) {
+        t = máy ảo lấy loại(ds[i]);
+        expected = 1024;
+        nếu (t != "chuỗi") { expected += 2048; };
+        lặp(j=0; j<10; j++) { nếu (t == tên[j]) { expected += mã[j]; }; };
+        kiểm(ds[i], expected);
+    };
+    lặp(i=0; i<1000; i++) { nếu (máy ảo lấy loại(i) != "số nguyên") { ném "raw slot"; }; };
+    v = "x";
+    nếu (máy ảo lấy loại(v) != "chuỗi") { ném "string"; };
+    v = 2;
+    nếu (máy ảo lấy loại(v) != "số nguyên") { ném "mutation"; };
+    in "type branches: PASS";
+};

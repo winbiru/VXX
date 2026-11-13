@@ -34,6 +34,21 @@ Lmo_loi:
 .globl vpp_native_os_close
 vpp_native_os_close:
     jmp _close
+// _lseeki64 returns a 64-bit offset; check before returning i32.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    movslq %edx, %rdx
+    subq $40, %rsp
+    call _lseeki64
+    testq %rax, %rax
+    js 1f
+    cmpq $2147483647, %rax
+    jle 1f
+    call _errno
+    movl $132, (%rax) // UCRT EOVERFLOW
+    movl $-1, %eax
+1:  addq $40, %rsp
+    ret
 .globl vpp_native_os_errno
 vpp_native_os_errno:
     subq $40, %rsp

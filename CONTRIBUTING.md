@@ -4,10 +4,10 @@ Cảm ơn bạn đã muốn đóng góp cho V++ — compiler và virtual machine
 
 ## Chuẩn bị môi trường
 
-- C++ compiler hỗ trợ C++17 (`c++`, GCC hoặc Clang)
-- CMake 3.15+ để build theo cấu hình chính thức
-- `curl` cho HTTP native và integration test
-- Bash trên Linux/macOS để chạy `run_tests.sh`
+- macOS ARM64 (Apple Silicon) cho bootstrap đầy đủ hiện tại
+- CMake 3.20+, Bash và Xcode Command Line Tools để build Assembly nền tảng
+- Python 3 cho kiểm tra mã nguồn và benchmark; Node.js cho kiểm thử extension
+- Seed V++/ASM trong `bootstrap/macos-arm64/`, được xác minh khi build
 
 ## Build và kiểm thử
 
@@ -21,18 +21,16 @@ Build nhanh cho môi trường phát triển:
 Hoặc build qua CMake:
 
 ```bash
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B build-pure-vpp
+cmake --build build-pure-vpp
+ctest --test-dir build-pure-vpp --output-on-failure
 ```
 
-`run_tests.sh` chạy toàn bộ regression suite. Các test HTTP sử dụng server fixture viết bằng V++ tại `src/tests/http_fixture.vi`, chạy ở `127.0.0.1:18080`; không gọi Internet. Không chạy đồng thời nhiều bản test runner trên cùng máy vì fixture dùng cổng cố định này.
-
-Tạo một backend mẫu để thử nghiệm thủ công bằng `vpp khởi tạo backend <tên>`. Template này dùng HTTP server native trên Linux, macOS và Windows.
+`run_tests.sh` chạy bộ smoke test AOT hiện tại. Các fixture hồi quy cũ vẫn được giữ để chuyển sang compiler native. Linux, Windows và các lệnh của CLI host cũ chưa có hỗ trợ đầy đủ trong bootstrap này.
 
 ## Khi thay đổi mã nguồn
 
-1. Giữ mã tương thích C++17 và không thêm warning mới với `-Wall -Wextra -Wpedantic`.
+1. Viết compiler, runtime và thư viện bằng V++; dùng Assembly tại biên giao tiếp với nền tảng. Không đưa mã nguồn hoặc host C/C++ trở lại quy trình build sản phẩm.
 2. Với thay đổi ngôn ngữ/VM/compiler, thêm hoặc cập nhật một entry `.vi` trong `src/tests/` cùng output tương ứng trong `src/tests/expected/`. Fixture tái sử dụng đặt trong `src/tests/fixtures/` không cần expected riêng.
 3. Với thay đổi HTTP, ưu tiên mở rộng fixture `.vi` thay vì gọi dịch vụ Internet.
 4. Mỗi module `.vi` phải import trực tiếp dependency của chính nó; không dựa vào thứ tự import của facade. Giữ `gói/ứng dụng` ở mức lifecycle chung, còn full stack nằm ở `gói/dựng/ứng dụng.vi`. Mỗi câu `nhập` chỉ nhận một file hoặc package/folder và target không dùng dấu nháy, ví dụ `nhập gói.mạng.chính.*;`.

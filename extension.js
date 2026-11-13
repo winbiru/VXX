@@ -1,12 +1,9 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
-const https = require('https');
 const { spawn } = require('child_process');
 
 const RELEASES_URL = 'https://github.com/winbiru/VXX/releases';
-const LATEST_DOWNLOAD_URL = `${RELEASES_URL}/latest/download`;
 const VPP_LANGUAGE_SELECTOR = { language: 'vpp' };
 const VPP_OPEN_DEFINITION_COMMAND = 'vpp.openFunctionDefinition';
 const VPP_LIBRARY_VIEW_ID = 'vpp.libraryRoots';
@@ -948,28 +945,7 @@ class VppLanguageServer {
 function languageServerExecutable(context) {
   const configured = vscode.workspace.getConfiguration('vpp').get('lsp.executable', '').trim();
   if (configured) return configured;
-  // In a V++ source checkout, use the current compiler before an older installed release.
-  const localCandidates = process.platform === 'win32'
-    ? [
-        'build/bin/vpp.exe',
-        'build/bin/Release/vpp-cli.exe',
-        'build/Release/vpp-cli.exe',
-        'build/vpp-cli.exe',
-        'build-cicd-release/bin/vpp.exe',
-        'bin/vpp.exe'
-      ]
-    : ['build/bin/vpp', 'build-cicd-release/bin/vpp', 'bin/vpp'];
-  for (const folder of vscode.workspace.workspaceFolders || []) {
-    const root = folder.uri.fsPath;
-    if (!fs.existsSync(path.join(root, 'vpp-libraries.json'))) continue;
-    for (const relative of localCandidates) {
-      const candidate = path.join(root, relative);
-      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
-    }
-  }
-  const managed = vmBinary(context);
-  if (fs.existsSync(managed)) return managed;
-  return process.platform === 'win32' ? 'vpp.exe' : 'vpp';
+  return ''; // The autonomous compiler does not yet provide a language server.
 }
 
 function stopWatchingLanguageServerExecutable() {
@@ -1022,7 +998,7 @@ async function ensureLanguageServer(context) {
 }
 
 async function startLanguageServer(context, showError = false) {
-  if (!vscode.workspace.getConfiguration('vpp').get('lsp.enabled', true)) return;
+  if (!vscode.workspace.getConfiguration('vpp').get('lsp.enabled', false) || !languageServerExecutable(context)) return;
   if (languageServer) return;
   if (languageServerStarting) return languageServerStarting;
 
@@ -1242,218 +1218,44 @@ function registerLanguageFeatures(context) {
   );
 }
 
-function assetForCurrentPlatform() {
-  if (process.platform === 'darwin') {
-    return 'vpp-macos.tar.gz';
-  }
-  if (process.platform === 'linux' && process.arch === 'x64') {
-    return 'vpp-linux-x64.tar.gz';
-  }
-  if (process.platform === 'win32' && process.arch === 'x64') {
-    return 'vpp-windows-x64.zip';
-  }
-
-  throw new Error(`V++ chưa có VM phát hành cho ${process.platform}/${process.arch}.`);
-}
-
 function vmDirectory(context) {
-  return path.join(context.globalStorageUri.fsPath, 'vm');
+  return path.join(context.globalStorageUri.fsPath, 'native-vpp');
 }
 
-function vmBinary(context) {
-  return path.join(vmDirectory(context), process.platform === 'win32' ? 'vpp.exe' : 'vpp');
+function nativeWorkspace() {
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') return null;
+  for (const folder of vscode.workspace.workspaceFolders || []) {
+    const root = folder.uri.fsPath;
+    const bin = path.join(root, 'build-pure-vpp', 'bin');
+    if (fs.existsSync(path.join(root, 'vpp-libraries.json')) && fs.existsSync(path.join(bin, 'vpp-native')) && fs.existsSync(path.join(bin, 'vpp'))) return { root, bin };
+  }
+  return null;
 }
 
 function configureTerminalEnvironment(context) {
-  const binary = vmBinary(context);
-  if (!fs.existsSync(binary)) {
-    return false;
-  }
-
-  const installDir = vmDirectory(context);
-  context.environmentVariableCollection.prepend('PATH', `${installDir}${path.delimiter}`);
-  context.environmentVariableCollection.replace('VPP_HOME', installDir);
+  const native = nativeWorkspace();
+  if (!native) return false;
+  context.environmentVariableCollection.prepend('PATH', `${native.bin}${path.delimiter}`);
+  context.environmentVariableCollection.replace('VPP_HOME', native.root);
   return true;
 }
 
-function requestToFile(url, destination, redirectCount = 0) {
-  return new Promise((resolve, reject) => {
-    if (redirectCount > 10) {
-      reject(new Error('GitHub chuyển hướng quá nhiều lần.'));
-      return;
-    }
-
-    const client = url.startsWith('https:') ? https : http;
-    const request = client.get(url, {
-      headers: {
-        'User-Agent': 'vpp-language-vscode-extension',
-        'Accept': 'application/octet-stream'
-      }
-    }, (response) => {
-      const status = response.statusCode || 0;
-      const location = response.headers.location;
-
-      if (status >= 300 && status < 400 && location) {
-        response.resume();
-        const nextUrl = new URL(location, url).toString();
-        requestToFile(nextUrl, destination, redirectCount + 1).then(resolve, reject);
-        return;
-      }
-
-      if (status !== 200) {
-        response.resume();
-        reject(new Error(`GitHub trả về HTTP ${status} cho ${url}`));
-        return;
-      }
-
-      const output = fs.createWriteStream(destination);
-      response.pipe(output);
-      output.on('finish', () => output.close(resolve));
-      output.on('error', reject);
-      response.on('error', reject);
-    });
-
-    request.setTimeout(60_000, () => request.destroy(new Error('Hết thời gian tải VM từ GitHub.')));
-    request.on('error', reject);
-  });
-}
-
-function run(command, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(stderr.trim() || `${command} thoát với mã ${code}`));
-      }
-    });
-  });
-}
-
-async function extractArchive(archivePath, destination) {
-  await fs.promises.mkdir(destination, { recursive: true });
-
-  if (process.platform === 'win32') {
-    const escapedArchive = archivePath.replace(/'/g, "''");
-    const escapedDestination = destination.replace(/'/g, "''");
-    const script = `Expand-Archive -LiteralPath '${escapedArchive}' -DestinationPath '${escapedDestination}' -Force`;
-    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
+async function installVmCommand(context) {
+  if (configureTerminalEnvironment(context)) {
+    vscode.window.showInformationMessage('V++ native đã sẵn sàng trong terminal mới.');
     return;
   }
-
-  await run('tar', ['-xzf', archivePath, '-C', destination]);
-}
-
-async function validateVmLayout(directory) {
-  const binary = path.join(directory, process.platform === 'win32' ? 'vpp.exe' : 'vpp');
-  const stdlib = path.join(directory, 'gói');
-  const templates = path.join(directory, 'templates');
-
-  for (const requiredPath of [binary, stdlib, templates]) {
-    if (!fs.existsSync(requiredPath)) {
-      throw new Error(`Gói release thiếu thành phần bắt buộc: ${path.basename(requiredPath)}`);
-    }
-  }
-
-  if (process.platform !== 'win32') {
-    await fs.promises.chmod(binary, 0o755);
-  }
-}
-
-async function installVm(context) {
-  const asset = assetForCurrentPlatform();
-  const storageDir = context.globalStorageUri.fsPath;
-  const archivePath = path.join(storageDir, asset);
-  const stagingDir = path.join(storageDir, 'vm-staging');
-  const installDir = vmDirectory(context);
-  const downloadUrl = `${LATEST_DOWNLOAD_URL}/${asset}`;
-
-  await fs.promises.mkdir(storageDir, { recursive: true });
-  await fs.promises.rm(stagingDir, { recursive: true, force: true });
-
-  try {
-    await vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification,
-      title: `V++: Đang cài VM từ GitHub (${asset})`,
-      cancellable: false
-    }, async (progress) => {
-      progress.report({ message: 'Đang tải release mới nhất…' });
-      await requestToFile(downloadUrl, archivePath);
-
-      progress.report({ message: 'Đang giải nén…' });
-      await extractArchive(archivePath, stagingDir);
-      await validateVmLayout(stagingDir);
-
-      progress.report({ message: 'Đang hoàn tất cài đặt…' });
-      await fs.promises.rm(installDir, { recursive: true, force: true });
-      await fs.promises.rename(stagingDir, installDir);
-    });
-
-    configureTerminalEnvironment(context);
-    libraryTreeProvider?.refresh();
-    const binary = vmBinary(context);
-    vscode.window.showInformationMessage(`Đã cài V++ VM: ${binary}. Terminal mới trong VS Code có thể dùng lệnh vpp.`);
-    await restartLanguageServer(context);
-  } finally {
-    await fs.promises.rm(archivePath, { force: true }).catch(() => {});
-    await fs.promises.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
-async function installVmCommand(context) {
-  try {
-    await installVm(context);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const choice = await vscode.window.showErrorMessage(`Không thể cài V++ VM: ${message}`, 'Mở GitHub Releases');
-    if (choice === 'Mở GitHub Releases') {
-      await vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
-    }
-  }
+  vscode.window.showInformationMessage('Bản V++/ASM hiện cần build trên macOS ARM64: make build trong repository V++.');
 }
 
 async function showVmInfo(context) {
-  const binary = vmBinary(context);
-  if (fs.existsSync(binary)) {
-    vscode.window.showInformationMessage(`V++ VM đang được extension quản lý tại: ${binary}`);
-    return;
-  }
-
-  const choice = await vscode.window.showInformationMessage('Chưa cài V++ VM bằng extension.', 'Cài VM');
-  if (choice === 'Cài VM') {
-    await installVmCommand(context);
-  }
+  await installVmCommand(context);
 }
 
 async function maybePromptInstall(context) {
-  const config = vscode.workspace.getConfiguration('vpp');
-  if (!config.get('vm.autoPromptInstall', true) || fs.existsSync(vmBinary(context))) {
-    return;
-  }
-
-  const promptedKey = 'vpp.vm.installPromptShown';
-  if (context.globalState.get(promptedKey, false)) {
-    return;
-  }
-
-  await context.globalState.update(promptedKey, true);
-  const choice = await vscode.window.showInformationMessage(
-    'V++ Language có thể cài V++ VM trực tiếp từ GitHub Releases.',
-    'Cài VM',
-    'Mở Releases'
-  );
-
-  if (choice === 'Cài VM') {
+  // Historical releases contain the retired host. Never auto-install them.
+  if (vscode.workspace.getConfiguration('vpp').get('vm.autoPromptInstall', false) && !nativeWorkspace()) {
     await installVmCommand(context);
-  } else if (choice === 'Mở Releases') {
-    await vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
   }
 }
 

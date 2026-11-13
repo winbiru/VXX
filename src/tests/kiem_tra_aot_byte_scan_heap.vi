@@ -1,0 +1,58 @@
+nhập gói.lõi.chuyển kiểu.*;
+biến cursor chung = 0;
+hàm quét thường(a, i, n) {
+    khi (i < n) {
+        nếu (a[i] < 48 || a[i] > 57) { thoát; };
+        i = i + 1;
+    };
+    trả về i;
+};
+hàm quét giữ(a, i, n) {
+    đọc = hàm() { trả về i; };
+    khi (i < n) {
+        nếu (a[i] < 48 || a[i] > 57) { thoát; };
+        i = i + 1;
+    };
+    trả về đọc;
+};
+hàm tạo(a, n) {
+    i = 0;
+    trả về [hàm() {
+        khi (i < n) {
+            nếu (a[i] < 48 || a[i] > 57) { thoát; };
+            i = i + 1;
+        };
+        trả về i;
+    }, hàm() { trả về i; }, hàm(v) { i = v; }];
+};
+hàm quét chung(a, n) {
+    khi (cursor chung < n) {
+        nếu (a[cursor chung] < 48 || a[cursor chung] > 57) { thoát; };
+        cursor chung = cursor chung + 1;
+    };
+    trả về cursor chung;
+};
+hàm chính() {
+    dài = "";
+    lặp(j = 0; j < 600; j++) { dài += "0123456789"; };
+    a = máy ảo xem byte chuỗi(dài + "x");
+    in quét thường(a, 0, 6001) == 6000;
+    in quét thường(a, 6000, 6001) == 6000;
+    in quét thường(a, 6001, 6001) == 6001;
+    in quét thường(a, 0, 6000.0) == 6000;
+    in quét thường([48,49,50,65], 0, 4) == 3;
+    đọc = quét giữ(a, 0, 6001);
+    in đọc() == 6000;
+    ds = tạo(a, 6001);
+    quét = ds[0]; xem = ds[1]; đặt = ds[2];
+    in xem() == 0;
+    in quét() == 6000;
+    in xem() == 6000;
+    đặt(5999);
+    in quét() == 6000;
+    in xem() == 6000;
+    đặt(6001);
+    in quét() == 6001;
+    in quét chung(a, 6001) == 6000;
+    in cursor chung == 6000;
+};

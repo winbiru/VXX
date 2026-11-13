@@ -122,3 +122,6 @@ node_modules/
 /gói/máy ảo/__aot_probe_*.vi
 /gói/máy ảo/__tham_do_aot.vi
 /gói/máy ảo/_codex_diag_*.vi
+
+# Document provenance of the native bootstrap seed.
+!/bootstrap/README.md

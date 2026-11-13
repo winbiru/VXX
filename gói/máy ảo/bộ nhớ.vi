@@ -120,6 +120,68 @@ hàm vm_error(code) {
     };
     trả về 0;
 };
+// Chẩn đoán lỗi dung lượng không dùng heap đang cạn. Vùng tạm stat 3376
+// chỉ được ghi sau lỗi không thể bắt (mã 1), không qua safepoint.
+hàm vm_capacity_text(handle) {
+    biến n = byte dài(handle);
+    nếu (n > 0 && n <= 208) {
+        lặp(i = 0; i < n; i++) { máy ghi byte(3376 + i, byte lấy(handle, i)); };
+        máy ghi(2, 3376, n);
+    };
+    byte hủy(handle);
+    trả về 0;
+};
+hàm vm_capacity_number(n) {
+    // Giữ số âm để không tràn khi n = INT32_MIN.
+    biến âm = n < 0;
+    nếu (n > 0) { n = 0 - n; };
+    biến at = 3392;
+    khi (đúng) {
+        biến q = máy chia số nguyên ba mươi hai bit(n, 10);
+        at = at - 1;
+        máy ghi byte(at, 48 + q * 10 - n);
+        n = q;
+        nếu (n == 0) { thoát; };
+    };
+    nếu (âm) { at = at - 1; máy ghi byte(at, 45); };
+    máy ghi(2, at, 3392 - at);
+    trả về 0;
+};
+hàm vm_capacity_error(reason, requested, limit) {
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_error(1);
+    biến end = vm_get(4198464, 0);
+    biến free = 67000000 - end;
+    biến largest = free;
+    biến p = 8388608;
+    khi (p < end) {
+        biến size = vm_get(p, 0);
+        nếu (size < 32 || size > end - p) { thoát; };
+        nếu (vm_get(p, 1) == -1) {
+            free += size;
+            nếu (size > largest) { largest = size; };
+        };
+        p += size;
+    };
+    vm_capacity_text("VPP_VM_CAPACITY reason="); vm_capacity_number(reason);
+    vm_capacity_text(" requested="); vm_capacity_number(requested);
+    vm_capacity_text(" limit="); vm_capacity_number(limit);
+    vm_capacity_text(" free="); vm_capacity_number(free);
+    vm_capacity_text(" largest="); vm_capacity_number(largest);
+    vm_capacity_text(" since_gc="); vm_capacity_number(vm_get(4198464, 9));
+    biến state = vm_get(4198464, 2);
+    nếu (state != 0) {
+        biến frames = vm_get(state, 6);
+        nếu (frames != 0 && vm_get(frames, 1) > 0) {
+            biến frame = vm_get(vm_get(frames, 3), vm_get(frames, 1) - 1);
+            vm_capacity_text(" frame="); vm_capacity_number(vm_get(frame, 11));
+            biến stack = vm_get(frame, 2);
+            nếu (stack != 0) { vm_capacity_text(" stack="); vm_capacity_number(vm_get(stack, 1)); };
+        };
+    };
+    vm_capacity_text("\n");
+    trả về 0;
+};
 hàm vm_init() {
     lặp(i = 4; i < 64; i++) { vm_set(16 + i * 32, 0, -1); };
     lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
@@ -153,8 +215,7 @@ hàm vm_alloc(bytes, scan) {
     trả về result;
 };
 hàm vm_alloc_body(bytes, scan) {
-    nếu (bytes < 0) { trả về vm_error(1); };
-    nếu (bytes > 31000000) { trả về vm_error(1); };
+    nếu (bytes < 0 || bytes > 31000000) { trả về vm_capacity_error(1, bytes, 31000000); };
     biến size = máy chia số nguyên ba mươi hai bit(bytes + 31, 16) * 16;
     biến end = vm_get(4198464, 0);
     // Segregate free blocks by size; the lexer makes millions of tiny
@@ -186,7 +247,7 @@ hàm vm_alloc_body(bytes, scan) {
     };
     nếu (p == 0) { p = end; };
     nếu (p == end) {
-        nếu (size > 67000000 - end) { trả về vm_error(1); };
+        nếu (size > 67000000 - end) { trả về vm_capacity_error(2, size, 67000000 - end); };
         vm_set(4198464, 0, end + size);
         // Vùng cấp phát tuần tự chưa từng sử dụng; hệ điều hành đã đặt về 0.
         // Chỉ xóa nội dung khi tái sử dụng vùng đã được thu gom.

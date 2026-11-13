@@ -113,6 +113,12 @@ status=$?
 set -e
 [[ "$status" -eq 42 ]]
 echo 'SOURCE_BOOTSTRAP_PLATFORM_DIR_ONLY=PASS'
+# The implicit runtime uses an absolute path. A relative entry importing
+# that same runtime must not collect its declarations a second time.
+for source in 'gói/biên dịch/bản địa/bộ biên dịch.vi' './gói/biên dịch/bản địa/bộ biên dịch.vi'; do
+    timeout --kill-after=5 600 "$out/selfhost/vpp-native-stage2" check "$source"
+done
+echo 'SOURCE_BOOTSTRAP_RELATIVE_MODULE_PATH=PASS'
 for stage in 1 2; do
     compiler="$out/selfhost/vpp-native-stage$stage"
     VPP_LINUX_HOST_COMPILER="$compiler" timeout --kill-after=5 120 \

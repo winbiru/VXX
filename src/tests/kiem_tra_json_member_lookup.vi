@@ -1,0 +1,31 @@
+nhập gói.dữ liệu.json.json.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+hàm chính() {
+    bảng = {"z": 1, "": rỗng, "Việt 🚀": {"a": [2, 3]}, "a\"": "x"};
+    nếu (json tạo(bảng) != "{\"\":null,\"Việt 🚀\":{\"a\":[2,3]},\"a\\\"\":\"x\",\"z\":1}") { ném "small order"; };
+    tài liệu = Tài Liệu JSON(json tạo(bảng));
+    nếu (tài liệu.lấy("missing", 99) != 99 || tài liệu.lấy("", 99) != rỗng) { ném "default"; };
+    lặp(k = 127; k <= 129; k++) {
+        bảng = {};
+        lặp(i = k - 1; i >= 0; i--) {
+            tên = "Việt\"" + thành chuỗi(i);
+            nếu (i % 3 == 0) { bảng[tên] = rỗng; }
+            hoặc { bảng[tên] = [i, "🚀"]; };
+        };
+        văn bản = json tạo(bảng);
+        đọc = json phân tích(văn bản);
+        nếu (json tạo(đọc) != văn bản || máy ảo lấy độ dài(khóa từ điển(đọc)) != k) { ném "deterministic"; };
+        lặp(i = 0; i < k; i++) {
+            tên = "Việt\"" + thành chuỗi(i);
+            nếu (!có khóa(đọc, tên)) { ném "missing member"; };
+            nếu (i % 3 == 0) { nếu (đọc[tên] != rỗng) { ném "null member"; }; }
+            hoặc { nếu (đọc[tên][0] != i || đọc[tên][1] != "🚀") { ném "member value"; }; };
+        };
+    };
+    bảng = {}; bảng["cycle"] = bảng;
+    lỗi vòng = sai;
+    thử { json tạo(bảng); } bắt lỗi(e) { lỗi vòng = e == "json tạo: phát hiện collection tự tham chiếu"; };
+    nếu (!lỗi vòng) { ném "cycle"; };
+    in "CP36 member lookup PASS";
+};

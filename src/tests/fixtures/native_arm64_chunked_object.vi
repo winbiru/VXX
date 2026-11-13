@@ -1,0 +1,52 @@
+nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.đối tượng macho động.Bộ Ghi MachO Động;
+
+hàm cần(ok) {
+    nếu (!ok) { ném "ARM64 chunk parity"; };
+};
+
+hàm ghi(chỉ số, phát) {
+    h = đối số lấy(chỉ số); a = [];
+    lặp(i = 0; i < byte dài(h); i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(a, byte lấy(h, i)); };
+    bỏ kết quả = byte hủy(h);
+    o = Bộ Ghi MachO Động(chuỗi từ byte máy ảo(a));
+    bỏ kết quả = o.ghi hàm("caller", phát);
+    bỏ kết quả = o.ghi hàm("callee", {"bytes": [64,5,128,82,192,3,95,214], "relocations": []});
+    bỏ kết quả = o.bắt đầu dữ liệu();
+    bỏ kết quả = o.nhãn("_table", đúng); bỏ kết quả = o.con trỏ("_caller");
+    bỏ kết quả = o.hoàn tất();
+};
+
+hàm chính() {
+    // Large enough to exercise the full encoder across many chunks.
+    số cặp = 5000;
+    lệnh = [biên dịch mã máy lệnh("PushConstant", 0),
+            biên dịch mã máy lệnh("BranchZero", 0, 2 * số cặp + 3, 1)];
+    lặp(i = 0; i < số cặp; i += 1) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("PushConstant", 65536 + i));
+        bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Drop", 0, 0, 1));
+    };
+    bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Jump", 0, 0));
+    bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Call", 0, 0, 0, "callee"));
+    bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Return", 0, 0, 1));
+    ir = {"parameterCount":0, "slotCount":0, "maxStackDepth":1, "instructions":lệnh};
+    phẳng = biên dịch mã máy hàm("aarch64", ir, "macos");
+    khối = biên dịch mã máy hàm("aarch64", ir, "macos", đúng);
+    bỏ kết quả = cần(khối["size"] == máy ảo lấy độ dài(phẳng["bytes"]));
+    bỏ kết quả = cần(máy ảo lấy độ dài(khối["chunks"]) > 1);
+    vị = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(khối["chunks"]); i += 1) {
+        b = khối["chunks"][i]; n = máy ảo lấy độ dài(b);
+        bỏ kết quả = cần(n > 0 && n <= 2048 && n % 4 == 0);
+        nếu (i + 1 < máy ảo lấy độ dài(khối["chunks"])) { bỏ kết quả = cần(n == 2048); };
+        lặp(j = 0; j < n; j += 1) { bỏ kết quả = cần(b[j] == phẳng["bytes"][vị]); vị += 1; };
+    };
+    bỏ kết quả = cần(vị == khối["size"]);
+    bỏ kết quả = cần(máy ảo lấy độ dài(phẳng["relocations"]) == 1);
+    bỏ kết quả = cần(máy ảo lấy độ dài(khối["relocations"]) == 1);
+    r = khối["relocations"][0]; s = phẳng["relocations"][0];
+    bỏ kết quả = cần(r["offset"] >= 8192 && r["offset"] == s["offset"] && r["symbol"] == s["symbol"]);
+    bỏ kết quả = ghi(1, phẳng); bỏ kết quả = ghi(2, khối);
+    in("ARM64 chunk parity: PASS");
+};

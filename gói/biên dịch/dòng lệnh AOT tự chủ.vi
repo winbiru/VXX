@@ -1,0 +1,236 @@
+// Native executable entry point. The compiler and dynamic runtime are V++/ASM.
+// The link routes use a prepared V++ runtime object.
+// The optional V++ Mach-O route replaces system linking;
+// The direct object route uses prepared platform objects and signs internally.
+nhập gói.biên dịch.dòng lệnh máy.biên dịch phân tích dòng lệnh máy;
+nhập gói.biên dịch.dòng lệnh máy.biên dịch chuẩn bị dòng lệnh máy;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn hóa yêu cầu;
+nhập gói.biên dịch.phiên AOT.biên dịch AOT gốc gói;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chạy lệnh;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT kiểm tra runtime;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT tạo thư mục tạm;
+nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT dọn thư mục tạm;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+nhập gói.nhập xuất.tệp.đổi tên tệp;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.biên dịch.xuất macho.macho xuất từ tệp;
+nhập gói.biên dịch.đối tượng macho động.Bộ Ghi MachO Động;
+
+hàm riêng tư AOT tự chủ xuất(kênh, văn bản) {
+    // Serial native CLI: borrow the runtime's 208-byte stat scratch region
+    // (3376) without opening or closing inherited descriptors. No path or
+    // subprocess operation runs while this buffer is in use.
+    vị trí = 0;
+    khi (đúng) {
+        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 128));
+        n = máy ảo lấy độ dài(bytes);
+        nếu (n == 0) { thoát; };
+        lặp(i = 0; i < n; i++) {
+            nếu (máy ghi byte(3376 + i, bytes[i]) != 0) { trả về sai; };
+        };
+        đã ghi = 0;
+        khi (đã ghi < n) {
+            got = máy ghi(kênh, 3376 + đã ghi, n - đã ghi);
+            nếu (got < 0 && máy lỗi() == 4) { bỏ qua; };
+            nếu (got <= 0) { trả về sai; };
+            đã ghi += got;
+        };
+        vị trí += n;
+    };
+    trả về đúng;
+};
+
+hàm riêng tư AOT tự chủ liên kết(tạm, kế hoạch, gốc, mã trực tiếp = sai) {
+    runtime = đọc biến môi trường("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"));
+    nếu (!đường dẫn là tuyệt đối(runtime) || !là tệp(runtime)) {
+        ném "Native AOT: V++ runtime object missing: " + runtime;
+    };
+    công cụ = đọc biến môi trường("VPP_AOT_ASSEMBLER", "/usr/bin/clang");
+    nếu (!mã trực tiếp && !đường dẫn là tuyệt đối(công cụ)) { ném "Native AOT: assembler must be an absolute path"; };
+    asm gốc = đường dẫn nối(gốc, "scripts/ASM");
+    đích = kế hoạch[2];
+    nguồn = đường dẫn nối(tạm, "program.S");
+    đối tượng = đường dẫn nối(tạm, "program.o");
+    primitives = đường dẫn nối(tạm, "primitives.o");
+    executable = đường dẫn nối(tạm, "program");
+    nếu (!mã trực tiếp) {
+        biên dịch AOT chạy lệnh([công cụ, "-c", nguồn, "-DVPP_AOT_VPP_RUNTIME=1", "-I" + asm gốc,
+            "-I" + đường dẫn nối(asm gốc, "common"), "-o", đối tượng], "V++ program assembly");
+    };
+    nếu (đọc biến môi trường("VPP_AOT_NATIVE_MACHO_LINK", "0") == "1") {
+        platform = đọc biến môi trường("VPP_AOT_PLATFORM_OBJECT", "");
+        nếu (mã trực tiếp && platform == "") {
+            platform = đường dẫn nối(gốc, "build/native-vpp-runtime/platform.o");
+        };
+        nếu (platform != "") {
+            nếu (!đường dẫn là tuyệt đối(platform) || !là tệp(platform)) {
+                ném "Native AOT: platform object missing: " + platform;
+            };
+            primitives = platform;
+        } hoặc {
+            biên dịch AOT chạy lệnh([công cụ, "-c", đường dẫn nối(asm gốc, "macos/vpp_aot_primitives_aarch64.S"),
+                "-DVPP_NATIVE_RUNTIME_STACK_ABI=1", "-o", primitives], "V++ platform primitives assembly");
+        };
+        nếu (mã trực tiếp) {
+            bridge = đọc biến môi trường("VPP_AOT_DYNAMIC_BRIDGE_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/dynamic-bridge.o"));
+            nếu (!đường dẫn là tuyệt đối(bridge) || !là tệp(bridge)) {
+                ném "Native AOT: dynamic bridge object missing: " + bridge;
+            };
+            bỏ kết quả = macho xuất từ tệp([đối tượng, bridge, runtime, primitives], executable);
+        } hoặc {
+            bỏ kết quả = macho xuất từ tệp([đối tượng, runtime, primitives], executable);
+        };
+        biên dịch AOT chạy lệnh(["/bin/chmod", "700", executable], "V++ executable permissions");
+    } hoặc {
+        biên dịch AOT chạy lệnh([công cụ, "-c", đường dẫn nối(asm gốc, "macos/vpp_aot_primitives_aarch64.S"),
+            "-DVPP_NATIVE_RUNTIME_STACK_ABI=1", "-o", primitives], "V++ platform primitives assembly");
+        biên dịch AOT chạy lệnh([công cụ, đối tượng, primitives, runtime, "-Wl,-dead_strip", "-o", executable],
+            "V++ executable link");
+    };
+    // Publish only after successful link. Rename on the same filesystem
+    // preserves executable permissions and replaces output atomically.
+    biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+    đổi tên tệp(executable, đích);
+};
+
+// The build owns the private directory from emission through publication.
+// Close the selected staging output before linking; failures preserve output.
+hàm riêng tư AOT tự chủ xuất ASM(kế hoạch, gốc) {
+    bộ ba = kế hoạch[6];
+    kế hoạch[0] = "build";
+    tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(kế hoạch[2]));
+    tệp = rỗng;
+    thử {
+        nguồn = đường dẫn nối(tạm, "program.S");
+        tệp = Bộ Đệm Tệp(nguồn, "ghi", 4096, "ghi ASM");
+        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, tệp);
+        nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
+        bỏ kết quả = tệp.đóng();
+        tệp = rỗng;
+        biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+        đổi tên tệp(nguồn, kế hoạch[2]);
+    } bắt lỗi(e) {
+        nếu (tệp != rỗng) { thử { bỏ kết quả = tệp.đóng(); } bắt lỗi(lỗi đóng) {}; };
+        thử { bỏ kết quả = biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+    bỏ kết quả = biên dịch AOT dọn thư mục tạm(tạm);
+    trả về 0;
+};
+
+hàm riêng tư AOT tự chủ liên kết linux(tạm, kế hoạch, gốc) {
+    runtime = đọc biến môi trường("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "build/native-vpp-runtime/runtime.o"));
+    nếu (!đường dẫn là tuyệt đối(runtime) || !là tệp(runtime)) {
+        ném "Native AOT: V++ runtime object missing: " + runtime;
+    };
+    công cụ = đọc biến môi trường("VPP_AOT_ASSEMBLER", "/usr/bin/clang");
+    nếu (!đường dẫn là tuyệt đối(công cụ)) { ném "Native AOT: assembler must be an absolute path"; };
+    asm gốc = đường dẫn nối(gốc, "scripts/ASM");
+    đối tượng = đường dẫn nối(tạm, "program.o");
+    executable = đường dẫn nối(tạm, "program");
+    biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+        đường dẫn nối(tạm, "program.S"), "-DVPP_AOT_VPP_RUNTIME=1",
+        "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"), "-o", đối tượng], "V++ program assembly");
+    liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
+        "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
+        "-Wl,-z,noexecstack", đối tượng];
+    thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+    lặp(i = 0; i < độ dài(thành phần); i++) {
+        phần = đường dẫn nối(tạm, thành phần[i] + ".o");
+        biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+            đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S"),
+            "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"), "-o", phần], "Linux " + thành phần[i] + " assembly");
+        máy ảo thêm cuối danh sách(liên kết, phần);
+    };
+    máy ảo thêm cuối danh sách(liên kết, runtime);
+    máy ảo thêm cuối danh sách(liên kết, "-o");
+    máy ảo thêm cuối danh sách(liên kết, executable);
+    biên dịch AOT chạy lệnh(liên kết, "V++ executable link");
+    biên dịch AOT chạy lệnh(["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable], "freestanding ELF audit");
+    biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+    đổi tên tệp(executable, kế hoạch[2]);
+};
+
+hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
+    tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(kế hoạch[2]));
+    tệp = rỗng;
+    obj = rỗng;
+    linux = bộ ba == "x86_64-unknown-linux-gnu";
+    mã trực tiếp = !linux && đọc biến môi trường("VPP_AOT_NATIVE_ARM64_OBJECT", "0") == "1";
+    thử {
+        nguồn = đường dẫn nối(tạm, "program.S");
+        nếu (mã trực tiếp) {
+            nếu (đọc biến môi trường("VPP_AOT_NATIVE_MACHO_LINK", "0") != "1") {
+                ném "Native AOT: direct ARM64 object requires VPP_AOT_NATIVE_MACHO_LINK=1";
+            };
+            obj = Bộ Ghi MachO Động(đường dẫn nối(tạm, "program.o"));
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, rỗng, obj);
+            nếu (kết quả[0] != "assemble") { ném "Native AOT: expected object"; };
+            bỏ kết quả = obj.hoàn tất();
+            obj = rỗng;
+        } hoặc nếu (đọc biến môi trường("VPP_AOT_ASM_STREAM", "1") == "0") {
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng);
+            nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
+            bỏ kết quả = ghi tệp(nguồn, kết quả[1]);
+        } hoặc {
+            tệp = Bộ Đệm Tệp(nguồn, "ghi", 4096, "ghi ASM");
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, tệp);
+            nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
+            bỏ kết quả = tệp.đóng();
+            tệp = rỗng;
+        };
+        nếu (linux) { bỏ kết quả = AOT tự chủ liên kết linux(tạm, kế hoạch, gốc); }
+        hoặc { bỏ kết quả = AOT tự chủ liên kết(tạm, kế hoạch, gốc, mã trực tiếp); };
+    } bắt lỗi(e) {
+        nếu (obj != rỗng) { thử { bỏ kết quả = obj.đóng(); } bắt lỗi(lỗi obj) {}; };
+        nếu (tệp != rỗng) { thử { bỏ kết quả = tệp.đóng(); } bắt lỗi(lỗi đóng) {}; };
+        thử { bỏ kết quả = biên dịch AOT dọn thư mục tạm(tạm); } bắt lỗi(lỗi dọn) {};
+        ném e;
+    };
+    bỏ kết quả = biên dịch AOT dọn thư mục tạm(tạm);
+    trả về 0;
+};
+
+hàm chính() {
+    args = [];
+    lặp(i = 1; i < đối số đếm(); i++) {
+        h = đối số lấy(i);
+        n = byte dài(h);
+        bytes = [];
+        lặp(j = 0; j < n; j++) { máy ảo thêm cuối danh sách(bytes, byte lấy(h, j)); };
+        byte hủy(h);
+        máy ảo thêm cuối danh sách(args, chuỗi từ byte máy ảo(bytes));
+    };
+    thử {
+        hệ = tên nền tảng();
+        bộ ba = "aarch64-apple-darwin";
+        nếu (hệ == "linux") { bộ ba = "x86_64-unknown-linux-gnu"; }
+        hoặc nếu (hệ != "macos") { ném "Native AOT: autonomous CLI requires macOS ARM64 or Linux x86-64"; };
+        bỏ kết quả = biên dịch AOT kiểm tra runtime(hệ);
+        kế hoạch = biên dịch phân tích dòng lệnh máy(args);
+        lệnh = kế hoạch[0];
+        nếu (lệnh == "run" || lệnh == "artifact" || lệnh == "embed" || kế hoạch[3] || kế hoạch[4]) {
+            ném "Native AOT: this command requires an unavailable host service";
+        };
+        kế hoạch = biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+        gốc = biên dịch AOT gốc gói("");
+        // The native runtime has no worker host ABI. Select serial lowering
+        // explicitly instead of changing the existing bootstrap defaults.
+        nếu (lệnh == "emit-program-asm") { trả về AOT tự chủ xuất ASM(kế hoạch, gốc); };
+        nếu (lệnh == "build") { trả về AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba); };
+        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng);
+        nếu (kết quả[0] == "complete" || kết quả[0] == "diagnostic-error") {
+            nếu (!AOT tự chủ xuất(1, kết quả[1])) { trả về 1; };
+            nếu (kết quả[0] == "diagnostic-error") { trả về 1; };
+            trả về 0;
+        };
+        ném "Native AOT: unsupported host request";
+    } bắt lỗi(e) {
+        AOT tự chủ xuất(2, thành chuỗi(e) + "\n");
+        trả về 1;
+    };
+};

@@ -62,7 +62,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (độ sâu hiện tại < 1) { trả về -1; };
         }
         hoặc nếu (mã phép toán == 17) {
-            nếu (đối số < -82) { trả về -1; };
+            nếu (đối số < -85) { trả về -1; };
             // The program codegen resolves and bounds-checks function IDs
             // against the complete function table when patching CALLs.
             nếu (đang chờ < 0) { trả về -1; };
@@ -238,6 +238,18 @@ hàm sinh mã vá các nhánh(biểu diễn trung gian, mã máy, các độ l�
     trả về 0;
 };
 
+// Keep a single-use evaluation result in W9/W0 across adjacent IR ops.
+// Do not omit its stack store if a branch can enter the consumer directly.
+hàm sinh mã nối đỉnh(biểu diễn trung gian, các độ lệch, pc) {
+    biến đích = pc + 8;
+    nếu (đích >= byte dài(biểu diễn trung gian)) { trả về 0; };
+    biến op = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, đích);
+    nếu (op != 3 && op != 7 && sinh mã nhị phân(op) != 1) { trả về 0; };
+    // Entries ahead of pc still contain the branch-target flags from the prepass.
+    nếu (byte đọc số nguyên ba mươi hai bit(các độ lệch, đích / 2) != 0) { trả về 0; };
+    trả về 1;
+};
+
 // CALL relocations are pairs (machine offset, callee index). The caller
 // must resolve all BL placeholders before making the object executable.
 hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời gọi) {
@@ -257,6 +269,18 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
         nếu (lời triệu hồi mã phép toán == 17) { có các lời gọi = 1; };
         nếu (lời triệu hồi mã phép toán == 22) { có các lời gọi = 1; };
         nếu (lời triệu hồi mã phép toán == 23) { có các lời gọi = 1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(các độ lệch, 0) != 0) { mã trạng thái = -1; thoát; };
+    };
+    // Mark every branch target before emitting. Reuse the offset table:
+    // a future entry is a 0/1 flag, a visited entry is its machine offset.
+    nếu (mã trạng thái == 0) {
+        lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+            biến op = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+            nếu (op == 10 || sinh mã nhánh điều kiện(op) == 1) {
+                biến đích = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+                nếu (byte ghi số nguyên ba mươi hai bit(các độ lệch, đích / 2, 1) != 0) { mã trạng thái = -1; thoát; };
+            };
+        };
     };
     nếu (có các lời gọi == 1) {
         nếu (các lời gọi <= 0) { byte hủy(các độ lệch); byte làm rỗng(mã máy); trả về -1; };
@@ -268,32 +292,49 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
     biến khung các ô nhớ = 0;
     lặp (i = 0; i < khung; i = i + 4) { khung các ô nhớ = khung các ô nhớ + 1; };
     biến đang chờ = -1;
+    biến đỉnh = -1;
     lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
-        nếu (byte đẩy số nguyên ba mươi hai bit(các độ lệch, byte dài(mã máy)) != 0) {
+        nếu (byte ghi số nguyên ba mươi hai bit(các độ lệch, pc / 2, byte dài(mã máy)) != 0) {
             byte hủy(các độ lệch); byte làm rỗng(mã máy); trả về -1;
         };
         biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
         biến đối số = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
         biến độ lệch = base + các ô nhớ + độ sâu hiện tại;
+        biến đỉnh trước = đỉnh;
+        đỉnh = -1;
+        biến giữ đỉnh = sinh mã nối đỉnh(biểu diễn trung gian, các độ lệch, pc);
         nếu (mã phép toán == 1) {
             mã trạng thái = sinh mã hằng số(mã máy, biểu diễn trung gian, pc + 4);
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 2) {
             mã trạng thái = sinh mã nạp(mã máy, 9, base + đối số);
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 3) {
             độ sâu hiện tại = độ sâu hiện tại - 1;
-            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại);
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + đối số); };
+            nếu (đỉnh trước < 0) {
+                mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại);
+                đỉnh trước = 9;
+            };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, đỉnh trước, base + đối số); };
         }
         hoặc nếu (sinh mã nhị phân(mã phép toán) == 1) {
             độ sâu hiện tại = độ sâu hiện tại - 1;
-            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã nạp(mã máy, 10, base + các ô nhớ + độ sâu hiện tại); };
+            nếu (đỉnh trước >= 0) {
+                // MOV W10,Wn before loading the left operand into W9.
+                mã trạng thái = sinh mã từ máy(mã máy, 704644074 + đỉnh trước * 65536);
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            } hoặc {
+                mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã nạp(mã máy, 10, base + các ô nhớ + độ sâu hiện tại); };
+            };
             nếu (mã trạng thái == 0) {
                 nếu (mã phép toán == 4) { mã trạng thái = sinh mã từ máy(mã máy, 185205033); };
                 nếu (mã phép toán == 5) { mã trạng thái = sinh mã từ máy(mã máy, 1258946857); };
@@ -330,18 +371,24 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
                     };
                 }; };
             };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            };
         }
         hoặc nếu (mã phép toán == 8) {
             mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1258882025); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            };
         }
         hoặc nếu (mã phép toán == 35) {
             // MVN W9,W9: đảo toàn bộ 32 bit.
             mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 707331049); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            };
         }
         hoặc nếu (mã phép toán == 25) {
             // !x: compare against zero and materialize a normalized i32 bool.
@@ -349,10 +396,13 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1384120330); }; // MOVZ W10,#0
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1795817791); }; // CMP W9,W10
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 446633961); }; // CSET W9,EQ
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+            };
         }
         hoặc nếu (mã phép toán == 7) {
-            mã trạng thái = sinh mã nạp(mã máy, 0, base + các ô nhớ);
+            nếu (đỉnh trước < 0) { mã trạng thái = sinh mã nạp(mã máy, 0, base + các ô nhớ); }
+            hoặc nếu (đỉnh trước == 9) { mã trạng thái = sinh mã từ máy(mã máy, 704644064 + 9 * 65536); }; // MOV W0,W9
             nếu (có các lời gọi == 1) {
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -113245186); }; // LDR X30,[SP]
             };
@@ -364,7 +414,9 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
             // On entry, incoming arguments begin at the previous SP.
             // Our prologue lowered SP by frame bytes.
             mã trạng thái = sinh mã nạp(mã máy, 9, khung các ô nhớ + đối số);
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 9; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 19) {
@@ -375,7 +427,9 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
             mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, byte dài(mã máy));
             nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, -1); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -1811939328); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 0, độ lệch); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 0; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 0, độ lệch); };
+            };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
         hoặc nếu (mã phép toán == 23) {
@@ -417,7 +471,9 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã điều chỉnh con trỏ ngăn xếp(mã máy, các ô đối số gửi đi * 4, 0); };
             };
             độ sâu hiện tại = độ sâu hiện tại - đang chờ + 1;
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 0, base + các ô nhớ + độ sâu hiện tại - 1); };
+            nếu (mã trạng thái == 0) {
+                nếu (giữ đỉnh == 1) { đỉnh = 0; } hoặc { mã trạng thái = sinh mã lưu(mã máy, 0, base + các ô nhớ + độ sâu hiện tại - 1); };
+            };
             đang chờ = -1;
         }
         hoặc nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {

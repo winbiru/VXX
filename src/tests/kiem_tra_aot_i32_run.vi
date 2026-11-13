@@ -1,0 +1,33 @@
+nhập gói.chuẩn.chính.*;
+hàm cp30 kiểm tra(s, start, packed, cursor, expected) {
+    ds = [99]; alias = ds;
+    r = máy ảo quét dãy số nguyên(s, start, ds, packed);
+    nếu (r != cursor || json tạo(alias) != expected) { ném "CP30 sai cursor hoặc danh sách"; };
+};
+hàm chính() {
+    cp30 kiểm tra("0,1,12,12345,-1,-2147483648,2147483647]", 0, 23852, -40, "[99,0,1,12,12345,-1,-2147483648,2147483647]");
+    cp30 kiểm tra("1, 2, -3 ]", 0, 23852, -11, "[99,1,2,-3]");
+    cp30 kiểm tra("1;2!", 0, 8507, -5, "[99,1,2]");
+    cp30 kiểm tra("1, true]", 0, 23852, 2, "[99,1]");
+    cp30 kiểm tra("1,01]", 0, 23852, 2, "[99,1]");
+    cp30 kiểm tra("-01]", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("1.5]", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("1e3]", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("2147483648]", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("-2147483649]", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("1,", 0, 23852, 2, "[99,1]");
+    cp30 kiểm tra("", 0, 23852, 0, "[99]");
+    cp30 kiểm tra("1]", 2, 23852, 2, "[99]");
+    prefix = "";
+    lặp(i = 0; i < 2047; i++) { prefix += "1,"; };
+    ds = [];
+    r = máy ảo quét dãy số nguyên(prefix + "2]", 0, ds, 23852);
+    nếu (r != -4097 || độ dài(ds) != 2048 || ds[2047] != 2) { ném "CP30 boundary"; };
+    ds = [];
+    s = prefix + "22]";
+    r = máy ảo quét dãy số nguyên(s, 0, ds, 23852);
+    nếu (r != 4094 || độ dài(ds) != 2047) { ném "CP30 budget"; };
+    r = máy ảo quét dãy số nguyên(s, r, ds, 23852);
+    nếu (r != -4098 || độ dài(ds) != 2048 || ds[2047] != 22) { ném "CP30 resume"; };
+    in "i32 run: PASS";
+};

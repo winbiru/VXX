@@ -1,0 +1,180 @@
+// Layout/symbol planning for the full dynamic Darwin ARM64 linker.
+// All addresses are image-relative; no executable is emitted here.
+nhập gói.biên dịch.đọc macho.Đối Tượng MachO;
+
+hàm riêng tư macho kế hoạch cần(ok, thông báo) {
+    nếu (!ok) { ném "Mach-O linker: " + thông báo; };
+};
+
+hàm riêng tư macho kế hoạch cộng(a, b) {
+    bỏ kết quả = macho kế hoạch cần(a >= 0 && b >= 0 && b <= 2147483647 - a, "tràn địa chỉ ảnh");
+    trả về a + b;
+};
+
+hàm riêng tư macho kế hoạch căn(n, a) {
+    d = n % a;
+    nếu (d == 0) { trả về n; };
+    trả về macho kế hoạch cộng(n, a - d);
+};
+
+hàm riêng tư macho nhóm(s) {
+    tên = s["segment"] + "," + s["name"];
+    nếu (tên == "__TEXT,__text" && s["flags"] == -2147482624 && !s["zeroFill"]) { trả về 0; };
+    nếu (tên == "__TEXT,__cstring" && s["flags"] == 2 && !s["zeroFill"]) { trả về 1; };
+    nếu (tên == "__DATA,__const" && s["flags"] == 0 && !s["zeroFill"]) { trả về 2; };
+    nếu (tên == "__DATA,__bss" && s["flags"] == 1 && s["zeroFill"]) { trả về 3; };
+    ném "Mach-O linker: section chưa hỗ trợ: " + tên;
+};
+
+// Objects use strong N_SECT definitions or ordinary N_UNDF references only.
+// Reject weak/common/absolute symbols until their semantics are implemented.
+hàm riêng tư macho kế hoạch ký hiệu(o, toàn cục, số đối tượng) {
+    ra = [];
+    lặp(i = 0; i < o.số ký hiệu(); i += 1) {
+        s = o.lấy ký hiệu(i);
+        loại = s["type"];
+        bỏ kết quả = macho kế hoạch cần(s["description"] == 0 && s["valueHigh"] == 0, "thuộc tính ký hiệu chưa hỗ trợ");
+        nếu (loại == 14 || loại == 15) {
+            phần = s["section"] - 1;
+            lệch = s["valueLow"] - o.lấy phần(phần)["address"];
+            mục = [phần, lệch];
+            nếu (loại == 15) {
+                tên = o.tên ký hiệu(s["nameOffset"]);
+                bỏ kết quả = macho kế hoạch cần(tên != "" && !máy ảo có khóa từ điển(toàn cục, tên), "ký hiệu trùng: " + tên);
+                toàn cục[tên] = [số đối tượng, phần, lệch];
+            };
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, mục);
+        } hoặc {
+            bỏ kết quả = macho kế hoạch cần(loại == 1 && s["section"] == 0 && s["valueLow"] == 0, "loại ký hiệu chưa hỗ trợ");
+            tên = o.tên ký hiệu(s["nameOffset"]);
+            bỏ kết quả = macho kế hoạch cần(tên != "", "ký hiệu nhập rỗng");
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, [-1, tên]);
+        };
+    };
+    trả về ra;
+};
+
+// The caller supplies the closed OS import catalog. Unresolved V++ symbols
+// must fail, never become dyld imports by accident.
+hàm riêng tư macho kế hoạch mở(đối tượng, cho phép) {
+    toàn cục = {};
+    bảng = [];
+    vị trí = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i += 1) {
+        o = đối tượng[i];
+        bỏ kết quả = máy ảo thêm cuối danh sách(bảng, macho kế hoạch ký hiệu(o, toàn cục, i));
+        các phần = [];
+        lặp(j = 0; j < o.số phần(); j += 1) {
+            s = o.lấy phần(j);
+            bỏ kết quả = máy ảo thêm cuối danh sách(các phần, [macho nhóm(s), -1]);
+        };
+        bỏ kết quả = máy ảo thêm cuối danh sách(vị trí, các phần);
+    };
+    danh sách nhập = [];
+    chỉ mục nhập = {};
+    lặp(i = 0; i < máy ảo lấy độ dài(bảng); i += 1) {
+        ký hiệu = bảng[i];
+        lặp(j = 0; j < máy ảo lấy độ dài(ký hiệu); j += 1) {
+            k = ký hiệu[j];
+            nếu (k[0] == -1) {
+                tên = k[1];
+                nếu (!máy ảo có khóa từ điển(toàn cục, tên) && !máy ảo có khóa từ điển(chỉ mục nhập, tên)) {
+                    bỏ kết quả = macho kế hoạch cần(máy ảo có khóa từ điển(cho phép, tên), "không tìm thấy ký hiệu: " + tên);
+                    chỉ mục nhập[tên] = máy ảo lấy độ dài(danh sách nhập);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(danh sách nhập, tên);
+                };
+            };
+        };
+    };
+    số nhập = máy ảo lấy độ dài(danh sách nhập);
+    bỏ kết quả = macho kế hoạch cần(số nhập <= 1048576, "quá nhiều ký hiệu nhập");
+    // Darwin ARM64 segment granularity is 16 KiB. Stubs are ADRP/LDR/BR
+    // (12 bytes) and each import receives an 8-byte dyld pointer slot.
+    p = 16384;
+    stub = 0;
+    con trỏ = 0;
+    đầu dữ liệu = 0;
+    hết tệp dữ liệu = 0;
+    các phần ra = [];
+    lặp(g = 0; g < 4; g += 1) {
+        nếu (g == 2) { p = macho kế hoạch căn(p, 16384); đầu dữ liệu = p; con trỏ = p; p = macho kế hoạch cộng(p, số nhập * 8); };
+        nếu (g == 3) { hết tệp dữ liệu = p; };
+        lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i += 1) {
+            o = đối tượng[i];
+            lặp(j = 0; j < o.số phần(); j += 1) {
+                v = vị trí[i][j];
+                nếu (v[0] == g) {
+                    s = o.lấy phần(j);
+                    a = 1;
+                    lặp(k = 0; k < s["align"]; k += 1) { a *= 2; };
+                    p = macho kế hoạch căn(p, a);
+                    v[1] = p;
+                    bỏ kết quả = máy ảo thêm cuối danh sách(các phần ra, [i, j, g, p, s["size"]]);
+                    p = macho kế hoạch cộng(p, s["size"]);
+                };
+            };
+        };
+        nếu (g == 0) { stub = macho kế hoạch căn(p, 4); p = macho kế hoạch cộng(stub, số nhập * 12); };
+    };
+    bỏ kết quả = macho kế hoạch cần(máy ảo có khóa từ điển(toàn cục, "_main"), "thiếu _main");
+    chính = toàn cục["_main"];
+    bỏ kết quả = macho kế hoạch cần(vị trí[chính[0]][chính[1]][0] == 0, "_main không nằm trong text");
+    phần chính = đối tượng[chính[0]].lấy phần(chính[1]);
+    bỏ kết quả = macho kế hoạch cần(chính[2] % 4 == 0 && chính[2] < phần chính["size"], "_main ngoài phạm vi mã");
+    điểm vào = macho kế hoạch cộng(vị trí[chính[0]][chính[1]][1], chính[2]);
+    // Convert each symbol index into its final image-relative address and
+    // its import flag; local names remain scoped to the original object.
+    lặp(i = 0; i < máy ảo lấy độ dài(bảng); i += 1) {
+        ký hiệu = bảng[i];
+        lặp(j = 0; j < máy ảo lấy độ dài(ký hiệu); j += 1) {
+            k = ký hiệu[j];
+            nếu (k[0] >= 0) {
+                ký hiệu[j] = [macho kế hoạch cộng(vị trí[i][k[0]][1], k[1]), 0];
+            } hoặc nếu (máy ảo có khóa từ điển(toàn cục, k[1])) {
+                đích = toàn cục[k[1]];
+                ký hiệu[j] = [macho kế hoạch cộng(vị trí[đích[0]][đích[1]][1], đích[2]), 0];
+            } hoặc {
+                ký hiệu[j] = [macho kế hoạch cộng(stub, chỉ mục nhập[k[1]] * 12), 1];
+            };
+        };
+    };
+    trả về {"sections": các phần ra, "imports": danh sách nhập, "stub": stub, "pointers": con trỏ, "data": đầu dữ liệu, "dataFileEnd": hết tệp dữ liệu, "imageEnd": p, "entry": điểm vào, "positions": vị trí, "symbols": bảng};
+};
+
+// Scan every relocation and validate the currently supported target shapes.
+// Return an order-dependent checksum per section for an independent oracle.
+hàm công khai macho kế hoạch tái định vị(đối tượng, kế hoạch) {
+    ra = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i += 1) {
+        o = đối tượng[i];
+        bảng = kế hoạch["symbols"][i];
+        lặp(j = 0; j < o.số phần(); j += 1) {
+            s = o.lấy phần(j);
+            v = kế hoạch["positions"][i][j];
+            đếm = [0,0,0,0,0];
+            băm = 0;
+            lặp(k = 0; k < s["relocationCount"]; k += 1) {
+                r = o.lấy tái định vị(j, k);
+                loại = r["type"];
+                đích = bảng[r["symbol"]];
+                bỏ kết quả = macho kế hoạch cần((loại == 0 && v[0] == 2 && đích[1] == 0 && r["address"] % 8 == 0) || (loại != 0 && v[0] == 0 && (đích[1] == 0 || loại == 2)), "relocation chưa hỗ trợ");
+                tại = macho kế hoạch cộng(v[1], r["address"]);
+                nếu (loại == 2) {
+                    lệch = đích[0] - tại;
+                    bỏ kết quả = macho kế hoạch cần(lệch % 4 == 0 && lệch >= -134217728 && lệch < 134217728, "BRANCH26 ngoài phạm vi");
+                };
+                đếm[loại] = đếm[loại] + 1;
+                băm = (băm * 31 + tại % 1000003) % 1000003;
+                băm = (băm * 31 + đích[0] % 1000003) % 1000003;
+                băm = (băm * 31 + loại) % 1000003;
+            };
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, [i, j, đếm, băm]);
+        };
+    };
+    trả về ra;
+};
+
+hàm công khai macho lập kế hoạch(đối tượng, cho phép) {
+    bỏ kết quả = macho kế hoạch cần(máy ảo lấy độ dài(đối tượng) > 0, "thiếu đối tượng");
+    trả về macho kế hoạch mở(đối tượng, cho phép);
+};

@@ -1,0 +1,372 @@
+// Full-language Darwin ARM64 executable writer. The caller owns a private
+// output path; signing is internal and publication is separate. No assembler or
+// linker process is used here. File-backed sections stream in 4 KiB chunks.
+nhập gói.biên dịch.bố trí macho.macho lập kế hoạch;
+nhập gói.biên dịch.vá macho.macho bản vá phần;
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.biên dịch.đọc macho.Đối Tượng MachO;
+nhập gói.văn bản.chuỗi.tách hằng văn bản;
+
+// Explicit OS imports, kept in parity with the restricted i32 linker.
+hàm công khai macho xuất danh sách nhập() {
+    tên = tách hằng văn bản("_CC_SHA256_Final|_CC_SHA256_Init|_CC_SHA256_Update|__NSGetArgc|__NSGetArgv|__NSGetEnviron|__NSGetExecutablePath|___error|_accept|_access|_atexit|_bind|_clock_gettime|_close|_closedir|_connect|_fchmod|_fcntl|_fstat|_getcwd|_getentropy|_getenv|_getsockname|_getsockopt|_kill|_listen|_lseek|_lstat|_memchr|_memcpy|_mkdir|_mkstemp|_mmap|_open|_opendir|_pipe|_poll|_posix_spawn|_posix_spawn_file_actions_addclose|_posix_spawn_file_actions_adddup2|_posix_spawn_file_actions_destroy|_posix_spawn_file_actions_init|_posix_spawnattr_destroy|_posix_spawnattr_init|_posix_spawnattr_setflags|_posix_spawnattr_setpgroup|_posix_spawnp|_read|_readdir|_realpath|_recv|_recvfrom|_rename|_send|_sendto|_setsockopt|_snprintf|_socket|_stat|_strtod|_unlink|_waitpid|_write", "|");
+    ra = {};
+    lặp(i = 0; i < máy ảo lấy độ dài(tên); i += 1) { ra[tên[i]] = đúng; };
+    trả về ra;
+};
+
+hàm riêng tư macho xuất cần(ok, lỗi) {
+    nếu (!ok) { ném "Mach-O executable: " + lỗi; };
+};
+hàm riêng tư macho xuất byte(b, x) {
+    bỏ kết quả = máy ảo thêm cuối danh sách(b, x);
+};
+hàm riêng tư macho xuất word(b, x) {
+    lặp(i = 0; i < 4; i += 1) {
+        n = x % 256;
+        nếu (n < 0) { n += 256; };
+        bỏ kết quả = macho xuất byte(b, n);
+        x = (x - n) / 256;
+    };
+};
+hàm riêng tư macho xuất word tại(b, p, x) {
+    lặp(i = 0; i < 4; i += 1) {
+        n = x % 256;
+        nếu (n < 0) { n += 256; };
+        b[p + i] = n;
+        x = (x - n) / 256;
+    };
+};
+hàm riêng tư macho xuất dài(b, thấp, cao = 0) {
+    bỏ kết quả = macho xuất word(b, thấp);
+    bỏ kết quả = macho xuất word(b, cao);
+};
+hàm riêng tư macho xuất nối(b, c) {
+    lặp(i = 0; i < máy ảo lấy độ dài(c); i += 1) { bỏ kết quả = macho xuất byte(b, c[i]); };
+};
+hàm riêng tư macho xuất tên(b, tên, dài) {
+    c = chuỗi thành byte máy ảo(tên);
+    bỏ kết quả = macho xuất cần(máy ảo lấy độ dài(c) <= dài, "tên quá dài");
+    bỏ kết quả = macho xuất nối(b, c);
+    lặp(i = máy ảo lấy độ dài(c); i < dài; i += 1) { bỏ kết quả = macho xuất byte(b, 0); };
+};
+hàm riêng tư macho xuất căn(n, a) {
+    d = n % a;
+    nếu (d == 0) { trả về n; };
+    bỏ kết quả = macho xuất cần(n <= 2147483647 - a + d, "tràn kích thước");
+    trả về n + a - d;
+};
+hàm riêng tư macho xuất đệm(b, a) {
+    khi (máy ảo lấy độ dài(b) % a != 0) { bỏ kết quả = macho xuất byte(b, 0); };
+};
+hàm riêng tư macho xuất uleb(b, n) {
+    bỏ kết quả = macho xuất cần(n >= 0, "ULEB128 âm");
+    khi (n >= 128) {
+        bỏ kết quả = macho xuất byte(b, n % 128 + 128);
+        n = làm tròn xuống(n / 128);
+    };
+    bỏ kết quả = macho xuất byte(b, n);
+};
+hàm riêng tư macho xuất words(b, words) {
+    lặp(i = 0; i < máy ảo lấy độ dài(words); i += 1) { bỏ kết quả = macho xuất word(b, words[i]); };
+};
+hàm riêng tư macho xuất segment(b, tên, vm, vm dài, off, file dài, quyền, số phần) {
+    bỏ kết quả = macho xuất words(b, [25, 72 + 80 * số phần]);
+    bỏ kết quả = macho xuất tên(b, tên, 16);
+    nếu (tên == "__PAGEZERO") { bỏ kết quả = macho xuất dài(b, 0); bỏ kết quả = macho xuất dài(b, 0, 1); }
+    hoặc { bỏ kết quả = macho xuất dài(b, vm, 1); bỏ kết quả = macho xuất dài(b, vm dài); };
+    bỏ kết quả = macho xuất dài(b, off); bỏ kết quả = macho xuất dài(b, file dài);
+    bỏ kết quả = macho xuất words(b, [quyền, quyền, số phần, 0]);
+};
+hàm riêng tư macho xuất section(b, tên, đoạn, tại, dài, off, căn, cờ) {
+    bỏ kết quả = macho xuất tên(b, tên, 16); bỏ kết quả = macho xuất tên(b, đoạn, 16);
+    bỏ kết quả = macho xuất dài(b, tại, 1); bỏ kết quả = macho xuất dài(b, dài);
+    bỏ kết quả = macho xuất words(b, [off, căn, 0, 0, cờ, 0, 0, 0]);
+};
+hàm riêng tư macho xuất stubs(k, bind) {
+    b = [];
+    bỏ kết quả = macho xuất byte(bind, 17); bỏ kết quả = macho xuất byte(bind, 81);
+    names = k["imports"];
+    lặp(i = 0; i < máy ảo lấy độ dài(names); i += 1) {
+        tại = k["stub"] + i * 12;
+        đích = k["pointers"] + i * 8;
+        trang = làm tròn xuống(đích / 4096) - làm tròn xuống(tại / 4096);
+        bỏ kết quả = macho xuất cần(trang >= -1048576 && trang < 1048576, "stub ngoài phạm vi");
+        nếu (trang < 0) { trang += 2097152; };
+        bỏ kết quả = macho xuất words(b, [-1879048176 + trang % 4 * 536870912 + làm tròn xuống(trang / 4) * 32,
+            -113245680 + làm tròn xuống(đích % 4096 / 8) * 1024, -702610944]);
+        bỏ kết quả = macho xuất byte(bind, 64);
+        bỏ kết quả = macho xuất nối(bind, chuỗi thành byte máy ảo(names[i]));
+        bỏ kết quả = macho xuất byte(bind, 0);
+        bỏ kết quả = macho xuất byte(bind, 114);
+        bỏ kết quả = macho xuất uleb(bind, đích - k["data"]);
+        bỏ kết quả = macho xuất byte(bind, 144);
+    };
+    bỏ kết quả = macho xuất byte(bind, 0); bỏ kết quả = macho xuất đệm(bind, 8);
+    trả về b;
+};
+hàm riêng tư macho xuất đầu(k, linkedit, link dài, rebase dài, bind dài, số ký hiệu, dài chuỗi, ký tại, ký dài) {
+    b = [];
+    text end = k["stub"] + máy ảo lấy độ dài(k["imports"]) * 12;
+    cstring start = -1;
+    cstring end = 0;
+    sections = k["sections"];
+    lặp(i = 0; i < máy ảo lấy độ dài(sections); i += 1) {
+        s = sections[i];
+        nếu (s[2] == 1 && s[4] > 0) {
+            nếu (cstring start < 0) { cstring start = s[3]; };
+            cstring end = s[3] + s[4];
+        };
+    };
+    ntext = 1;
+    nếu (cstring start >= 0) { ntext = 2; };
+    bỏ kết quả = macho xuất segment(b, "__PAGEZERO", 0, 0, 0, 0, 0, 0);
+    bỏ kết quả = macho xuất segment(b, "__TEXT", 0, k["data"], 0, k["data"], 5, ntext);
+    bỏ kết quả = macho xuất section(b, "__text", "__TEXT", 16384, text end - 16384, 16384, 2, -2147482624);
+    nếu (ntext == 2) {
+        bỏ kết quả = macho xuất section(b, "__cstring", "__TEXT", cstring start, cstring end - cstring start, cstring start, 0, 2);
+    };
+    // Map the zero-initialized BSS as part of writable data for now. Its
+    // bytes are zero in the file; no relocation may target an unbacked slot.
+    bỏ kết quả = macho xuất segment(b, "__DATA", k["data"], linkedit - k["data"], k["data"], linkedit - k["data"], 3, 1);
+    bỏ kết quả = macho xuất section(b, "__data", "__DATA", k["data"], k["imageEnd"] - k["data"], k["data"], 3, 0);
+    bỏ kết quả = macho xuất segment(b, "__LINKEDIT", linkedit, macho xuất căn(link dài, 16384), linkedit, link dài, 1, 0);
+    bỏ kết quả = macho xuất words(b, [-2147483614, 48, linkedit, rebase dài, linkedit + rebase dài, bind dài, 0, 0, 0, 0, 0, 0]);
+    sym = linkedit + rebase dài + bind dài;
+    bỏ kết quả = macho xuất words(b, [2, 24, sym, số ký hiệu, sym + số ký hiệu * 16, dài chuỗi]);
+    bỏ kết quả = macho xuất words(b, [11, 80, 0, 0, 0, số ký hiệu, số ký hiệu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    bỏ kết quả = macho xuất words(b, [14, 32, 12]); bỏ kết quả = macho xuất tên(b, "/usr/lib/dyld", 20);
+    bỏ kết quả = macho xuất words(b, [50, 24, 1, 720896, 720896, 0]);
+    bỏ kết quả = macho xuất words(b, [-2147483608, 24]); bỏ kết quả = macho xuất dài(b, k["entry"]); bỏ kết quả = macho xuất dài(b, 0);
+    bỏ kết quả = macho xuất words(b, [12, 56, 24, 2, 88866816, 65536]); bỏ kết quả = macho xuất tên(b, "/usr/lib/libSystem.B.dylib", 32);
+    bỏ kết quả = macho xuất words(b, [29, 16, ký tại, ký dài]);
+    đầu = [];
+    bỏ kết quả = macho xuất words(đầu, [-17958193, 16777228, 0, 2, 12, máy ảo lấy độ dài(b), 2097285, 0]);
+    bỏ kết quả = macho xuất nối(đầu, b);
+    bỏ kết quả = macho xuất cần(máy ảo lấy độ dài(đầu) <= 16384, "load commands quá dài");
+    trả về đầu;
+};
+
+// Retain every external definition. The merged executable sections have
+// their own ordinals, independent of the original object section indices.
+hàm riêng tư macho xuất ký hiệu(đối tượng, k, sym, strings) {
+    có chuỗi = sai;
+    sections = k["sections"];
+    lặp(i = 0; i < máy ảo lấy độ dài(sections); i += 1) {
+        nếu (sections[i][2] == 1 && sections[i][4] > 0) { có chuỗi = đúng; };
+    };
+    bỏ kết quả = macho xuất byte(strings, 0);
+    lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i += 1) {
+        o = đối tượng[i];
+        lặp(j = 0; j < o.số ký hiệu(); j += 1) {
+            s = o.lấy ký hiệu(j);
+            nếu (s["type"] != 15) { bỏ qua; };
+            nhóm = k["positions"][i][s["section"] - 1][0];
+            ordinal = 1;
+            nếu (nhóm == 1) {
+                bỏ kết quả = macho xuất cần(có chuỗi, "ký hiệu cstring rỗng");
+                ordinal = 2;
+            } hoặc nếu (nhóm >= 2) {
+                ordinal = 2;
+                nếu (có chuỗi) { ordinal = 3; };
+            };
+            bỏ kết quả = macho xuất word(sym, máy ảo lấy độ dài(strings));
+            bỏ kết quả = macho xuất words(sym, [15 + ordinal * 256]);
+            bỏ kết quả = macho xuất dài(sym, k["symbols"][i][j][0], 1);
+            bỏ kết quả = macho xuất nối(strings, chuỗi thành byte máy ảo(o.tên ký hiệu(s["nameOffset"])));
+            bỏ kết quả = macho xuất byte(strings, 0);
+        };
+    };
+    bỏ kết quả = macho xuất đệm(strings, 8);
+};
+
+// Apple CodeDirectory/SuperBlob fields are big-endian, unlike Mach-O.
+hàm riêng tư macho ký word(b, x) {
+    little = [];
+    bỏ kết quả = macho xuất word(little, x);
+    lặp(i = 3; i >= 0; i -= 1) { bỏ kết quả = macho xuất byte(b, little[i]); };
+};
+hàm riêng tư macho ký words(b, words) {
+    lặp(i = 0; i < máy ảo lấy độ dài(words); i += 1) { bỏ kết quả = macho ký word(b, words[i]); };
+};
+
+// Borrow an owned native byte arena slot, never an unallocated raw address.
+// The native ABI byte records carry the handle and the payload offset is
+// fixed by môi trường thực thi.vi. No VM objects alias this scratch storage.
+hàm riêng tư macho ký trang(đường, giới hạn, b) {
+    h = byte mới();
+    bỏ kết quả = macho xuất cần(h > 0, "không thể cấp vùng băm");
+    fd = -1;
+    thử {
+        slot = h % 128;
+        bỏ kết quả = macho xuất cần(slot < 64 && máy đọc số nguyên ba mươi hai bit(16 + slot * 32) == h, "ABI vùng băm không hợp lệ");
+        địa chỉ = 4096 + slot * 2097168;
+        path = chuỗi thành byte máy ảo(đường);
+        n = máy ảo lấy độ dài(path);
+        bỏ kết quả = macho xuất cần(n > 0 && n < 4096, "đường ký quá dài");
+        lặp(i = 0; i < n; i += 1) {
+            bỏ kết quả = macho xuất cần(path[i] != 0 && máy ghi byte(địa chỉ + i, path[i]) == 0, "đường ký không hợp lệ");
+        };
+        bỏ kết quả = macho xuất cần(máy ghi byte(địa chỉ + n, 0) == 0, "kết thúc đường ký");
+        fd = máy mở(địa chỉ, 0);
+        bỏ kết quả = macho xuất cần(fd >= 0, "không thể đọc tệp ký");
+        pos = 0;
+        khi (pos < giới hạn) {
+            n = giới hạn - pos;
+            nếu (n > 16384) { n = 16384; };
+            done = 0;
+            khi (done < n) {
+                got = máy đọc(fd, địa chỉ + done, n - done);
+                nếu (got < 0 && máy lỗi() == 4) { bỏ qua; };
+                bỏ kết quả = macho xuất cần(got > 0 && got <= n - done, "đọc trang ký thất bại");
+                done += got;
+            };
+            bỏ kết quả = macho xuất cần(máy sha bắt đầu() == 0, "khởi tạo SHA-256");
+            bỏ kết quả = macho xuất cần(máy sha nạp(địa chỉ, n) == 0, "băm trang ký");
+            bỏ kết quả = macho xuất cần(máy sha kết(địa chỉ + 16384) == 0, "kết SHA-256");
+            lặp(i = 0; i < 32; i += 1) { bỏ kết quả = macho xuất byte(b, máy đọc byte(địa chỉ + 16384 + i)); };
+            pos += n;
+        };
+        status = máy đóng(fd); fd = -1;
+        bỏ kết quả = macho xuất cần(status == 0, "đóng tệp ký");
+        bỏ kết quả = byte hủy(h);
+    } bắt lỗi(e) {
+        nếu (fd >= 0) { bỏ kết quả = máy đóng(fd); };
+        bỏ kết quả = byte hủy(h);
+        ném e;
+    };
+};
+
+hàm riêng tư macho ký executable(đường, giới hạn, ký dài, text dài) {
+    pages = làm tròn xuống((giới hạn - 1) / 16384) + 1;
+    // CodeDirectory v0x20400, SHA-256, CS_ADHOC, 16 KiB pages,
+    // no entitlements or special slots, executable segment is __TEXT.
+    cd dài = 103 + pages * 32;
+    b = [];
+    bỏ kết quả = macho ký words(b, [-86111040, 20 + cd dài, 1, 0, 20]);
+    bỏ kết quả = macho ký words(b, [-86111230, cd dài, 132096, 2, 103, 88, 0, pages, giới hạn]);
+    bỏ kết quả = macho xuất nối(b, [32, 2, 0, 14]);
+    bỏ kết quả = macho ký words(b, [0, 0, 0, 0, 0, 0, 0, 0, 0, text dài, 0, 1]);
+    bỏ kết quả = macho xuất tên(b, "org.vpp.native", 15);
+    bỏ kết quả = macho ký trang(đường, giới hạn, b);
+    bỏ kết quả = macho xuất đệm(b, 16);
+    bỏ kết quả = macho xuất cần(máy ảo lấy độ dài(b) == ký dài, "kích thước chữ ký sai");
+    t = Bộ Đệm Tệp(đường, "nối", 4096, "ký Mach-O");
+    thử {
+        bỏ kết quả = t.ghi các byte(b);
+        bỏ kết quả = t.đóng();
+    } bắt lỗi(e) {
+        thử { bỏ kết quả = t.đóng(); } bắt lỗi(lỗi đóng) {};
+        ném e;
+    };
+};
+
+// Finalize load commands before hashing; append the signature only after
+// closing the writer so the page hashes cover the final mapped contents.
+hàm công khai macho xuất executable(đối tượng, cho phép, đường tạm) {
+    k = macho lập kế hoạch(đối tượng, cho phép);
+    // Keep a nonempty writable mapping even for a freestanding program.
+    hết = k["imageEnd"];
+    nếu (hết == k["data"]) { hết += 1; };
+    linkedit = macho xuất căn(hết, 16384);
+    bind = [];
+    stubs = macho xuất stubs(k, bind);
+    rebase = [17];
+    t = Bộ Đệm Tệp(đường tạm, "ghi", 4096, "xuất Mach-O");
+    thử {
+        sections = k["sections"];
+        lặp(i = 0; i < máy ảo lấy độ dài(sections); i += 1) {
+            s = sections[i];
+            nếu (s[2] == 3) { bỏ qua; };
+            o = đối tượng[s[0]];
+            mô tả = o.lấy phần(s[1]);
+            patches = macho bản vá phần(o, s[1], k["positions"][s[0]][s[1]], k["symbols"][s[0]]);
+            // Bucket by absolute image page. Relocations can arrive in any
+            // order; preserve that order in the dyld rebase stream.
+            buckets = {};
+            lặp(j = 0; j < máy ảo lấy độ dài(patches); j += 1) {
+                patch = patches[j];
+                nếu (patch[2] != 0) {
+                    bỏ kết quả = macho xuất byte(rebase, 34);
+                    bỏ kết quả = macho xuất uleb(rebase, patch[0] - k["data"]);
+                    bỏ kết quả = macho xuất byte(rebase, 81);
+                };
+                page = patch[0] - patch[0] % 4096;
+                nếu (!máy ảo có khóa từ điển(buckets, page)) { buckets[page] = []; };
+                bỏ kết quả = máy ảo thêm cuối danh sách(buckets[page], patch);
+            };
+            // Absolute page boundaries cannot split aligned 4/8-byte
+            // relocations, even when a section itself starts mid-page.
+            bỏ kết quả = t.dịch(s[3]);
+            p = 0;
+            khi (p < s[4]) {
+                tại = s[3] + p;
+                page = tại - tại % 4096;
+                n = s[4] - p;
+                còn = 4096 - tại % 4096;
+                nếu (n > còn) { n = còn; };
+                block = o.đọc khối riêng(mô tả["offset"] + p, n);
+                nếu (máy ảo có khóa từ điển(buckets, page)) {
+                    batch = buckets[page];
+                    lặp(j = 0; j < máy ảo lấy độ dài(batch); j += 1) {
+                        record = batch[j];
+                        lệch = record[0] - tại;
+                        rộng = 4;
+                        nếu (record[2] != 0) { rộng = 8; };
+                        bỏ kết quả = macho xuất cần(lệch >= 0 && rộng <= n - lệch, "bản vá ngoài khối");
+                        bỏ kết quả = macho xuất word tại(block, lệch, record[1]);
+                        nếu (rộng == 8) { bỏ kết quả = macho xuất word tại(block, lệch + 4, record[2]); };
+                    };
+                };
+                bỏ kết quả = t.ghi khối trực tiếp(block);
+                p += n;
+            };
+        };
+        bỏ kết quả = t.dịch(k["stub"]);
+        bỏ kết quả = t.ghi các byte(stubs);
+        bỏ kết quả = macho xuất byte(rebase, 0); bỏ kết quả = macho xuất đệm(rebase, 8);
+        bỏ kết quả = t.dịch(linkedit);
+        bỏ kết quả = t.ghi các byte(rebase);
+        bỏ kết quả = t.ghi các byte(bind);
+        sym = [];
+        strings = [];
+        bỏ kết quả = macho xuất ký hiệu(đối tượng, k, sym, strings);
+        bỏ kết quả = t.ghi các byte(sym);
+        bỏ kết quả = t.ghi các byte(strings);
+        sym dài = máy ảo lấy độ dài(sym);
+        strings dài = máy ảo lấy độ dài(strings);
+        unsigned end = linkedit + máy ảo lấy độ dài(rebase) + máy ảo lấy độ dài(bind) + sym dài + strings dài;
+        ký tại = macho xuất căn(unsigned end, 16);
+        pages = làm tròn xuống((ký tại - 1) / 16384) + 1;
+        ký dài = macho xuất căn(123 + pages * 32, 16);
+        lặp(i = unsigned end; i < ký tại; i += 1) { bỏ kết quả = t.ghi các byte([0]); };
+        đầu = macho xuất đầu(k, linkedit, ký tại + ký dài - linkedit,
+            máy ảo lấy độ dài(rebase), máy ảo lấy độ dài(bind), sym dài / 16, strings dài, ký tại, ký dài);
+        bỏ kết quả = t.dịch(0);
+        bỏ kết quả = t.ghi các byte(đầu);
+        bỏ kết quả = t.đóng();
+    } bắt lỗi(e) {
+        thử { bỏ kết quả = t.đóng(); } bắt lỗi(lỗi đóng) {};
+        ném e;
+    };
+    bỏ kết quả = macho ký executable(đường tạm, ký tại, ký dài, k["data"]);
+    trả về k;
+};
+
+
+// Link object paths into a private staging file. The CLI owns its temporary
+// directory and handles permission changes and atomic publication.
+hàm công khai macho xuất từ tệp(paths, đường tạm) {
+    objects = [];
+    thử {
+        lặp(i = 0; i < máy ảo lấy độ dài(paths); i += 1) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(objects, Đối Tượng MachO(paths[i]));
+        };
+        bỏ kết quả = macho xuất executable(objects, macho xuất danh sách nhập(), đường tạm);
+        lặp(i = 0; i < máy ảo lấy độ dài(objects); i += 1) { bỏ kết quả = objects[i].đóng(); };
+    } bắt lỗi(e) {
+        lặp(i = 0; i < máy ảo lấy độ dài(objects); i += 1) { thử { bỏ kết quả = objects[i].đóng(); } bắt lỗi(lỗi đóng) {}; };
+        ném e;
+    };
+};

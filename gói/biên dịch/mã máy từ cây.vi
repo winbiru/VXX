@@ -5,8 +5,8 @@ nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thu�
 nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
 nhập gói.biên dịch.chương trình.*;
 nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
-nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
-nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh asm;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh byte;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
 nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
@@ -441,8 +441,7 @@ lớp công khai Bộ Hạ Cây {
         mình.chuẩn hóa ABI(biểu diễn trung gian);
         tên = mình.mã hóa tên ABI(tên hàm);
         máy = biên dịch máy hạ IR(biểu diễn trung gian, tên);
-        trả về biên dịch lắp ráp đầu(hệ điều hành, tên) +
-            biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, sai);
+        trả về biên dịch i32 sinh asm(máy, tên, kiến trúc, hệ điều hành);
     };
 
     // Pipeline độc lập: nguồn .vi -> AST -> IR -> Machine IR -> ISA bytes.
@@ -453,7 +452,7 @@ lớp công khai Bộ Hạ Cây {
         biểu diễn trung gian = mình.tạo IR(mã nguồn);
         mình.chuẩn hóa ABI(biểu diễn trung gian);
         máy = biên dịch máy hạ IR(biểu diễn trung gian, mình.mã hóa tên ABI(tên hàm));
-        phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+        phát = biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành);
         trả về {"ir": biểu diễn trung gian, "machine": máy, "bytes": phát["bytes"],
                 "relocations": phát["relocations"]};
     };
@@ -497,7 +496,7 @@ lớp công khai Bộ Hạ Cây {
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             tên hàm = các hàm[i]["name"];
             máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
-            phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+            phát = biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành);
             đối tượng = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
                 phát["bytes"], tên hàm, phát["relocations"]);
             máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm, "machine": máy,

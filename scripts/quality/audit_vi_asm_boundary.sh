@@ -43,8 +43,8 @@ foreign_libraries=$(count_matches '^[[:space:]]*ngoại thư viện ')
 printf 'V++ foreign library declarations: %s\n' "$foreign_libraries"
 printf 'V++ foreign function declarations: %s (before identity migration: 51)\n' "$foreign_functions"
 
-# The standard library no longer declares FFI; legacy native adapters remain
-# for compatibility and OS services until replaced by audited low-level ABI.
+# The standard library no longer declares FFI. OS services cross the
+# machine primitive / assembly boundary.
 test "$foreign_functions" -eq 0 || {
     echo 'FAIL: V++ foreign function declarations reintroduced' >&2
     exit 1
@@ -86,9 +86,8 @@ require_call "$dns_module" 'máy đầu nối kết nối('
 require_call "$dns_module" 'phân giải tên miền đọc phản hồi đầy đủ('
 # Numeric IPv4/IPv6 literals should be parsed in V++ before invoking the
 # compatibility OS name resolver. Connect deadline uses the machine clock.
-if ! has_call "$socket_module" 'đầu nối địa chỉ mạng các byte(tên máy)' ||
-   ! grep -q 'machineMonotonicMilliseconds' "$root/src/runtime/socket_machine.cpp"; then
-    echo 'FAIL: socket literal or monotonic machine boundary missing' >&2
+if ! has_call "$socket_module" 'đầu nối địa chỉ mạng các byte(tên máy)'; then
+    echo 'FAIL: socket literal machine boundary missing' >&2
     exit 1
 fi
 if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$ip_module" "$hosts_module"; then
@@ -189,14 +188,39 @@ for identity in 'mã tiến trình' 'mã tiến trình cha' 'mã người dùng'
     require_call "$module" "máy tiến trình ${identity}()"
 done
 
-cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) | wc -l | tr -d '[:space:]')
-ffi_symbols=$(grep -E -o 'ffi_call|dlopen|dlsym' "$root/src/runtime/foreign.cpp" | wc -l | tr -d '[:space:]')
+# Check all nonignored repository sources, including untracked new files.
+# The C comparison workload is an isolated benchmark reference, never a
+# production dependency. Deleted tracked paths and ignored historical build
+# artifacts do not participate in this audit.
+if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    python3 - "$root" <<'PY'
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+paths = subprocess.check_output(
+    ['git', '-C', str(root), 'ls-files', '-co', '--exclude-standard', '-z']
+).split(b'\0')
+suffixes = ('.c', '.cc', '.cpp', '.cxx', '.c++', '.h', '.hh', '.hpp',
+            '.hxx', '.h.in', '.hpp.in', '.mm')
+forbidden = sorted({p for raw in paths if (p := os.fsdecode(raw))
+                    and p != 'benchmark/languages/workloads.c'
+                    and p.lower().endswith(suffixes) and (root / p).is_file()})
+print(f'Remaining production C/C++ source and header files: {len(forbidden)}')
+if forbidden:
+    print('\n'.join(forbidden), file=sys.stderr)
+    sys.exit(1)
+PY
+fi
+cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.h' -o -name '*.hpp' -o -name '*.hxx' -o -name '*.hh' \) | wc -l | tr -d '[:space:]')
 asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.s' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
 printf 'Remaining C/C++ source files in src/: %s\n' "$cpp_sources"
-printf 'foreign.cpp references to ffi_call/dlopen/dlsym: %s\n' "$ffi_symbols"
+test "$cpp_sources" -eq 0 || { echo "FAIL: legacy native sources present" >&2; exit 1; }
 printf 'ASM call instructions requiring boundary review: %s\n' "$asm_calls"
 
-binary=${VPP_AUDIT_BINARY:-"$root/build/bin/vpp-cli"}
+binary=${VPP_AUDIT_BINARY:-"$root/build-pure-vpp/bin/vpp-native"}
 if test -f "$binary"; then
     printf 'Dynamic dependencies of %s:\n' "$binary"
     if command -v otool >/dev/null 2>&1; then

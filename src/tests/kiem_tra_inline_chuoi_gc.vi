@@ -1,5 +1,7 @@
 // Ép GC chạy giữa các phép nối chuỗi, giữ chuỗi ngắn và bảng UTF-8 còn sống.
 nhập gói.chuẩn.chính.*;
+nhập gói.bộ sưu tập.danh sách.xóa tại;
+nhập gói.bộ sưu tập.từ điển.xóa khóa;
 
 hàm chính() {
     giữ = [];
@@ -12,6 +14,22 @@ hàm chính() {
     unicode = "a𠮷Việt🌿";
     thêm(giữ, có nul);
     thêm(giữ, unicode);
+
+    // Dịch các tham chiếu chồng lấp ở cả hai hướng trước khi GC chạy.
+    danh sách = [];
+    cùng danh sách = danh sách;
+    chung = [unicode, 41];
+    bảng = {};
+    lặp(i = 127; i >= 0; i--) {
+        thêm(danh sách, [i, chung]);
+        bảng["khóa:" + thành chuỗi(i)] = [i, chung];
+    };
+    lặp(i = 0; i < 32; i++) {
+        đã xóa = xóa tại(danh sách, 0);
+        nếu (đã xóa[0] != 127 - i) { ném "list shift"; };
+        xóa khóa(bảng, "khóa:" + thành chuỗi(i));
+    };
+    chung[1] = 42;
 
     // Chạm ngưỡng GC nhiều lần; các chuỗi trong danh sách vẫn phải nguyên vẹn.
     lặp(i = 0; i < 30000; i++) {
@@ -31,5 +49,15 @@ hàm chính() {
     nếu (máy ảo lấy độ dài(các byte nul) != 3 || các byte nul[0] != 65 ||
         các byte nul[1] != 0 || các byte nul[2] != 66) { hợp lệ = sai; };
     nếu (giữ[35] != "a𠮷Việt🌿") { hợp lệ = sai; };
+    nếu (độ dài(cùng danh sách) != 96 || độ dài(máy ảo liệt kê khóa từ điển(bảng)) != 96) { hợp lệ = sai; };
+    lặp(i = 0; i < 32; i++) {
+        nếu (máy ảo có khóa từ điển(bảng, "khóa:" + thành chuỗi(i))) { hợp lệ = sai; };
+    };
+    lặp(i = 0; i < 96; i++) {
+        mục = cùng danh sách[i];
+        nếu (mục[0] != 95 - i || mục[1][0] != unicode || mục[1][1] != 42) { hợp lệ = sai; };
+        mục = bảng["khóa:" + thành chuỗi(i + 32)];
+        nếu (mục[0] != i + 32 || mục[1][0] != unicode || mục[1][1] != 42) { hợp lệ = sai; };
+    };
     in hợp lệ;
 };

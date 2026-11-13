@@ -54,6 +54,23 @@ vpp_native_os_close:
     addq $8, %rsp
     ret
 
+// Signed i32 position; retain the complete syscall result until checked.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    movslq %esi, %rsi
+    subq $8, %rsp
+    call vpp_sys_lseek
+    cmpq $-4095, %rax
+    jb 1f
+    call .Lchuan_hoa_goi_he_thong
+    jmp 2f
+1:  cmpq $2147483647, %rax
+    jle 2f
+    movl $75, vpp_linux_errno(%rip)
+    movl $-1, %eax
+2:  addq $8, %rsp
+    ret
+
 // struct stat nhân Linux x86-64: st_dev@0, st_ino@8, st_mode@24. V++ đọc đầu Darwin: dev 32 bit@0,
 // mode@4, inode 64 bit@8. Đọc vào vùng tạm riêng rồi đổi đầu bản ghi để giữ nguyên dữ liệu nhân.
 .macro VPP_STAT ten, theo_lien_ket, mo_ta

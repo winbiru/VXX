@@ -139,3 +139,116 @@ vpp_native_memory_bind:
     movl $-1, %eax
     VPP_TRA_BO_NHO
 
+
+// Checked memmove semantics, with SSE2 vector blocks.
+.globl vpp_native_memory_copy
+vpp_native_memory_copy:
+    VPP_VAO_BO_NHO
+    movl %edi, %r9d
+    movl %esi, %r10d
+    movl %edx, %r8d
+    testl %r8d, %r8d
+    js .Lbo_nho_khong_hop_le
+    movl $VPP_LINUX_ARENA_SIZE, %eax
+    subl %r8d, %eax
+    jc .Lbo_nho_khong_hop_le
+    cmpl %eax, %r9d
+    ja .Lbo_nho_khong_hop_le
+    cmpl %eax, %r10d
+    ja .Lbo_nho_khong_hop_le
+    testl %r8d, %r8d
+    jz Lbulk_copy_done
+    cmpl %r10d, %r9d
+    je Lbulk_copy_done
+    jb Lbulk_copy_forward_prepare
+    movl %r9d, %eax
+    subl %r10d, %eax
+    cmpl %r8d, %eax
+    jae Lbulk_copy_forward_prepare
+    leaq (%r11,%r9), %r9
+    leaq (%r11,%r10), %r10
+    addq %r8, %r9
+    addq %r8, %r10
+Lbulk_copy_backward:
+    cmpl $16, %r8d
+    jb Lbulk_copy_backward_tail
+    subq $16, %r10
+    subq $16, %r9
+    movdqu (%r10), %xmm0
+    movdqu %xmm0, (%r9)
+    subl $16, %r8d
+    jmp Lbulk_copy_backward
+Lbulk_copy_backward_tail:
+    testl %r8d, %r8d
+    jz Lbulk_copy_done
+    decq %r10
+    decq %r9
+    movb (%r10), %al
+    movb %al, (%r9)
+    decl %r8d
+    jmp Lbulk_copy_backward_tail
+Lbulk_copy_forward_prepare:
+    leaq (%r11,%r9), %r9
+    leaq (%r11,%r10), %r10
+Lbulk_copy_forward:
+    cmpl $16, %r8d
+    jb Lbulk_copy_forward_tail
+    movdqu (%r10), %xmm0
+    movdqu %xmm0, (%r9)
+    addq $16, %r10
+    addq $16, %r9
+    subl $16, %r8d
+    jmp Lbulk_copy_forward
+Lbulk_copy_forward_tail:
+    testl %r8d, %r8d
+    jz Lbulk_copy_done
+    movb (%r10), %al
+    movb %al, (%r9)
+    incq %r10
+    incq %r9
+    decl %r8d
+    jmp Lbulk_copy_forward_tail
+Lbulk_copy_done:
+    xorl %eax, %eax
+    VPP_TRA_BO_NHO
+
+.globl vpp_native_memory_ascii_prefix
+vpp_native_memory_ascii_prefix:
+    VPP_VAO_BO_NHO
+    movl %edi, %r9d
+    movl %esi, %r8d
+    testl %r8d, %r8d
+    js .Lbo_nho_khong_hop_le
+    movl $VPP_LINUX_ARENA_SIZE, %eax
+    subl %r8d, %eax
+    jc .Lbo_nho_khong_hop_le
+    cmpl %eax, %r9d
+    ja .Lbo_nho_khong_hop_le
+    leaq (%r11,%r9), %r9
+    xorl %eax, %eax
+Lbulk_ascii_vector:
+    cmpl $16, %r8d
+    jb Lbulk_ascii_tail
+    movdqu (%r9), %xmm0
+    pmovmskb %xmm0, %ecx
+    testl %ecx, %ecx
+    jnz Lbulk_ascii_hit
+    addq $16, %r9
+    addl $16, %eax
+    subl $16, %r8d
+    jmp Lbulk_ascii_vector
+Lbulk_ascii_hit:
+    bsfl %ecx, %ecx
+    addl %ecx, %eax
+    jmp Lbulk_ascii_done
+Lbulk_ascii_tail:
+    testl %r8d, %r8d
+    jz Lbulk_ascii_done
+    cmpb $0, (%r9)
+    js Lbulk_ascii_done
+    incq %r9
+    incl %eax
+    decl %r8d
+    jmp Lbulk_ascii_tail
+Lbulk_ascii_done:
+    VPP_TRA_BO_NHO

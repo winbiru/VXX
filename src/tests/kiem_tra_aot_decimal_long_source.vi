@@ -1,0 +1,80 @@
+nhập gói.chuẩn.chính.*;
+hàm cp26 quét số(các byte, vị trí, n, chữ số, giá trị âm, trong i32, chữ số cuối) {
+    khi (vị trí < n) {
+        chữ số = các byte[vị trí];
+        nếu (chữ số < 48 || chữ số > 57) { thoát; };
+        chữ số = chữ số - 48;
+        nếu (giá trị âm < -214748364 || (giá trị âm == -214748364 && chữ số > chữ số cuối)) {
+            trong i32 = sai;
+            thoát;
+        };
+        giá trị âm = giá trị âm * 10 - chữ số;
+        vị trí += 1;
+    };
+    trả về [vị trí,chữ số,giá trị âm,trong i32];
+};
+hàm cp26 kiểm tra(a, i, n, d, tổng, cờ, cuối, e) {
+    r = cp26 quét số(a,i,n,d,tổng,cờ,cuối);
+    lặp(j = 0; j < 4; j++) { nếu (r[j] != e[j]) { ném "CP26 sai kết quả"; }; };
+};
+hàm cp26 heap(các byte, vị trí, n, chữ số, giá trị âm, trong i32, chữ số cuối) {
+    đọc = hàm() { trả về [vị trí,chữ số,giá trị âm,trong i32]; };
+    khi (vị trí < n) {
+        chữ số = các byte[vị trí];
+        nếu (chữ số < 48 || chữ số > 57) { thoát; };
+        chữ số = chữ số - 48;
+        nếu (giá trị âm < -214748364 || (giá trị âm == -214748364 && chữ số > chữ số cuối)) {
+            trong i32 = sai;
+            thoát;
+        };
+        giá trị âm = giá trị âm * 10 - chữ số;
+        vị trí += 1;
+    };
+    trả về đọc;
+};
+biến vị trí chung = 0;
+hàm cp26 global(các byte, n, chữ số, giá trị âm, trong i32, chữ số cuối) {
+    khi (vị trí chung < n) {
+        chữ số = các byte[vị trí chung];
+        nếu (chữ số < 48 || chữ số > 57) { thoát; };
+        chữ số = chữ số - 48;
+        nếu (giá trị âm < -214748364 || (giá trị âm == -214748364 && chữ số > chữ số cuối)) {
+            trong i32 = sai;
+            thoát;
+        };
+        giá trị âm = giá trị âm * 10 - chữ số;
+        vị trí chung += 1;
+    };
+    trả về [vị trí chung,chữ số,giá trị âm,trong i32];
+};
+hàm chính() {
+    cp26 kiểm tra(máy ảo xem byte chuỗi("2147483648!"),0,11,0,0,1,7,[9,8,-214748364,0]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("2147483648!"),0,11,0,0,1,8,[10,33,-2147483647-1,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("2147483647"),0,10,0,0,1,7,[10,7,-2147483647,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("2147483649"),0,10,0,0,1,8,[9,9,-214748364,0]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("x"),0,1,99,0,1,7,[0,120,0,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("x"),1,1,99,0,0,7,[1,99,0,0]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("a0012z"),1,6,99,0,1,7,[5,122,-12,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("34"),0,2,99,-12,0,7,[2,4,-1234,0]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("4"),0,1,99,2,1,7,[1,4,16,1]);
+    cp26 kiểm tra([49,50,120],0,3,99,0,1,7,[2,120,-12,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("0"),0,1,99,-214748365,1,7,[0,0,-214748365,0]);
+    dài = "";
+    lặp(j = 0; j < 128; j++) { dài += "0"; };
+    cp26 kiểm tra(máy ảo xem byte chuỗi(dài+"9!"),0,130,99,0,1,7,[129,33,-9,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("12!"),0,3.0,99,0,1,7,[2,33,-12,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("12!"),0,3,99,0,1,9,[2,33,-12,1]);
+    đọc = cp26 heap(máy ảo xem byte chuỗi("2147483648!"),0,11,99,0,1,7);
+    r = đọc();
+    nếu (r[0] != 9 || r[1] != 8 || r[2] != -214748364 || r[3] != 0) { ném "heap mismatch"; };
+    r = cp26 global(máy ảo xem byte chuỗi("12!"),3,99,0,1,7);
+    nếu (r[0] != 2 || r[1] != 33 || r[2] != -12 || r[3] != 1 || vị trí chung != 2) { ném "global mismatch"; };
+    đuôi = "";
+    lặp(j = 0; j < 4200; j++) { đuôi += "0"; };
+    cp26 kiểm tra(máy ảo xem byte chuỗi("123!"+đuôi),0,4204,99,0,1,7,[3,33,-123,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi("2147483648!"+đuôi),0,4211,99,0,1,7,[9,8,-214748364,0]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi(đuôi+"9!"),0,4202,99,0,1,7,[4201,33,-9,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi(đuôi),0,4096,99,0,1,7,[4096,0,0,1]);
+    cp26 kiểm tra(máy ảo xem byte chuỗi(đuôi),0,4097,99,0,1,7,[4097,0,0,1]);
+    in "decimal scan long source: PASS";
+};

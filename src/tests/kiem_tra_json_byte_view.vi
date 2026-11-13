@@ -1,0 +1,16 @@
+nhập gói.chuẩn.chính.*;
+nhập gói.dữ liệu.json.json.*;
+hàm chính() {
+    v = máy ảo xem byte chuỗi("A");
+    b = bộ([65]);
+    in thành chuỗi(v) == thành chuỗi(b);
+    in json tạo(v) == json tạo(b);
+    alias = v;
+    in máy ảo băm định danh(alias) == máy ảo băm định danh(v);
+    in máy ảo băm định danh(v) != máy ảo băm định danh(b);
+    in máy ảo kiểm tra utf8(chuỗi từ byte máy ảo([0]));
+    prefix = "0123456789abcdef0123456789abcdef";
+    in máy ảo kiểm tra utf8(prefix + "🚀" + prefix);
+    in !máy ảo kiểm tra utf8(prefix + chuỗi từ byte máy ảo([237,160,128]));
+    in !máy ảo kiểm tra utf8(prefix + chuỗi từ byte máy ảo([240,159,154]));
+};

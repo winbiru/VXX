@@ -35,16 +35,20 @@ hàm test_bad_ir() {
     byte làm rỗng(ir);
     byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, -2147483648);
     byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
-    nếu (sinh mã phát(ir, code) != 28) { trả về 19; };
+    nếu (sinh mã phát(ir, code) != 24) { trả về 19; };
     nếu (byte đọc số nguyên ba mươi hai bit(code, 4) != 1384120329) { trả về 19; };
     nếu (byte đọc số nguyên ba mươi hai bit(code, 8) != 1924136969) { trả về 19; }; // clang: 0x72b00009
-    nếu (sinh mã phát(ir, code) != 28) { trả về 19; }; // đặt lại populated output
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 12) != 705233888) { trả về 19; }; // MOV W0,W9
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 20) != -698416192) { trả về 19; }; // RET
+    nếu (sinh mã phát(ir, code) != 24) { trả về 19; }; // đặt lại populated output
     byte làm rỗng(ir);
     byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 2147483647);
     byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
-    nếu (sinh mã phát(ir, code) != 28) { trả về 20; };
+    nếu (sinh mã phát(ir, code) != 24) { trả về 20; };
     nếu (byte đọc số nguyên ba mươi hai bit(code, 4) != 1386217449) { trả về 20; };
     nếu (byte đọc số nguyên ba mươi hai bit(code, 8) != 1924136937) { trả về 20; }; // clang: 0x72afffe9
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 12) != 705233888) { trả về 20; }; // MOV W0,W9
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 20) != -698416192) { trả về 20; }; // RET
     // RET must reject unconsumed evaluation operands without emitting code.
     byte làm rỗng(ir);
     lặp (i = 0; i < 1001; i++) {
@@ -94,6 +98,30 @@ hàm test_bad_ir() {
     byte đẩy số nguyên ba mươi hai bit(ir, 35); byte đẩy số nguyên ba mươi hai bit(ir, 1);
     byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
     nếu (sinh mã phát(ir, code) != -1) { trả về 36; };
+    // Forward constant -> local, right operand -> SUB, and result -> return.
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 45);
+    byte đẩy số nguyên ba mươi hai bit(ir, 3); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 2); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 7);
+    byte đẩy số nguyên ba mươi hai bit(ir, 5); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != 48) { trả về 37; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 8) != -1191181335) { trả về 37; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 24) != 705233898) { trả về 37; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 32) != 1258946857) { trả về 37; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 36) != 705233888) { trả về 37; };
+    // A branch enters RET directly: the preceding NEG must spill W9.
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 41);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 9); byte đẩy số nguyên ba mươi hai bit(ir, 32);
+    byte đẩy số nguyên ba mươi hai bit(ir, 8); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != 52) { trả về 38; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 36) != -1191181335) { trả về 38; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 40) != -1186987040) { trả về 38; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 24) != 872415369) { trả về 38; }; // CBZ W9,+16
     nếu (byte hủy(ir) != 0) { trả về 18; };
     nếu (byte hủy(code) != 0) { trả về 18; };
     trả về 0;

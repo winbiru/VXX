@@ -44,6 +44,24 @@ _vpp_native_os_open:
 .globl _vpp_native_os_close
 _vpp_native_os_close:
     b _close
+// Signed i32 offset; do not truncate a successful 64-bit OS position.
+// On EOVERFLOW the underlying file cursor may already have moved.
+.globl _vpp_native_os_seek
+_vpp_native_os_seek:
+    str x30, [sp, #-16]!
+    sxtw x1, w1
+    bl _lseek
+    cmp x0, #0
+    b.lt 1f
+    lsr x9, x0, #31
+    cbz x9, 1f
+    bl ___error
+    mov w9, #84
+    str w9, [x0]
+    mov w0, #-1
+1:
+    ldr x30, [sp], #16
+    ret
 .globl _vpp_native_os_errno
 _vpp_native_os_errno:
     str x30, [sp, #-16]!

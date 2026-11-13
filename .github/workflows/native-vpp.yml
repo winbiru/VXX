@@ -1,0 +1,246 @@
+name: V++ native CI
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  macos-full:
+    name: macOS ARM64 - full compiler
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build-pure-vpp
+      - run: cmake --build build-pure-vpp --parallel
+      - run: ctest --test-dir build-pure-vpp --output-on-failure
+      - name: Check i32 relative module paths
+        run: |
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
+          build-pure-vpp/bin/vpp-i32 check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
+          build-pure-vpp/bin/vpp-i32 check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+      - run: cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
+      - run: '"$RUNNER_TEMP/vpp-install/bin/vpp" --version'
+      - name: Package and execute an installed native program
+        run: |
+          COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/vpp-install" -czf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz" .
+          mkdir -p "$RUNNER_TEMP/vpp-extracted"
+          tar -C "$RUNNER_TEMP/vpp-extracted" -xzf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz"
+          printf 'hàm chính() { in 42; }\n' > "$RUNNER_TEMP/probe.vi"
+          result=$("$RUNNER_TEMP/vpp-extracted/bin/vpp" run "$RUNNER_TEMP/probe.vi")
+          test "$result" = 42
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/vpp-macos-arm64.tar.gz
+          if-no-files-found: error
+      - name: Emit full Linux compiler assembly from V++
+        run: |
+          probe="$RUNNER_TEMP/probe.vi"
+          build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu "$probe" -o "$RUNNER_TEMP/linux-probe.S"
+          clang -target x86_64-unknown-linux-gnu -DVPP_AOT_VPP_RUNTIME=1 \
+            -I scripts/ASM -I scripts/ASM/common -c "$RUNNER_TEMP/linux-probe.S" -o "$RUNNER_TEMP/linux-probe.o"
+          before=$(shasum -a 256 "$probe")
+          if build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu "$probe" -o "$probe"; then
+            echo 'Cross emitter overwrote its input'; exit 1
+          fi
+          test "$before" = "$(shasum -a 256 "$probe")"
+          build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu \
+            "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$RUNNER_TEMP/linux-full-compiler.S"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-full-compiler-assembly
+          path: ${{ runner.temp }}/linux-full-compiler.S
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-test-logs
+          path: build-pure-vpp/Testing/Temporary/
+          if-no-files-found: ignore
+  linux-i32:
+    name: Linux x86-64 - i32 source bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify seed
+        run: |
+          (cd bootstrap/linux-x86_64 && sha256sum -c SHA256SUMS)
+          bash scripts/quality/audit_linux_static_elf.sh bootstrap/linux-x86_64/vpp-i32
+      - name: Build assembler, host and compiler from source
+        run: bash scripts/quality/check_linux_source_bootstrap.sh "$GITHUB_WORKSPACE/bootstrap/linux-x86_64/vpp-i32" "$RUNNER_TEMP/linux-bootstrap"
+      - name: Package and test the Linux i32 distribution
+        run: |
+          package="$RUNNER_TEMP/linux-package"
+          mkdir -p "$package/bin" "$package/scripts/ASM/linux"
+          cp -R "$RUNNER_TEMP/linux-bootstrap/source/gói" "$package/"
+          install -m 755 "$RUNNER_TEMP/linux-bootstrap/selfhost/vpp-native-stage2" "$package/bin/vpp-i32"
+          install -m 644 "$RUNNER_TEMP/linux-bootstrap/host-stage2.o" "$package/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o"
+          tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-i32.tar.gz" .
+          extracted="$RUNNER_TEMP/linux-extracted"
+          mkdir -p "$extracted"
+          tar -C "$extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-i32.tar.gz"
+          export VPP_HOME="$extracted" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          printf 'hàm chính() { trả về 42; };\n' > "$RUNNER_TEMP/probe.vi"
+          "$extracted/bin/vpp-i32" build "$RUNNER_TEMP/probe.vi" -o "$RUNNER_TEMP/linux-probe"
+          status=0
+          "$RUNNER_TEMP/linux-probe" || status=$?
+          test "$status" -eq 42
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-i32-selfhost
+          path: ${{ runner.temp }}/vpp-linux-x86_64-i32.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-bootstrap-logs
+          path: ${{ runner.temp }}/linux-bootstrap/**/*.log
+          if-no-files-found: ignore
+  linux-full:
+    name: Linux x86-64 - full dynamic compiler
+    runs-on: ubuntu-24.04
+    needs: [macos-full, linux-i32]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-full-compiler-assembly
+          path: ${{ runner.temp }}/linux-full
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-i32-selfhost
+          path: ${{ runner.temp }}/linux-i32
+      - name: Build full V++ runtime from source
+        run: |
+          mkdir -p "$RUNNER_TEMP/linux-full/i32"
+          tar -C "$RUNNER_TEMP/linux-full/i32" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
+          export VPP_HOME="$RUNNER_TEMP/linux-full/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          "$RUNNER_TEMP/linux-full/i32/bin/vpp-i32" runtime-object \
+            "$VPP_HOME/gói/máy ảo/runtime syscall.vi" -o "$RUNNER_TEMP/linux-full/runtime.o"
+      - name: Link and verify the full Linux compiler
+        run: |
+          out="$RUNNER_TEMP/linux-full"
+          bash scripts/build-linux-full-seed.sh "$out/linux-full-compiler.S" "$out/runtime.o" "$out/vpp-native"
+          bash scripts/quality/check_linux_dynamic_vpp.sh "$out/fixtures" "$out/vpp-native" "$out/runtime.o"
+      - name: Rebuild full compiler using V++ on Linux
+        run: |
+          out="$RUNNER_TEMP/linux-full"
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)"
+          "$out/vpp-native" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage2"
+          bash scripts/quality/check_linux_dynamic_vpp.sh "$out/stage2-fixtures" "$out/vpp-native-stage2" "$out/runtime.o"
+          "$out/vpp-native-stage2" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage3"
+          bash scripts/quality/audit_linux_static_elf.sh "$out/vpp-native-stage3"
+          cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
+          sha256sum "$out/vpp-native-stage2" "$out/vpp-native-stage3" > "$out/convergence.sha256"
+      - name: Package and test full Linux compiler
+        run: |
+          out="$RUNNER_TEMP/linux-full"
+          package="$out/package"
+          mkdir -p "$package/bin" "$package/share/vpp/native-vpp-runtime" "$package/share/vpp/scripts/quality"
+          install -m 755 "$out/vpp-native-stage3" "$package/bin/vpp-native"
+          install -m 755 "$out/i32/bin/vpp-i32" "$package/bin/vpp-i32"
+          install -m 644 "$out/runtime.o" "$package/share/vpp/native-vpp-runtime/runtime.o"
+          cp -R "$out/i32/gói" "$package/share/vpp/"
+          cp -R scripts/ASM "$package/share/vpp/scripts/"
+          install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
+          install -m 644 scripts/quality/audit_linux_static_elf.sh "$package/share/vpp/scripts/quality/"
+          install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
+          sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/vpp-native-launcher.sh.in > "$package/bin/vpp"
+          chmod 755 "$package/bin/vpp"
+          tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
+          mkdir -p "$out/extracted"
+          tar -C "$out/extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz"
+          printf 'hàm chính() { in 42; };\n' > "$out/package-probe.vi"
+          unset VPP_HOME VPP_AOT_VPP_OBJECT VPP_AOT_ASSEMBLER
+          test "$("$out/extracted/bin/vpp" run "$out/package-probe.vi")" = 42
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-full
+          path: ${{ runner.temp }}/vpp-linux-x86_64-full.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-full-test-logs
+          path: |
+            ${{ runner.temp }}/linux-full/**/*.log
+            ${{ runner.temp }}/linux-full/convergence.sha256
+          if-no-files-found: ignore
+  windows-seed:
+    name: Windows x86-64 - create PE seed
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-build V++ i32 and Windows boundary
+        run: |
+          (cd bootstrap/macos-arm64 && shasum -a 256 -c SHA256SUMS)
+          out="$RUNNER_TEMP/windows-seed"
+          mkdir -p "$out"
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_MACHO_REL_LINK=0
+          bootstrap/macos-arm64/vpp-i32 build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/vpp-i32"
+          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
+          export VPP_NATIVE_TARGET=windows-x86_64 VPP_WINDOWS_RUNTIME_OBJECT="$out/windows-runtime.obj"
+          "$out/vpp-i32" build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/stage1.exe"
+          python3 scripts/quality/check_native_executable_layout.py "$out/stage1.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-i32-seed
+          path: |
+            ${{ runner.temp }}/windows-seed/stage1.exe
+            ${{ runner.temp }}/windows-seed/windows-runtime.obj
+          if-no-files-found: error
+  windows-i32:
+    name: Windows x86-64 - native i32 selfhost
+    runs-on: windows-2025
+    needs: windows-seed
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-i32-seed
+          path: ${{ runner.temp }}/windows-seed
+      - name: Rebuild and execute native Windows compiler
+        shell: pwsh
+        run: |
+          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:RUNNER_TEMP/windows-seed/stage1.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
+      - name: Package and test the Windows i32 distribution
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP 'windows-package'
+          New-Item -ItemType Directory -Path "$package/bin" | Out-Null
+          Copy-Item -Recurse -LiteralPath "$env:GITHUB_WORKSPACE/gói" -Destination $package
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/windows-selfhost/stage3.exe" -Destination "$package/bin/vpp-i32.exe"
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/windows-selfhost/windows-runtime.obj" -Destination "$package/windows-runtime.obj"
+          $archive = "$env:RUNNER_TEMP/vpp-windows-x86_64-i32.zip"
+          # Python sets the UTF-8 ZIP filename flag for Vietnamese module names.
+          python -c "import pathlib,sys,zipfile; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2], 'w', zipfile.ZIP_DEFLATED); [z.write(p, p.relative_to(root).as_posix()) for p in sorted(root.rglob('*')) if p.is_file()]; z.close()" $package $archive
+          if ($LASTEXITCODE -ne 0) { throw 'UTF-8 archive creation failed' }
+          $extracted = Join-Path $env:RUNNER_TEMP 'windows-extracted'
+          Expand-Archive -LiteralPath $archive -DestinationPath $extracted
+          $env:VPP_HOME = $extracted.Replace([char]92, [char]47)
+          $env:VPP_NATIVE_TARGET = 'windows-x86_64'
+          $env:VPP_NATIVE_NO_CACHE = '1'
+          $env:VPP_WINDOWS_RUNTIME_OBJECT = "$extracted/windows-runtime.obj"
+          $probe = "$env:RUNNER_TEMP/package-probe.vi"
+          [IO.File]::WriteAllText($probe, 'hàm chính() { trả về 42; };' + "`n", [Text.UTF8Encoding]::new($false))
+          $PSNativeCommandUseErrorActionPreference = $false
+          & "$extracted/bin/vpp-i32.exe" build $probe -o "$env:RUNNER_TEMP/package-probe.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Packaged compiler build failed: $LASTEXITCODE" }
+          & "$env:RUNNER_TEMP/package-probe.exe"
+          if ($LASTEXITCODE -ne 42) { throw "Packaged program returned $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-i32-selfhost
+          path: ${{ runner.temp }}/vpp-windows-x86_64-i32.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-selfhost-logs
+          path: |
+            ${{ runner.temp }}/windows-selfhost/*.log
+            ${{ runner.temp }}/windows-selfhost/sha256.txt
+          if-no-files-found: ignore

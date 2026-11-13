@@ -39,6 +39,28 @@ foreach(runtime IN LISTS runtimes)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL expected)
         message(FATAL_ERROR "Sai kết quả biểu thức i32/${runtime}: ${status}\n${stdout}\n${stderr}")
     endif()
+    set(backend_calls "${VPP_OUTPUT_DIR}/i32-backend-calls-${runtime}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
+        "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
+        "${VPP_NATIVE_COMPILER}" build
+        "${VPP_ROOT}/src/tests/fixtures/native_i32_backend_calls.vi" -o "${backend_calls}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Không dựng được backend i32 dùng chung/${runtime}: ${stdout}\n${stderr}")
+    endif()
+    file(READ "${backend_calls}.S" backend_asm)
+    foreach(id IN ITEMS 1 2 4)
+        if(NOT backend_asm MATCHES "vpp_aot_i32_${id}:")
+            message(FATAL_ERROR "Thiếu thân native có lời gọi trong vòng/nhánh ${id}/${runtime}")
+        endif()
+    endforeach()
+    file(READ "${VPP_ROOT}/src/tests/expected/native_i32_backend_calls.expected" backend_expected)
+    execute_process(COMMAND "${backend_calls}" RESULT_VARIABLE status
+        OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
+    if(NOT status STREQUAL "0" OR NOT stdout STREQUAL backend_expected)
+        message(FATAL_ERROR "Sai backend i32 hoặc nhánh động/${runtime}: ${status}\n${stdout}\n${stderr}")
+    endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"

@@ -1,0 +1,5 @@
+hàm chính() {
+    nếu (máy ảo lấy loại(chưa) != "số nguyên") { ném "missing slot type"; };
+    nếu (chưa != 0) { ném "missing slot default"; };
+    in "missing slot: PASS";
+};

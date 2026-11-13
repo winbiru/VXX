@@ -1,6 +1,6 @@
 // Giá trị gắn thẻ và tập hợp. Tham chiếu là độ dời trong vùng nhớ máy ảo.
 // 0=rỗng, 1=i32, 2=f64, 3=UTF-8, 4=danh sách, 5=từ điển,
-// 6=bộ, 7=bao đóng, 8=lớp, 9=đối tượng, 10=ô chia sẻ, 11=u32.
+// 6=bộ, 7=bao đóng, 8=lớp, 9=đối tượng, 10=ô chia sẻ, 11=u32, 13=view byte bất biến (độ dài, dữ liệu, chuỗi sở hữu).
 hàm vm_tag(v) { nếu (v == 0) { trả về 0; }; trả về vm_get(v, 0); };
 hàm vm_int(n) {
     // Số i32 bất biến: dùng lại các số nhỏ, tránh cấp phát khi tính toán.
@@ -69,12 +69,7 @@ hàm vm_slice(s, start, n) {
     nếu (start > vm_get(s, 1) || n > vm_get(s, 1) - start) { trả về vm_error(3); };
     biến v = vm_string(n); nếu (v == 0) { trả về 0; };
     biến nguồn = vm_get(s, 2) + start; biến đích = vm_get(v, 2);
-    biến i = 0;
-    khi (i <= n - 4) {
-        máy ghi số nguyên ba mươi hai bit(đích + i, máy đọc số nguyên ba mươi hai bit(nguồn + i));
-        i = i + 4;
-    };
-    khi (i < n) { máy ghi byte(đích + i, máy đọc byte(nguồn + i)); i = i + 1; };
+    nếu (máy sao chép vùng nhớ(đích, nguồn, n) != 0) { trả về vm_error(3); };
     trả về v;
 };
 hàm vm_equal(a, b) {
@@ -105,7 +100,7 @@ hàm vm_truth(v) {
     biến t = vm_tag(v); nếu (t == 0) { trả về 0; };
     nếu (t == 1) { trả về vm_get(v, 1) != 0; };
     nếu (t == 2) { trả về máy thực so sánh(v, vm_real(vm_int(0))) != 0; };
-    nếu (t >= 3 && t <= 6) { trả về vm_get(v, 1) != 0; };
+    nếu ((t >= 3 && t <= 6) || t == 13) { trả về vm_get(v, 1) != 0; };
     trả về 1;
 };
 hàm vm_vector(tag) {
@@ -137,11 +132,11 @@ hàm vm_append(v, item) {
         // map, tuple và danh sách tham số vẫn giữ quy tắc nới cũ.
         nếu (vm_get(v, 0) == 4) { cap = cap * 4; }
         hoặc { cap = cap * 2 + 8; };
-        nếu (cap > 2000000) { trả về vm_error(1); };
+        nếu (cap > 2000000) { trả về vm_capacity_error(3, cap, 2000000); };
         biến dữ liệu cũ = vm_get(v, 3);
         biến raw = vm_alloc(cap * 4, 1); nếu (raw == 0) { trả về 0; };
         // Đã biết n <= dung lượng cũ; sao chép trực tiếp, bỏ kiểm tra chỉ số.
-        lặp(i = 0; i < n; i++) { vm_set(raw, i, vm_get(dữ liệu cũ, i)); };
+        nếu (máy sao chép vùng nhớ(raw, dữ liệu cũ, n * 4) != 0) { trả về vm_error(4); };
         // Xóa toàn bộ ô nội tuyến cũ sau khi nới vùng dữ liệu. Ngăn xếp
         // trong khung AOT có bốn ô, danh sách thông thường có hai ô.
         biến inline_at = v + 16; nếu (vm_get(v, 0) == 5) { inline_at = v + 20; };
@@ -166,22 +161,24 @@ hàm vm_pop(v) {
 hàm vm_remove(v, index) {
     biến n = vm_get(v, 1); nếu (index < 0 || index >= n) { trả về vm_error(4); };
     biến result = vm_at(v, index);
-    lặp(i = index; i + 1 < n; i++) { vm_put(v, i, vm_at(v, i + 1)); };
+    biến data = vm_get(v, 3);
+    nếu (máy sao chép vùng nhớ(data + index * 4, data + (index + 1) * 4, (n - index - 1) * 4) != 0) { trả về vm_error(4); };
     vm_pop(v); trả về result;
 };
 hàm vm_map_find(v, key) {
     nếu (vm_tag(v) != 5) { vm_error(2); trả về -1; };
     biến mode = vm_get(v, 4); biến kind = vm_tag(key);
-    nếu ((mode == 1 && kind == 3) || (mode == 2 && kind == 1)) {
+    nếu (mode == 1 && kind == 3) {
+        biến slot = vm_map_locate_string(v, key);
+        nếu (slot < 0) { trả về -1; }; trả về slot;
+    };
+    nếu (mode == 2 && kind == 1) {
         biến low = 0; biến high = máy chia số nguyên ba mươi hai bit(vm_get(v, 1), 2);
         khi (low < high) {
             biến mid = máy chia số nguyên ba mươi hai bit(low + high, 2);
             biến existing = vm_at(v, mid * 2); biến cmp = 0;
-            nếu (mode == 1) { cmp = vm_string_compare(existing, key); }
-            hoặc {
-                biến x = vm_number(existing); biến y = vm_number(key);
-                nếu (x < y) { cmp = -1; }; nếu (x > y) { cmp = 1; };
-            };
+            biến x = vm_number(existing); biến y = vm_number(key);
+            nếu (x < y) { cmp = -1; }; nếu (x > y) { cmp = 1; };
             nếu (cmp < 0) { low = mid + 1; } hoặc { high = mid; };
         };
         nếu (low * 2 < vm_get(v, 1) && vm_equal(vm_at(v, low * 2), key)) { trả về low * 2; };
@@ -218,14 +215,51 @@ hàm vm_map_find_int(v, number) {
 hàm vm_map_get(v, key) { biến i = vm_map_find(v, key); nếu (i < 0) { trả về 0; }; trả về vm_at(v, i + 1); };
 hàm vm_map_get_int(v, number) { biến i = vm_map_find_int(v, number); nếu (i < 0) { trả về 0; }; trả về vm_get(vm_get(v, 3), i + 1); };
 hàm vm_string_compare(a, b) {
+    nếu (a == b) { trả về 0; };
     biến na = vm_get(a, 1); biến nb = vm_get(b, 1); biến n = na; nếu (nb < n) { n = nb; };
-    lặp(i = 0; i < n; i++) {
-        biến x = máy đọc byte(vm_get(a, 2) + i); biến y = máy đọc byte(vm_get(b, 2) + i);
+    biến nguồn a = vm_get(a, 2); biến nguồn b = vm_get(b, 2);
+    biến i = 0;
+    khi (i <= n - 4) {
+        nếu (máy đọc số nguyên ba mươi hai bit(nguồn a + i) != máy đọc số nguyên ba mươi hai bit(nguồn b + i)) { thoát; };
+        i = i + 4;
+    };
+    khi (i < n) {
+        biến x = máy đọc byte(nguồn a + i); biến y = máy đọc byte(nguồn b + i);
         nếu (x < y) { trả về -1; }; nếu (x > y) { trả về 1; };
+        i = i + 1;
     };
     nếu (na < nb) { trả về -1; }; nếu (na > nb) { trả về 1; }; trả về 0;
 };
+// Return the matching slot, or -(insertion slot + 1).
+hàm vm_map_locate_string(v, key) {
+    biến data = vm_get(v, 3); biến low = 0; biến high = vm_get(v, 1) >> 1;
+    khi (low < high) {
+        biến mid = (low + high) >> 1;
+        biến cmp = vm_string_compare(vm_get(data, mid * 2), key);
+        nếu (cmp == 0) { trả về mid * 2; };
+        nếu (cmp < 0) { low = mid + 1; } hoặc { high = mid; };
+    };
+    trả về 0 - low * 2 - 1;
+};
 hàm vm_map_put(v, key, value) {
+    nếu (vm_tag(v) == 5 && vm_get(v, 4) == 1 && vm_tag(key) == 3) {
+        biến slot = vm_map_locate_string(v, key);
+        nếu (slot >= 0) { vm_put(v, slot + 1, value); trả về 0; };
+        slot = 0 - slot - 1;
+        biến at = vm_get(v, 1);
+        vm_append(v, key);
+        nếu (vm_get(v, 1) != at + 1) { trả về 0; };
+        vm_append(v, value);
+        nếu (vm_get(v, 1) != at + 2) { vm_pop(v); trả về 0; };
+        biến data = vm_get(v, 3);
+        nếu (at > slot) {
+            nếu (máy sao chép vùng nhớ(data + (slot + 2) * 4, data + slot * 4, (at - slot) * 4) != 0) {
+                vm_pop(v); vm_pop(v); trả về vm_error(4);
+            };
+        };
+        vm_set(data, slot, key); vm_set(data, slot + 1, value);
+        trả về 0;
+    };
     biến i = vm_map_find(v, key);
     nếu (i >= 0) { vm_put(v, i + 1, value); }
     hoặc {
@@ -288,18 +322,8 @@ hàm vm_concat(a, b) {
     biến n = vm_get(a, 1); biến m = vm_get(b, 1); biến s = vm_string(n + m);
     nếu (s == 0) { trả về 0; };
     biến đích = vm_get(s, 2); biến nguồn a = vm_get(a, 2); biến nguồn b = vm_get(b, 2);
-    biến i = 0;
-    khi (i <= n - 4) {
-        máy ghi số nguyên ba mươi hai bit(đích + i, máy đọc số nguyên ba mươi hai bit(nguồn a + i));
-        i = i + 4;
-    };
-    khi (i < n) { máy ghi byte(đích + i, máy đọc byte(nguồn a + i)); i = i + 1; };
-    i = 0;
-    khi (i <= m - 4) {
-        máy ghi số nguyên ba mươi hai bit(đích + n + i, máy đọc số nguyên ba mươi hai bit(nguồn b + i));
-        i = i + 4;
-    };
-    khi (i < m) { máy ghi byte(đích + n + i, máy đọc byte(nguồn b + i)); i = i + 1; };
+    nếu (máy sao chép vùng nhớ(đích, nguồn a, n) != 0 ||
+        máy sao chép vùng nhớ(đích + n, nguồn b, m) != 0) { trả về vm_error(3); };
     trả về s;
 };
 hàm vm_text(v) {
@@ -322,10 +346,12 @@ hàm vm_text(v) {
     nếu (active == 0) { active = vm_vector(4); vm_set(4198464, 7, active); };
     lặp(i = 0; i < vm_get(active, 1); i++) { nếu (vm_at(active, i) == v) { trả về vm_literal("<cycle>"); }; };
     vm_append(active, v);
-    biến s = vm_literal("["); nếu (t == 5) { s = vm_literal("{"); }; nếu (t == 6) { s = vm_literal("("); };
+    biến s = vm_literal("["); nếu (t == 5) { s = vm_literal("{"); }; nếu (t == 6 || t == 13) { s = vm_literal("("); };
     lặp(i = 0; i < vm_get(v, 1); i++) {
         nếu (i != 0) { s = vm_concat(s, vm_literal(", ")); };
-        biến item = vm_at(v, i);
+        biến item = 0;
+        nếu (t == 13) { item = vm_int(máy đọc byte(vm_get(v, 2) + i)); }
+        hoặc { item = vm_at(v, i); };
         nếu (t == 5) {
             s = vm_concat(s, vm_literal("\"")); s = vm_concat(s, vm_text(item)); s = vm_concat(s, vm_literal("\": "));
             i = i + 1; item = vm_at(v, i);
@@ -335,8 +361,8 @@ hàm vm_text(v) {
         } hoặc { s = vm_concat(s, vm_text(item)); };
     };
     vm_pop(active);
-    nếu (t == 6 && vm_get(v, 1) == 1) { s = vm_concat(s, vm_literal(",")); };
-    nếu (t == 5) { trả về vm_concat(s, vm_literal("}")); }; nếu (t == 6) { trả về vm_concat(s, vm_literal(")")); };
+    nếu ((t == 6 || t == 13) && vm_get(v, 1) == 1) { s = vm_concat(s, vm_literal(",")); };
+    nếu (t == 5) { trả về vm_concat(s, vm_literal("}")); }; nếu (t == 6 || t == 13) { trả về vm_concat(s, vm_literal(")")); };
     trả về vm_concat(s, vm_literal("]"));
 };
 hàm vm_binary(op, a, b) {

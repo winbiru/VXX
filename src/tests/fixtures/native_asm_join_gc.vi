@@ -1,0 +1,19 @@
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+
+hàm chính() {
+    nếu (biên dịch lắp ráp nối các phần([]) != "") { trả về 1; };
+    nếu (biên dịch lắp ráp nối các phần(["lẻ"]) != "lẻ") { trả về 2; };
+    phần = [];
+    đoạn = "0123456789abcdef";
+    lặp(i = 0; i < 5; i += 1) { đoạn += đoạn; };
+    lặp(i = 0; i < 8193; i += 1) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(phần, đoạn + "\n");
+    };
+    kết quả = biên dịch lắp ráp nối các phần(phần);
+    nếu (độ dài(kết quả) != 8193 * 513 || độ dài(phần) != 8193) { trả về 3; };
+    lặp(i = 0; i < 8193; i += 1) {
+        nếu (máy ảo cắt chuỗi theo byte(kết quả, i * 513, 513) != đoạn + "\n") { trả về 4; };
+    };
+    nếu (biên dịch lắp ráp nối các phần(["a", "", "ế", "b", "c"]) != "aếbc") { trả về 5; };
+    in "ASM join GC: PASS";
+};

@@ -11,7 +11,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     hàm công khai khởi tạo(đường, chế độ, kích thước = 4096, thao tác = "luồng tệp") {
         đường = thành chuỗi(đường);
         đường các byte = bảng mã unicode tám bit mã hóa(đường);
-        lặp(i = 0; i < máy ảo lấy độ dài(đường các byte); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(đường các byte); i += 1) {
             nếu (đường các byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
         };
         nếu (loại của(kích thước) != "số nguyên" || kích thước < 1 || kích thước > 65536) {
@@ -41,7 +41,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             nếu (tệp thô mã lỗi() != mình.lỗi gián đoạn) {
                 thông báo mở = "không thể mở tệp để ghi";
                 nếu (mã == 0) { thông báo mở = "không thể mở tệp để đọc"; };
-                mình.báo lỗi("mở", "FILE_OPEN_FAILED", thông báo mở);
+                bỏ kết quả = mình.báo lỗi("mở", "FILE_OPEN_FAILED", thông báo mở);
             };
         };
         mình.mã tài nguyên = mã tài nguyên;
@@ -64,7 +64,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     hàm công khai đang mở() { trả về !mình.đã đóng; };
 
     hàm công khai đọc các byte(đếm) {
-        mình.yêu cầu mở();
+        bỏ kết quả = mình.yêu cầu mở();
         nếu (mình.chế độ != "đọc") { ném "luồng tệp: không ở chế độ đọc"; };
         nếu (loại của(đếm) != "số nguyên" || đếm < 0 || đếm > 65536) {
             ném "luồng tệp: số byte phải trong 0..65536";
@@ -74,12 +74,12 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             nếu (mình.vị trí đọc == mình.số đọc) {
                 nếu (mình.hết tệp) { thoát; };
                 nếu (máy ảo lấy độ dài(mình.đệm đọc) == 0) {
-                    lặp(i = 0; i < mình.kích thước; i++) { máy ảo thêm cuối danh sách(mình.đệm đọc, 0); };
+                    lặp(i = 0; i < mình.kích thước; i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.đệm đọc, 0); };
                 };
                 n = tệp thô đọc(mình.mã tài nguyên, mình.đệm đọc, mình.kích thước);
                 nếu (n < 0) {
                     nếu (tệp thô mã lỗi() == mình.lỗi gián đoạn) { bỏ qua; };
-                    mình.báo lỗi("đọc", "FILE_READ_FAILED", "không thể đọc tệp");
+                    bỏ kết quả = mình.báo lỗi("đọc", "FILE_READ_FAILED", "không thể đọc tệp");
                 };
                 mình.vị trí đọc = 0;
                 mình.số đọc = n;
@@ -88,8 +88,8 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             còn = đếm - máy ảo lấy độ dài(kết quả);
             sẵn = mình.số đọc - mình.vị trí đọc;
             nếu (còn > sẵn) { còn = sẵn; };
-            lặp(i = 0; i < còn; i++) {
-                máy ảo thêm cuối danh sách(kết quả, mình.đệm đọc[mình.vị trí đọc + i]);
+            lặp(i = 0; i < còn; i += 1) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(kết quả, mình.đệm đọc[mình.vị trí đọc + i]);
             };
             mình.vị trí đọc = mình.vị trí đọc + còn;
         };
@@ -101,37 +101,70 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
         khi (đúng) {
             khối = mình.đọc các byte(4096);
             nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
-            lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };
+            lặp(i = 0; i < máy ảo lấy độ dài(khối); i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(kết quả, khối[i]); };
         };
         trả về chuỗi từ byte máy ảo(kết quả);
     };
 
     hàm công khai ghi các byte(các byte) {
-        mình.yêu cầu mở();
+        bỏ kết quả = mình.yêu cầu mở();
         nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
         nếu (loại của(các byte) != "danh sách") { ném "ghi bytes tệp: cần danh sách bytes"; };
         // Validate the whole input before accepting any bytes.
-        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i += 1) {
             nếu (loại của(các byte[i]) != "số nguyên" || các byte[i] < 0 || các byte[i] > 255) {
                 ném "ghi bytes tệp: byte phải là số nguyên trong 0..255";
             };
         };
-        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
-            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { mình.đẩy đệm(); };
-            máy ảo thêm cuối danh sách(mình.đệm ghi, các byte[i]);
-            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { mình.đẩy đệm(); };
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i += 1) {
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { bỏ kết quả = mình.đẩy đệm(); };
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.đệm ghi, các byte[i]);
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { bỏ kết quả = mình.đẩy đệm(); };
+        };
+        trả về 1;
+    };
+
+    // Synchronous bounded binary transfer for private staging files. Check
+    // bytes before invoking the raw primitive, whose type errors can be
+    // fatal on the native runtime rather than catchable V++ exceptions.
+    // On failure the written prefix remains on disk; the caller discards
+    // the staging file. No caller-owned list is retained in the buffer.
+    hàm công khai ghi khối trực tiếp(các byte) {
+        bỏ kết quả = mình.yêu cầu mở();
+        nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
+        nếu (loại của(các byte) != "danh sách") { ném "ghi khối: cần danh sách bytes"; };
+        dài = máy ảo lấy độ dài(các byte);
+        nếu (dài > 65536) { ném "ghi khối: tối đa 65536 byte"; };
+        lặp(i = 0; i < dài; i += 1) {
+            b = các byte[i];
+            nếu (loại của(b) != "số nguyên" || b < 0 || b > 255) {
+                ném "ghi bytes tệp: byte phải là số nguyên trong 0..255";
+            };
+        };
+        bỏ kết quả = mình.đẩy đệm();
+        đã = 0;
+        khi (đã < dài) {
+            đệm = các byte;
+            nếu (đã > 0) {
+                đệm = [];
+                lặp(i = đã; i < dài; i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(đệm, các byte[i]); };
+            };
+            n = máy tệp ghi(mình.mã tài nguyên, đệm, dài - đã);
+            nếu (n < 0 && tệp thô mã lỗi() == mình.lỗi gián đoạn) { bỏ qua; };
+            nếu (n <= 0 || n > dài - đã) { bỏ kết quả = mình.báo lỗi("ghi", "FILE_WRITE_FAILED", "không thể ghi tệp"); };
+            đã += n;
         };
         trả về 1;
     };
 
     hàm công khai ghi(nội dung) {
-        mình.yêu cầu mở();
+        bỏ kết quả = mình.yêu cầu mở();
         nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
         văn bản = thành chuỗi(nội dung);
         vị trí ghi = 0;
         khi (đúng) {
             còn = mình.kích thước - máy ảo lấy độ dài(mình.đệm ghi);
-            nếu (còn == 0) { mình.đẩy đệm(); còn = mình.kích thước; };
+            nếu (còn == 0) { bỏ kết quả = mình.đẩy đệm(); còn = mình.kích thước; };
             // The representation primitive produces valid bytes. Transfer a
             // whole bounded chunk instead of validating/copying every byte
             // through dynamic V++ calls and instance-field lookups.
@@ -141,23 +174,23 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             nếu (máy ảo lấy độ dài(mình.đệm ghi) == 0) {
                 mình.đệm ghi = khối;
             } hoặc {
-                lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(mình.đệm ghi, khối[i]); };
+                lặp(i = 0; i < n; i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.đệm ghi, khối[i]); };
             };
             vị trí ghi += n;
-            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { mình.đẩy đệm(); };
+            nếu (máy ảo lấy độ dài(mình.đệm ghi) == mình.kích thước) { bỏ kết quả = mình.đẩy đệm(); };
         };
         trả về 1;
     };
 
     hàm công khai đẩy đệm() {
-        mình.yêu cầu mở();
+        bỏ kết quả = mình.yêu cầu mở();
         nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
         // Preserve the accepted prefix across errors to avoid duplicate writes.
         khi (mình.đã ghi < máy ảo lấy độ dài(mình.đệm ghi)) {
             đệm = mình.đệm ghi;
             nếu (mình.đã ghi > 0) {
                 đệm = [];
-                lặp(i = mình.đã ghi; i < máy ảo lấy độ dài(mình.đệm ghi); i++) { máy ảo thêm cuối danh sách(đệm, mình.đệm ghi[i]); };
+                lặp(i = mình.đã ghi; i < máy ảo lấy độ dài(mình.đệm ghi); i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(đệm, mình.đệm ghi[i]); };
             };
             // Accepted byte lists were validated by ghi các byte; text
             // chunks came from the representation primitive. The raw OS
@@ -165,7 +198,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             n = máy tệp ghi(mình.mã tài nguyên, đệm, máy ảo lấy độ dài(đệm));
             nếu (n < 0 && tệp thô mã lỗi() == mình.lỗi gián đoạn) { bỏ qua; };
             nếu (n <= 0 || n > máy ảo lấy độ dài(đệm)) {
-                mình.báo lỗi("ghi", "FILE_WRITE_FAILED", "không thể ghi tệp");
+                bỏ kết quả = mình.báo lỗi("ghi", "FILE_WRITE_FAILED", "không thể ghi tệp");
             };
             mình.đã ghi = mình.đã ghi + n;
         };
@@ -175,31 +208,31 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     };
 
     hàm công khai vị trí() {
-        mình.yêu cầu mở();
-        nếu (mình.chế độ == "nối") { mình.đẩy đệm(); };
+        bỏ kết quả = mình.yêu cầu mở();
+        nếu (mình.chế độ == "nối") { bỏ kết quả = mình.đẩy đệm(); };
         n = tệp thô vị trí(mình.mã tài nguyên);
-        nếu (n < 0) { mình.báo lỗi("vị trí", "FILE_TELL_FAILED", "không đọc được vị trí"); };
+        nếu (n < 0) { bỏ kết quả = mình.báo lỗi("vị trí", "FILE_TELL_FAILED", "không đọc được vị trí"); };
         nếu (mình.chế độ == "đọc") { trả về n - (mình.số đọc - mình.vị trí đọc); };
         trả về n + (máy ảo lấy độ dài(mình.đệm ghi) - mình.đã ghi);
     };
 
     hàm công khai dịch(lệch, mốc = 0) {
-        mình.yêu cầu mở();
+        bỏ kết quả = mình.yêu cầu mở();
         nếu (loại của(mốc) != "số nguyên" || mốc < 0 || mốc > 2) {
             ném "luồng tệp: gốc phải là 0, 1 hoặc 2";
         };
-        nếu (mình.chế độ != "đọc") { mình.đẩy đệm(); };
+        nếu (mình.chế độ != "đọc") { bỏ kết quả = mình.đẩy đệm(); };
         chưa đọc = mình.số đọc - mình.vị trí đọc;
         nếu (chưa đọc > 0) {
             nếu (tệp thô dịch(mình.mã tài nguyên, 0 - chưa đọc, 1) < 0) {
-                mình.báo lỗi("dịch", "FILE_SEEK_FAILED", "không thể dịch vị trí");
+                bỏ kết quả = mình.báo lỗi("dịch", "FILE_SEEK_FAILED", "không thể dịch vị trí");
             };
         };
         mình.vị trí đọc = 0;
         mình.số đọc = 0;
         mình.hết tệp = sai;
         nếu (tệp thô dịch(mình.mã tài nguyên, lệch, mốc) < 0) {
-            mình.báo lỗi("dịch", "FILE_SEEK_FAILED", "không thể dịch vị trí");
+            bỏ kết quả = mình.báo lỗi("dịch", "FILE_SEEK_FAILED", "không thể dịch vị trí");
         };
         trả về đúng;
     };
@@ -207,20 +240,20 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     hàm công khai đóng() {
         nếu (mình.đã đóng) { trả về đúng; };
         thử {
-            nếu (mình.chế độ != "đọc") { mình.đẩy đệm(); };
+            nếu (mình.chế độ != "đọc") { bỏ kết quả = mình.đẩy đệm(); };
         } bắt lỗi(e) {
             // Flush failure still releases the resource and keeps the original error.
             mình.đã đóng = đúng;
             mã tài nguyên = mình.mã tài nguyên;
             mình.mã tài nguyên = rỗng;
-            tệp thô đóng(mã tài nguyên);
+            bỏ kết quả = tệp thô đóng(mã tài nguyên);
             ném e;
         };
         mình.đã đóng = đúng;
         mã tài nguyên = mình.mã tài nguyên;
         mình.mã tài nguyên = rỗng;
         nếu (tệp thô đóng(mã tài nguyên) != 0) {
-            mình.báo lỗi("đóng", "FILE_CLOSE_FAILED", "không thể đóng tệp");
+            bỏ kết quả = mình.báo lỗi("đóng", "FILE_CLOSE_FAILED", "không thể đóng tệp");
         };
         trả về đúng;
     };

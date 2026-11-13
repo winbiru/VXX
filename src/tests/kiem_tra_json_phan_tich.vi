@@ -56,4 +56,64 @@ hàm chính() {
     } bắt lỗi (e) {
         in 1;
     };
+    // Đường nhanh phải ghi lại cursor khi chuyển sang số dài, số thực
+    // hoặc giá trị tổng quát và khi gặp khoảng trắng.
+    in json tạo(json phân tích("[1, 2,12,34, 56789,123456,0,-1,2.5,true]")) ==
+       "[1,2,12,34,56789,123456,0,-1,2.5,1]";
+    in json tạo(json phân tích("[12,34, \"x\", [1,2], null]")) == "[12,34,\"x\",[1,2],null]";
+    thử {
+        json phân tích("[12,34,]");
+        in 0;
+    } bắt lỗi(e) { in 1; };
+
+    // Mọi ngưỡng byte và số lần escape, kể cả NUL và UTF-8 nhiều byte.
+    lặp(n = 1023; n <= 1025; n++) {
+        lặp(t = 0; t < 6; t++) {
+            số thoát = [0,31,32,33,64,65][t];
+            nguồn = "";
+            đích = "";
+            lặp(i = 0; i < số thoát; i++) {
+                nguồn += "\n";
+                đích += "\\n";
+            };
+            nguồn += "Việt 🚀";
+            đích += "Việt 🚀";
+            lặp(i = số thoát + máy ảo lấy độ dài(chuỗi thành byte máy ảo("Việt 🚀")); i < n; i++) {
+                nguồn += "a";
+                đích += "a";
+            };
+            in json thoát(nguồn) == đích && json phân tích(json chuỗi(nguồn)) == nguồn;
+        };
+    };
+    nguồn = ""; đích = "";
+    lặp(i = 0; i < 96; i++) {
+        nguồn += chuỗi từ byte máy ảo([i % 32,34,92]) + "Việt 🚀";
+        đích += json thoát(chuỗi từ byte máy ảo([i % 32,34,92]) + "Việt 🚀");
+    };
+    in json thoát(nguồn) == đích && json phân tích(json chuỗi(nguồn)) == nguồn;
+    lỗi = chuỗi từ byte máy ảo([255]);
+    lặp(i = 0; i < 2; i++) {
+        nguồn lỗi = lỗi + nguồn;
+        nếu (i == 1) { nguồn lỗi = nguồn + lỗi; };
+        thử { json thoát(nguồn lỗi); in 0; } bắt lỗi(e) { in e == "bảng mã: cần đúng một ký tự Unicode"; };
+    };
+    lặp(n = 127; n <= 129; n++) {
+        obj = {}; chung = [1,"Việt 🚀",rỗng];
+        lặp(i = n - 1; i >= 0; i--) {
+            khóa = thành chuỗi(1000 + i);
+            đặt từ điển(obj, khóa, chung);
+        };
+        mong đợi = "{";
+        lặp(i = 0; i < n; i++) {
+            nếu (i > 0) { mong đợi += ","; };
+            mong đợi += "\"" + thành chuỗi(1000 + i) + "\":[1,\"Việt 🚀\",null]";
+        };
+        mong đợi += "}";
+        in json tạo(obj) == mong đợi;
+        lặp(i = 0; i < 4; i++) {
+            in json tạo(obj) == mong đợi;
+        };
+        đặt từ điển(obj, "1000", obj);
+        thử { json tạo(obj); in 0; } bắt lỗi(e) { in e == "json tạo: phát hiện collection tự tham chiếu"; };
+    };
 };

@@ -1,6 +1,6 @@
 # V++ — Trạng thái repo và hướng cập nhật
 
-> Cập nhật: 14/09/2026
+> Tài liệu lịch sử của kiến trúc host C++ (14/09/2026). Nhánh hiện tại đã chuyển sang V++/ASM; xem [hướng dẫn build hiện hành](README.md#build-bản-tự-chủ-hiện-tại).
 > Tài liệu này mô tả những gì đang có trong source tree và các hạng mục còn lại. Sự
 > tồn tại của workflow không đồng nghĩa mọi lần chạy CI đều đã thành công; trạng thái
 > từng lần chạy cần xem trên GitHub Actions.

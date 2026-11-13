@@ -1,0 +1,18 @@
+hàm vòng thường(n = 1) {
+    tổng = n;
+    lặp(i = 0; i < 10; i++) { tổng = tổng + 2; };
+    trả về tổng;
+};
+hàm vòng bảo vệ(n = 1) {
+    tổng = n;
+    thử {
+        nếu (n < 0) { ném "lỗi vòng"; };
+        lặp(i = 0; i < 10; i++) { tổng = tổng + 2; };
+        trả về tổng;
+    } bắt lỗi(e) { trả về -7; };
+};
+hàm chính() {
+    in vòng thường();
+    in vòng bảo vệ();
+    in vòng bảo vệ(-1);
+};

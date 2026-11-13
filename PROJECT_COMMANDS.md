@@ -1,3 +1,20 @@
+# V++ — Các lệnh phát triển bản tự chủ
+
+```sh
+make build
+make test
+./VPP phiên bản
+./VPP build hello.vi -o hello
+./VPP run hello.vi -- arg1 arg2
+make benchmark
+cmake --install build-pure-vpp --prefix "$HOME/.local"
+```
+
+Chi tiết: [Cài đặt](docs/installation.md). Build đầy đủ hiện hỗ trợ macOS ARM64.
+
+<details>
+<summary>Lệnh của kiến trúc host trước đây (tham khảo lịch sử)</summary>
+
 # V++ — Các lệnh phát triển thường dùng
 
 File này tập hợp các lệnh build, test, chạy V++, đóng gói/cài extension và các
@@ -478,3 +495,6 @@ Cài lại extension VS Code:
 ```bash
 ./scripts/vpp-lang install --editor vscode
 ```
+
+
+</details>

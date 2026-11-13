@@ -1,3 +1,36 @@
+nhập gói.chuẩn.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
+
 m = {"a": 1, "b": "xin chao", "c": rỗng};
 in m;
 in rỗng;
+
+// Ordered string maps: identical-prefix keys, growth, update, removal, and
+// conversion to mixed key mode. Keep expected output independent of storage.
+keys = ["", "a", "ab", "abcd", "abcdx", "abcdy", "abcdxyz", "Việt", "Việt🚀", "日本語", "🚀", chuỗi từ byte máy ảo([97,0,98]), chuỗi từ byte máy ảo([255]), chuỗi từ byte máy ảo([128]), chuỗi từ byte máy ảo([97,0])];
+bảng = {};
+lặp(i = độ dài(keys) - 1; i >= 0; i--) { bảng[keys[i]] = i; };
+lặp(i = 0; i < độ dài(keys); i++) {
+    nếu (bảng[keys[i]] != i) { ném "map key mismatch"; };
+    bảng[keys[i]] = i + 100;
+};
+khóa = khóa từ điển(bảng);
+nếu (độ dài(khóa) != độ dài(keys)) { ném "map size mismatch"; };
+lặp(i = 1; i < độ dài(khóa); i++) {
+    nếu (khóa[i-1] > khóa[i]) { ném "map order mismatch"; };
+};
+nếu (có khóa(bảng, "missing")) { ném "map missing key"; };
+// Existing backends differ in the deletion return value. Check mutation.
+xóa khóa(bảng, "abcd");
+nếu (có khóa(bảng, "abcd")) { ném "map delete mismatch"; };
+bảng["abcd"] = 7;
+bảng[2] = 20;
+bảng["abcd"] = 40;
+nếu (bảng[2] != 20 || bảng["abcd"] != 40 || bảng["Việt"] != 107) { ném "mixed map mismatch"; };
+bảng = {};
+lặp(i = 127; i >= 0; i--) { bảng["common-prefix-" + thành chuỗi(i)] = [i, "Việt"]; };
+lặp(i = 0; i < 1024; i++) { rác = ["GC:" + thành chuỗi(i), i]; };
+lặp(i = 0; i < 128; i++) {
+    nếu (bảng["common-prefix-" + thành chuỗi(i)][0] != i) { ném "map growth mismatch"; };
+};
+in "map string keys: PASS";

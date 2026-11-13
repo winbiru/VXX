@@ -1,0 +1,32 @@
+nhập gói.lõi.chuyển kiểu.*;
+hàm quét khoảng(a, i, n) {
+    khi (i < n) {
+        nếu (a[i] < 48 || a[i] > 57) { thoát; };
+        i = i + 1;
+    };
+    trả về i;
+};
+hàm quét dấu(a, i, n) {
+    khi (i < n) {
+        nếu (a[i] == 34 || a[i] == 92 || a[i] < 32) { thoát; };
+        i = i + 1;
+    };
+    trả về i;
+};
+hàm chính() {
+    a = máy ảo xem byte chuỗi("0123456789x");
+    in quét khoảng(a, 0, 11) == 10;
+    in quét khoảng(a, 2, 7) == 7;
+    in quét khoảng(a, 10, 11) == 10;
+    in quét khoảng(a, 11, 11) == 11;
+    in quét khoảng(a, 12, 11) == 12;
+    in quét khoảng([48,49,58], 0, 3) == 2;
+    in quét khoảng([48,49,50], 0, 2) == 2;
+    in quét dấu(máy ảo xem byte chuỗi("Việt🚀\"a"), 0, 12) == 10;
+    in quét dấu(máy ảo xem byte chuỗi("abc\\x"), 0, 5) == 3;
+    in quét dấu(máy ảo xem byte chuỗi("abc\nx"), 0, 5) == 3;
+    in quét dấu(máy ảo xem byte chuỗi(""), 0, 0) == 0;
+    dài = "";
+    lặp(i = 0; i < 1024; i++) { dài += "0123456789"; };
+    in quét khoảng(máy ảo xem byte chuỗi(dài), 0, 10240) == 10240;
+};
