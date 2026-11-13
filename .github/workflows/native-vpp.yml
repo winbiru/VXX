@@ -24,6 +24,14 @@ jobs:
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
           build-pure-vpp/bin/vpp-i32 check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
           build-pure-vpp/bin/vpp-i32 check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+      - name: Check ELF and COFF symbol index regression
+        run: |
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
+          out="$RUNNER_TEMP/symbol-index"
+          mkdir -p "$out"
+          build-pure-vpp/bin/vpp-i32 build "$GITHUB_WORKSPACE/src/tests/fixtures/native_object_symbol_index.vi" -o "$out/probe"
+          "$out/probe" "$out/probe.elf.o" "$out/probe.coff.obj"
+          python3 scripts/quality/check_native_object_symbol_index.py "$out/probe.elf.o" "$out/probe.coff.obj"
       - run: cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
       - run: '"$RUNNER_TEMP/vpp-install/bin/vpp" --version'
       - name: Package and execute an installed native program
@@ -50,7 +58,9 @@ jobs:
             echo 'Cross emitter overwrote its input'; exit 1
           fi
           test "$before" = "$(shasum -a 256 "$probe")"
-          build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu \
+          source scripts/build-vpp-progress.sh
+          vpp_profile_command build-pure-vpp/linux-cross-profile.log \
+            build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu \
             "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$RUNNER_TEMP/linux-full-compiler.S"
       - uses: actions/upload-artifact@v4
         with:
@@ -61,7 +71,10 @@ jobs:
         if: always()
         with:
           name: macos-test-logs
-          path: build-pure-vpp/Testing/Temporary/
+          path: |
+            build-pure-vpp/Testing/Temporary/
+            build-pure-vpp/full-compiler-profile.log
+            build-pure-vpp/linux-cross-profile.log
           if-no-files-found: ignore
   linux-i32:
     name: Linux x86-64 - i32 source bootstrap
@@ -123,9 +136,10 @@ jobs:
           echo '[Biên dịch V++ Linux đầy đủ   0%] Chuẩn bị bộ biên dịch i32 và mã nguồn bộ thực thi'
           mkdir -p "$RUNNER_TEMP/linux-full/i32"
           tar -C "$RUNNER_TEMP/linux-full/i32" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
-          export VPP_HOME="$RUNNER_TEMP/linux-full/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          export VPP_HOME="$RUNNER_TEMP/linux-full/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_BUILD_PROGRESS=1
+          source scripts/build-vpp-progress.sh
           echo '[Biên dịch V++ Linux đầy đủ  10%] Biên dịch tệp đối tượng bộ thực thi V++'
-          "$RUNNER_TEMP/linux-full/i32/bin/vpp-i32" runtime-object \
+          vpp_timed_command "$RUNNER_TEMP/linux-full/i32/bin/vpp-i32" runtime-object \
             "$VPP_HOME/gói/máy ảo/runtime syscall.vi" -o "$RUNNER_TEMP/linux-full/runtime.o"
       - name: Link and verify the full Linux compiler
         run: |
@@ -137,12 +151,13 @@ jobs:
       - name: Rebuild full compiler using V++ on Linux
         run: |
           out="$RUNNER_TEMP/linux-full"
-          export VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)"
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)" VPP_NATIVE_NO_CACHE=1
           echo '[Biên dịch V++ Linux đầy đủ  45%] Tự biên dịch bộ biên dịch giai đoạn 2'
-          "$out/vpp-native" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage2"
+          source scripts/build-vpp-progress.sh
+          vpp_profile_command "$out/stage2-profile.log" "$out/vpp-native" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage2"
           bash scripts/quality/check_linux_dynamic_vpp.sh "$out/stage2-fixtures" "$out/vpp-native-stage2" "$out/runtime.o"
           echo '[Biên dịch V++ Linux đầy đủ  65%] Tự biên dịch bộ biên dịch giai đoạn 3'
-          "$out/vpp-native-stage2" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage3"
+          vpp_profile_command "$out/stage3-profile.log" "$out/vpp-native-stage2" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage3"
           echo '[Biên dịch V++ Linux đầy đủ  80%] Kiểm tra tính đồng nhất của hai thế hệ bộ biên dịch'
           bash scripts/quality/audit_linux_static_elf.sh "$out/vpp-native-stage3"
           cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
@@ -202,7 +217,7 @@ jobs:
           clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
           export VPP_NATIVE_TARGET=windows-x86_64 VPP_WINDOWS_RUNTIME_OBJECT="$out/windows-runtime.obj"
           echo '[Biên dịch V++ Windows khởi tạo  75%] Biên dịch và kiểm tra tệp PE khởi tạo'
-          "$out/vpp-i32" build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/stage1.exe"
+          VPP_NATIVE_BUILD_PROGRESS=1 "$out/vpp-i32" build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/stage1.exe"
           python3 scripts/quality/check_native_executable_layout.py "$out/stage1.exe"
           echo '[Biên dịch V++ Windows khởi tạo 100%] Tạo bộ biên dịch khởi tạo Windows hoàn tất'
       - uses: actions/upload-artifact@v4
@@ -252,6 +267,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Packaged compiler build failed: $LASTEXITCODE" }
           & "$env:RUNNER_TEMP/package-probe.exe"
           if ($LASTEXITCODE -ne 42) { throw "Packaged program returned $LASTEXITCODE" }
+          # The probe intentionally exits 42; the packaging step succeeded.
+          exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: windows-i32-selfhost
@@ -267,30 +284,25 @@ jobs:
           if-no-files-found: ignore
 
   macos-regression:
-    name: macos-regression - full shard ${{ matrix.shard }}
+    name: macOS ARM64 - full regression
     needs: macos-full
     runs-on: macos-15
     timeout-minutes: 240
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: macos-arm64-full
           path: ${{ runner.temp }}/regression-package
-      - name: Run full V++ regression shard
+      - name: Run full V++ regression
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-          python3 scripts/quality/run_native_regression.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: macos-regression-${{ matrix.shard }}-logs
+          name: macos-regression-logs
           path: regression-logs/
 
   linux-regression:

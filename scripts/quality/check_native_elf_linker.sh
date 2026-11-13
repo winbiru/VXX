@@ -4,6 +4,7 @@
 # been prepared once with prepare_linux_freestanding_host.sh.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$ROOT_DIR/scripts/build-vpp-progress.sh"
 if [[ $# -ne 2 && !( $# -eq 3 && ${3:-} == source-bootstrap ) ]]; then
     echo 'Usage: check_native_elf_linker.sh <seed-compiler> <output-dir> [source-bootstrap]' >&2
     exit 2
@@ -24,8 +25,9 @@ if [[ ${3:-} == source-bootstrap ]]; then
     progress_span=45
     progress_label='Linux i32'
 fi
+build_start=$SECONDS
 progress() {
-    printf '[Biên dịch V++ %s %3d%%] %s\n' "$progress_label" "$((progress_start + progress_span * $1 / 100))" "$2" >&2
+    printf '[Biên dịch V++ %s %3d%% | %ds] %s\n' "$progress_label" "$((progress_start + progress_span * $1 / 100))" "$((SECONDS - build_start))" "$2" >&2
 }
 progress 0 'Kiểm tra bộ liên kết ELF và bộ biên dịch khởi tạo'
 mkdir -p "$output_dir"
@@ -47,8 +49,8 @@ done
 export PATH="$output_dir/forbid-tools:$PATH"
 compile() {
     local compiler="$1" source="$2" executable="$3" log="$4"
-    if timeout --kill-after=10 "${VPP_SELFHOST_STAGE_TIMEOUT_SECONDS:-900}" \
-        "$compiler" build "$source" -o "$executable" > "$log" 2>&1; then
+    if vpp_timed_command timeout --kill-after=10 "${VPP_SELFHOST_STAGE_TIMEOUT_SECONDS:-900}" \
+        "$compiler" build "$source" -o "$executable" 2>&1 | tee "$log"; then
         :
     else
         local exit_code=$?
@@ -128,7 +130,7 @@ compiler_source="${VPP_LINUX_COMPILER_SOURCE:-$ROOT_DIR/gói/biên dịch/bản 
 for stage in 1 2; do
     executable="$output_dir/vpp-native-stage$stage"
     progress "$((stage * 25))" "Tự biên dịch bộ biên dịch V++ giai đoạn $stage/2"
-    compile "$compiler" "$compiler_source" \
+    VPP_NATIVE_BUILD_PROGRESS=1 compile "$compiler" "$compiler_source" \
         "$executable" "$output_dir/stage$stage.log"
     compiler="$executable"
 done

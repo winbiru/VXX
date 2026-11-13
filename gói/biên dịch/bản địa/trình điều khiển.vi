@@ -22,6 +22,7 @@ hàm biên dịch đích windows() {
 
 // Chế độ 0: tệp chạy; 1: object nguồn; 2: object kèm runtime V++.
 hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đường tệp, chế độ xuất) {
+    biến tiến độ = thực thi tiến độ bật();
     biến linux = chạy trên linux();
     biến windows = biên dịch đích windows();
     biến x86 = 0;
@@ -70,6 +71,7 @@ hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đư�
     biến số đơn vị runtime = 0;
     biến số đối tượng runtime = 0;
     nếu (mã trạng thái == 0) {
+        nếu (tiến độ == 1) { thực thi tiến độ ghi("Bắt đầu nạp mã nguồn và phụ thuộc", 0, 0); };
         số đơn vị runtime = nạp mô đun chuẩn bị(nguồn đầu vào đường tệp, nguồn đầu vào);
         nếu (số đơn vị runtime <= 0) { mã trạng thái = 12; };
     };
@@ -78,6 +80,7 @@ hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đư�
         nếu (điểm vào mã định danh < 0) { mã trạng thái = 14; };
     };
     nếu (mã trạng thái == 0) {
+        nếu (tiến độ == 1) { thực thi tiến độ ghi("Sinh mã máy và tệp đối tượng", 0, byte dài(mô đun ends) / 4); };
         biến đầu tiên = 0;
         biến nguồn đầu vào độ lệch = 0;
         lặp (đơn vị = 0; đơn vị < byte dài(mô đun ends); đơn vị = đơn vị + 4) {
@@ -156,10 +159,12 @@ hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đư�
                 };
             };
             đầu tiên = cuối cùng;
+            nếu (tiến độ == 1) { thực thi tiến độ ghi("Sinh mã máy và tệp đối tượng", đơn vị / 4 + 1, byte dài(mô đun ends) / 4); };
         };
         nếu (byte dài(đối tượng kho lưu trữ) <= 0) { mã trạng thái = 16; };
     };
     nếu (mã trạng thái == 0) {
+        nếu (tiến độ == 1) { thực thi tiến độ ghi("Bắt đầu liên kết và công bố tệp đầu ra", 0, 0); };
         nếu (chế độ xuất == 2) {
             nếu (windows == 1) {
                 nếu (ghi coff hợp nhất(đối tượng kho lưu trữ, kết xuất đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 19; };
@@ -239,6 +244,7 @@ hàm biên dịch tệp(nguồn đầu vào đường tệp, kết xuất đư�
         };
     };
 
+    nếu (tiến độ == 1 && mã trạng thái == 0) { thực thi tiến độ ghi("Biên dịch và liên kết hoàn tất", 0, 0); };
     byte hủy(nguồn đầu vào);
     byte hủy(biểu diễn trung gian);
     byte hủy(các hàm);

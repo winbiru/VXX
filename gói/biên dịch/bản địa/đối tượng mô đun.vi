@@ -36,6 +36,22 @@ hàm có tham chiếu hàm(các cặp, mã định danh) {
     trả về 0;
 };
 
+// Mark referenced IDs in a dense table. Zero means absent; each writer
+// replaces the mark with the final one-based symbol index in emission order.
+hàm bảng ký hiệu tham chiếu(bảng, các cặp, giới hạn) {
+    nếu (giới hạn < 0 || giới hạn > 524288) { trả về -1; };
+    lặp (i = 0; i < giới hạn; i++) {
+        nếu (byte đẩy số nguyên ba mươi hai bit(bảng, 0) != 0) { trả về -1; };
+    };
+    lặp (i = 0; i < byte dài(các cặp); i = i + 8) {
+        nếu (i + 8 > byte dài(các cặp)) { trả về -1; };
+        biến mã = byte đọc số nguyên ba mươi hai bit(các cặp, i + 4);
+        nếu (mã < 0 || mã >= giới hạn) { trả về -1; };
+        nếu (byte ghi số nguyên ba mươi hai bit(bảng, mã * 4, 1) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
 // Add one nlist_64 and its UTF-8 string. is_defined selects N_SECT or N_UNDF.
 hàm thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên định danh, là đã định nghĩa, giá trị đang xét) {
     nếu (tên định danh <= 0) { trả về -1; };
@@ -96,10 +112,34 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
     biến các mục ký hiệu = byte mới();
     biến các chuỗi = byte mới();
     biến các mục tái định vị = byte mới();
+    biến bảng nhập = byte mới();
+    biến bảng lõi = byte mới();
     biến mã trạng thái = 0;
     nếu (các mục ký hiệu <= 0) { mã trạng thái = -1; };
     nếu (các chuỗi <= 0) { mã trạng thái = -1; };
-    nếu (các mục tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (các mục tái định vị <= 0 || bảng nhập <= 0 || bảng lõi <= 0) { mã trạng thái = -1; };
+    // Each registry record occupies at least nine bytes. Reserve a dense
+    // table once, mark referenced IDs, then assign nlist indices in order.
+    // Zero is absent; stored indices are one-based.
+    nếu (mã trạng thái == 0) {
+        biến giới hạn = byte dài(sổ đăng ký) / 9;
+        lặp (i = 0; i < giới hạn; i++) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(bảng nhập, 0) != 0) { mã trạng thái = -1; thoát; };
+        };
+        lặp (i = 0; i < 85; i++) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(bảng lõi, 0) != 0) { mã trạng thái = -1; thoát; };
+        };
+        lặp (i = 0; i < byte dài(các phần nhập); i = i + 8) {
+            biến mã nhập = byte đọc số nguyên ba mươi hai bit(các phần nhập, i + 4);
+            nếu (i + 8 > byte dài(các phần nhập) || mã nhập < 0 || mã nhập >= giới hạn) { mã trạng thái = -1; thoát; };
+            nếu (byte ghi số nguyên ba mươi hai bit(bảng nhập, mã nhập * 4, 1) != 0) { mã trạng thái = -1; thoát; };
+        };
+        lặp (i = 0; i < byte dài(lời gọi lõi); i = i + 8) {
+            biến mã nhập = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, i + 4);
+            nếu (i + 8 > byte dài(lời gọi lõi) || mã nhập < 0 || mã nhập >= 85) { mã trạng thái = -1; thoát; };
+            nếu (byte ghi số nguyên ba mươi hai bit(bảng lõi, mã nhập * 4, 1) != 0) { mã trạng thái = -1; thoát; };
+        };
+    };
     nếu (mã trạng thái == 0) {
         nếu (byte thêm(các chuỗi, 0) != 0) { mã trạng thái = -1; };
         lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
@@ -114,8 +154,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
         };
     };
     biến mục ký hiệu số phần tử = cuối cùng - đầu tiên;
-    // Global registry records are scanned once per imported symbol so each
-    // global function ID is emitted only once, even when called many times.
+    // Emit each referenced global function ID exactly once, in registry order.
     biến toàn cục mã định danh = 0;
     nếu (mã trạng thái == 0) {
         biến độ lệch = 0;
@@ -124,10 +163,11 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
             biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
             nếu (kích cỡ <= 0) { mã trạng thái = -1; thoát; };
             nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { mã trạng thái = -1; thoát; };
-            nếu (có tham chiếu hàm(các phần nhập, toàn cục mã định danh) == 1) {
+            nếu (byte đọc số nguyên ba mươi hai bit(bảng nhập, toàn cục mã định danh * 4) == 1) {
                 nếu (toàn cục mã định danh >= đầu tiên) { nếu (toàn cục mã định danh < cuối cùng) { mã trạng thái = -1; thoát; }; };
                 biến mục ký hiệu = tên ký hiệu hàm(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh);
                 nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, mục ký hiệu, 0, 0) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte ghi số nguyên ba mươi hai bit(bảng nhập, toàn cục mã định danh * 4, mục ký hiệu số phần tử + 1) != 0) { mã trạng thái = -1; thoát; };
                 mục ký hiệu số phần tử = mục ký hiệu số phần tử + 1;
             };
             độ lệch = độ lệch + 8 + kích cỡ;
@@ -144,11 +184,12 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
     };
     nếu (mã trạng thái == 0) {
         lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 85; môi trường thực thi mã định danh++) {
-            nếu (có tham chiếu hàm(lời gọi lõi, môi trường thực thi mã định danh) == 1) {
+            nếu (byte đọc số nguyên ba mươi hai bit(bảng lõi, môi trường thực thi mã định danh * 4) == 1) {
                 nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên ký hiệu lõi(môi trường thực thi mã định danh), 0, 0) != 0) {
                     mã trạng thái = -1;
                     thoát;
                 };
+                nếu (byte ghi số nguyên ba mươi hai bit(bảng lõi, môi trường thực thi mã định danh * 4, mục ký hiệu số phần tử + 1) != 0) { mã trạng thái = -1; thoát; };
                 mục ký hiệu số phần tử = mục ký hiệu số phần tử + 1;
             };
         };
@@ -160,7 +201,9 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
             nếu (vị trí nhập < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí nhập + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, vị trí nhập) != 0) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục ký hiệu nhập(các phần nhập, đầu tiên, cuối cùng, mã định danh nhập)) != 0) {
+            biến chỉ mục = byte đọc số nguyên ba mươi hai bit(bảng nhập, mã định danh nhập * 4) - 1;
+            nếu (chỉ mục < 0) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
@@ -173,7 +216,9 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
             nếu (mã lõi < 0) { mã trạng thái = -1; thoát; };
             nếu (mã lõi > 84) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, vị trí gọi lõi) != 0) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, toàn cục mã định danh, mã lõi)) != 0) {
+            biến chỉ mục = byte đọc số nguyên ba mươi hai bit(bảng lõi, mã lõi * 4) - 1;
+            nếu (chỉ mục < 0) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
@@ -247,6 +292,8 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
     nếu (các mục ký hiệu > 0) { byte hủy(các mục ký hiệu); };
     nếu (các chuỗi > 0) { byte hủy(các chuỗi); };
     nếu (các mục tái định vị > 0) { byte hủy(các mục tái định vị); };
+    nếu (bảng nhập > 0) { byte hủy(bảng nhập); };
+    nếu (bảng lõi > 0) { byte hủy(bảng lõi); };
     nếu (mã trạng thái != 0) { byte làm rỗng(đối tượng); trả về -1; };
     trả về byte dài(đối tượng);
 };

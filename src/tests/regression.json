@@ -2534,6 +2534,7 @@
     "src/tests/fixtures/native_aot_hash.vi": "Module/support fixture or specialized entry; no standalone golden registered",
     "src/tests/fixtures/native_direct_asm.vi": "Module/support fixture or specialized entry; no standalone golden registered",
     "src/tests/fixtures/native_elf_linker_runtime.vi": "Covered by existing Linux bootstrap convergence gate (check_native_elf_linker.sh), independent exit 42 and ELF audit.",
+    "src/tests/fixtures/native_object_symbol_index.vi": "Covered by native CI object symbol index gate; checks ELF and COFF relocation indices with an independent Python oracle.",
     "src/tests/fixtures/oop_pipeline/api.vi": "Module/support fixture or specialized entry; no standalone golden registered",
     "src/tests/fixtures/oop_pipeline/base.vi": "Module/support fixture or specialized entry; no standalone golden registered",
     "src/tests/fixtures/stack_trace/module_loi.vi": "Module/support fixture or specialized entry; no standalone golden registered",

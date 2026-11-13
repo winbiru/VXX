@@ -18,6 +18,7 @@ out="$(realpath "$2")"
 root="$out/source"
 mkdir -p "$root/scripts/ASM/linux" "$root/scripts/quality" "$root/src/tests/fixtures"
 cp -R "$ROOT_DIR/gói" "$root/"
+cp "$ROOT_DIR/scripts/build-vpp-progress.sh" "$root/scripts/"
 cp "$ROOT_DIR/scripts/ASM/linux/vpp_linux_host_x86_64.s" "$root/scripts/ASM/linux/"
 cp -R "$ROOT_DIR/scripts/ASM/linux/tu_chu_x86_64" "$root/scripts/ASM/linux/"
 for script in prepare_linux_freestanding_host.sh check_native_elf_linker.sh check_native_elf_partial_linker.py audit_linux_static_elf.sh check_native_assembler.py; do

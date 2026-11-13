@@ -8,8 +8,9 @@ param(
 $ErrorActionPreference = 'Stop'
 # Expected nonzero native exit codes are checked explicitly below.
 $PSNativeCommandUseErrorActionPreference = $false
+$buildClock = [Diagnostics.Stopwatch]::StartNew()
 function Write-BuildProgress([int]$Percent, [string]$Message) {
-    Write-Host ('[Biên dịch V++ Windows i32 {0,3}%] {1}' -f $Percent, $Message)
+    Write-Host ('[Biên dịch V++ Windows i32 {0,3}% | {1}s] {2}' -f $Percent, [int]$buildClock.Elapsed.TotalSeconds, $Message)
 }
 if (-not $IsWindows -or (Test-Path -LiteralPath $OutputDirectory)) {
     throw 'Windows and a new output directory are required.'
@@ -21,7 +22,7 @@ $runtime = (Resolve-Path -LiteralPath $RuntimeObject).Path
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $out = (Resolve-Path -LiteralPath $OutputDirectory).Path
 Copy-Item -LiteralPath $runtime -Destination (Join-Path $out 'windows-runtime.obj')
-$names = @('VPP_HOME', 'VPP_NATIVE_NO_CACHE', 'VPP_NATIVE_TARGET', 'VPP_WINDOWS_RUNTIME_OBJECT')
+$names = @('VPP_HOME', 'VPP_NATIVE_NO_CACHE', 'VPP_NATIVE_TARGET', 'VPP_WINDOWS_RUNTIME_OBJECT', 'VPP_NATIVE_BUILD_PROGRESS')
 $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
@@ -34,7 +35,9 @@ try {
     foreach ($stage in 1..3) {
         Write-BuildProgress (15 + ($stage - 1) * 20) "Tự biên dịch bộ biên dịch V++ giai đoạn $stage/3"
         $exe = Join-Path $out "stage$stage.exe"
-        & $compiler build $source -o $exe 2>&1 | Out-File -LiteralPath (Join-Path $out "stage$stage.log")
+        $env:VPP_NATIVE_BUILD_PROGRESS = '1'
+        & $compiler build $source -o $exe 2>&1 | Tee-Object -FilePath (Join-Path $out "stage$stage.log") | ForEach-Object { Write-Host ('[{0}s] {1}' -f [int]$buildClock.Elapsed.TotalSeconds, $_) }
+        $env:VPP_NATIVE_BUILD_PROGRESS = '0'
         if ($LASTEXITCODE -ne 0) { throw "Windows native PE stage $stage exited $LASTEXITCODE" }
         # Check the actual binary produced by V++ before bootstrapping from it.
         $image = [IO.File]::ReadAllBytes($exe)
@@ -118,3 +121,6 @@ try {
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
 }
 Write-BuildProgress 100 'Tự biên dịch V++ i32 hoàn tất'
+# The rejected COFF probe intentionally exits 17. GitHub Actions propagates
+# $LASTEXITCODE even after all checks pass, so explicitly report success.
+exit 0

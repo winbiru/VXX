@@ -281,14 +281,19 @@ lớp công khai Bộ Hạ ASM Động {
         mình.dự phòng đến = 0;
     };
     hàm riêng tư phát(mã, hằng = 0, ô = 0, ký hiệu = "") {
-        máy ảo thêm cuối danh sách(mình.lệnh, biên dịch mã máy lệnh(mã, hằng, ô, mình.sâu, ký hiệu));
+        máy ảo thêm cuối danh sách(mình.lệnh, {"opcode": mã, "immediate": hằng,
+            "operand": ô, "depthBefore": mình.sâu, "symbol": ký hiệu});
+        // Các toán tử logic đánh giá cả hai vế. Tách nhóm lệnh thường gặp
+        // để không thực hiện chuỗi so sánh của các phép tính mỗi lần phát.
         nếu (mã == "PushConstant" || mã == "LoadSlot") { mình.sâu = mình.sâu + 1; }
         hoặc nếu (mã == "Call") { mình.sâu = mình.sâu - ô + 1; }
-        hoặc nếu (mã == "Drop" || mã == "BranchZero" || mã == "Return" ||
-            mã == "Add" || mã == "Sub" || mã == "Mul" || mã == "Equal" ||
-            mã == "BitAnd" || mã == "BitOr" || mã == "BitXor" || mã == "ShiftLeft" || mã == "ShiftRight" ||
-            mã == "NotEqual" || mã == "Less" || mã == "LessEqual" ||
-            mã == "Greater" || mã == "GreaterEqual") { mình.sâu = mình.sâu - 1; };
+        hoặc nếu (mã == "Drop" || mã == "BranchZero" || mã == "Return") { mình.sâu = mình.sâu - 1; }
+        hoặc nếu (mã != "Jump" && mã != "StoreSlot") {
+            nếu (mã == "Add" || mã == "Sub" || mã == "Mul" || mã == "Equal" ||
+                mã == "BitAnd" || mã == "BitOr" || mã == "BitXor" || mã == "ShiftLeft" || mã == "ShiftRight" ||
+                mã == "NotEqual" || mã == "Less" || mã == "LessEqual" ||
+                mã == "Greater" || mã == "GreaterEqual") { mình.sâu = mình.sâu - 1; };
+        };
         nếu (mình.sâu < 0) { ném "AOT V++: stack lowering không hợp lệ"; };
         nếu (mình.sâu > mình.sâu nhất) { mình.sâu nhất = mình.sâu; };
     };

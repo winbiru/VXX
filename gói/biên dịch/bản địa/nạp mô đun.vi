@@ -244,12 +244,9 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
             // The parser now lexes each payload independently.
             nếu (byte đẩy số nguyên ba mươi hai bit(đã kết hợp, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) { mã trạng thái = -1; };
             nếu (mã trạng thái == 0) {
-                lặp (i = điểm bắt đầu; i < byte dài(nguồn đầu vào); i++) {
-                    nếu (byte thêm(đã kết hợp, byte lấy(nguồn đầu vào, i)) != 0) {
-                        mã trạng thái = -1;
-                        thoát;
-                    };
-                };
+                nếu (thực thi các byte nối đoạn(đã kết hợp, nguồn đầu vào, điểm bắt đầu, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) {
+                    mã trạng thái = -1;
+                } hoặc { thực thi tiến độ nguồn(đường tệp); };
             };
         };
     };

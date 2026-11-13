@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/build-vpp-progress.sh"
 OUTPUT_DIR="${1:-$ROOT_DIR/build/native-vpp-runtime}"
 SEED_COMPILER="${2:-$ROOT_DIR/bootstrap/macos-arm64/vpp-i32}"
 # Standalone builds report 0–100%; the CLI bootstrap reserves 10–50%
@@ -11,8 +12,9 @@ if [[ ${3:-} == cli ]]; then
   progress_start=10
   progress_span=40
 fi
+runtime_start=$SECONDS
 runtime_progress() {
-  printf '[Biên dịch V++ %3d%%] %s\n' "$((progress_start + progress_span * $1 / 100))" "$2" >&2
+  printf '[Biên dịch V++ %3d%% | %ds] %s\n' "$((progress_start + progress_span * $1 / 100))" "$((SECONDS - runtime_start))" "$2" >&2
 }
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) ;;
@@ -33,7 +35,7 @@ if [[ ! -x "$SEED_COMPILER" ]]; then
 fi
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-export VPP_HOME="$ROOT_DIR"
+export VPP_HOME="$ROOT_DIR" VPP_NATIVE_BUILD_PROGRESS="${VPP_NATIVE_BUILD_PROGRESS:-1}"
 # Rebuild the i32 compiler from V++ to install the two pointer-safe AOT
 # machine boundaries and runtime-object output mode. The seed uses V++/ASM.
 seed_output="$OUTPUT_DIR/vpp-i32"
@@ -52,7 +54,7 @@ else
 fi
 if (( seed_needs_build )); then
   runtime_progress 0 'Biên dịch bộ biên dịch V++ i32 bằng bộ biên dịch giai đoạn 1'
-  "$SEED_COMPILER" build "$ROOT_DIR/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$seed_output"
+  vpp_timed_command "$SEED_COMPILER" build "$ROOT_DIR/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$seed_output"
 else
   runtime_progress 0 'Sử dụng lại bộ biên dịch V++ i32 hiện có'
 fi
@@ -62,7 +64,7 @@ if [[ "$(uname -s)" == Linux ]]; then
   runtime_source="$ROOT_DIR/gói/máy ảo/runtime syscall.vi"
 fi
 runtime_progress 25 "Biên dịch tệp đối tượng bộ thực thi V++: $runtime_source"
-"$OUTPUT_DIR/vpp-i32" runtime-object "$runtime_source" -o "$OUTPUT_DIR/runtime.o"
+vpp_timed_command "$OUTPUT_DIR/vpp-i32" runtime-object "$runtime_source" -o "$OUTPUT_DIR/runtime.o"
 if [[ ! -s "$OUTPUT_DIR/runtime.o" ]]; then
   echo 'V++ runtime-object báo thành công nhưng không tạo được tệp runtime.o có dữ liệu.' >&2
   exit 1
