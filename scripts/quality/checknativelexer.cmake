@@ -14,8 +14,17 @@ set(source "${VPP_OUTPUT_DIR}/nativelexer.vi")
 set(executable "${VPP_OUTPUT_DIR}/nativelexer${VPP_TEST_EXE_SUFFIX}")
 file(WRITE "${source}" "${kernel}\n${driver}\n")
 # CRLF, UTF-8 identifier, block comment and escaped string in an actual file.
-file(WRITE "${VPP_OUTPUT_DIR}/native-lexer-input.vi"
-    "// header\r\nhàm mẫu(a) { /* chú */ biến x = 12; in \"Chào\\n\"; trả về x; };\n")
+# file(WRITE) uses text mode on Windows, where an explicit CRLF becomes CRCRLF.
+# Configure from LF text with an explicit newline style on every host.
+set(lexer_input "// header\nhàm mẫu(a) { /* chú */ biến x = 12; in \"Chào\\n\"; trả về x; };\n")
+set(lexer_input_path "${VPP_OUTPUT_DIR}/native-lexer-input.vi")
+file(CONFIGURE OUTPUT "${lexer_input_path}" CONTENT "${lexer_input}" @ONLY NEWLINE_STYLE CRLF)
+string(REPLACE "\n" "\r\n" lexer_input_crlf "${lexer_input}")
+string(HEX "${lexer_input_crlf}" expected_input_hex)
+file(READ "${lexer_input_path}" actual_input_hex HEX)
+if (NOT actual_input_hex STREQUAL expected_input_hex)
+    message(FATAL_ERROR "V++ native lexer fixture bytes differ: ${actual_input_hex}; expected ${expected_input_hex}")
+endif()
 file(REMOVE "${executable}")
 if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
     if (NOT EXISTS "${VPP_STAGE1}")
