@@ -18,6 +18,13 @@ add_custom_command(OUTPUT "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/v
   VERBATIM USES_TERMINAL)
 add_custom_target(vpp-cli ALL DEPENDS "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"
   "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o")
+add_custom_command(OUTPUT "${VPP_BIN}/vpp-vm"
+  COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${CMAKE_SOURCE_DIR}" "VPP_NATIVE_NO_CACHE=1"
+    "${VPP_BIN}/vpp-i32" build "${CMAKE_SOURCE_DIR}/gói/máy ảo/chính.vi" -o "${VPP_BIN}/vpp-vm"
+  DEPENDS "${VPP_BIN}/vpp-i32" ${VPP_SOURCES}
+  COMMENT "Biên dịch máy ảo V++ dùng chung cho các nhóm kiểm thử"
+  VERBATIM)
+add_custom_target(vpp-vm ALL DEPENDS "${VPP_BIN}/vpp-vm")
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME vpp-source-boundary COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh")
@@ -29,7 +36,9 @@ if(BUILD_TESTING)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   set(VPP_REGRESSION "${CMAKE_SOURCE_DIR}/scripts/quality/run_native_regression.py")
   add_test(NAME vpp-regression-inventory COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}" --inventory)
-  set_tests_properties(vpp-source-boundary vpp-regression-inventory PROPERTIES LABELS smoke)
+  add_test(NAME vpp-regression-runner COMMAND "${Python3_EXECUTABLE}" -m unittest discover
+    -s "${CMAKE_SOURCE_DIR}/scripts/quality" -p test_run_native_regression.py)
+  set_tests_properties(vpp-source-boundary vpp-regression-inventory vpp-regression-runner PROPERTIES LABELS smoke)
   if(VPP_NODE)
     set_tests_properties(vpp-extension PROPERTIES LABELS smoke)
   endif()
@@ -46,7 +55,7 @@ if(BUILD_TESTING)
     set_tests_properties(vpp-native-regression-${shard} PROPERTIES TIMEOUT 14400 LABELS "regression;full")
   endforeach()
 endif()
-install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" DESTINATION bin)
+install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/gói" DESTINATION share/vpp)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/scripts/ASM" DESTINATION share/vpp/scripts

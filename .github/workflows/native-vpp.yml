@@ -178,6 +178,8 @@ jobs:
           install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
           sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/vpp-native-launcher.sh.in > "$package/bin/vpp"
           chmod 755 "$package/bin/vpp"
+          VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 \
+            "$package/bin/vpp-i32" build "$package/share/vpp/gói/máy ảo/chính.vi" -o "$package/bin/vpp-vm"
           tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
           mkdir -p "$out/extracted"
           tar -C "$out/extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz"

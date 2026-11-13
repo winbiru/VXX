@@ -74,25 +74,49 @@ def load_manifest():
 
 
 def execute(command, cwd, env, logs, name, timeout):
+    start = time.monotonic()
     with (logs / (name + ".stdout")).open("wb") as out, (logs / (name + ".stderr")).open("wb") as err:
         process = subprocess.Popen([str(x) for x in command], cwd=cwd, env=env,
                                    stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                    start_new_session=(os.name != "nt"))
         try:
             status = process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            if os.name == "nt":
-                process.kill()
-            else:
-                os.killpg(process.pid, signal.SIGKILL)
+        except BaseException:
+            if process.poll() is None:
+                if os.name == "nt":
+                    process.kill()
+                else:
+                    os.killpg(process.pid, signal.SIGKILL)
             process.wait()
             raise
+        finally:
+            (logs / (name + ".seconds")).write_text(f"{time.monotonic() - start:.2f}\n")
     (logs / (name + ".status")).write_text(str(status))
     return status
 
 
 def build(compiler, source, binary, cwd, env, logs, timeout):
     return execute([compiler, "build", source, "-o", binary], cwd, env, logs, "build", timeout)
+
+
+def prepare_vm(compiler, logs, env, timeout):
+    # CI packages one VM for every regression shard. Local runs build it once.
+    packaged = compiler.with_name("vpp-vm")
+    if packaged.is_file():
+        print(f"SETUP shared VM: {packaged}", flush=True)
+        return packaged
+    directory = logs / "shared-vm"
+    directory.mkdir(parents=True, exist_ok=True)
+    vm = directory / "vpp-vm"
+    vm_env = dict(env)
+    if platform.system() == "Linux":
+        vm_env["VPP_NATIVE_ELF_LINK"] = "1"
+    print("SETUP building shared VM", flush=True)
+    status = build(compiler.with_name("vpp-i32"), ROOT / "gói/máy ảo/chính.vi",
+                   vm, ROOT, vm_env, directory, timeout)
+    if status or not vm.is_file():
+        raise RuntimeError(f"Shared VM build failed (exit {status}); logs: {directory}")
+    return vm
 
 
 def verify_failure(case, status, logs, stage):
@@ -103,7 +127,7 @@ def verify_failure(case, status, logs, stage):
         raise RuntimeError(f"{stage} missing diagnostic: {case['diagnostic']}")
 
 
-def run_case(case, compiler, logs, env, timeout):
+def run_case(case, compiler, logs, env, timeout, vm=None):
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
@@ -132,8 +156,14 @@ def run_case(case, compiler, logs, env, timeout):
         if "vm_phase" in case:
             cmd = ["cmake", f"-DVPP_STAGE1={compiler.with_name('vpp-i32')}",
                    f"-DVPP_NATIVE_COMPILER={compiler}", f"-DVPP_ROOT={ROOT}",
-                   f"-DVPP_OUTPUT_DIR={cwd}", f"-DVPP_VM_PHASE={case['vm_phase']}",
-                   "-P", ROOT / "scripts/quality/check_vm_asm.cmake"]
+                   f"-DVPP_OUTPUT_DIR={cwd}", f"-DVPP_VM_PHASE={case['vm_phase']}"]
+            if vm is not None:
+                # DNS provider discovery uses the VM's directory. Keep each
+                # phase's generated providers beside its own copy of the VM.
+                local_vm = cwd / "vpp-vm"
+                shutil.copy2(vm, local_vm)
+                cmd.append(f"-DVPP_VM={local_vm}")
+            cmd += ["-P", ROOT / "scripts/quality/check_vm_asm.cmake"]
             try:
                 status = execute(cmd, cwd, env, logs, "harness", max(timeout, 3600))
             finally:
@@ -319,15 +349,28 @@ def main():
     logs = Path(tempfile.mkdtemp(prefix="run-", dir=logs))
     server = None
     http_error = None
+    vm = None
+    vm_error = None
     results = [{"id": c["id"], "status": "PENDING", "detail": c["pending"], "seconds": 0} for c in pending]
     results += [{"id": c["id"], "status": "UNSUPPORTED", "detail": platform.system(), "seconds": 0} for c in unsupported]
     for c in pending:
         print(f"PENDING {c['id']}: {c['pending']}", flush=True)
+    results_path = logs / "results.json"
+    results_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     try:
         for case in cases:
             start = time.monotonic()
             directory = logs / case["id"]
+            print(f"START {case['id']}", flush=True)
             try:
+                if "vm_phase" in case and vm is None:
+                    if vm_error:
+                        raise RuntimeError(vm_error)
+                    try:
+                        vm = prepare_vm(compiler, logs, env, args.timeout)
+                    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                        vm_error = str(exc)
+                        raise
                 if case.get("http") and server is None:
                     if http_error:
                         raise RuntimeError(http_error)
@@ -336,16 +379,20 @@ def main():
                     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                         http_error = str(exc)
                         raise
-                run_case(case, compiler, directory, env, args.timeout)
+                run_case(case, compiler, directory, env, args.timeout, vm=vm)
                 status, detail = "PASS", ""
             except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                 status, detail = "FAIL", str(exc)
+            seconds = round(time.monotonic() - start, 2)
+            stages = {p.stem: float(p.read_text()) for p in directory.glob("*.seconds")}
             results.append({"id": case["id"], "status": status, "detail": detail,
-                            "seconds": round(time.monotonic() - start, 2)})
-            print(f"{status} {case['id']} {detail}", flush=True)
+                            "seconds": seconds, "stages": stages})
+            results_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+            timing = ", ".join(f"{name}={value:.2f}s" for name, value in sorted(stages.items()))
+            print(f"{status} {case['id']} ({seconds:.2f}s; {timing}) {detail}", flush=True)
     finally:
         stop_http(server)
-        (logs / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        results_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     failed = sum(c["status"] == "FAIL" for c in results)
     passed = sum(c["status"] == "PASS" for c in results)
     print(f"{passed} passed, {failed} failed, {len(pending)} pending, {len(unsupported)} unsupported on this platform; logs: {logs}")
