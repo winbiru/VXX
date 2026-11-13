@@ -1,3 +1,6 @@
+if(CMAKE_HOST_WIN32)
+    set(VPP_TEST_EXE_SUFFIX ".exe")
+endif()
 # Compile V++ native lexer and a V++ test driver as one standalone module.
 # The assembly uses no host-side lexer, parser, or pre-tokenized data.
 if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_KERNEL OR NOT DEFINED VPP_HARNESS OR
@@ -8,7 +11,7 @@ file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 file(READ "${VPP_KERNEL}" kernel)
 file(READ "${VPP_HARNESS}" driver)
 set(source "${VPP_OUTPUT_DIR}/nativelexer.vi")
-set(executable "${VPP_OUTPUT_DIR}/nativelexer")
+set(executable "${VPP_OUTPUT_DIR}/nativelexer${VPP_TEST_EXE_SUFFIX}")
 file(WRITE "${source}" "${kernel}\n${driver}\n")
 # CRLF, UTF-8 identifier, block comment and escaped string in an actual file.
 file(WRITE "${VPP_OUTPUT_DIR}/native-lexer-input.vi"

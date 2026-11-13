@@ -245,6 +245,54 @@ def file_seek_smoke(compiler, root, out, env):
     print('NATIVE FILE SEEK/TELL PASS (signed i32, overflow, buffering, EOF)', flush=True)
 
 
+def direct_object_smoke(compiler, root, out, env):
+    object_probe = out / 'native_macho_dynamic_object'
+    run([compiler, 'build', root / 'src/tests/fixtures/native_macho_dynamic_object.vi', '-o', object_probe], env)
+    first, second = out / 'dynamic-object-first.o', out / 'dynamic-object-second.o'
+    for path in (first, second):
+        run([object_probe, path], env)
+    assert first.read_bytes() == second.read_bytes()
+    parts, symbols = parse_macho_object(first)
+    assert parts == [(0, 0, 16, 4, [(0, 0x2d000001)]),
+                     (2, 16, 24, 8, [(8, 0x0e000002), (16, 0x0e000001)])]
+    assert symbols == [('_caller', 15, 0, 0), ('_callee', 15, 0, 8),
+                       ('.local', 14, 1, 16), ('_table', 15, 1, 24)]
+    print(f'DIRECT OBJECT PASS sha256={digest(first)}', flush=True)
+    paged_probe = out / 'native_macho_paged_relocations'
+    run([compiler, 'build', root / 'src/tests/fixtures/native_macho_paged_relocations.vi',
+         '-o', paged_probe], env)
+    paged = out / 'paged-relocations.o'
+    run([paged_probe, paged], env)
+    verify_paged_object(paged)
+    chunk_probe = out / 'native_arm64_chunked_object'
+    run([compiler, 'build', root / 'src/tests/fixtures/native_arm64_chunked_object.vi',
+         '-o', chunk_probe], env)
+    flat, chunked = out / 'arm64-flat.o', out / 'arm64-chunked.o'
+    result, _ = run([chunk_probe, flat, chunked], env)
+    assert result.stdout == b'ARM64 chunk parity: PASS\n' and not result.stderr
+    assert flat.read_bytes() == chunked.read_bytes()
+    parts, symbols = parse_macho_object(chunked)
+    assert parts[0][2] > 8192 and len(parts[0][4]) == 1, parts
+    call_offset = parts[0][4][0][0]
+    assert call_offset >= 8192, parts
+    # Decode the two branch immediates independently of the V++ encoder.
+    data = chunked.read_bytes()
+    text_offset = struct.unpack_from('<I', data, 32 + 72 + 48)[0]
+    words = list(struct.iter_unpack('<I', data[text_offset:text_offset + parts[0][2]]))
+    cbz = [(i * 4, (w >> 5) & 0x7ffff)
+           for i, (w,) in enumerate(words) if w & 0xff000000 == 0x34000000]
+    jumps = [(i * 4, w & 0x3ffffff)
+             for i, (w,) in enumerate(words) if w & 0xfc000000 == 0x14000000]
+    assert len(cbz) == len(jumps) == 1
+    forward, delta = cbz[0]
+    backward, back_delta = jumps[0]
+    assert delta < 0x40000 and forward + 4 * delta == call_offset
+    assert back_delta >= 0x2000000 and backward + 4 * (back_delta - 0x4000000) == forward - 4
+    assert forward < 8192 <= backward
+    assert words[call_offset // 4][0] == 0x94000000
+    print(f'ARM64 CHUNK OBJECT PASS sha256={digest(chunked)}', flush=True)
+
+
 def smoke(compiler, root, out, env):
     source = out / 'gói thử nghiệm 𠮷.vi'
     source.write_text('hàm chính() { trả về 42; };\n', encoding='utf-8')
@@ -328,51 +376,7 @@ def smoke(compiler, root, out, env):
     if not direct:
         asm_stream_parity(compiler, root, out, env)
     else:
-        object_probe = out / 'native_macho_dynamic_object'
-        run([compiler, 'build', root / 'src/tests/fixtures/native_macho_dynamic_object.vi', '-o', object_probe], env)
-        first, second = out / 'dynamic-object-first.o', out / 'dynamic-object-second.o'
-        for path in (first, second):
-            run([object_probe, path], env)
-        assert first.read_bytes() == second.read_bytes()
-        parts, symbols = parse_macho_object(first)
-        assert parts == [(0, 0, 16, 4, [(0, 0x2d000001)]),
-                         (2, 16, 24, 8, [(8, 0x0e000002), (16, 0x0e000001)])]
-        assert symbols == [('_caller', 15, 0, 0), ('_callee', 15, 0, 8),
-                           ('.local', 14, 1, 16), ('_table', 15, 1, 24)]
-        print(f'DIRECT OBJECT PASS sha256={digest(first)}', flush=True)
-        paged_probe = out / 'native_macho_paged_relocations'
-        run([compiler, 'build', root / 'src/tests/fixtures/native_macho_paged_relocations.vi',
-             '-o', paged_probe], env)
-        paged = out / 'paged-relocations.o'
-        run([paged_probe, paged], env)
-        verify_paged_object(paged)
-        chunk_probe = out / 'native_arm64_chunked_object'
-        run([compiler, 'build', root / 'src/tests/fixtures/native_arm64_chunked_object.vi',
-             '-o', chunk_probe], env)
-        flat, chunked = out / 'arm64-flat.o', out / 'arm64-chunked.o'
-        result, _ = run([chunk_probe, flat, chunked], env)
-        assert result.stdout == b'ARM64 chunk parity: PASS\n' and not result.stderr
-        assert flat.read_bytes() == chunked.read_bytes()
-        parts, symbols = parse_macho_object(chunked)
-        assert parts[0][2] > 8192 and len(parts[0][4]) == 1, parts
-        call_offset = parts[0][4][0][0]
-        assert call_offset >= 8192, parts
-        # Decode the two branch immediates independently of the V++ encoder.
-        data = chunked.read_bytes()
-        text_offset = struct.unpack_from('<I', data, 32 + 72 + 48)[0]
-        words = list(struct.iter_unpack('<I', data[text_offset:text_offset + parts[0][2]]))
-        cbz = [(i * 4, (w >> 5) & 0x7ffff)
-               for i, (w,) in enumerate(words) if w & 0xff000000 == 0x34000000]
-        jumps = [(i * 4, w & 0x3ffffff)
-                 for i, (w,) in enumerate(words) if w & 0xfc000000 == 0x14000000]
-        assert len(cbz) == len(jumps) == 1
-        forward, delta = cbz[0]
-        backward, back_delta = jumps[0]
-        assert delta < 0x40000 and forward + 4 * delta == call_offset
-        assert back_delta >= 0x2000000 and backward + 4 * (back_delta - 0x4000000) == forward - 4
-        assert forward < 8192 <= backward
-        assert words[call_offset // 4][0] == 0x94000000
-        print(f'ARM64 CHUNK OBJECT PASS sha256={digest(chunked)}', flush=True)
+        direct_object_smoke(compiler, root, out, env)
     assert not list(out.glob('.vpp-aot-*')), out
     print(f'SMOKE PASS {compiler.name} vmb={digest(image)}', flush=True)
     return image

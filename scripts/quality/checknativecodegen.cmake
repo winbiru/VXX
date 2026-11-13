@@ -3,6 +3,9 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR)
     message(FATAL_ERROR "missing native codegen test arguments")
 endif()
+if(NOT DEFINED VPP_HOME)
+    set(VPP_HOME "${VPP_ROOT}")
+endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/nativecodegen.vi")
 set(harness "${VPP_OUTPUT_DIR}/nativecodegen")
@@ -33,7 +36,7 @@ else()
     set(compile_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
         --emit-exe-selfhost "${source}" "${harness}")
 endif()
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
     ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)

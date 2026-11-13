@@ -33,8 +33,18 @@ hàm goi_muoi(a, b, c, d, e, f, g, h, i, j) {
 }
 
 hàm chính() {
+    in co_so();
+    in nhan_sau(0);
     in ket_hop(1, 2, 3, 4);
     in nhan_sau(5);
+    in nhan_sau(7);
+    in ket_hop(-4, 10, -5, 4);
+    in tinh_vong(0);
     in tinh_vong(4);
     in goi_bon(4, 5, 6, 7);
-}
+    in goi_bon(-5, 2, -3, 8);
+    in tong_muoi(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    in goi_muoi(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+    in goi_muoi(-1, 2, -3, 4, -5, 6, -7, 8, -9, 10);
+    trả về 0;
+};

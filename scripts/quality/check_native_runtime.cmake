@@ -8,10 +8,12 @@ include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
 set(source "${VPP_ROOT}/src/tests/fixtures/native_runtime.vi")
 set(executable "${VPP_OUTPUT_DIR}/native-runtime-check")
 file(REMOVE "${executable}" "${VPP_OUTPUT_DIR}/runtime-owned.bin")
-set(VPP_HOME "${VPP_ROOT}")
+if(NOT DEFINED ENV{VPP_HOME})
+    set(ENV{VPP_HOME} "${VPP_ROOT}")
+endif()
 vpp_native_compile_command("${source}" "${executable}" compile_command)
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=$ENV{VPP_HOME}"
         ${compile_command}
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")

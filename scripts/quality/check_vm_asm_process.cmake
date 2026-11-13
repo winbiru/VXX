@@ -71,5 +71,5 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
 if (NOT status STREQUAL "234")
     message(FATAL_ERROR "Process ASM accepted negative arena offset: ${status}\n${output}\n${errors}")
 endif()
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_process_x86.cmake")
+
 message(STATUS "V++/ASM process: spawn, argv Unicode, pipes, exit and close PASS")

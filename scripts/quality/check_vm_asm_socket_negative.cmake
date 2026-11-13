@@ -1,0 +1,38 @@
+set(socket_dir "${VPP_OUTPUT_DIR}/socket-gate")
+file(MAKE_DIRECTORY "${socket_dir}")
+# Always exercise guest argument validation and secure failure of TLS,
+# including in CI sandboxes that prohibit even 127.0.0.1 bind().
+foreach(socket_case IN ITEMS invalid-port stale-token unverified-tls
+    unverified-tls-send unverified-tls-recv)
+    if(socket_case STREQUAL "invalid-port")
+        set(guest_source "hàm chính() { máy đầu nối kết nối([127, 0, 0, 1], 0, 1, 1000); };\n")
+        set(expected_error "error=2")
+    elseif(socket_case STREQUAL "stale-token")
+        set(guest_source "hàm chính() { máy đầu nối đóng(1073741825); };\n")
+        set(expected_error "error=2")
+    elseif(socket_case STREQUAL "unverified-tls")
+        set(guest_source "hàm chính() { máy tls nâng cấp(0, \"example.com\"); };\n")
+        set(expected_error "error=22 opcode=206")
+    elseif(socket_case STREQUAL "unverified-tls-send")
+        set(guest_source "hàm chính() { máy tls gửi(0, [65], 1); };\n")
+        set(expected_error "error=22 opcode=207")
+    else()
+        set(guest_source "hàm chính() { máy tls nhận(0, [0], 1); };\n")
+        set(expected_error "error=22 opcode=208")
+    endif()
+    set(guest_path "${socket_dir}/socket-${socket_case}.vi")
+    set(image_path "${socket_dir}/socket-${socket_case}.vmb")
+    file(WRITE "${guest_path}" "${guest_source}")
+    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${guest_path}" -o "${image_path}"
+        RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+    if(NOT code STREQUAL "0")
+        message(FATAL_ERROR "Socket negative fixture ${socket_case} build: ${code}\n${output}\n${errors}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
+        "${VPP_VM}" "${image_path}"
+        RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+    if(code STREQUAL "0" OR NOT errors MATCHES "${expected_error}")
+        message(FATAL_ERROR "Socket negative fixture ${socket_case}: ${code}\n${output}\n${errors}")
+    endif()
+endforeach()
+message(STATUS "V++ socket guest invalid arguments/stale token/TLS fail-closed 206..208: PASS")

@@ -164,12 +164,17 @@ def object_file(path, parts, symbols):
     return path
 
 
-def smoke(probe, out, env=None):
+def layout_objects(out):
     one = object_file(out / 'layout-program.o', [(0, 16, 2, [(0, 2, 2), (4, 2, 3), (8, 3, 1), (12, 4, 1)]),
                                                 (2, 8, 3, [(0, 0, 0)])],
                       [('_main', 15, 1, 0), ('local', 14, 2, 0), ('_helper', 1, 0, 0), ('_write', 1, 0, 0)])
     two = object_file(out / 'layout-runtime.o', [(0, 8, 3, [(0, 2, 2)]), (1, 16, 4, []), (3, 8, 3, [])],
                       [('_helper', 15, 1, 0), ('local', 14, 2, 0), ('_main', 1, 0, 0)])
+    return one, two
+
+
+def smoke(probe, out, env=None):
+    one, two = layout_objects(out)
     verify(probe, [one, two], env)
     missing = object_file(out / 'layout-missing-entry.o', [(0, 4, 2, [])], [('_helper', 15, 1, 0)])
     bad = object_file(out / 'layout-bad-reloc.o', [(0, 8, 3, [(0, 0, 0)])], [('_main', 15, 1, 0)])
@@ -261,7 +266,7 @@ def verify_patches(probe, paths, env=None, allowed=None):
 
 
 def patch_smoke(probe, out, env=None):
-    one, two = out / 'layout-program.o', out / 'layout-runtime.o'
+    one, two = layout_objects(out)
     verify_patches(probe, [one, two], env)
     data, offsets = section_file_offsets(one)
     cases = []

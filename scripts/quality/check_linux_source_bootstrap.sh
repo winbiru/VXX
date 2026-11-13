@@ -9,6 +9,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 }
 seed="$(realpath "$1")"
 [[ -x "$seed" && ! -e "$2" ]] || { echo 'Seed must be executable; output must not exist.' >&2; exit 2; }
+progress() {
+    printf '[Biên dịch V++ Linux i32 %3d%%] %s\n' "$1" "$2" >&2
+}
+progress 0 'Chuẩn bị mã nguồn và môi trường tự biên dịch'
 mkdir -p "$2"
 out="$(realpath "$2")"
 root="$out/source"
@@ -37,6 +41,7 @@ export PATH="$out/forbid-tools:$PATH"
 export VPP_HOME="$root" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
 cd "$root"
 host="$root/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o"
+progress 10 'Hợp dịch lớp giao tiếp hệ thống từ mã nguồn'
 VPP_LINUX_HOST_COMPILER="$seed" timeout --kill-after=5 120 \
     bash scripts/quality/prepare_linux_freestanding_host.sh "$host"
 cp "$host" "$out/host-seed.o"
@@ -52,6 +57,7 @@ ln -s linux/vpp_aot_primitives_linux_x86_64.o \
 # Self-append reaches exactly 2 MiB in 21 doublings. A second live buffer
 # detects a stale 1 MiB slot stride even if its bounds checks allow 2 MiB.
 # The final append must fail without changing either buffer.
+progress 20 'Kiểm tra bộ nhớ của bộ biên dịch khởi tạo'
 cat > "$out/seed-buffer-probe.vi" <<'VPP'
 hàm chính() {
     biến dữ liệu = byte mới();
@@ -91,7 +97,7 @@ if ! timeout --kill-after=5 60 "$out/seed-buffer-probe"; then
     exit 1
 fi
 echo 'SOURCE_BOOTSTRAP_SEED_ARENA_2M=PASS'
-if bash scripts/quality/check_native_elf_linker.sh "$seed" "$out/selfhost" 2>&1 | tee "$out/selfhost.log"; then
+if bash scripts/quality/check_native_elf_linker.sh "$seed" "$out/selfhost" source-bootstrap 2>&1 | tee "$out/selfhost.log"; then
     :
 else
     status=$?
@@ -101,6 +107,7 @@ else
     exit "$status"
 fi
 rm "$root/scripts/ASM/vpp_aot_primitives_linux_x86_64.o"
+progress 75 'Kiểm tra chương trình và đường dẫn mô-đun'
 # Check that the newly self-hosted compiler resolves only the organized
 # Linux path, with the compatibility alias removed from the source tree.
 timeout --kill-after=5 120 "$out/selfhost/vpp-native-stage2" build \
@@ -119,6 +126,7 @@ for source in 'gói/biên dịch/bản địa/bộ biên dịch.vi' './gói/biê
     timeout --kill-after=5 600 "$out/selfhost/vpp-native-stage2" check "$source"
 done
 echo 'SOURCE_BOOTSTRAP_RELATIVE_MODULE_PATH=PASS'
+progress 85 'Kiểm tra tính đồng nhất của bộ hợp dịch và lớp giao tiếp hệ thống'
 for stage in 1 2; do
     compiler="$out/selfhost/vpp-native-stage$stage"
     VPP_LINUX_HOST_COMPILER="$compiler" timeout --kill-after=5 120 \
@@ -133,3 +141,4 @@ echo 'SOURCE_BOOTSTRAP_HOST_EXACT_CMP=0'
 echo 'SOURCE_BOOTSTRAP_COMPILER_ASSEMBLER_LINKER=VPP'
 echo 'SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE'
 echo 'SOURCE_BOOTSTRAP_CONVERGENCE=PASS'
+progress 100 'Tự biên dịch V++ i32 hoàn tất'

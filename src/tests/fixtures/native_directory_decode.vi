@@ -87,7 +87,9 @@ hàm chính() {
     nếu (!vm_equal(vm_binary(8, largest, below_max), vm_int(1))) { trả về 48; };
     nếu (!vm_equal(vm_text(middle), vm_literal("3221225472"))) { trả về 49; };
     nếu (!vm_equal(vm_text(below_max), vm_literal("4294967294"))) { trả về 50; };
-    nếu (máy thư mục thô(5, 0, 0) != -22) { trả về 23; };
+    // Opcode 5 now implements readlink; 8 remains outside the directory ABI.
+    nếu (máy thư mục thô(8, 0, 0) != -22) { trả về 23; };
+    nếu (máy thư mục thô(5, -1, 4096) != -22) { trả về 52; };
     nếu (máy thư mục thô(0, -1, 4096) != -22) { trả về 24; };
     nếu (máy thư mục thô(0, 4096, 68162560) != -22) { trả về 25; };
     // A boxed POSIX credential must not silently order against a string.

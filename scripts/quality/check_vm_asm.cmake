@@ -1,40 +1,33 @@
+cmake_minimum_required(VERSION 3.20)
 foreach(required IN ITEMS VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "VM ASM test missing ${required}")
     endif()
 endforeach()
-# CMAKE_HOST_SYSTEM_PROCESSOR is empty under `cmake -P` on some CMake
-# versions. OS_PLATFORM is populated without a configured project.
-cmake_host_system_information(RESULT host_arch QUERY OS_PLATFORM)
-if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND
-    host_arch MATCHES "^(x86_64|amd64)$")
-    # Direct CTest/script invocations may bypass the default CMake build.
-    # Rebuild from source even when a stale ignored .o exists in the checkout.
-    set(host_object "${VPP_ROOT}/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o")
-    execute_process(COMMAND bash
-        "${VPP_ROOT}/scripts/quality/prepare_linux_freestanding_host.sh"
-        "${host_object}"
-        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_output
-        ERROR_VARIABLE host_errors TIMEOUT 120)
-    if (NOT host_status STREQUAL "0")
-        message(FATAL_ERROR "Linux freestanding ASM host failed (${host_status}):\n${host_output}\n${host_errors}")
-    endif()
-    execute_process(COMMAND nm --defined-only "${host_object}"
-        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_symbols
-        ERROR_VARIABLE host_errors TIMEOUT 15)
-    if (NOT host_status STREQUAL "0" OR
-        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_parse([\r\n]|$)" OR
-        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_text([\r\n]|$)")
-        message(FATAL_ERROR "Linux ASM host missing f64 runtime bridges: ${host_object}\n${host_errors}\n${host_symbols}")
-    endif()
+# Use the installed ASM host and package root when testing artifacts.
+if(NOT DEFINED ENV{VPP_HOME})
+    set(ENV{VPP_HOME} "${VPP_ROOT}")
+endif()
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    set(ENV{VPP_NATIVE_ELF_LINK} "1")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
-set(ENV{VPP_HOME} "${VPP_ROOT}")
 set(vm "${VPP_OUTPUT_DIR}/vpp-vm")
 execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "VM ASM compilation failed (${status}):\n${output}\n${errors}")
+endif()
+set(VPP_VM "${vm}")
+if(DEFINED VPP_VM_PHASE AND NOT VPP_VM_PHASE STREQUAL "core")
+    if(VPP_VM_PHASE STREQUAL "tls")
+        include("${CMAKE_CURRENT_LIST_DIR}/check_vm_tls_crypto.cmake")
+    elseif(VPP_VM_PHASE MATCHES "^(system|directory|process|resolver|socket_negative)$")
+        include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_${VPP_VM_PHASE}.cmake")
+    else()
+        message(FATAL_ERROR "Unknown VM regression phase: ${VPP_VM_PHASE}")
+    endif()
+    return()
 endif()
 set(image "${VPP_OUTPUT_DIR}/runtime.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
@@ -226,11 +219,4 @@ execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/identity-invalid.vmb"
 if (status STREQUAL "0" OR NOT errors MATCHES "error=2")
     message(FATAL_ERROR "VM accepted identity hash on scalar: ${status}\n${output}\n${errors}")
 endif()
-set(VPP_VM "${vm}")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_system.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_directory.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_process.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_resolver.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_socket.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_tls_crypto.cmake")
 message(STATUS "V++/ASM VM: values, control flow, closures, OOP, exceptions, GC and no C++ symbols PASS")

@@ -1,11 +1,17 @@
+if(CMAKE_HOST_WIN32)
+    set(VPP_TEST_EXE_SUFFIX ".exe")
+endif()
 # Ghép các module nguồn V++ để chạy native khi native import chưa sẵn sàng.
 if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR)
     message(FATAL_ERROR "missing native parser test arguments")
 endif()
+if(NOT DEFINED VPP_HOME)
+    set(VPP_HOME "${VPP_ROOT}")
+endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/nativeparser.vi")
-set(executable "${VPP_OUTPUT_DIR}/nativeparser")
+set(executable "${VPP_OUTPUT_DIR}/nativeparser${VPP_TEST_EXE_SUFFIX}")
 file(WRITE "${source}" "")
 foreach(part IN ITEMS
     "gói/biên dịch/bản địa/phân tích từ vựng.vi"
@@ -32,7 +38,7 @@ else()
     set(compile_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
         --emit-exe-selfhost "${source}" "${executable}")
 endif()
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
     ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
@@ -74,7 +80,7 @@ function(expect_native_rejection name code diagnostic)
         set(negative_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
             --emit-exe-selfhost "${input}" "${exe}")
     endif()
-    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
         ${negative_command}
         RESULT_VARIABLE result ERROR_VARIABLE errors TIMEOUT 60)
     if (result EQUAL 0 OR EXISTS "${exe}")

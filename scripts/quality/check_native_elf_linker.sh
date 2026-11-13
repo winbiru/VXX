@@ -4,8 +4,8 @@
 # been prepared once with prepare_linux_freestanding_host.sh.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if [[ $# -ne 2 ]]; then
-    echo 'Usage: check_native_elf_linker.sh <seed-compiler> <output-dir>' >&2
+if [[ $# -ne 2 && !( $# -eq 3 && ${3:-} == source-bootstrap ) ]]; then
+    echo 'Usage: check_native_elf_linker.sh <seed-compiler> <output-dir> [source-bootstrap]' >&2
     exit 2
 fi
 seed="$1"
@@ -15,6 +15,19 @@ output_dir="$2"
     echo 'Prepare the freestanding host object before this gate.' >&2
     exit 2
 }
+# Reserve 30–75% of the source bootstrap for the native ELF linker gate.
+progress_start=0
+progress_span=100
+progress_label='Linux ELF'
+if [[ ${3:-} == source-bootstrap ]]; then
+    progress_start=30
+    progress_span=45
+    progress_label='Linux i32'
+fi
+progress() {
+    printf '[Biên dịch V++ %s %3d%%] %s\n' "$progress_label" "$((progress_start + progress_span * $1 / 100))" "$2" >&2
+}
+progress 0 'Kiểm tra bộ liên kết ELF và bộ biên dịch khởi tạo'
 mkdir -p "$output_dir"
 output_dir="$(cd "$output_dir" && pwd)"
 export VPP_HOME="$ROOT_DIR"
@@ -114,7 +127,7 @@ compiler_source="${VPP_LINUX_COMPILER_SOURCE:-$ROOT_DIR/gói/biên dịch/bản 
 [[ -f "$compiler_source" ]] || { echo "Missing compiler source: $compiler_source" >&2; exit 2; }
 for stage in 1 2; do
     executable="$output_dir/vpp-native-stage$stage"
-    echo "[native ELF] Self-host stage $stage"
+    progress "$((stage * 25))" "Tự biên dịch bộ biên dịch V++ giai đoạn $stage/2"
     compile "$compiler" "$compiler_source" \
         "$executable" "$output_dir/stage$stage.log"
     compiler="$executable"
@@ -122,6 +135,7 @@ done
 cmp "$output_dir/vpp-native-stage1" "$output_dir/vpp-native-stage2"
 sha256sum "$output_dir/vpp-native-stage1" "$output_dir/vpp-native-stage2"
 echo 'NATIVE_ELF_SELFHOST_EXACT_CMP=0'
+progress 75 'Kiểm tra bộ liên kết đối tượng và chương trình sau tự biên dịch'
 # Exercise the native ET_REL -> ET_REL path with the converged compiler.
 # Both harnesses use the in-tree V++ linker and the same preassembled host
 # object as the self-hosting smoke; the Python fixtures need no assembler.
@@ -142,3 +156,6 @@ set -e
 [[ ! -s "$VPP_FORBIDDEN_TOOL_LOG" ]]
 echo 'NATIVE_ELF_EXTERNAL_BUILD_TOOLS=NONE'
 echo 'NATIVE_ELF_SELFHOST_CONVERGENCE=PASS'
+if [[ ${3:-} != source-bootstrap ]]; then
+    progress 100 'Kiểm tra tự biên dịch ELF hoàn tất'
+fi

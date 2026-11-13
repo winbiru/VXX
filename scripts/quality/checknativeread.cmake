@@ -1,10 +1,13 @@
+if(CMAKE_HOST_WIN32)
+    set(VPP_TEST_EXE_SUFFIX ".exe")
+endif()
 if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_SOURCE OR
     NOT DEFINED VPP_TARGET OR NOT DEFINED VPP_OUTPUT_DIR OR NOT DEFINED VPP_HOME)
     message(FATAL_ERROR "missing native input ABI arguments")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
-set(executable "${VPP_OUTPUT_DIR}/native read i32")
+set(executable "${VPP_OUTPUT_DIR}/native read i32${VPP_TEST_EXE_SUFFIX}")
 file(REMOVE "${executable}")
 vpp_native_compile_command("${VPP_SOURCE}" "${executable}" compile_command)
 execute_process(

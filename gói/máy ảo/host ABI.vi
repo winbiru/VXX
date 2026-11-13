@@ -838,8 +838,11 @@ hàm vm_host(state, op, args) {
         biến chế_độ_tệp = vm_number(b); nếu (chế_độ_tệp < 0 || chế_độ_tệp > 2) { trả về vm_error(2); };
         biến đường_tệp_mở = vm_path_handle(a); nếu (đường_tệp_mở < 0) { trả về 0; };
         biến flags = 0; nếu (chế_độ_tệp == 1) { flags = 1537; }; nếu (chế_độ_tệp == 2) { flags = 521; };
-        biến token = thực thi tệp dữ liệu mở(đường_tệp_mở, flags); byte hủy(đường_tệp_mở);
-        vm_set(state, 9, máy lỗi()); trả về vm_int(token);
+        biến token = thực thi tệp dữ liệu mở(đường_tệp_mở, flags);
+        biến lỗi_mở = máy lỗi(); byte hủy(đường_tệp_mở);
+        vm_set(state, 9, lỗi_mở);
+        nếu (token < 0) { trả về 0; };
+        trả về vm_int(token);
     };
     nếu (op == 160 || op == 161) {
         biến fd = vm_file_fd(vm_number(a)); biến số_byte_io = vm_number(c);

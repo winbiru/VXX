@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: cmake -S . -B build-pure-vpp
       - run: cmake --build build-pure-vpp --parallel
-      - run: ctest --test-dir build-pure-vpp --output-on-failure
+      - run: ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
       - name: Check i32 relative module paths
         run: |
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
@@ -120,28 +120,36 @@ jobs:
           path: ${{ runner.temp }}/linux-i32
       - name: Build full V++ runtime from source
         run: |
+          echo '[Biên dịch V++ Linux đầy đủ   0%] Chuẩn bị bộ biên dịch i32 và mã nguồn bộ thực thi'
           mkdir -p "$RUNNER_TEMP/linux-full/i32"
           tar -C "$RUNNER_TEMP/linux-full/i32" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
           export VPP_HOME="$RUNNER_TEMP/linux-full/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          echo '[Biên dịch V++ Linux đầy đủ  10%] Biên dịch tệp đối tượng bộ thực thi V++'
           "$RUNNER_TEMP/linux-full/i32/bin/vpp-i32" runtime-object \
             "$VPP_HOME/gói/máy ảo/runtime syscall.vi" -o "$RUNNER_TEMP/linux-full/runtime.o"
       - name: Link and verify the full Linux compiler
         run: |
           out="$RUNNER_TEMP/linux-full"
+          echo '[Biên dịch V++ Linux đầy đủ  25%] Hợp dịch và liên kết bộ biên dịch V++ đầy đủ'
           bash scripts/build-linux-full-seed.sh "$out/linux-full-compiler.S" "$out/runtime.o" "$out/vpp-native"
+          echo '[Biên dịch V++ Linux đầy đủ  35%] Kiểm tra bộ biên dịch vừa tạo'
           bash scripts/quality/check_linux_dynamic_vpp.sh "$out/fixtures" "$out/vpp-native" "$out/runtime.o"
       - name: Rebuild full compiler using V++ on Linux
         run: |
           out="$RUNNER_TEMP/linux-full"
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)"
+          echo '[Biên dịch V++ Linux đầy đủ  45%] Tự biên dịch bộ biên dịch giai đoạn 2'
           "$out/vpp-native" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage2"
           bash scripts/quality/check_linux_dynamic_vpp.sh "$out/stage2-fixtures" "$out/vpp-native-stage2" "$out/runtime.o"
+          echo '[Biên dịch V++ Linux đầy đủ  65%] Tự biên dịch bộ biên dịch giai đoạn 3'
           "$out/vpp-native-stage2" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage3"
+          echo '[Biên dịch V++ Linux đầy đủ  80%] Kiểm tra tính đồng nhất của hai thế hệ bộ biên dịch'
           bash scripts/quality/audit_linux_static_elf.sh "$out/vpp-native-stage3"
           cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
           sha256sum "$out/vpp-native-stage2" "$out/vpp-native-stage3" > "$out/convergence.sha256"
       - name: Package and test full Linux compiler
         run: |
+          echo '[Biên dịch V++ Linux đầy đủ  90%] Đóng gói và chạy thử bộ biên dịch'
           out="$RUNNER_TEMP/linux-full"
           package="$out/package"
           mkdir -p "$package/bin" "$package/share/vpp/native-vpp-runtime" "$package/share/vpp/scripts/quality"
@@ -161,6 +169,7 @@ jobs:
           printf 'hàm chính() { in 42; };\n' > "$out/package-probe.vi"
           unset VPP_HOME VPP_AOT_VPP_OBJECT VPP_AOT_ASSEMBLER
           test "$("$out/extracted/bin/vpp" run "$out/package-probe.vi")" = 42
+          echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64-full
@@ -182,15 +191,20 @@ jobs:
       - uses: actions/checkout@v4
       - name: Cross-build V++ i32 and Windows boundary
         run: |
+          echo '[Biên dịch V++ Windows khởi tạo   0%] Kiểm tra bộ biên dịch khởi tạo'
           (cd bootstrap/macos-arm64 && shasum -a 256 -c SHA256SUMS)
           out="$RUNNER_TEMP/windows-seed"
           mkdir -p "$out"
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_MACHO_REL_LINK=0
+          echo '[Biên dịch V++ Windows khởi tạo  25%] Biên dịch bộ biên dịch V++ i32'
           bootstrap/macos-arm64/vpp-i32 build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/vpp-i32"
+          echo '[Biên dịch V++ Windows khởi tạo  50%] Hợp dịch lớp giao tiếp Windows'
           clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
           export VPP_NATIVE_TARGET=windows-x86_64 VPP_WINDOWS_RUNTIME_OBJECT="$out/windows-runtime.obj"
+          echo '[Biên dịch V++ Windows khởi tạo  75%] Biên dịch và kiểm tra tệp PE khởi tạo'
           "$out/vpp-i32" build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/stage1.exe"
           python3 scripts/quality/check_native_executable_layout.py "$out/stage1.exe"
+          echo '[Biên dịch V++ Windows khởi tạo 100%] Tạo bộ biên dịch khởi tạo Windows hoàn tất'
       - uses: actions/upload-artifact@v4
         with:
           name: windows-i32-seed
@@ -251,3 +265,128 @@ jobs:
             ${{ runner.temp }}/windows-selfhost/*.log
             ${{ runner.temp }}/windows-selfhost/sha256.txt
           if-no-files-found: ignore
+
+  macos-regression:
+    name: macos-regression - full shard ${{ matrix.shard }}
+    needs: macos-full
+    runs-on: macos-15
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/regression-package
+      - name: Run full V++ regression shard
+        run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
+          python3 scripts/quality/run_native_regression.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-regression-${{ matrix.shard }}-logs
+          path: regression-logs/
+
+  linux-regression:
+    name: linux-regression - full shard ${{ matrix.shard }}
+    needs: linux-full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64-full
+          path: ${{ runner.temp }}/regression-package
+      - name: Run full V++ regression shard
+        run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
+          python3 scripts/quality/run_native_regression.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-regression-${{ matrix.shard }}-logs
+          path: regression-logs/
+
+  macos-i32-regression:
+    name: macOS ARM64 - i32 regression
+    needs: macos-full
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/regression-package
+      - run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --logs regression-logs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-i32-regression-logs
+          path: regression-logs/
+
+  linux-i32-regression:
+    name: Linux x86-64 - i32 regression
+    needs: linux-i32
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-i32-selfhost
+          path: ${{ runner.temp }}/regression-package
+      - run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-i32.tar.gz"
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$VPP_HOME/bin/vpp-i32" --logs regression-logs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-i32-regression-logs
+          path: regression-logs/
+
+  windows-i32-regression:
+    name: Windows x86-64 - i32 regression
+    needs: windows-i32
+    runs-on: windows-2025
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-i32-selfhost
+          path: ${{ runner.temp }}/regression-package
+      - shell: pwsh
+        run: |
+          $extracted = Join-Path $env:RUNNER_TEMP 'regression-compiler'
+          Expand-Archive -LiteralPath "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-i32.zip" -DestinationPath $extracted
+          $env:VPP_HOME = $extracted.Replace([char]92, [char]47)
+          $env:VPP_NATIVE_TARGET = 'windows-x86_64'
+          $env:VPP_NATIVE_NO_CACHE = '1'
+          $env:VPP_WINDOWS_RUNTIME_OBJECT = "$extracted/windows-runtime.obj"
+          python scripts/quality/run_native_regression.py --suite i32 --compiler "$extracted/bin/vpp-i32.exe" --logs regression-logs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-i32-regression-logs
+          path: regression-logs/

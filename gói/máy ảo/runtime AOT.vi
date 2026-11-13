@@ -13,6 +13,20 @@ nhập runtime.*;
 
 hàm aot_state() { trả về vm_get(4198464, 2); };
 hàm aot_status() { trả về vm_get(4198464, 1) != 0; };
+// Lỗi vận chuyển socket của OS phải đi qua thử/bắt lỗi để thư viện
+// mạng đóng socket, retry hoặc chuyển máy chủ. Giữ nguyên lỗi ABI,
+// token không hợp lệ và provider không được hỗ trợ.
+hàm aot_host_call(state, op, args) {
+    biến result = vm_host(state, op, args);
+    nếu (op >= 186 && op <= 192 && vm_get(4198464, 1) == 20) {
+        vm_set(4198464, 1, 0);
+        biến reason = vm_literal("socket: OS transport failed");
+        nếu (aot_status() == 0) {
+            vm_set(4198464, 3, reason); vm_error(16);
+        };
+    };
+    trả về result;
+};
 hàm aot_stack(frame) { trả về vm_get(frame, 2); };
 hàm aot_push(frame, value) { vm_append(aot_stack(frame), value); trả về aot_status(); };
 hàm aot_integer(frame, value) { trả về aot_push(frame, vm_int(value)); };
@@ -1758,7 +1772,7 @@ hàm aot_call(frame, id, count) {
             nếu (count >= 1 && count <= 4) { aot_release_args(frame); };
             vm_error(13); trả về 1;
         };
-        result = vm_host(state, op, host_args);
+        result = aot_host_call(state, op, host_args);
         nếu (count >= 1 && count <= 4) { aot_release_args(frame); };
     };
     trả về aot_push(frame, result);
@@ -2162,7 +2176,7 @@ hàm aot_intrinsic(frame, op) {
     biến arity = vm_host_arity(op); nếu (arity < 0) { vm_error(22); trả về 1; };
     biến args = aot_take_args(frame, arity);
     nếu (aot_status()) { trả về 1; };
-    biến result = vm_host(aot_state(), op, args);
+    biến result = aot_host_call(aot_state(), op, args);
     nếu (arity >= 1 && arity <= 4) { aot_release_args(frame); };
     trả về aot_push(frame, result);
 };
