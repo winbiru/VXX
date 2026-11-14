@@ -1,4 +1,4 @@
-nhập src.tests.modules.math.* như toan;
+nhập scripts.test.modules.math.* như toan;
 
 hàm chính() {
     in toan.tong(2, 3);

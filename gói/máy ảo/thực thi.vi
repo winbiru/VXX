@@ -4,6 +4,18 @@ hàm vm_jump(frame, target) {
     nếu (target < 0 || target > vm_get(vm_get(frame, 0), 0)) { trả về vm_error(17); };
     vm_set(frame, 1, target); trả về 0;
 };
+// A nested provider may raise a guest exception. Route it through the
+// caller's handlers instead of appending a result to an unwound stack.
+hàm vm_host_result(state, stack, op, args) {
+    biến value = vm_host(state, op, args);
+    nếu (vm_get(4198464, 1) == 16) {
+        biến reason = vm_get(4198464, 3);
+        vm_set(4198464, 1, 0); vm_set(4198464, 3, 0);
+        trả về vm_throw(state, reason);
+    };
+    nếu (vm_get(4198464, 1) == 0) { vm_append(stack, value); };
+    trả về 0;
+};
 hàm vm_step(state, frames) {
     nếu (vm_get(4198464, 12) != 1) { trả về vm_step_body(state, frames); };
     vm_profile_begin(3);
@@ -168,7 +180,7 @@ hàm vm_step_body(state, frames) {
         nếu (id >= 0 && id < vm_get(vm_get(state, 1), 1)) { trả về vm_invoke(state, id, args, 0, 0, 0); };
         biến name = id; nếu (id < 0) { name = 0 - id - 1; };
         biến primitive = vm_host_cached(state, name); nếu (primitive < 0) { trả về vm_error(13); };
-        vm_append(stack, vm_host(state, primitive, args)); trả về 0;
+        trả về vm_host_result(state, stack, primitive, args);
     };
     nếu (op == 91) {
         biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
@@ -223,7 +235,7 @@ hàm vm_step_body(state, frames) {
         nếu (allowed == 0) { trả về vm_error(19); };
         trả về vm_invoke(state, vm_get(method, 0), args, instance, vm_get(method, 1), 0);
     };
-    nếu (op == 43) { vm_write(1, vm_text(vm_pop(stack))); vm_write(1, vm_literal("\n")); trả về 0; };
+    nếu (op == 43) { trả về vm_guest_print(state, vm_text(vm_pop(stack))); };
     nếu (op == 40 || op == 44) { biến result = 0; nếu (vm_get(stack, 1) > 0) { result = vm_pop(stack); }; trả về vm_return(state, result); };
     nếu (op == 32) {
         biến depth = 0; biến target = -1;
@@ -276,7 +288,7 @@ hàm vm_step_body(state, frames) {
     nếu (op == 80) { trả về vm_throw(state, vm_pop(stack)); };
     nếu (op == 14 || op == 15 || op == 16 || op == 17 || op == 20 || op == 22 || op == 26 || op == 28 || op == 29 || op == 38) { trả về 0; };
     biến arity = vm_host_arity(op);
-    nếu (arity >= 0) { vm_append(stack, vm_host(state, op, vm_take(stack, arity))); trả về 0; };
+    nếu (arity >= 0) { trả về vm_host_result(state, stack, op, vm_take(stack, arity)); };
     vm_set(4198464, 13, op); trả về vm_error(22);
 };
 hàm vm_execute(state) {

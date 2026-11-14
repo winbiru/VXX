@@ -188,6 +188,8 @@ hàm vm_init() {
     lặp(i = 4; i < 64; i++) { vm_set(16 + i * 32, 0, -1); };
     lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
     lặp(i = 0; i < 32; i++) { vm_set(4198592, i, 0); };
+    // Linked roots for embedded bytecode calls (after the profiling scratch).
+    vm_set(4198720, 0, 0);
     vm_set(4198464, 0, 8388608);
     vm_set(127000000, 0, 67000000);
     trả về 0;
@@ -292,6 +294,7 @@ hàm vm_collect(root) {
     vm_set(4198464, 6, epoch);
     vm_set(4198464, 11, 0);
     vm_mark(root, epoch);
+    vm_mark(vm_get(4198720, 0), epoch);
     // Nested V++ providers share the arena, but have independent guest
     // stacks. Keep both program states and the executable path rooted.
     vm_mark(vm_get(4198464, 2), epoch);

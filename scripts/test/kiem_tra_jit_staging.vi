@@ -1,0 +1,41 @@
+// Exercise the staging ABI independently of the code generator.
+hàm chính() {
+    capacity = 2097160;
+    h = máy JIT thô(10, capacity, 0);
+    in h > 0;
+    in máy JIT thô(13, h, 0) == -1;
+    ok = đúng;
+    lặp(i = 0; i < 524289; i++) {
+        nếu (máy JIT thô(11, h, i) != 0) { ok = sai; thoát; };
+    };
+    in ok;
+    in máy JIT thô(14, h, 2097152) == 524288;
+    in máy JIT thô(14, h, 2097153) == -1;
+    packet = byte mới();
+    byte đẩy số nguyên ba mươi hai bit(packet, 2097152);
+    byte đẩy số nguyên ba mươi hai bit(packet, 123456789);
+    in máy JIT thô(15, h, packet) == 0;
+    in máy JIT thô(14, h, 2097152) == 123456789;
+    byte ghi số nguyên ba mươi hai bit(packet, 0, 2097153);
+    in máy JIT thô(15, h, packet) == -1;
+    in máy JIT thô(12, h, 256) == -1;
+    in máy JIT thô(11, h, 0) == 0;
+    in máy JIT thô(12, h, 0) == -1;
+    in máy JIT thô(16, h, capacity) == h;
+    in máy JIT thô(11, h, 0) == -1;
+    in máy JIT thô(3, h, 0) == 0;
+    in máy JIT thô(14, h, 0) == -1;
+    bad = máy JIT thô(10, 16, 0);
+    in bad > h;
+    máy JIT thô(11, bad, 0); máy JIT thô(11, bad, 0);
+    máy JIT thô(11, bad, 1); // misaligned pointer relocation
+    in máy JIT thô(16, bad, 8) == -1;
+    in máy JIT thô(11, bad, 0) == -1;
+    in máy JIT thô(3, bad, 0) == 0;
+    in máy JIT thô(10, 0, 0) == -1;
+    in máy JIT thô(10, 16777217, 0) == -1;
+    max = máy JIT thô(10, 16777216, 0);
+    in max > 0;
+    in máy JIT thô(3, max, 0) == 0;
+    byte hủy(packet);
+};

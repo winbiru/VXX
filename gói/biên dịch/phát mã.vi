@@ -198,6 +198,17 @@ lớp công khai Bộ Phát Bytecode {
         trả về mình.biên dịch phát mã ô nhớ(trạng thái, tên);
     };
 
+    // Save the already evaluated lvalue in a compiler-only local slot.
+    // The slot name cannot be produced by the source lexer.
+    hàm riêng tư biên dịch phát mã giữ đích(trạng thái, thô) {
+        ô nhớ = mình.biên dịch phát mã ô nhớ(trạng thái,
+            "$compound:" + thành chuỗi(máy ảo lấy độ dài(trạng thái["slots"])));
+        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_KHOI_TAO"), 0, ô nhớ, 0);
+        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_ID"), 0, ô nhớ, 0);
+        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GAN"), 0, 0, 0);
+        trả về ô nhớ;
+    };
+
     hàm công khai biên dịch phát mã tách chuỗi(từ tố) {
         // Copy the source bytes once; repeated Unicode indexing and immutable
         // string concatenation make long literals quadratic in the VM.
@@ -510,11 +521,19 @@ lớp công khai Bộ Phát Bytecode {
             trả về đúng;
         };
         nếu (mã == "chuẩn bị gán thành viên") {
+            kết hợp = lấy từ điển(giá trị, "gán kết hợp", sai);
             nếu (!lấy từ điển(giá trị, "tạm", sai)) {
                 nhận ô nhớ = mình.biên dịch phát mã ô nhớ receiver(trạng thái, giá trị["nhận"], mục ký hiệu);
                 mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, nhận ô nhớ, 0);
+            } hoặc nếu (kết hợp) {
+                nhận ô nhớ = mình.biên dịch phát mã giữ đích(trạng thái, thô);
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, nhận ô nhớ, 0);
             };
             tên chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, giá trị["tên"]);
+            nếu (kết hợp) {
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, nhận ô nhớ, 0);
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_DOC_THUOC_TINH"), 0, tên chỉ mục, 0);
+            };
             máy ảo thêm cuối danh sách(trạng thái["gán thành viên"], tên chỉ mục);
             trả về đúng;
         };
@@ -726,6 +745,18 @@ lớp công khai Bộ Phát Bytecode {
             trả về đúng;
         };
         nếu (mã == "đọc chỉ số") {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_DOC_CHI_SO"), 0, 0, 0);
+            trả về đúng;
+        };
+        nếu (mã == "chuẩn bị gán kết hợp chỉ số") {
+            khóa ô = mình.biên dịch phát mã giữ đích(trạng thái, thô);
+            đích ô = mình.biên dịch phát mã giữ đích(trạng thái, thô);
+            // Keep one receiver/key pair for the store and consume the second
+            // pair to read the old value before evaluating the right side.
+            lặp(i = 0; i < 2; i++) {
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, đích ô, 0);
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, khóa ô, 0);
+            };
             mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_DOC_CHI_SO"), 0, 0, 0);
             trả về đúng;
         };

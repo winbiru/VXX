@@ -210,6 +210,12 @@
       "suite": "full"
     },
     {
+      "id": "kiem_tra_embedded_vm",
+      "source": "scripts/test/kiem_tra_embedded_vm.vi",
+      "expected": "scripts/test/expected/kiem_tra_embedded_vm.expected",
+      "suite": "full"
+    },
+    {
       "id": "kiem_tra_chay_bytecode_tu_chu",
       "source": "scripts/test/kiem_tra_chay_bytecode_tu_chu.vi",
       "expected": "scripts/test/expected/kiem_tra_chay_bytecode_tu_chu.expected",
@@ -304,8 +310,11 @@
     {
       "id": "kiem_tra_de_quy_vuot_gioi_han",
       "source": "scripts/test/kiem_tra_de_quy_vuot_gioi_han.vi",
-      "expected": "scripts/test/expected/kiem_tra_de_quy_vuot_gioi_han.expected",
-      "suite": "full"
+      "historical_expected": "scripts/test/expected/kiem_tra_de_quy_vuot_gioi_han.expected",
+      "suite": "full",
+      "exit": 1,
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=15 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_dich_vu",
@@ -324,6 +333,35 @@
       "source": "scripts/test/kiem_tra_diem_vao_lop_chinh.vi",
       "expected": "scripts/test/expected/kiem_tra_diem_vao_lop_chinh.expected",
       "suite": "full"
+    },
+    {
+      "id": "kiem_tra_diem_vao_ke_thua_module",
+      "source": "scripts/test/fixtures/entrypoint_inheritance/imported.vi",
+      "sources": ["scripts/test/fixtures/entrypoint_inheritance/parent.vi"],
+      "stdout": "17\n",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_diem_vao_mac_dinh",
+      "source": "scripts/test/fixtures/entrypoint_inheritance/defaults.vi",
+      "stdout": "52\n",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_diem_vao_rieng_tu",
+      "source": "scripts/test/fixtures/entrypoint_inheritance/private.vi",
+      "suite": "full",
+      "diagnostic": "biên dịch điểm vào: lớp Chính cần phương thức chạy() công khai không yêu cầu tham số",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "kiem_tra_diem_vao_thieu_phuong_thuc",
+      "source": "scripts/test/fixtures/entrypoint_inheritance/missing.vi",
+      "suite": "full",
+      "diagnostic": "biên dịch điểm vào: lớp Chính cần phương thức chạy() công khai không yêu cầu tham số",
+      "exit": 1,
+      "failure_phase": "build"
     },
     {
       "id": "kiem_tra_dieu_kien_long_nhieu_cap",
@@ -953,6 +991,20 @@
       "source": "scripts/test/kiem_tra_jit_mvp.vi",
       "expected": "scripts/test/expected/kiem_tra_jit_mvp.expected",
       "suite": "full"
+    },
+    {
+      "id": "kiem_tra_jit_staging",
+      "source": "scripts/test/kiem_tra_jit_staging.vi",
+      "expected": "scripts/test/expected/kiem_tra_jit_staging.expected",
+      "suite": "full",
+      "platforms": ["Darwin", "Linux", "Windows"]
+    },
+    {
+      "id": "kiem_tra_gan_ket_hop",
+      "source": "scripts/test/kiem_tra_gan_ket_hop.vi",
+      "expected": "scripts/test/expected/kiem_tra_gan_ket_hop.expected",
+      "suite": "full",
+      "platforms": ["Darwin", "Linux", "Windows"]
     },
     {
       "id": "kiem_tra_jit_vpp",

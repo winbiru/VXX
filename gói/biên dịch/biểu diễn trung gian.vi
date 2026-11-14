@@ -537,23 +537,29 @@ lớp công khai Bộ Hạ IR {
                 đích thành viên = mình.biên dịch IR lấy thành viên(trái);
                 nếu (đích thành viên != rỗng) {
                     nếu (toán tử != "=") {
-                        ném "biên dịch IR: gán kết hợp vào thuộc tính chưa hỗ trợ";
+                        đích thành viên["gán kết hợp"] = đúng;
                     };
                     nếu (lấy từ điển(đích thành viên, "tạm", sai)) {
                         mình.biên dịch IR biểu thức(đích thành viên["biểu thức nhận"], lệnh);
                     };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán thành viên", đích thành viên);
                     mình.biên dịch IR biểu thức(phải, lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "toán tử gán", toán tử);
+                    };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán thành viên", đích thành viên);
                     trả về đúng;
                 };
                 nếu (lấy từ điển(trái, "loại", "") == "chỉ số") {
-                    nếu (toán tử != "=") {
-                        ném "biên dịch IR: gán kết hợp vào chỉ số chưa hỗ trợ";
-                    };
                     mình.biên dịch IR biểu thức(trái["đối tượng"], lệnh);
                     mình.biên dịch IR biểu thức(trái["chỉ số"], lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán kết hợp chỉ số", "");
+                    };
                     mình.biên dịch IR biểu thức(phải, lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "toán tử gán", toán tử);
+                    };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán chỉ số", "");
                     trả về đúng;
                 };

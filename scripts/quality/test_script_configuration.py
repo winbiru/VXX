@@ -452,6 +452,31 @@ print('ok')
         self.assertIn('FAIL reject', result.stdout)
         self.assertFalse(self.calls.exists())
 
+    def test_default_regression_routes_only_qualified_guests_to_jit(self):
+        jit = self.root / 'bin/vpp-jit'
+        jit.write_text(f'#!{sys.executable}\n' + """import os, pathlib, sys
+name = pathlib.Path(sys.argv[2]).stem
+if name == 'reject':
+    assert sys.argv[1] == '--check-dynamic'
+    print('V++ JIT: từ chối cú pháp')
+    sys.exit(1)
+assert name == 'regular0' and sys.argv[1] == '--dynamic'
+print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
+""")
+        jit.chmod(0o755)
+        options = ('--jit', str(jit), '--jobs', '2', '--case', 'regular0',
+                   '--case', 'regular1', '--case', 'reject')
+        result = self.invoke('all', *options)
+        self.assertIn('2 direct JIT cases, 1 AOT/toolchain cases', result.stdout)
+        self.assertIn('3 passed, 0 failed', result.stdout)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(Path(calls[0][1]).stem, 'regular1')
+        result = self.invoke('all', *options, status=1, fail=True)
+        self.assertIn('FAIL regular0', result.stdout)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertEqual([Path(call[1]).stem for call in calls], ['regular1', 'regular1'])
+
     def test_missing_binary_fails_without_rebuild(self):
         options = ('--case', 'regular0')
         self.invoke('build', *options)

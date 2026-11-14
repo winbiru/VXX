@@ -45,7 +45,13 @@ vpp_native_jit_service:
     movl %esi, %r12d
     movl %edx, %r13d
 #endif
-    cmpl $0, -64(%rbp)
+    cmpl $10, -64(%rbp)
+    je .Lvpp_jit_staging_new
+    cmpl $11, -64(%rbp)
+    jl 1f
+    cmpl $16, -64(%rbp)
+    jle .Lvpp_jit_lookup
+1:  cmpl $0, -64(%rbp)
     je .Lvpp_jit_host
     cmpl $1, -64(%rbp)
     je .Lvpp_jit_publish
@@ -74,6 +80,10 @@ vpp_native_jit_service:
 .Lvpp_jit_found:
     cmpl $3, -64(%rbp)
     je .Lvpp_jit_release
+    cmpl $10, 20(%rbx)
+    je .Lvpp_jit_staging
+    cmpl $10, -64(%rbp)
+    jge .Lvpp_jit_invalid
     cmpl $1, 20(%rbx)
     jne .Lvpp_jit_invalid
     cmpl $6, -64(%rbp)
@@ -195,6 +205,15 @@ vpp_native_jit_service:
     testl $3, %eax
     jne .Lvpp_jit_invalid
     movl %r13d, %r14d
+.Lvpp_jit_staging_new:
+    // Capacity is independent of the four public byte handles.
+    cmpl $10, -64(%rbp)
+    jne .Lvpp_jit_size_ready
+    testl %r12d, %r12d
+    jle .Lvpp_jit_invalid
+    cmpl $16777216, %r12d
+    ja .Lvpp_jit_invalid
+    movl %r12d, %r14d
 .Lvpp_jit_size_ready:
     cmpl $0x7fffffff, vpp_jit_next(%rip)
     je .Lvpp_jit_resource
@@ -229,7 +248,18 @@ vpp_native_jit_service:
     jae .Lvpp_jit_resource
 #endif
     movq %rax, %r15
-    movl $0, -80(%rbp)
+    cmpl $10, -64(%rbp)
+    jne 1f
+    incl vpp_jit_next(%rip)
+    movl vpp_jit_next(%rip), %eax
+    movq %r15, (%rbx)
+    movl %r14d, 8(%rbx)
+    movl $0, 12(%rbx)
+    movl %eax, 16(%rbx)
+    movl $10, 20(%rbx)
+    movl %r14d, 24(%rbx)
+    jmp .Lvpp_jit_done
+1:  movl $0, -80(%rbp)
 .Lvpp_jit_copy:
     JIT_ARG1 %r12d
     JIT_ARG2 -80(%rbp)
@@ -298,6 +328,7 @@ vpp_native_jit_service:
     movl %eax, 16(%rbx)
     movl -64(%rbp), %ecx
     movl %ecx, 20(%rbx)
+    movl $0, 24(%rbx)
     jmp .Lvpp_jit_done
 .Lvpp_jit_rollback:
 #ifdef _WIN32
@@ -312,6 +343,137 @@ vpp_native_jit_service:
     syscall
 #endif
     jmp .Lvpp_jit_resource
+// 11 append word, 12 append byte, 13 read byte, 14 read word,
+// 15 patch word from byte packet [offset,value], 16 seal(image size).
+.Lvpp_jit_staging:
+    movq (%rbx), %r15
+    movl 12(%rbx), %r14d
+    cmpl $11, -64(%rbp)
+    je .Lvpp_jit_stage_word
+    cmpl $12, -64(%rbp)
+    je .Lvpp_jit_stage_byte
+    cmpl $13, -64(%rbp)
+    je .Lvpp_jit_stage_read_byte
+    cmpl $14, -64(%rbp)
+    je .Lvpp_jit_stage_read_word
+    cmpl $15, -64(%rbp)
+    je .Lvpp_jit_stage_patch
+    cmpl $16, -64(%rbp)
+    je .Lvpp_jit_stage_seal
+    jmp .Lvpp_jit_invalid
+.Lvpp_jit_stage_word:
+    leal 4(%r14), %eax
+    cmpl 8(%rbx), %eax
+    ja .Lvpp_jit_invalid
+    movl %r13d, (%r15,%r14)
+    movl %eax, 12(%rbx)
+    jmp .Lvpp_jit_stage_ok
+.Lvpp_jit_stage_byte:
+    cmpl $255, %r13d
+    ja .Lvpp_jit_invalid
+    cmpl 8(%rbx), %r14d
+    jae .Lvpp_jit_invalid
+    movb %r13b, (%r15,%r14)
+    incl 12(%rbx)
+    jmp .Lvpp_jit_stage_ok
+.Lvpp_jit_stage_read_byte:
+    cmpl %r14d, %r13d
+    jae .Lvpp_jit_invalid
+    movzbl (%r15,%r13), %eax
+    jmp .Lvpp_jit_done
+.Lvpp_jit_stage_read_word:
+    cmpl $4, %r14d
+    jb .Lvpp_jit_invalid
+    leal -4(%r14), %eax
+    cmpl %eax, %r13d
+    ja .Lvpp_jit_invalid
+    movl (%r15,%r13), %eax
+    jmp .Lvpp_jit_done
+.Lvpp_jit_stage_patch:
+    JIT_ARG1 %r13d
+    call vpp_native_bytes_length
+    cmpl $8, %eax
+    jne .Lvpp_jit_invalid
+    JIT_ARG1 %r13d
+    JIT_ARG2 $0
+    call vpp_native_bytes_load_i32
+    cmpl $4, %r14d
+    jb .Lvpp_jit_invalid
+    leal -4(%r14), %ecx
+    cmpl %ecx, %eax
+    ja .Lvpp_jit_invalid
+    movl %eax, -80(%rbp)
+    JIT_ARG1 %r13d
+    JIT_ARG2 $4
+    call vpp_native_bytes_load_i32
+    movl -80(%rbp), %ecx
+    movl %eax, (%r15,%rcx)
+.Lvpp_jit_stage_ok:
+    xorl %eax, %eax
+    jmp .Lvpp_jit_done
+.Lvpp_jit_stage_seal:
+    testl %r13d, %r13d
+    jle .Lvpp_jit_invalid
+    cmpl %r14d, %r13d
+    ja .Lvpp_jit_invalid
+    movl %r14d, %eax
+    subl %r13d, %eax
+    testl $3, %eax
+    jne .Lvpp_jit_invalid
+    movl $17, 20(%rbx)
+    movl %r13d, %eax
+.Lvpp_jit_stage_reloc:
+    cmpl %r14d, %eax
+    jae .Lvpp_jit_stage_protect
+    movl (%r15,%rax), %ecx
+    testl $7, %ecx
+    jne .Lvpp_jit_invalid
+    cmpl $8, %r13d
+    jb .Lvpp_jit_invalid
+    leal -8(%r13), %edx
+    cmpl %edx, %ecx
+    ja .Lvpp_jit_invalid
+    movq (%r15,%rcx), %rdx
+    cmpq %r13, %rdx
+    jae .Lvpp_jit_invalid
+    addq %r15, %rdx
+    movq %rdx, (%r15,%rcx)
+    addl $4, %eax
+    jmp .Lvpp_jit_stage_reloc
+.Lvpp_jit_stage_protect:
+#ifdef _WIN32
+    movq %r15, %rcx
+    movl %r13d, %edx
+    movl $0x20, %r8d
+    leaq -120(%rbp), %r9
+    call VirtualProtect
+    testl %eax, %eax
+    je .Lvpp_jit_resource
+    movq $-1, %rcx
+    movq %r15, %rdx
+    movl %r13d, %r8d
+    call FlushInstructionCache
+    testl %eax, %eax
+    je .Lvpp_jit_stage_failed_rx
+#else
+    movq %r15, %rdi
+    movl %r13d, %esi
+    movl $5, %edx
+    movl $10, %eax
+    syscall
+    testq %rax, %rax
+    jne .Lvpp_jit_resource
+#endif
+    movl %r13d, 8(%rbx)
+    movl $5, 20(%rbx)
+    movl 16(%rbx), %eax
+    jmp .Lvpp_jit_done
+#ifdef _WIN32
+.Lvpp_jit_stage_failed_rx:
+    // Only release is valid after a protection/cache failure.
+    movl $17, 20(%rbx)
+    jmp .Lvpp_jit_resource
+#endif
 .Lvpp_jit_release:
 #ifdef _WIN32
     movq (%rbx), %rcx
@@ -322,8 +484,11 @@ vpp_native_jit_service:
     je .Lvpp_jit_resource
 #else
     movq (%rbx), %rdi
+    movl 24(%rbx), %esi
+    testl %esi, %esi
+    jne 1f
     movl 8(%rbx), %esi
-    movl $11, %eax
+1:  movl $11, %eax
     syscall
     testq %rax, %rax
     jne .Lvpp_jit_resource
@@ -331,6 +496,7 @@ vpp_native_jit_service:
     movq $0, (%rbx)
     movl $0, 16(%rbx)
     movl $0, 20(%rbx)
+    movl $0, 24(%rbx)
     xorl %eax, %eax
     jmp .Lvpp_jit_done
 .Lvpp_jit_address:

@@ -206,9 +206,11 @@ Nếu build bằng `scripts/macos/build-vpp-cli.sh`:
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
 ```
 
-CI macOS, Linux và Windows dùng bộ JIT trong gói V++ đã build.
-Runner mặc định chạy nguồn .vi bằng `vpp-jit --dynamic`, không build executable
-cho test thông thường, không tạo/giải nén artifact test và không fallback AOT.
+CI macOS, Linux và Windows dùng compiler và JIT trong gói V++ đã build.
+Runner mặc định chạy các fixture đã được đánh dấu `jit: true` bằng
+`vpp-jit --dynamic`; các fixture còn lại được build AOT một lần rồi thực thi.
+Không fallback AOT khi một fixture JIT thất bại. Cách này giữ hợp đồng của
+fixture chưa tương thích với giới hạn image JIT hoặc cần runtime bản địa.
 Các kiểm tra compiler/linker/VM/i32, tooling và các API JIT độc lập vẫn chạy theo
 hợp đồng riêng. Test từ chối biên dịch dùng `--check-dynamic`; test argv truyền
 đối số sau đường dẫn nguồn trong `--dynamic`.
@@ -218,7 +220,9 @@ python3 scripts/quality/run_native_regression.py --compiler "$PACKAGE/bin/vpp" \
   --jit "$PACKAGE/bin/vpp-jit" --jobs 2
 ```
 
-Để kiểm tra riêng đường biên dịch AOT, dùng `--backend aot`. Các tùy chọn
+Để kiểm tra riêng đường biên dịch AOT, dùng `--backend aot`. Để thử nghiệm
+JIT trên cả các nguồn chưa được xác nhận tương thích, dùng `--backend jit`.
+Các tùy chọn
 `--phase build/run`, `--artifacts`, `--batch-size`, `--module-suites` chỉ
 phục vụ kiểm tra AOT và tương thích với artifact cũ.
 

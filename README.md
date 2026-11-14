@@ -66,10 +66,11 @@ stderr. Đặt `VPP_JIT_TIER=0` để tắt tầng thích ứng và đo baseline
 chương trình. Chưa đo được lợi ích hiệu năng của tầng này; hàm tổng quát vẫn chạy mã
 native baseline.
 
-Giới hạn hiện tại: ảnh dynamic tối đa 2 MiB (kể cả bảng relocation), một luồng
-thực thi, chưa hỗ trợ descriptor FFI hoặc chọn hàm dynamic từ CLI. Nên import
-module hẹp; gói chuẩn tổng hợp hiện vượt giới hạn ảnh. JIT không phải môi
-trường cách ly mã không tin cậy.
+Giới hạn hiện tại: bộ đệm ảnh dynamic tối đa 16 MiB (kể cả bảng relocation),
+độc lập với bộ đệm byte thông thường 2 MiB. JIT hỗ trợ một luồng thực thi,
+chưa hỗ trợ descriptor FFI hoặc chọn hàm dynamic từ CLI. Import module hẹp
+vẫn giúp giảm thời gian biên dịch. JIT không phải môi trường cách ly mã không
+tin cậy.
 
 ```vi
 hàm cộng(a, b) {

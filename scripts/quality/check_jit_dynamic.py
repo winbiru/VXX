@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 
 
@@ -50,14 +51,14 @@ hàm chính() {
         missing.write_text('hàm chính() { trả về hàm_không_tồn_tại(); };', encoding='utf-8')
         before = {p.name: p.read_bytes() for p in work.iterdir()}
 
-        def run(source, status, expected=None, profile=False, tier=True, *, mode="--dynamic", guest_args=(), diagnostic=None):
+        def run(source, status, expected=None, profile=False, tier=True, *, mode="--dynamic", guest_args=(), diagnostic=None, timeout=600):
             run_env = dict(env)
             if profile:
                 run_env['VPP_JIT_PROFILE'] = '1'
             if not tier:
                 run_env['VPP_JIT_TIER'] = '0'
             result = subprocess.run([str(executable), mode, str(source), *guest_args], cwd=work,
-                                    env=run_env, capture_output=True, timeout=600)
+                                    env=run_env, capture_output=True, timeout=timeout)
             output = result.stdout.replace(b'\r\n', b'\n')
             error = result.stderr.replace(b'\r\n', b'\n')
             if result.returncode != status or (expected is not None and output != expected):
@@ -79,10 +80,13 @@ hàm chính() {
             guest_args=('Tiếng Việt', '', '--dynamic'))
         for stem in ('native_dynamic_vpp', 'native_aot_private_method'):
             run(FIXTURES / f'{stem}.vi', 0, (EXPECTED / f'{stem}.expected').read_bytes().replace(b'\r\n', b'\n'))
-        # The full umbrella package currently exceeds the dynamic image limit.
-        # Exercise the real library resolver with a narrow module instead.
+        # Exercise both the narrow library resolver and the full umbrella.
         run(library, 0, b'36\n1\n0\n15\n')
+        compound = ROOT / 'scripts/test/kiem_tra_gan_ket_hop.vi'
+        run(compound, 0, (EXPECTED / 'kiem_tra_gan_ket_hop.expected').read_bytes().replace(b'\r\n', b'\n'))
         if not args.baseline_only:
+            large = ROOT / 'scripts/test/kiem_tra_aot_type_branch.vi'
+            run(large, 0, (EXPECTED / 'kiem_tra_aot_type_branch.expected').read_bytes().replace(b'\r\n', b'\n'), timeout=1800)
             profile = run(FIXTURES / 'native_jit_hot.vi', 0,
                           (EXPECTED / 'native_jit_hot.expected').read_bytes().replace(b'\r\n', b'\n'), True)
             rows = {}
@@ -117,4 +121,8 @@ hàm chính() {
 
 
 if __name__ == '__main__':
+    # Bootstrap captures these streams as bytes and decodes the logs as UTF-8.
+    # Redirected Windows stdout can otherwise default to a legacy code page.
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
     main()

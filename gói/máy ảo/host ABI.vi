@@ -412,6 +412,32 @@ hàm vm_file_fd(token) {
     biến slot = thực thi tệp dữ liệu ô nhớ(token); nếu (slot < 0) { trả về -1; };
     trả về vm_get(2064 + slot * 16, 1);
 };
+// Embedded bytecode owns its file tokens independently of its caller.
+hàm vm_embedded_file_table(state) {
+    biến root = vm_get(4198720, 0);
+    nếu (root == 0 || vm_get(root, 2) != state) { trả về 0; };
+    trả về vm_get(root, 6);
+};
+hàm vm_embedded_file_index(table, token) {
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến item = vm_at(table, i);
+        nếu (item != 0 && vm_number(item) == token) { trả về i; };
+    };
+    trả về -1;
+};
+hàm vm_embedded_file_allowed(state, token) {
+    biến table = vm_embedded_file_table(state);
+    nếu (table == 0) { trả về 1; };
+    trả về vm_embedded_file_index(table, token) >= 0;
+};
+hàm vm_embedded_file_close_all(root) {
+    biến table = vm_get(root, 6);
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến item = vm_at(table, i);
+        nếu (item != 0) { tệp đóng(vm_number(item)); };
+    };
+    trả về 0;
+};
 // Native file primitives are small OS boundaries. The VM owns validation,
 // byte streaming, permission preservation and failure cleanup.
 hàm vm_file_rename(a, b) {
@@ -781,6 +807,7 @@ hàm vm_host(state, op, args) {
     nếu (n != vm_host_arity(op)) { trả về vm_error(21); };
     biến a = 0; biến b = 0; biến c = 0; biến d = 0;
     nếu (n > 0) { a = vm_at(args, 0); }; nếu (n > 1) { b = vm_at(args, 1); }; nếu (n > 2) { c = vm_at(args, 2); }; nếu (n > 3) { d = vm_at(args, 3); };
+    nếu (op == 157) { trả về vm_embedded_run(state, args); };
     nếu (op == 145) { trả về vm_type(a); };
     nếu (op == 146) {
         // Identity is only defined for VM reference values, as on Stage 0.
@@ -856,9 +883,20 @@ hàm vm_host(state, op, args) {
         biến lỗi_mở = máy lỗi(); byte hủy(đường_tệp_mở);
         vm_set(state, 9, lỗi_mở);
         nếu (token < 0) { trả về 0; };
-        trả về vm_int(token);
+        biến value = vm_int(token);
+        biến table = vm_embedded_file_table(state);
+        nếu (table != 0) {
+            biến saved = 0;
+            lặp(i = 0; i < vm_get(table, 1); i++) {
+                nếu (vm_at(table, i) == 0) { vm_put(table, i, value); saved = 1; thoát; };
+            };
+            nếu (saved == 0) { vm_append(table, value); };
+        };
+        nếu (vm_get(4198464, 1) != 0) { tệp đóng(token); trả về 0; };
+        trả về value;
     };
     nếu (op == 160 || op == 161) {
+        nếu (!vm_embedded_file_allowed(state, vm_number(a))) { trả về vm_int(-1); };
         biến fd = vm_file_fd(vm_number(a)); biến số_byte_io = vm_number(c);
         nếu (vm_tag(b) != 4 || số_byte_io < 1 || số_byte_io > 65536 || vm_get(b, 1) != số_byte_io || fd < 0) { trả về vm_int(-1); };
         biến vùng_io = vm_alloc(số_byte_io, 0); nếu (vùng_io == 0) { trả về 0; };
@@ -872,10 +910,17 @@ hàm vm_host(state, op, args) {
         nếu (op == 160 && got > 0) { lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(vùng_io + i))); }; };
         trả về vm_int(got);
     };
-    nếu (op == 162) { biến trạng_thái_đóng = tệp đóng(vm_number(a)); vm_set(state, 9, máy lỗi()); trả về vm_int(trạng_thái_đóng); };
+    nếu (op == 162) {
+        biến table = vm_embedded_file_table(state); biến token = vm_number(a); biến index = -1;
+        nếu (table != 0) { index = vm_embedded_file_index(table, token); nếu (index < 0) { trả về vm_int(-1); }; };
+        biến trạng_thái_đóng = tệp đóng(token); vm_set(state, 9, máy lỗi());
+        nếu (index >= 0) { vm_put(table, index, 0); };
+        trả về vm_int(trạng_thái_đóng);
+    };
     // Signed i32 positions: the OS boundary reports EOVERFLOW instead of truncating.
     nếu (op == 163 || op == 164) {
         nếu (vm_tag(a) != 1) { trả về vm_error(2); };
+        nếu (!vm_embedded_file_allowed(state, vm_number(a))) { trả về vm_error(2); };
         biến fd_seek = vm_file_fd(vm_number(a));
         nếu (fd_seek < 0) { trả về vm_error(2); };
         biến lệch_seek = 0; biến mốc_seek = 1;

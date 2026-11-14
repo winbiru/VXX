@@ -125,8 +125,9 @@ lớp công khai Bộ Ghi Ảnh JIT {
     hàm công khai khởi tạo() {
         mình.hệ = máy JIT thô(0, 0, 0);
         ảnh cần(mình.hệ >= 1 && mình.hệ <= 3, "host chưa hỗ trợ");
-        mình.đệm = byte mới();
-        ảnh cần(mình.đệm > 0, "không cấp được bộ đệm");
+        mình.đệm = máy JIT thô(10, 16777216, 0);
+        ảnh cần(mình.đệm > 0, "không cấp được bộ đệm JIT");
+        mình.kích thước = 0;
         mình.ký hiệu = {};
         mình.gọi = [];
         mình.con trỏ chờ = [];
@@ -134,30 +135,32 @@ lớp công khai Bộ Ghi Ảnh JIT {
         mình.mã = 0;
         mình.spec = -1;
     };
-    hàm riêng tư dài() { trả về byte dài(mình.đệm); };
+    hàm riêng tư dài() { trả về mình.kích thước; };
     hàm riêng tư ghi byte(b) {
-        ảnh cần(mình.dài() < 2097152, "ảnh vượt 2 MiB");
-        ảnh cần(byte thêm(mình.đệm, b) == 0, "không ghi được ảnh");
+        ảnh cần(mình.dài() < 16777216, "ảnh vượt 16 MiB");
+        ảnh cần(máy JIT thô(12, mình.đệm, b) == 0, "không ghi được ảnh");
+        mình.kích thước = mình.kích thước + 1;
     };
     hàm riêng tư ghi dãy(b) {
         n = máy ảo lấy độ dài(b);
-        ảnh cần(n <= 2097152 - mình.dài(), "ảnh vượt 2 MiB");
+        ảnh cần(n <= 16777216 - mình.dài(), "ảnh vượt 16 MiB");
         // Native byte storage writes words little-endian; avoid a virtual
         // method and length query for every emitted instruction byte.
         i = 0;
         khi (i + 4 <= n) {
             word = b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
-            ảnh cần(byte đẩy số nguyên ba mươi hai bit(mình.đệm, word) == 0, "không ghi được word");
+            bỏ kết quả = mình.ghi word(word);
             i += 4;
         };
         khi (i < n) {
-            ảnh cần(byte thêm(mình.đệm, b[i]) == 0, "không ghi được ảnh");
+            bỏ kết quả = mình.ghi byte(b[i]);
             i += 1;
         };
     };
     hàm riêng tư ghi word(n) {
-        ảnh cần(mình.dài() <= 2097148, "ảnh vượt 2 MiB");
-        ảnh cần(byte đẩy số nguyên ba mươi hai bit(mình.đệm, n) == 0, "không ghi được word");
+        ảnh cần(mình.dài() <= 16777212, "ảnh vượt 16 MiB");
+        ảnh cần(máy JIT thô(11, mình.đệm, n) == 0, "không ghi được word");
+        mình.kích thước = mình.kích thước + 4;
     };
     hàm riêng tư định nghĩa(tên) {
         ảnh cần(lấy từ điển(mình.ký hiệu, tên, -1) < 0, "ký hiệu trùng: " + tên);
@@ -184,9 +187,9 @@ lớp công khai Bộ Ghi Ảnh JIT {
             p = r[i]["offset"];
             ảnh cần(p > trước && p >= 0 && p <= n - 4, "CALL offset sai");
             nếu (mình.hệ == 1) {
-                ảnh cần(p % 4 == 0 && byte đọc số nguyên ba mươi hai bit(mình.đệm, bắt đầu + p) == -1811939328, "CALL opcode ARM64 sai");
+                ảnh cần(p % 4 == 0 && máy JIT thô(14, mình.đệm, bắt đầu + p) == -1811939328, "CALL opcode ARM64 sai");
             } hoặc {
-                ảnh cần(p > 0 && byte lấy(mình.đệm, bắt đầu + p - 1) == 232 && byte đọc số nguyên ba mươi hai bit(mình.đệm, bắt đầu + p) == 0, "CALL opcode x86-64 sai");
+                ảnh cần(p > 0 && máy JIT thô(13, mình.đệm, bắt đầu + p - 1) == 232 && máy JIT thô(14, mình.đệm, bắt đầu + p) == 0, "CALL opcode x86-64 sai");
             };
             bỏ kết quả = máy ảo thêm cuối danh sách(mình.gọi, [bắt đầu + p, "_" + r[i]["symbol"]]);
             trước = p;
@@ -233,6 +236,11 @@ lớp công khai Bộ Ghi Ảnh JIT {
         lặp(k = 0; k < 8; k++) { bỏ kết quả = mình.ghi byte(byte lấy(địa chỉ, k)); };
         nếu (mình.hệ != 1) { bỏ kết quả = mình.ghi dãy([65, 255, 227]); };
     };
+    hàm riêng tư sửa word(packet, tại, word) {
+        ảnh cần(byte ghi số nguyên ba mươi hai bit(packet, 0, tại) == 0, "offset relocation sai");
+        ảnh cần(byte ghi số nguyên ba mươi hai bit(packet, 4, word) == 0, "word relocation sai");
+        ảnh cần(máy JIT thô(15, mình.đệm, packet) == 0, "relocation thất bại");
+    };
     hàm công khai hoàn tất() {
         ảnh cần(mình.phần == 2 && mình.mã == 0, "ảnh đã hoàn tất");
         bảng = {};
@@ -254,22 +262,23 @@ lớp công khai Bộ Ghi Ảnh JIT {
                     ảnh cần(chênh % 4 == 0 && chênh >= -134217728 && chênh < 134217728, "CALL ngoài phạm vi");
                     chênh = -1811939328 | ((chênh / 4) & 67108863);
                 } hoặc { chênh -= 4; };
-                ảnh cần(byte ghi số nguyên ba mươi hai bit(mình.đệm, tại, chênh) == 0, "CALL relocation thất bại");
+                bỏ kết quả = mình.sửa word(địa chỉ, tại, chênh);
             };
+            mình.spec = lấy từ điển(mình.ký hiệu, "_vpp_aot_spec", -1);
+            ảnh cần(mình.spec >= 0, "thiếu metadata");
+            n = mình.dài();
+            lặp(i = 0; i < máy ảo lấy độ dài(mình.con trỏ chờ); i++) {
+                tại = mình.con trỏ chờ[i][0];
+                đích = lấy từ điển(mình.ký hiệu, mình.con trỏ chờ[i][1], -1);
+                ảnh cần(đích >= 0 && đích < n, "thiếu ký hiệu dữ liệu");
+                bỏ kết quả = mình.sửa word(địa chỉ, tại, đích);
+                bỏ kết quả = mình.ghi word(tại);
+            };
+            mình.mã = máy JIT thô(16, mình.đệm, n);
+            ảnh cần(mình.mã > 0, "không công bố được ảnh RX");
+            mình.đệm = 0;
         } bắt lỗi(e) { byte hủy(địa chỉ); ném e; };
         byte hủy(địa chỉ);
-        mình.spec = lấy từ điển(mình.ký hiệu, "_vpp_aot_spec", -1);
-        ảnh cần(mình.spec >= 0, "thiếu metadata");
-        n = mình.dài();
-        lặp(i = 0; i < máy ảo lấy độ dài(mình.con trỏ chờ); i++) {
-            tại = mình.con trỏ chờ[i][0];
-            đích = lấy từ điển(mình.ký hiệu, mình.con trỏ chờ[i][1], -1);
-            ảnh cần(đích >= 0 && đích < n, "thiếu ký hiệu dữ liệu");
-            ảnh cần(byte ghi số nguyên ba mươi hai bit(mình.đệm, tại, đích) == 0, "pointer relocation thất bại");
-            bỏ kết quả = mình.ghi word(tại);
-        };
-        mình.mã = máy JIT thô(5, mình.đệm, n);
-        ảnh cần(mình.mã > 0, "không công bố được ảnh RX");
         mình.phần = 3;
         trả về mình.mã;
     };
@@ -280,7 +289,7 @@ lớp công khai Bộ Ghi Ảnh JIT {
     };
     hàm công khai đóng() {
         nếu (mình.mã > 0) { máy JIT thô(3, mình.mã, 0); mình.mã = 0; };
-        nếu (mình.đệm > 0) { byte hủy(mình.đệm); mình.đệm = 0; };
+        nếu (mình.đệm > 0) { máy JIT thô(3, mình.đệm, 0); mình.đệm = 0; };
     };
 };
 

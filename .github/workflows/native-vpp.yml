@@ -400,7 +400,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-      - name: Run full V++ regression (direct JIT and toolchain checks)
+      - name: Run full V++ regression (qualified JIT and AOT checks)
         run: |
           python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --logs regression-logs/full
       - name: Run i32 compiler regression
@@ -430,7 +430,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
-      - name: Run full V++ regression (direct JIT and toolchain checks)
+      - name: Run full V++ regression (qualified JIT and AOT checks)
         run: |
           export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
           python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --logs regression-logs/full
@@ -476,7 +476,7 @@ jobs:
           $package = "$env:RUNNER_TEMP/regression-compiler"
           python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
           if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
-      - name: Run full V++ regression (direct JIT and toolchain checks)
+      - name: Run full V++ regression (qualified JIT and AOT checks)
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'

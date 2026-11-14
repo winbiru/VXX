@@ -470,7 +470,11 @@ lớp công khai Xử Lý Chuỗi {
     hàm công khai mã hóa caesar(s, khóa) {
         chữ thường = "abcdefghijklmnopqrstuvwxyz";
         chữ hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        dịch = khóa % 26;
+        kiểu khóa = loại của(khóa);
+        nếu (kiểu khóa != "số nguyên" && kiểu khóa != "số thực") {
+            ném "mã hóa caesar: khóa phải là số nguyên";
+        };
+        dịch = thành số nguyên(khóa) % 26;
         nếu (dịch < 0) {
             dịch = dịch + 26;
         };

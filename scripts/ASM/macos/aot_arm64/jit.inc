@@ -19,7 +19,13 @@ _vpp_native_jit_service:
     mov w19, w0
     mov w20, w1
     mov w21, w2
-    cbz w19, Ljit_host
+    cmp w19, #10
+    b.eq Ljit_staging_new
+    cmp w19, #11
+    b.lt 1f
+    cmp w19, #16
+    b.le Ljit_lookup
+1:  cbz w19, Ljit_host
     cmp w19, #1
     b.eq Ljit_publish
     cmp w19, #5
@@ -50,6 +56,10 @@ Ljit_found:
     cmp w19, #3
     b.eq Ljit_release
     ldr w9, [x22, #20]
+    cmp w9, #10
+    b.eq Ljit_staging
+    cmp w19, #10
+    b.ge Ljit_invalid
     cmp w9, #1
     b.ne Ljit_invalid
     cmp w19, #6
@@ -142,6 +152,15 @@ Ljit_publish_limit_done:
     tst w9, #3
     b.ne Ljit_invalid
     mov w23, w21
+Ljit_staging_new:
+    cmp w19, #10
+    b.ne Ljit_image_size_ready
+    cmp w20, #0
+    b.le Ljit_invalid
+    mov w9, #0x1000000
+    cmp w20, w9
+    b.hi Ljit_invalid
+    mov w23, w20
 Ljit_image_size_ready:
     adrp x22, _vpp_jit_slots@PAGE
     add x22, x22, _vpp_jit_slots@PAGEOFF
@@ -169,7 +188,19 @@ Ljit_allocate:
     cmn x0, #1
     b.eq Ljit_resource
     mov x24, x0
-    mov w26, #0
+    cmp w19, #10
+    b.ne 1f
+    ldr w0, [x25]
+    add w0, w0, #1
+    str w0, [x25]
+    str x24, [x22]
+    str w23, [x22, #8]
+    str wzr, [x22, #12]
+    str w0, [x22, #16]
+    str w19, [x22, #20]
+    str w23, [x22, #24]
+    b Ljit_done
+1:  mov w26, #0
 Ljit_copy:
     mov w0, w20
     mov w1, w26
@@ -223,6 +254,7 @@ Ljit_image_relocated:
     str w23, [x22, #8]
     str w0, [x22, #16]
     str w19, [x22, #20]
+    str wzr, [x22, #24]
     b Ljit_done
 Ljit_rollback:
     mov x0, x24
@@ -230,14 +262,133 @@ Ljit_rollback:
     mov x16, #73                 // Darwin SYS_munmap
     svc #0x80
     b Ljit_resource
+// Staging mapping is RW until sealing. No native pointer is exposed.
+Ljit_staging:
+    ldr x24, [x22]
+    ldr w23, [x22, #12]
+    cmp w19, #11
+    b.eq Ljit_stage_word
+    cmp w19, #12
+    b.eq Ljit_stage_byte
+    cmp w19, #13
+    b.eq Ljit_stage_read_byte
+    cmp w19, #14
+    b.eq Ljit_stage_read_word
+    cmp w19, #15
+    b.eq Ljit_stage_patch
+    cmp w19, #16
+    b.eq Ljit_stage_seal
+    b Ljit_invalid
+Ljit_stage_word:
+    add w9, w23, #4
+    ldr w10, [x22, #8]
+    cmp w9, w10
+    b.hi Ljit_invalid
+    str w21, [x24, w23, uxtw]
+    str w9, [x22, #12]
+    b Ljit_stage_ok
+Ljit_stage_byte:
+    cmp w21, #255
+    b.hi Ljit_invalid
+    ldr w9, [x22, #8]
+    cmp w23, w9
+    b.hs Ljit_invalid
+    strb w21, [x24, w23, uxtw]
+    add w23, w23, #1
+    str w23, [x22, #12]
+    b Ljit_stage_ok
+Ljit_stage_read_byte:
+    cmp w21, w23
+    b.hs Ljit_invalid
+    ldrb w0, [x24, w21, uxtw]
+    b Ljit_done
+Ljit_stage_read_word:
+    cmp w23, #4
+    b.lo Ljit_invalid
+    sub w9, w23, #4
+    cmp w21, w9
+    b.hi Ljit_invalid
+    ldr w0, [x24, w21, uxtw]
+    b Ljit_done
+Ljit_stage_patch:
+    mov w0, w21
+    bl _vpp_native_bytes_length
+    cmp w0, #8
+    b.ne Ljit_invalid
+    mov w0, w21
+    mov w1, #0
+    bl _vpp_native_bytes_load_i32
+    cmp w23, #4
+    b.lo Ljit_invalid
+    sub w9, w23, #4
+    cmp w0, w9
+    b.hi Ljit_invalid
+    mov w26, w0
+    mov w0, w21
+    mov w1, #4
+    bl _vpp_native_bytes_load_i32
+    str w0, [x24, w26, uxtw]
+Ljit_stage_ok:
+    mov w0, #0
+    b Ljit_done
+Ljit_stage_seal:
+    cmp w21, #0
+    b.le Ljit_invalid
+    cmp w21, w23
+    b.hi Ljit_invalid
+    sub w9, w23, w21
+    tst w9, #3
+    b.ne Ljit_invalid
+    // A partial relocation cannot be retried or written; release only.
+    mov w9, #17
+    str w9, [x22, #20]
+    mov w26, w21
+Ljit_stage_reloc:
+    cmp w26, w23
+    b.hs Ljit_stage_protect
+    ldr w9, [x24, w26, uxtw]
+    tst w9, #7
+    b.ne Ljit_invalid
+    cmp w21, #8
+    b.lo Ljit_invalid
+    sub w10, w21, #8
+    cmp w9, w10
+    b.hi Ljit_invalid
+    add x9, x24, w9, uxtw
+    ldr x10, [x9]
+    cmp x10, x21
+    b.hs Ljit_invalid
+    add x10, x24, x10
+    str x10, [x9]
+    add w26, w26, #4
+    b Ljit_stage_reloc
+Ljit_stage_protect:
+    mov x0, x24
+    mov w1, w21
+    bl Ljit_flush_cache
+    mov x0, x24
+    mov w1, w21
+    mov w2, #5
+    mov x16, #74
+    svc #0x80
+    cbnz w0, Ljit_resource
+    str w21, [x22, #8]
+    mov w9, #5
+    str w9, [x22, #20]
+    ldr w0, [x22, #16]
+    b Ljit_done
 Ljit_release:
     ldr x0, [x22]
+    ldr w1, [x22, #24]
+    cbnz w1, 1f
     ldr w1, [x22, #8]
-    mov x16, #73
+1:  mov x16, #73
     svc #0x80
     cbnz w0, Ljit_resource
     str xzr, [x22]
     str wzr, [x22, #16]
+    str wzr, [x22, #20]
+    str wzr, [x22, #24]
     b Ljit_done
 Ljit_address:
     mov w0, w21

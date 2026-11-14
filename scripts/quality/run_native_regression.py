@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run V++ source regressions in JIT; retain explicit toolchain assertions."""
+"""Run qualified V++ fixtures in JIT and other regressions on their native toolchain."""
 import argparse
 import collections
 import concurrent.futures
@@ -63,6 +63,12 @@ def toolchain_reason(case):
     if case["id"] in {"kiem_tra_jit_vpp"}:
         return "standalone JIT API/runtime assertion"
     return None
+
+
+def jit_eligible(case, experimental=False):
+    """Do not assume an ordinary AOT fixture is supported by dynamic JIT."""
+    return not toolchain_reason(case) and (
+        experimental or case.get("jit", False) or case.get("compile_reject", False))
 
 
 def jit_environment(env):
@@ -929,14 +935,13 @@ def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout
                 shutil.copy2(http_log, destination / "server.log")
 
 
-def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record):
+def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record, *, experimental=False):
     """Run sources independently; never build or fall back for a JIT case."""
     errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
-    guests = [c for c in cases if not toolchain_reason(c)]
-    checks = [c for c in cases if toolchain_reason(c)]
-    print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} toolchain checks", flush=True)
+    guests = [c for c in cases if jit_eligible(c, experimental)]
+    checks = [c for c in cases if not jit_eligible(c, experimental)]
+    print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} AOT/toolchain cases", flush=True)
     server = None
-    vm = None
     def run_guest(case):
         start = time.monotonic()
         print(f"START JIT {case['id']}", flush=True)
@@ -963,17 +968,10 @@ def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record):
                 record(c, "FAIL", f"JIT HTTP fixture: {exc}", 0)
         finally:
             stop_http(server)
-    for case in checks:
-        start = time.monotonic()
-        reason = toolchain_reason(case)
-        print(f"START TOOLCHAIN {case['id']}: {reason}", flush=True)
-        try:
-            if "vm_phase" in case and vm is None:
-                vm = prepare_vm(compiler, logs, env, timeout)
-            run_case(case, compiler, logs / case["id"], env, timeout, vm=vm)
-            record(case, "PASS", "", time.monotonic() - start)
-        except errors as exc:
-            record(case, "FAIL", str(exc), time.monotonic() - start)
+    if checks:
+        # Build unqualified fixtures once, then execute them without invoking
+        # the compiler again. A failing qualified JIT case never enters here.
+        staged_regression(checks, compiler, logs, env, timeout, jobs, record)
 
 
 def print_failure_logs(directory):
@@ -991,7 +989,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", type=Path)
     parser.add_argument("--backend", choices=("jit", "aot"),
-                        help="default: direct JIT; use aot for explicit compiler regression")
+                        help="default: qualified JIT + AOT; jit: experimental all ordinary sources; aot: compiler regression")
     parser.add_argument("--jit", type=Path,
                         help="path to packaged JIT (default: vpp-jit beside compiler)")
     parser.add_argument("--suite", choices=("full", "i32", "smoke"), default="full")
@@ -1091,6 +1089,8 @@ def main():
     installed = compiler.parent.parent / "share/vpp"
     env.setdefault("VPP_HOME", str(installed if (installed / "gói").is_dir() else ROOT))
     env.update(VPP_NATIVE_NO_CACHE="1", VPP_FFI_ENV_TEST="vpp-env-ffi-ok", VPP_FFI_ENV_EMPTY_TEST="")
+    # Child quality scripts write UTF-8 logs even when Windows redirects stdout.
+    env["PYTHONIOENCODING"] = "utf-8"
     env.pop("VPP_FFI_ENV_MISSING_TEST", None)
     logs = args.logs.resolve()
     logs.mkdir(parents=True, exist_ok=True)
@@ -1141,7 +1141,8 @@ def main():
             elif case["id"] in jit_cases:
                 record(case, "JIT_READY", "source saved in checkout; run with packaged JIT", 0)
     elif direct:
-        direct_regression(cases, compiler, jit, logs, env, args.timeout, args.jobs or 1, record)
+        direct_regression(cases, compiler, jit, logs, env, args.timeout, args.jobs or 1, record,
+                          experimental=args.backend == "jit")
     elif args.jobs is not None:
         staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
                           batch_size=args.batch_size, module_suites=args.module_suites)
@@ -1193,4 +1194,6 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
     raise SystemExit(main())

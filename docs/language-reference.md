@@ -61,6 +61,15 @@ Toán tử chính: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&
 `+` cộng số khi hai toán hạng là số; nếu có toán hạng phi số, runtime nối biểu diễn chuỗi.
 Chi tiết promotion, equality, ordering và truthiness được khóa trong `docs/semantics.md`.
 
+Phép gán kết hợp như `+=` áp dụng cho biến, thuộc tính đối tượng và phần tử
+danh sách hoặc từ điển. Với thuộc tính và chỉ số, đối tượng nhận và chỉ số
+được tính đúng một lần; giá trị cũ được đọc trước khi tính vế phải.
+
+```vi
+danhSách[0] += 10;
+dữLiệu["phiên bản"] += 1;
+```
+
 ## Điều kiện và vòng lặp
 
 ```vi

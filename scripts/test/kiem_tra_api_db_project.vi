@@ -1,8 +1,8 @@
-nhập src.tests.fixtures.api_project.database.*;
-nhập src.tests.fixtures.api_project.controller.*;
-nhập src.tests.fixtures.api_project.repository.*;
-nhập src.tests.fixtures.api_project.mapper.*;
-nhập src.tests.fixtures.api_project.service.*;
+nhập scripts.test.fixtures.api_project.database.*;
+nhập scripts.test.fixtures.api_project.controller.*;
+nhập scripts.test.fixtures.api_project.repository.*;
+nhập scripts.test.fixtures.api_project.mapper.*;
+nhập scripts.test.fixtures.api_project.service.*;
 nhập gói.ứng dụng.cầu nối.giao diện lập trình.*;
 
 lớp công khai ApiDbProjectTest {

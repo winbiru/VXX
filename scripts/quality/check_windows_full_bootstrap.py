@@ -74,7 +74,8 @@ def audit_pe(path, deterministic=True):
 
 def clean_env():
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith('VPP_')}
-    env.update(VPP_NATIVE_TARGET='windows-x86_64', VPP_NATIVE_NO_CACHE='1')
+    env.update(VPP_NATIVE_TARGET='windows-x86_64', VPP_NATIVE_NO_CACHE='1',
+               PYTHONIOENCODING='utf-8')
     return env
 
 
@@ -369,4 +370,6 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
     sys.exit(main())

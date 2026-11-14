@@ -10,6 +10,7 @@ nhập phân giải máy.*;
 nhập host ABI.*;
 nhập nạp chương trình.*;
 nhập runtime.*;
+nhập thực thi.*;
 
 hàm aot_state() { trả về vm_get(4198464, 2); };
 hàm aot_status() { trả về vm_get(4198464, 1) != 0; };
@@ -2416,8 +2417,6 @@ hàm aot_native_core(frame, id, count) {
 // Arbitrary foreign descriptors and compiler-host services have no native
 // V++ provider yet. Reject them explicitly; never load a C++ fallback.
 hàm aot_foreign(frame, descriptor, count) { vm_error(22); trả về 1; };
-hàm vm_execute(state) { vm_error(22); trả về 0; };
-hàm vm_run(state) { vm_error(22); trả về 0; };
 hàm aot_switch_begin(frame) {
     biến switches = vm_get(frame, 8);
     nếu (switches == 0) { switches = vm_vector(4); vm_set(frame, 8, switches); };

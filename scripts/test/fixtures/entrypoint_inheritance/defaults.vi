@@ -1,0 +1,7 @@
+lớp Cha {
+    hàm công khai chạy(x = 42) { in mình.giá_trị + x; };
+};
+lớp Trung kế thừa Cha {};
+lớp Chính kế thừa Trung {
+    hàm khởi tạo(x = 10) { mình.giá_trị = x; };
+};
