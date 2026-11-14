@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run V++/ASM regression fixtures against an existing native compiler."""
+"""Run V++ source regressions in JIT; retain explicit toolchain assertions."""
 import argparse
 import collections
 import concurrent.futures
@@ -44,12 +44,40 @@ MODULE_SUITES = {
     "time": ("goi_thoi_gian", "goi_thoi_gian_1_0"),
 }
 HARNESS_KEYS = ("dump", "linker_phase", "vm_phase", "cmake")
+# Only explicitly reviewed language fixtures may run as dynamic JIT guests.
+JIT_CASE_KEYS = {"id", "suite", "source", "expected", "stdout", "exit", "smoke", "jit"}
+
+
+def toolchain_reason(case):
+    """Cases whose contract requires a specific compiler or executable."""
+    if case["suite"] == "i32":
+        return "i32 compiler/runtime"
+    if "run_diagnostic_regex" in case or "run_forbidden_regex" in case:
+        return "AOT runtime diagnostic assertion"
+    if "diagnostic" in case:
+        return "compiler diagnostic assertion"
+    if any(key in case for key in HARNESS_KEYS):
+        return "compiler/linker/VM artifact assertion"
+    if case.get("tooling_test"):
+        return "build tooling and executable fixture"
+    if case["id"] in {"kiem_tra_jit_vpp"}:
+        return "standalone JIT API/runtime assertion"
+    return None
+
+
+def jit_environment(env):
+    env = dict(env, VPP_AOT_ASSEMBLER="/assembler-must-not-run",
+               VPP_AOT_LINKER="/linker-must-not-run")
+    env["PATH"] = str(Path(os.environ["SystemRoot"]) / "System32") if os.name == "nt" else ""
+    env.pop("VPP_JIT_PROFILE", None)
+    env.pop("VPP_JIT_TIER", None)
+    return env
 
 
 def module_source(case):
     """Adapt a reviewed function-only fixture without merging its imports."""
     if case.get("suite") != "full" or set(case) - {
-            "id", "suite", "source", "expected", "http", "smoke"} or "expected" not in case:
+            "id", "suite", "source", "expected", "http", "smoke", "jit"} or "expected" not in case:
         return None
     source = (ROOT / case["source"]).read_text(encoding="utf-8")
     # Only imports/comments before the entry function; no argument or relative
@@ -193,6 +221,9 @@ def load_manifest():
         actual = {p for p in actual if not any(part.startswith(".") for part in Path(p).parts)}
         if actual != registered:
             raise ValueError(f"{kind} inventory mismatch: new={sorted(actual-registered)}, missing={sorted(registered-actual)}")
+    for case in cases:
+        if case.get("jit") and (case["suite"] != "full" or set(case) - JIT_CASE_KEYS):
+            raise ValueError(f"unsupported JIT case configuration: {case['id']}")
     full = [c for c in cases if c["suite"] == "full"]
     shards = partition(full, 16)
     assigned = [c["id"] for shard in shards for c in shard]
@@ -337,7 +368,7 @@ def verify_failure(case, status, logs, stage):
 
 
 def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=None,
-             prepared_binary=None, selector=None):
+             prepared_binary=None, selector=None, jit=None):
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
@@ -409,7 +440,21 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             if status:
                 raise RuntimeError(f"CMake harness exit {status}")
             return
-        if phase != "run":
+        if jit is not None:
+            if phase == "build" or selector is not None or toolchain_reason(case):
+                raise RuntimeError("invalid JIT execution plan")
+            env = jit_environment(env)
+            if case.get("compile_reject") or case.get("failure_phase") == "build":
+                status = execute([jit, "--check-dynamic", source], cwd, env, logs, "build", timeout)
+                if binary.exists():
+                    raise RuntimeError("JIT check produced a guest executable")
+                if case.get("compile_reject"):
+                    if status != 1 or "V++ JIT: từ chối cú pháp".encode() not in (logs / "build.stdout").read_bytes():
+                        raise RuntimeError(f"expected JIT syntax rejection, got exit {status}")
+                else:
+                    verify_failure(case, status, logs, "build")
+                return False
+        elif phase != "run":
             status = build(compiler, source, binary, ROOT, env, logs, timeout)
             if case.get("compile_reject"):
                 if status != 1 or binary.exists():
@@ -426,7 +471,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
                 prepare_dns_mock(compiler, cwd, env, logs, timeout)
             if phase == "build":
                 return True
-        if not binary.is_file():
+        if jit is None and not binary.is_file():
             raise RuntimeError("missing prepared executable")
         if case["suite"] == "full":
             # Test programs may write relative paths; do not mutate the checkout.
@@ -434,10 +479,21 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             shutil.copytree(ROOT / "gói", cwd / "gói")
             shutil.copytree(TESTS / "fixtures", cwd / "fixtures", ignore=shutil.ignore_patterns(".*"))
         if case.get("dns_mock"):
-            run_dns_mock(binary, cwd, env, logs)
+            if jit is None:
+                run_dns_mock(binary, cwd, env, logs)
+            else:
+                run_dns_mock([jit, "--dynamic", source], cwd, env, logs,
+                             server=[jit, "--dynamic", TESTS / "fixtures/native_dns_mock.vi"],
+                             timeout=timeout)
             return
         args = case.get("args", []) if selector is None else [selector]
-        status = execute([binary, *args], cwd, env, logs, "run", timeout)
+        command = [jit, "--dynamic", source, *args] if jit is not None else [binary, *args]
+        status = execute(command, cwd, env, logs, "run", timeout)
+        if jit is not None:
+            if binary.exists():
+                raise RuntimeError("JIT produced a guest executable")
+            if not (case.get("run_diagnostic_regex") or case.get("diagnostic")) and (logs / "run.stderr").read_bytes():
+                raise RuntimeError("unexpected JIT stderr")
         if "diagnostic" in case:
             if case.get("failure_phase") == "build":
                 raise RuntimeError("expected build rejection, but compiler produced an executable")
@@ -463,7 +519,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             raise RuntimeError("stdout differs from golden")
 
 
-def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None):
+def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, timeout=30):
     # Keep the actual V++ server and client on every OS; Python only manages
     # their lifetime and checks the protocol between the test processes.
     config = logs / "config"
@@ -471,9 +527,9 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None):
     hosts = logs / "empty-hosts"
     hosts.touch()
     server_out = logs / "server.out"
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + timeout
     with config.open("rb") as inp, server_out.open("wb") as out, (logs / "server.err").open("wb") as err:
-        worker = subprocess.Popen([str(server)], cwd=cwd, env={**env, "PATH": ""},
+        worker = subprocess.Popen([str(x) for x in server] if isinstance(server, list) else [str(server)], cwd=cwd, env={**env, "PATH": ""},
                                   stdin=inp, stdout=out, stderr=err)
         try:
             while True:
@@ -493,7 +549,7 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None):
                               VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
             if image is not None:
                 client_env["PATH"] = ""
-            status = execute([client] if image is None else [client, image], cwd, client_env,
+            status = execute((client if isinstance(client, list) else [client]) if image is None else [client, image], cwd, client_env,
                              logs, "client", max(0.1, deadline - time.monotonic()))
             if image is not None and mode >= 10:
                 if status == 0 or b"error=16" not in (logs / "client.stderr").read_bytes():
@@ -529,15 +585,16 @@ def prepare_dns_mock(compiler, cwd, env, logs, timeout):
         raise RuntimeError("missing DNS server executable")
 
 
-def run_dns_mock(client, cwd, env, logs):
-    server = cwd / executable_name("dns-server")
+def run_dns_mock(client, cwd, env, logs, server=None, timeout=30):
+    if server is None:
+        server = cwd / executable_name("dns-server")
     failures = []
     for mode in (0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 30, 31, 32, 33, 34, 35, 36, 37):
         queries = 2 if mode in (0, 1, 3, 20, 21) else 1
         mode_logs = logs / f"mode-{mode}"
         mode_logs.mkdir(exist_ok=True)
         try:
-            run_dns_mode(server, client, cwd, env, mode_logs, mode, queries)
+            run_dns_mode(server, client, cwd, env, mode_logs, mode, queries, timeout=timeout)
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
             failures.append(f"mode {mode}: {exc}")
     if failures:
@@ -552,11 +609,13 @@ def prepare_http(compiler, directory, env, timeout):
     return binary
 
 
-def start_prepared_http(binary, directory, env):
+def start_prepared_http(binary, directory, env, timeout=30):
+    directory.mkdir(parents=True, exist_ok=True)
+    command = [str(x) for x in binary] if isinstance(binary, list) else [str(binary)]
     with (directory / "server.log").open("wb") as log:
-        process = subprocess.Popen([str(binary)], cwd=directory, env=env, stdout=log, stderr=log)
+        process = subprocess.Popen(command, cwd=directory, env=env, stdout=log, stderr=log)
     try:
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and process.poll() is None:
             try:
                 with urllib.request.urlopen("http://127.0.0.1:18080/health", timeout=1) as response:
@@ -764,7 +823,7 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
             stop_http(server)
 
 
-def artifact_inputs(compiler):
+def artifact_inputs(compiler, jit=None):
     """Reject artifacts from a different compiler, test corpus or tool version."""
     digest = hashlib.sha256()
     paths = [MANIFEST, Path(__file__).resolve()]
@@ -778,14 +837,19 @@ def artifact_inputs(compiler):
     return {"version": 1, "system": platform.system(), "machine": platform.machine().lower(),
             "compiler": hashlib.sha256(compiler.read_bytes()).hexdigest(),
             "backend": hashlib.sha256(backend.read_bytes()).hexdigest() if backend.is_file() else None,
-            "sources": digest.hexdigest()}
+            "sources": digest.hexdigest(),
+            "jit": hashlib.sha256(jit.read_bytes()).hexdigest() if jit is not None else None}
 
 
-def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout, record):
-    """Execute only saved binaries, in fresh workspaces on every invocation."""
+def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout, record, jit=None):
+    """Run saved AOT binaries and JIT sources in fresh workspaces."""
     ready = {c["id"]: c for c in plan["ready"]}
     checked = {c["id"]: c for c in plan["checks"]}
-    missing = {c["id"] for c in cases} - (ready.keys() | checked.keys())
+    jit_ids = set(plan.get("jit_cases", []))
+    selected_jit = {c["id"] for c in cases if jit is not None and c.get("jit")}
+    if jit_ids.intersection(c["id"] for c in cases) != selected_jit or jit_ids & (ready.keys() | checked.keys()):
+        raise RuntimeError("JIT cases do not match the test artifact")
+    missing = {c["id"] for c in cases} - (ready.keys() | checked.keys() | jit_ids)
     if missing:
         raise RuntimeError(f"cases missing from build artifact: {sorted(missing)}")
 
@@ -819,9 +883,17 @@ def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout
                     record(case, result["status"], "checked during build: " + result["detail"], 0)
                     continue
                 start = time.monotonic()
-                print(f"RUN {name} (prebuilt)", flush=True)
+                print(f"RUN {name} ({'JIT' if name in jit_ids else 'prebuilt'})", flush=True)
                 case_work = work / str(index)
                 try:
+                    if name in jit_ids:
+                        try:
+                            run_case(case, compiler, logs / name, env, timeout, phase="run", jit=jit)
+                            status, detail = "PASS", "JIT"
+                        except errors as exc:
+                            status, detail = "FAIL", f"JIT: {exc}"
+                        record(case, status, detail, time.monotonic() - start)
+                        continue
                     if case.get("http") and server is None:
                         if http_error:
                             raise RuntimeError(http_error)
@@ -857,6 +929,53 @@ def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout
                 shutil.copy2(http_log, destination / "server.log")
 
 
+def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record):
+    """Run sources independently; never build or fall back for a JIT case."""
+    errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
+    guests = [c for c in cases if not toolchain_reason(c)]
+    checks = [c for c in cases if toolchain_reason(c)]
+    print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} toolchain checks", flush=True)
+    server = None
+    vm = None
+    def run_guest(case):
+        start = time.monotonic()
+        print(f"START JIT {case['id']}", flush=True)
+        try:
+            run_case(case, compiler, logs / case["id"], env, timeout, jit=jit)
+            return case, "PASS", "", time.monotonic() - start
+        except errors as exc:
+            return case, "FAIL", str(exc), time.monotonic() - start
+    # HTTP has a fixed port. Keep the shared source server isolated from
+    # other fixtures, especially tooling tests which start their own server.
+    ordinary = [c for c in guests if not c.get("http")]
+    http = [c for c in guests if c.get("http")]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        for result in concurrent.futures.as_completed([pool.submit(run_guest, c) for c in ordinary]):
+            record(*result.result())
+    if http:
+        try:
+            server = start_prepared_http([jit, "--dynamic", TESTS / "http_fixture.vi"],
+                                         logs / "http-fixture", jit_environment(env), timeout)
+            for c in http:
+                record(*run_guest(c))
+        except errors as exc:
+            for c in http:
+                record(c, "FAIL", f"JIT HTTP fixture: {exc}", 0)
+        finally:
+            stop_http(server)
+    for case in checks:
+        start = time.monotonic()
+        reason = toolchain_reason(case)
+        print(f"START TOOLCHAIN {case['id']}: {reason}", flush=True)
+        try:
+            if "vm_phase" in case and vm is None:
+                vm = prepare_vm(compiler, logs, env, timeout)
+            run_case(case, compiler, logs / case["id"], env, timeout, vm=vm)
+            record(case, "PASS", "", time.monotonic() - start)
+        except errors as exc:
+            record(case, "FAIL", str(exc), time.monotonic() - start)
+
+
 def print_failure_logs(directory):
     for name in ("build.stderr", "run.stderr", "run.stdout", "harness.stderr", "harness.stdout"):
         path = directory / name
@@ -871,13 +990,17 @@ def print_failure_logs(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", type=Path)
+    parser.add_argument("--backend", choices=("jit", "aot"),
+                        help="default: direct JIT; use aot for explicit compiler regression")
+    parser.add_argument("--jit", type=Path,
+                        help="path to packaged JIT (default: vpp-jit beside compiler)")
     parser.add_argument("--suite", choices=("full", "i32", "smoke"), default="full")
     parser.add_argument("--case", action="append")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--inventory", action="store_true")
     parser.add_argument("--shard-count", type=int, default=1)
     parser.add_argument("--shard-index", type=int, default=0)
-    parser.add_argument("--jobs", type=int, help="staged build and run with this many concurrent workers")
+    parser.add_argument("--jobs", type=int, help="number of concurrent regression workers")
     parser.add_argument("--batch-size", type=int, choices=range(1, 5), default=1,
                         help="experimental full compiler AST reuse, up to four builds per process")
     parser.add_argument("--module-suites", action="store_true",
@@ -919,11 +1042,23 @@ def main():
         parser.error("--module-suites requires the full suite and --jobs")
     if (args.phase != "all") != (args.artifacts is not None):
         parser.error("--phase build/run requires --artifacts; --phase all does not accept it")
+    direct = args.phase == "all" and args.backend != "aot" and args.suite != "i32"
+    if direct and (args.batch_size != 1 or args.module_suites):
+        parser.error("AOT batching/module suites require --backend aot")
+    if args.backend == "jit" and args.phase != "all":
+        parser.error("direct JIT does not prepare test artifacts")
+    jit = args.jit.resolve() if args.jit is not None else None
+    if jit is not None and not jit.is_file():
+        parser.error(f"missing JIT: {jit}")
     if args.compiler is None:
         parser.error("--compiler required")
     compiler = args.compiler.resolve()
     if not compiler.is_file():
         parser.error(f"missing compiler: {compiler}")
+    if direct and jit is None:
+        jit = compiler.with_name(executable_name("vpp-jit"))
+    if direct and not jit.is_file():
+        parser.error(f"missing JIT: {jit}")
     if args.shard_count > 1:
         cases = partition(cases, args.shard_count, args.module_suites)[args.shard_index]
         print(f"SHARD {args.shard_index + 1}/{args.shard_count}: {len(cases)} registered cases", flush=True)
@@ -948,8 +1083,8 @@ def main():
     elif args.phase == "run":
         try:
             plan = json.loads((artifacts / "build.json").read_text(encoding="utf-8"))
-            if plan["inputs"] != artifact_inputs(compiler) or plan["suite"] != args.suite:
-                parser.error("test artifact does not match this compiler, sources, suite or platform; rebuild it")
+            if plan["inputs"] != artifact_inputs(compiler, jit) or plan["suite"] != args.suite:
+                parser.error("test artifact does not match this compiler, JIT, sources, suite or platform; rebuild it")
         except (OSError, ValueError, KeyError) as exc:
             parser.error(f"invalid test artifact: {exc}")
     env = dict(os.environ)
@@ -986,20 +1121,27 @@ def main():
 
     if args.phase == "run":
         try:
-            run_prepared_regression(cases, compiler, artifacts, plan, logs, env, args.timeout, record)
+            run_prepared_regression(cases, compiler, artifacts, plan, logs, env, args.timeout, record, jit=jit)
         except (OSError, RuntimeError, KeyError, TypeError) as exc:
             parser.error(f"cannot run test artifact: {exc}")
     elif args.phase == "build":
-        plan = staged_regression(cases, compiler, logs, env, args.timeout, args.jobs or 1, record,
+        jit_cases = [c["id"] for c in cases if jit is not None and c.get("jit")]
+        aot_cases = [c for c in cases if c["id"] not in jit_cases]
+        print(f"PLAN: {len(jit_cases)} JIT cases, {len(aot_cases)} AOT/harness cases", flush=True)
+        plan = staged_regression(aot_cases, compiler, logs, env, args.timeout, args.jobs or 1, record,
                                  batch_size=args.batch_size, module_suites=args.module_suites,
                                  artifacts=artifacts)
-        plan.update(inputs=artifact_inputs(compiler), suite=args.suite,
+        plan.update(inputs=artifact_inputs(compiler, jit), suite=args.suite, jit_cases=jit_cases,
                     checks=[r for r in results if r["status"] in ("PASS", "FAIL")])
         (artifacts / "build.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
         ready_ids = {c["id"] for c in plan["ready"]}
         for case in cases:
             if case["id"] in ready_ids:
                 record(case, "BUILT", "saved for --phase run", 0)
+            elif case["id"] in jit_cases:
+                record(case, "JIT_READY", "source saved in checkout; run with packaged JIT", 0)
+    elif direct:
+        direct_regression(cases, compiler, jit, logs, env, args.timeout, args.jobs or 1, record)
     elif args.jobs is not None:
         staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
                           batch_size=args.batch_size, module_suites=args.module_suites)
@@ -1029,7 +1171,8 @@ def main():
                         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                             http_error = str(exc)
                             raise
-                    run_case(case, compiler, directory, env, args.timeout, vm=vm)
+                    run_case(case, compiler, directory, env, args.timeout, vm=vm,
+                             jit=jit if case.get("jit") and args.backend != "aot" else None)
                     status, detail = "PASS", ""
                 except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                     status, detail = "FAIL", str(exc)
@@ -1042,7 +1185,7 @@ def main():
     passed = sum(c["status"] == "PASS" for c in results)
     summary = f"{passed} passed, {failed} failed, {len(pending)} pending"
     if args.phase == "build":
-        summary = f"{len(plan['ready'])} built, {passed} build checks passed, {failed} failed, {len(pending)} pending"
+        summary = f"{len(plan['ready'])} built, {len(plan['jit_cases'])} JIT ready, {passed} build checks passed, {failed} failed, {len(pending)} pending"
     if not quiet_platform_skips:
         summary += f", {len(unsupported)} unsupported on this platform"
     print(f"{summary}; logs: {logs}")

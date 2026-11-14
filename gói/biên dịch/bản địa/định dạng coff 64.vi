@@ -96,7 +96,7 @@ hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ
     biến trạng thái = 0;
     nếu (bảng nhập <= 0 || bảng lõi <= 0) { trạng thái = -1; };
     nếu (trạng thái == 0) { trạng thái = bảng ký hiệu tham chiếu(bảng nhập, các phần nhập, byte dài(sổ đăng ký) / 9); };
-    nếu (trạng thái == 0) { trạng thái = bảng ký hiệu tham chiếu(bảng lõi, lời gọi lõi, 85); };
+    nếu (trạng thái == 0) { trạng thái = bảng ký hiệu tham chiếu(bảng lõi, lời gọi lõi, 86); };
     nếu (các ký hiệu <= 0) { trạng thái = -1; };
     nếu (các chuỗi <= 0) { trạng thái = -1; };
     nếu (các mục tái định vị <= 0) { trạng thái = -1; };
@@ -134,7 +134,7 @@ hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ
         };
     };
     nếu (trạng thái == 0) {
-        lặp (id = 0; id < 85; id++) {
+        lặp (id = 0; id < 86; id++) {
             nếu (byte đọc số nguyên ba mươi hai bit(bảng lõi, id * 4) == 1) {
                 nếu (coff thêm ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(id), 0, 0) != 0) { trạng thái = -1; thoát; };
                 nếu (byte ghi số nguyên ba mươi hai bit(bảng lõi, id * 4, byte dài(các ký hiệu) / 18) != 0) { trạng thái = -1; thoát; };
@@ -155,7 +155,7 @@ hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ
             nếu (vị trí lời gọi lõi < 0) { trạng thái = -1; thoát; };
             nếu (vị trí lời gọi lõi + 4 > n) { trạng thái = -1; thoát; };
             nếu (id < 0) { trạng thái = -1; thoát; };
-            nếu (id >= 85) { trạng thái = -1; thoát; };
+            nếu (id >= 86) { trạng thái = -1; thoát; };
             nếu (coff thêm tái định vị(các mục tái định vị, vị trí lời gọi lõi, byte đọc số nguyên ba mươi hai bit(bảng lõi, id * 4) - 1) != 0) { trạng thái = -1; thoát; };
         };
     };

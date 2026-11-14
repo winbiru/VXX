@@ -75,7 +75,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
     biến mã trạng thái = 0;
     nếu (bảng nhập <= 0 || bảng lõi <= 0) { mã trạng thái = -1; };
     nếu (mã trạng thái == 0) { mã trạng thái = bảng ký hiệu tham chiếu(bảng nhập, các phần nhập, byte dài(sổ đăng ký) / 9); };
-    nếu (mã trạng thái == 0) { mã trạng thái = bảng ký hiệu tham chiếu(bảng lõi, lời gọi lõi, 85); };
+    nếu (mã trạng thái == 0) { mã trạng thái = bảng ký hiệu tham chiếu(bảng lõi, lời gọi lõi, 86); };
     nếu (các ký hiệu <= 0) { mã trạng thái = -1; };
     nếu (các chuỗi <= 0) { mã trạng thái = -1; };
     nếu (các mục tái định vị <= 0) { mã trạng thái = -1; };
@@ -123,7 +123,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
         };
     };
     nếu (mã trạng thái == 0) {
-        lặp (mã lõi = 0; mã lõi < 85; mã lõi++) {
+        lặp (mã lõi = 0; mã lõi < 86; mã lõi++) {
             nếu (byte đọc số nguyên ba mươi hai bit(bảng lõi, mã lõi * 4) == 1) {
                 nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(mã lõi), 0, 0) != 0) {
                     mã trạng thái = -1;
@@ -150,7 +150,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
             nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (mã ký hiệu lõi < 0) { mã trạng thái = -1; thoát; };
-            nếu (mã ký hiệu lõi >= 85) { mã trạng thái = -1; thoát; };
+            nếu (mã ký hiệu lõi >= 86) { mã trạng thái = -1; thoát; };
             nếu (elf tái định vị bổ sung(các mục tái định vị, vị trí gọi lõi, byte đọc số nguyên ba mươi hai bit(bảng lõi, mã ký hiệu lõi * 4)) != 0) {
                 mã trạng thái = -1;
                 thoát;

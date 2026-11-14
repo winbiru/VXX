@@ -244,3 +244,14 @@ Lbulk_ascii_done:
 Lbo_nho_loi:
     mov w0, #-1
     TRA_BO_NHO
+
+// Internal JIT context boundary. Swap the full arena, never copy heap objects
+// or mix allocation metadata across the compiler and generated program.
+.globl _vpp_native_jit_swap_arena
+_vpp_native_jit_swap_arena:
+    adrp x9, _vpp_native_arena_base@PAGE
+    add x9, x9, _vpp_native_arena_base@PAGEOFF
+    ldr x10, [x9]
+    str x0, [x9]
+    mov x0, x10
+    ret

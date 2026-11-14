@@ -93,6 +93,8 @@ hàm test_parser_invalid() {
     nếu (expect_reject("hàm chính() { biến x = 0; nếu (x) { biến y = 1; }; trả về y; };") != 0) { trả về 70; };
     nếu (expect_reject("hàm chính() { biến x = 0; nếu (1) { trả về 52; } hoặc { trả về 51; }; trả về x; };") != 0) { trả về 71; };
     nếu (expect_reject("hàm chính() { lặp (i = 0; i < 3; i++) { }; trả về i; };") != 0) { trả về 72; };
+    nếu (expect_reject("hàm chính() { trả về (2147483648); };") != 0) { trả về 73; };
+    nếu (expect_reject("hàm chính() { trả về (x = 42); };") != 0) { trả về 74; };
     trả về 0;
 };
 
@@ -166,6 +168,10 @@ hàm test_parser_precedence() {
     nếu (run_case("hàm chính() { biến x = 0; lặp (i = 208; i > 0; i /= 2) { x += 13; }; trả về x; };", 104) != 0) { trả về 117; };
     nếu (run_case("hàm chính() { biến x = 0; lặp (i = 52; i > 0; i %= 13) { x += 52; }; trả về x; };", 52) != 0) { trả về 118; };
     nếu (run_case("hàm chính() { trả về 14 + 76 / 2 * 2 % 55; };", 35) != 0) { trả về 119; };
+    nếu (run_case("hàm chính() { trả về -((2147483648)); };", -2147483648) != 0) { trả về 123; };
+    nếu (run_case("hàm chính() { biến x = 1; biến y = 2; trả về (x = y += 3) + x + y; };", 15) != 0) { trả về 124; };
+    nếu (run_case("hàm chính() { biến x = 0; biến a = 0 && (x += 1); biến b = 1 || (x += 2); trả về x + a + b; };", 1) != 0) { trả về 125; };
+    nếu (run_case("hàm chính() { biến x = 0; biến a = 1 && (x += 1); biến b = 0 || (x += 2); trả về x + a + b; };", 5) != 0) { trả về 126; };
     trả về 0;
 };
 

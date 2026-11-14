@@ -252,3 +252,11 @@ Lbulk_ascii_tail:
     jmp Lbulk_ascii_tail
 Lbulk_ascii_done:
     VPP_TRA_BO_NHO
+
+// Switch native arenas at the JIT execution boundary.
+.text
+.globl vpp_native_jit_swap_arena
+vpp_native_jit_swap_arena:
+    movq vpp_native_arena_base(%rip), %rax
+    movq %rdi, vpp_native_arena_base(%rip)
+    ret

@@ -467,8 +467,7 @@ lớp công khai Bộ Hạ Cây {
 
     // Cả chương trình dùng chung một lần parse, semantic và IR; mỗi hàm
     // giữ object/relocation riêng để host linker xử lý các lời gọi chéo.
-    hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
-                                             hệ điều hành = "linux", abi = "gnu") {
+    hàm công khai sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành = "linux", mặc định thoát = sai) {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
             mình.báo lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
@@ -479,6 +478,7 @@ lớp công khai Bộ Hạ Cây {
         có chính = sai;
         có main = sai;
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            các hàm[i]["sourceName"] = các hàm[i]["name"];
             nếu (các hàm[i]["name"] == "main") { có main = đúng; };
             nếu (các hàm[i]["name"] == "chính") { có chính = đúng; };
         };
@@ -495,13 +495,27 @@ lớp công khai Bộ Hạ Cây {
         kết quả = [];
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             tên hàm = các hàm[i]["name"];
+            // JIT entrypoint returns zero on fallthrough, as the AOT CLI does.
+            nếu (mặc định thoát && tên hàm == "main") {
+                gốc = mình.thêm giá trị IR(biểu diễn trung gian, "ConstInt", "0");
+                máy ảo thêm cuối danh sách(các hàm[i]["children"][0]["children"], mình.tạo câu IR("Return", [gốc]));
+            };
             máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
             phát = biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành);
-            đối tượng = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
-                phát["bytes"], tên hàm, phát["relocations"]);
-            máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm, "machine": máy,
-                "bytes": phát["bytes"], "relocations": phát["relocations"],
-                "object": đối tượng});
+            máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm,
+                "sourceName": các hàm[i]["sourceName"], "machine": máy,
+                "bytes": phát["bytes"], "relocations": phát["relocations"]});
+        };
+        trả về kết quả;
+    };
+
+    hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
+                                             hệ điều hành = "linux", abi = "gnu") {
+        kết quả = mình.sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành);
+        lặp(i = 0; i < máy ảo lấy độ dài(kết quả); i++) {
+            mục = kết quả[i];
+            mục["object"] = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
+                mục["bytes"], mục["name"], mục["relocations"]);
         };
         trả về kết quả;
     };

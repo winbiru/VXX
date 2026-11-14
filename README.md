@@ -32,8 +32,70 @@ ctest --test-dir build-pure-vpp --output-on-failure
 ./VPP phiên bản
 ./VPP build hello.vi -o hello
 ./VPP run hello.vi
+./VPP jit hello.vi
 make benchmark
 ```
+
+### Chạy mã máy trong bộ nhớ (JIT thử nghiệm)
+
+V++ có ba chế độ thực thi:
+
+| Chế độ | Luồng thực thi |
+| --- | --- |
+| AOT (`vpp build`, `vpp run`) | Mã nguồn → tệp thực thi → CPU |
+| VM (`vpp vm-build`, `vpp-vm`) | Mã nguồn → bytecode → máy ảo |
+| JIT (`vpp jit`, `vpp-jit`) | Mã nguồn → AST/IR → mã máy trong bộ nhớ → CPU |
+
+JIT được viết bằng V++ và dùng Assembly cho ranh giới hệ điều hành/CPU. Khi chạy JIT,
+không sinh tệp object hay executable, không gọi assembler/linker bên ngoài và không
+chuyển sang VM. Mã được tạo trong bộ nhớ rồi chuyển sang vùng chỉ đọc/thực thi (RX).
+
+Chế độ mặc định hỗ trợ tập i32: số nguyên, toán tử, nhánh, vòng lặp, lời gọi hàm
+(kể cả đệ quy), in số nguyên và tối đa tám tham số i32. Chế độ `--dynamic` dùng
+runtime native cho kiểu động, số thực, chuỗi Unicode, danh sách, từ điển, lớp,
+closure, ngoại lệ, GC và import module. macOS ARM64 đã chạy các fixture dynamic
+và kiểm thử biên dịch lại hàm nóng; Linux/Windows x86-64 đã cross-assemble phần
+ranh giới Assembly, còn cần xác nhận thực thi bằng CI trên nền tảng đích.
+
+Runtime dynamic đếm lần gọi và số lần đủ điều kiện i32 của mỗi hàm. Sau 32 lần
+gọi đủ điều kiện, các hàm thuần dạng hai tham số với một phép `+`, `-`, `*`,
+`&`, `|` hoặc `^` được biên dịch lại thành hàm lá mã máy. Kiểm tra kiểu trước
+mỗi lần gọi giữ nguyên ngữ nghĩa dynamic khi đối số đổi kiểu. Đặt
+`VPP_JIT_PROFILE=1` để xem các bộ đếm `calls`, `i32`, `compiled`, `hits` trên
+stderr. Đặt `VPP_JIT_TIER=0` để tắt tầng thích ứng và đo baseline trên cùng
+chương trình. Chưa đo được lợi ích hiệu năng của tầng này; hàm tổng quát vẫn chạy mã
+native baseline.
+
+Giới hạn hiện tại: ảnh dynamic tối đa 2 MiB (kể cả bảng relocation), một luồng
+thực thi, chưa hỗ trợ descriptor FFI hoặc chọn hàm dynamic từ CLI. Nên import
+module hẹp; gói chuẩn tổng hợp hiện vượt giới hạn ảnh. JIT không phải môi
+trường cách ly mã không tin cậy.
+
+```vi
+hàm cộng(a, b) {
+    trả về a + b;
+};
+hàm chính() {
+    in cộng(19, 23);
+};
+```
+
+```sh
+./VPP jit hello.vi
+./VPP jit hello.vi --function cộng -- 19 23
+./VPP jit --dynamic "$PWD/hello.vi"
+./VPP jit --check-dynamic "$PWD/hello.vi"
+VPP_JIT_PROFILE=1 ./VPP jit --dynamic "$PWD/hello.vi"
+```
+
+Hàm được chọn trả về mã thoát tiến trình (theo quy ước hệ điều hành); hàm chính không
+có giá trị trả về sẽ thoát với mã 0. API `Bộ Biên Dịch JIT` có thể gọi lại hàm đã
+biên dịch nhiều lần trong cùng tiến trình, rồi giải phóng vùng mã bằng `đóng()`.
+API dynamic `jit động tệp(đường, thư viện)` và `jit động nguồn(nguồn, gốc, thư viện)`
+trả về ảnh có `chạy()` và `đóng()`. Dùng đường dẫn tuyệt đối; khi gọi `vpp-jit`
+trực tiếp, đặt `VPP_HOME` trỏ tới thư mục chứa `gói/`. Với `--dynamic`, các
+đối số sau đường dẫn nguồn được chuyển đến guest; argv[0] là đường dẫn nguồn.
+`--check-dynamic` biên dịch trong bộ nhớ nhưng không chạy guest.
 
 Xem [hướng dẫn cài đặt](docs/installation.md) và [nguồn gốc seed](bootstrap/README.md). Các binary build cũ trong `build/`, `bin/` không được launcher mới sử dụng.
 

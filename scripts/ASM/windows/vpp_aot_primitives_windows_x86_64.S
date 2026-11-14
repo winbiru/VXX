@@ -13,6 +13,23 @@
 #define VPP_ARENA_SIZE 135271424
 
 #include "aot_x86_64/bo_nho.inc"
+#ifdef VPP_JIT_DISABLED
+.text
+.globl vpp_native_jit_service
+vpp_native_jit_service:
+    xorl %eax, %eax
+    testl %ecx, %ecx
+    jz 1f
+    movl $-3, %eax
+1:  ret
+.globl vpp_native_jit_image
+vpp_native_jit_image:
+    xorl %eax, %eax
+    xorl %edx, %edx
+    ret
+#else
+#include "../common/vpp_jit_x86_64.inc"
+#endif
 #include "aot_x86_64/nhap_xuat.inc"
 #include "aot_x86_64/unicode.inc"
 #include "aot_x86_64/trich_doi_so.inc"

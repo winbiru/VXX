@@ -5,6 +5,9 @@ _vpp_native_argc:
     str x30, [sp, #-16]!
     bl __NSGetArgc
     ldr w0, [x0]
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    ldr w9, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    sub w0, w0, w9
     ldr x30, [sp], #16
     ret
 
@@ -16,6 +19,11 @@ Ldoi_so_con_tro:
     ldr w10, [sp]
     cmp w10, #0
     b.lt Ldoi_so_khong_hop_le
+    adrp x11, _vpp_jit_argv_offset@PAGE
+    ldr w11, [x11, _vpp_jit_argv_offset@PAGEOFF]
+    adds w10, w10, w11
+    b.vs Ldoi_so_khong_hop_le
+    str w10, [sp]
     cmp w10, w9
     b.ge Ldoi_so_khong_hop_le
     bl __NSGetArgv
@@ -82,3 +90,7 @@ Ldoi_so_byte_loi:
     add sp, sp, #16
     ret
 
+
+.globl _vpp_jit_argv_offset
+.zerofill __DATA,__bss,_vpp_jit_argv_offset,4,2
+.text

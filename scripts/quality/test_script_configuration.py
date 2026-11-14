@@ -136,6 +136,24 @@ class OpcodeAbiTests(unittest.TestCase):
 
 
 class RegressionShardTests(unittest.TestCase):
+    def test_backend_specific_diagnostics_stay_on_toolchain(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+
+        cases = runner.load_manifest()['cases']
+        diagnostic_cases = [case for case in cases
+                            if 'run_diagnostic_regex' in case or 'run_forbidden_regex' in case]
+        self.assertTrue(diagnostic_cases)
+        self.assertTrue(all(runner.toolchain_reason(case) == 'AOT runtime diagnostic assertion'
+                            for case in diagnostic_cases))
+
+        compile_diagnostic = next(case for case in cases if 'diagnostic' in case)
+        self.assertEqual(runner.toolchain_reason(compile_diagnostic),
+                         'compiler diagnostic assertion')
+        jit_syntax = next(case for case in cases if case.get('compile_reject'))
+        self.assertIsNone(runner.toolchain_reason(jit_syntax))
+
     def test_full_shards_keep_all_cases_and_module_groups(self):
         spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
         runner = importlib.util.module_from_spec(spec)
@@ -255,7 +273,7 @@ class WindowsRunnerTests(unittest.TestCase):
                     '--suite', 'smoke', '--compiler', str(compiler),
                     '--case', 'kiem_tra_aot_i32_run', '--timeout', '37', '--shard-count', '4',
                     '--shard-index', '2', '--phase', 'run', '--artifacts', str(package / 'tests'),
-                    '--logs', str(package / 'logs')]
+                    '--jit', str(package / 'bin/vpp-jit.exe'), '--logs', str(package / 'logs')]
             with mock.patch.object(sys, 'argv', argv), \
                  mock.patch.object(module.platform, 'system', return_value='Windows'), \
                  mock.patch.object(module.platform, 'machine', return_value='AMD64'), \
@@ -265,7 +283,8 @@ class WindowsRunnerTests(unittest.TestCase):
             for option, value in (('--compiler', str(compiler.resolve())), ('--suite', 'smoke'),
                                   ('--case', 'kiem_tra_aot_i32_run'), ('--timeout', '37'),
                                   ('--shard-count', '4'), ('--shard-index', '2'),
-                                  ('--phase', 'run'), ('--artifacts', str((package / 'tests').resolve()))):
+                                  ('--phase', 'run'), ('--artifacts', str((package / 'tests').resolve())),
+                                  ('--jit', str((package / 'bin/vpp-jit.exe').resolve()))):
                 self.assertEqual(command[command.index(option) + 1], value)
             env = run.call_args.kwargs['env']
             self.assertEqual(env['VPP_HOME'], (package.resolve() / 'share/vpp').as_posix())
@@ -289,6 +308,8 @@ class PreparedRegressionTests(unittest.TestCase):
             source = f'scripts/test/{name}.vi'
             (self.root / source).write_text('hàm chính() { in "ok"; };\n', encoding='utf-8')
             case = dict(id=name, source=source, suite='full')
+            if name == 'regular0':
+                case['jit'] = True
             if name == 'reject':
                 case['compile_reject'] = True
             elif name == 'dump':
@@ -331,7 +352,8 @@ else:
     def invoke(self, phase, *options, status=0, fail=False):
         result = subprocess.run([
             sys.executable, str(self.root / 'scripts/quality/run_native_regression.py'),
-            '--compiler', str(self.compiler), '--phase', phase, '--artifacts', str(self.artifacts),
+            '--compiler', str(self.compiler), '--phase', phase,
+            *(['--artifacts', str(self.artifacts)] if phase != 'all' else []),
             '--logs', str(self.root / 'logs'), *options],
             env=dict(os.environ, VPP_PREPARED_TEST_CALLS=str(self.calls),
                      VPP_PREPARED_TEST_FAIL='1' if fail else ''),
@@ -367,6 +389,68 @@ else:
         result = self.invoke('run', *options)
         self.assertIn('5 passed, 0 failed', result.stdout)
         self.assertEqual(len(self.calls.read_text().splitlines()), 2)
+
+    def test_jit_runs_source_without_build_or_fallback(self):
+        jit = self.root / 'bin/vpp-jit'
+        jit_calls = self.root / 'jit-calls'
+        jit.write_text(f'#!{sys.executable}\n' + """import os, pathlib, sys
+assert sys.argv[1] == '--dynamic'
+assert pathlib.Path(sys.argv[2]).is_absolute()
+assert os.environ['VPP_AOT_ASSEMBLER'] == '/assembler-must-not-run'
+assert os.environ['VPP_AOT_LINKER'] == '/linker-must-not-run'
+assert not pathlib.Path('program').exists()
+with open(""" + repr(str(jit_calls)) + """, 'a') as log:
+    log.write(pathlib.Path(sys.argv[2]).stem + '\\n')
+print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
+""")
+        jit.chmod(0o755)
+        options = ('--case', 'regular0', '--case', 'regular1', '--jit', str(jit))
+        self.invoke('build', *options)
+        plan = json.loads((self.artifacts / 'build.json').read_text())
+        self.assertEqual(plan['jit_cases'], ['regular0'])
+        self.assertEqual([c['id'] for c in plan['ready']], ['regular1'])
+        self.assertFalse(jit_calls.exists())
+        calls = self.calls.read_text()
+        self.assertEqual(len(calls.splitlines()), 1)
+        self.compiler.chmod(0o644)
+        for _ in range(2):
+            result = self.invoke('run', *options)
+            self.assertIn('2 passed, 0 failed', result.stdout)
+        result = self.invoke('run', *options, status=1, fail=True)
+        self.assertIn('FAIL regular0', result.stdout)
+        self.assertEqual(jit_calls.read_text().splitlines(), ['regular0'] * 3)
+        self.assertEqual(self.calls.read_text(), calls)
+        with jit.open('a') as stream:
+            stream.write('# changed JIT\n')
+        self.invoke('run', *options, status=2)
+
+    def test_direct_jit_checks_args_and_syntax_without_aot(self):
+        manifest_path = self.root / 'scripts/test/regression.json'
+        manifest = json.loads(manifest_path.read_text())
+        next(c for c in manifest['cases'] if c['id'] == 'regular1')['args'] = ['đối số']
+        manifest_path.write_text(json.dumps(manifest))
+        jit = self.root / 'bin/vpp-jit'
+        jit.write_text(f'#!{sys.executable}\n' + """import os, pathlib, sys
+assert os.environ['VPP_AOT_ASSEMBLER'] == '/assembler-must-not-run'
+assert not pathlib.Path('program').exists()
+name = pathlib.Path(sys.argv[2]).stem
+if name == 'reject':
+    assert sys.argv[1] == '--check-dynamic'
+    print('unrelated failure' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'V++ JIT: từ chối cú pháp')
+    sys.exit(1)
+assert sys.argv[1] == '--dynamic'
+assert sys.argv[3:] == (['đối số'] if name == 'regular1' else [])
+print('ok')
+""")
+        jit.chmod(0o755)
+        options = ('--backend', 'jit', '--jit', str(jit), '--jobs', '2',
+                   '--case', 'regular0', '--case', 'regular1', '--case', 'reject')
+        result = self.invoke('all', *options)
+        self.assertIn('3 passed, 0 failed', result.stdout)
+        self.assertFalse(self.calls.exists())
+        result = self.invoke('all', *options, status=1, fail=True)
+        self.assertIn('FAIL reject', result.stdout)
+        self.assertFalse(self.calls.exists())
 
     def test_missing_binary_fails_without_rebuild(self):
         options = ('--case', 'regular0')

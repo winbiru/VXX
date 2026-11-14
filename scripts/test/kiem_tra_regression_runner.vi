@@ -142,7 +142,7 @@ hàm fixture(root, work) {
 };
 hàm scenario(work, mode, names, batch, module, expected_status) {
     state = work + "/state-" + mode; logs = work + "/logs-" + mode; tạo thư mục(state);
-    args = [work + "/scripts/quality/run_native_regression.py", "--compiler", work + "/bin/" + exe("vpp"), "--jobs", "2", "--batch-size", thành chuỗi(batch), "--timeout", "2", "--logs", logs];
+    args = [work + "/scripts/quality/run_native_regression.py", "--compiler", work + "/bin/" + exe("vpp"), "--backend", "aot", "--jobs", "2", "--batch-size", thành chuỗi(batch), "--timeout", "2", "--logs", logs];
     nếu (module) { máy ảo thêm cuối danh sách(args, "--module-suites"); };
     lặp(i = 0; i < độ dài(names); i++) { máy ảo thêm cuối danh sách(args, "--case"); máy ảo thêm cuối danh sách(args, names[i]); };
     k = chạy tiến trình(env("VPP_TEST_PYTHON"), args, {"VPP_TEST_FAKE": "1", "VPP_TEST_MODE": mode, "VPP_TEST_STATE": state, "VPP_TEST_SELF": env("VPP_TEST_SELF"), "VPP_TEST_CMAKE": env("VPP_TEST_CMAKE"), "VPP_COMPILER_PROFILE_FILE": state + "/profile"}, 60000);

@@ -41,6 +41,17 @@ add_custom_target(vpp-vm ALL DEPENDS "${VPP_BIN}/vpp-vm")
 # target-level ordering edge as well as the compiler file dependency above,
 # otherwise it can execute the same bootstrap rule in parallel target recipes.
 add_dependencies(vpp-vm vpp-cli)
+add_custom_command(OUTPUT "${VPP_BIN}/vpp-jit"
+  COMMAND "${VPP_BIN}/vpp" build "${CMAKE_SOURCE_DIR}/gói/biên dịch/dòng lệnh JIT.vi" -o "${VPP_BIN}/vpp-jit"
+  DEPENDS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" ${VPP_SOURCES}
+  COMMENT "Biên dịch bộ JIT V++ chạy mã máy trong bộ nhớ"
+  VERBATIM USES_TERMINAL)
+if(VPP_CI_PINNED_FULL_STAGE1)
+  add_custom_target(vpp-jit DEPENDS "${VPP_BIN}/vpp-jit")
+else()
+  add_custom_target(vpp-jit ALL DEPENDS "${VPP_BIN}/vpp-jit")
+endif()
+add_dependencies(vpp-jit vpp-cli)
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME vpp-source-boundary COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh")
@@ -50,6 +61,12 @@ if(BUILD_TESTING)
     add_test(NAME vpp-extension COMMAND "${VPP_NODE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_extension.js")
   endif()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME vpp-jit-cli COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/check_jit_cli.py" "${VPP_BIN}/vpp-jit")
+  add_test(NAME vpp-jit-dynamic COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/check_jit_dynamic.py" "${VPP_BIN}/vpp-jit" "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(vpp-jit-cli PROPERTIES TIMEOUT 300 LABELS jit)
+  set_tests_properties(vpp-jit-dynamic PROPERTIES TIMEOUT 7200 LABELS jit)
   add_test(NAME vpp-opcode-abi COMMAND "${CMAKE_COMMAND}" "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
     -P "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_opcodes.cmake")
   add_test(NAME vpp-script-configuration COMMAND "${Python3_EXECUTABLE}"
@@ -75,7 +92,7 @@ if(BUILD_TESTING)
     set_tests_properties(vpp-native-regression-${shard} PROPERTIES TIMEOUT 14400 LABELS "regression;full")
   endforeach()
 endif()
-install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" DESTINATION bin)
+install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/gói" DESTINATION share/vpp)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/scripts/ASM" DESTINATION share/vpp/scripts

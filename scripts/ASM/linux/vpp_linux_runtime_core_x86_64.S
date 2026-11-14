@@ -8,6 +8,7 @@
 #define VPP_LINUX_PATH_MAX 4096
 
 #include "thuc_thi_x86_64/bo_nho.inc"
+#include "../common/vpp_jit_x86_64.inc"
 #include "thuc_thi_x86_64/tep.inc"
 #include "thuc_thi_x86_64/moi_truong.inc"
 #include "thuc_thi_x86_64/tep_tam.inc"

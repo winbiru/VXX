@@ -2,6 +2,7 @@
   "cases": [
     {
       "id": "anonymous_functions",
+      "jit": true,
       "source": "scripts/test/fixtures/anonymous_functions/entry.vi",
       "expected": "scripts/test/expected/anonymous_functions.expected",
       "suite": "full"
@@ -196,12 +197,14 @@
     },
     {
       "id": "kiem_tra_bo_qua",
+      "jit": true,
       "source": "scripts/test/kiem_tra_bo_qua.vi",
       "expected": "scripts/test/expected/kiem_tra_bo_qua.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_boolean",
+      "jit": true,
       "source": "scripts/test/kiem_tra_boolean.vi",
       "expected": "scripts/test/expected/kiem_tra_boolean.expected",
       "suite": "full"
@@ -227,6 +230,7 @@
     },
     {
       "id": "kiem_tra_chon_ca",
+      "jit": true,
       "source": "scripts/test/kiem_tra_chon_ca.vi",
       "expected": "scripts/test/expected/kiem_tra_chon_ca.expected",
       "suite": "full"
@@ -245,6 +249,7 @@
     },
     {
       "id": "kiem_tra_closure_capture",
+      "jit": true,
       "source": "scripts/test/kiem_tra_closure_capture.vi",
       "expected": "scripts/test/expected/kiem_tra_closure_capture.expected",
       "suite": "full"
@@ -257,24 +262,28 @@
     },
     {
       "id": "kiem_tra_collection_bai_63_75",
+      "jit": true,
       "source": "scripts/test/kiem_tra_collection_bai_63_75.vi",
       "expected": "scripts/test/expected/kiem_tra_collection_bai_63_75.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_collections_oop",
+      "jit": true,
       "source": "scripts/test/kiem_tra_collections_oop.vi",
       "expected": "scripts/test/expected/kiem_tra_collections_oop.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_constructor_tham_so",
+      "jit": true,
       "source": "scripts/test/kiem_tra_constructor_tham_so.vi",
       "expected": "scripts/test/expected/kiem_tra_constructor_tham_so.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_cu_phap_modifier_cu",
+      "jit": true,
       "source": "scripts/test/kiem_tra_cu_phap_modifier_cu.vi",
       "expected": "scripts/test/expected/kiem_tra_cu_phap_modifier_cu.expected",
       "suite": "full"
@@ -287,6 +296,7 @@
     },
     {
       "id": "kiem_tra_de_quy",
+      "jit": true,
       "source": "scripts/test/kiem_tra_de_quy.vi",
       "expected": "scripts/test/expected/kiem_tra_de_quy.expected",
       "suite": "full"
@@ -317,12 +327,14 @@
     },
     {
       "id": "kiem_tra_dieu_kien_long_nhieu_cap",
+      "jit": true,
       "source": "scripts/test/kiem_tra_dieu_kien_long_nhieu_cap.vi",
       "expected": "scripts/test/expected/kiem_tra_dieu_kien_long_nhieu_cap.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_dieu_kien_phu_dinh",
+      "jit": true,
       "source": "scripts/test/kiem_tra_dieu_kien_phu_dinh.vi",
       "expected": "scripts/test/expected/kiem_tra_dieu_kien_phu_dinh.expected",
       "suite": "full"
@@ -387,6 +399,7 @@
     },
     {
       "id": "kiem_tra_doc_chi_so_ket_qua_goi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_doc_chi_so_ket_qua_goi.vi",
       "expected": "scripts/test/expected/kiem_tra_doc_chi_so_ket_qua_goi.expected",
       "suite": "full"
@@ -561,6 +574,7 @@
     },
     {
       "id": "kiem_tra_giao_dien_trien_khai",
+      "jit": true,
       "source": "scripts/test/kiem_tra_giao_dien_trien_khai.vi",
       "expected": "scripts/test/expected/kiem_tra_giao_dien_trien_khai.expected",
       "suite": "full"
@@ -591,6 +605,7 @@
     },
     {
       "id": "kiem_tra_goi_bo_suu_tap",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_bo_suu_tap.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_bo_suu_tap.expected",
       "suite": "full"
@@ -652,6 +667,7 @@
     },
     {
       "id": "kiem_tra_goi_hoa_hoc",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_hoa_hoc.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_hoa_hoc.expected",
       "suite": "full"
@@ -677,6 +693,7 @@
     },
     {
       "id": "kiem_tra_goi_kiem_thu",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_kiem_thu.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_kiem_thu.expected",
       "suite": "full"
@@ -743,6 +760,7 @@
     },
     {
       "id": "kiem_tra_goi_regex",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_regex.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_regex.expected",
       "suite": "full"
@@ -767,6 +785,7 @@
     },
     {
       "id": "kiem_tra_goi_tap_ban_ghi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_tap_ban_ghi.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_tap_ban_ghi.expected",
       "suite": "full"
@@ -785,6 +804,7 @@
     },
     {
       "id": "kiem_tra_goi_toan_hoc",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_toan_hoc.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_toan_hoc.expected",
       "suite": "full"
@@ -803,6 +823,7 @@
     },
     {
       "id": "kiem_tra_goi_vat_ly",
+      "jit": true,
       "source": "scripts/test/kiem_tra_goi_vat_ly.vi",
       "expected": "scripts/test/expected/kiem_tra_goi_vat_ly.expected",
       "suite": "full"
@@ -833,18 +854,21 @@
     },
     {
       "id": "kiem_tra_ham",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ham.vi",
       "expected": "scripts/test/expected/kiem_tra_ham.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_ham_4_tham_so",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ham_4_tham_so.vi",
       "expected": "scripts/test/expected/kiem_tra_ham_4_tham_so.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_ham_an_danh",
+      "jit": true,
       "source": "scripts/test/fixtures/anonymous_functions/entry.vi",
       "expected": "scripts/test/expected/kiem_tra_ham_an_danh.expected",
       "suite": "full"
@@ -863,18 +887,21 @@
     },
     {
       "id": "kiem_tra_ham_da_tu_khong_nhay",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ham_da_tu_khong_nhay.vi",
       "expected": "scripts/test/expected/kiem_tra_ham_da_tu_khong_nhay.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_ham_tham_so",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ham_tham_so.vi",
       "expected": "scripts/test/expected/kiem_tra_ham_tham_so.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_hoi_quy_tong_hop",
+      "jit": true,
       "source": "scripts/test/kiem_tra_hoi_quy_tong_hop.vi",
       "expected": "scripts/test/expected/kiem_tra_hoi_quy_tong_hop.expected",
       "suite": "full"
@@ -926,6 +953,13 @@
       "source": "scripts/test/kiem_tra_jit_mvp.vi",
       "expected": "scripts/test/expected/kiem_tra_jit_mvp.expected",
       "suite": "full"
+    },
+    {
+      "id": "kiem_tra_jit_vpp",
+      "source": "scripts/test/kiem_tra_jit_vpp.vi",
+      "expected": "scripts/test/expected/kiem_tra_jit_vpp.expected",
+      "suite": "full",
+      "platforms": ["Darwin", "Linux", "Windows"]
     },
     {
       "id": "kiem_tra_json_an_toan",
@@ -1009,12 +1043,14 @@
     },
     {
       "id": "kiem_tra_ke_thua",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ke_thua.vi",
       "expected": "scripts/test/expected/kiem_tra_ke_thua.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_khai_bao_bien_runtime",
+      "jit": true,
       "source": "scripts/test/kiem_tra_khai_bao_bien_runtime.vi",
       "expected": "scripts/test/expected/kiem_tra_khai_bao_bien_runtime.expected",
       "suite": "full"
@@ -1027,6 +1063,7 @@
     },
     {
       "id": "kiem_tra_khi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_khi.vi",
       "expected": "scripts/test/expected/kiem_tra_khi.expected",
       "suite": "full"
@@ -1045,12 +1082,14 @@
     },
     {
       "id": "kiem_tra_kieu_dong_call_boundary",
+      "jit": true,
       "source": "scripts/test/kiem_tra_kieu_dong_call_boundary.vi",
       "expected": "scripts/test/expected/kiem_tra_kieu_dong_call_boundary.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_lambda_hof_mac_dinh",
+      "jit": true,
       "source": "scripts/test/kiem_tra_lambda_hof_mac_dinh.vi",
       "expected": "scripts/test/expected/kiem_tra_lambda_hof_mac_dinh.expected",
       "suite": "full"
@@ -1294,12 +1333,14 @@
     },
     {
       "id": "kiem_tra_lop_phuong_thuc_forward",
+      "jit": true,
       "source": "scripts/test/kiem_tra_lop_phuong_thuc_forward.vi",
       "expected": "scripts/test/expected/kiem_tra_lop_phuong_thuc_forward.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_lop_truy_cap",
+      "jit": true,
       "source": "scripts/test/kiem_tra_lop_truy_cap.vi",
       "expected": "scripts/test/expected/kiem_tra_lop_truy_cap.expected",
       "suite": "full"
@@ -1336,6 +1377,7 @@
     },
     {
       "id": "kiem_tra_mang_3_chieu",
+      "jit": true,
       "source": "scripts/test/kiem_tra_mang_3_chieu.vi",
       "expected": "scripts/test/expected/kiem_tra_mang_3_chieu.expected",
       "suite": "full"
@@ -1378,6 +1420,7 @@
     },
     {
       "id": "kiem_tra_native_control_flow",
+      "jit": true,
       "source": "scripts/test/kiem_tra_native_control_flow.vi",
       "expected": "scripts/test/expected/kiem_tra_native_control_flow.expected",
       "suite": "full"
@@ -1426,18 +1469,21 @@
     },
     {
       "id": "kiem_tra_ngoai_le",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ngoai_le.vi",
       "expected": "scripts/test/expected/kiem_tra_ngoai_le.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_ngoai_le_xuyen_ham",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ngoai_le_xuyen_ham.vi",
       "expected": "scripts/test/expected/kiem_tra_ngoai_le_xuyen_ham.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_nhanh_dieu_kien_moi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_nhanh_dieu_kien_moi.vi",
       "expected": "scripts/test/expected/kiem_tra_nhanh_dieu_kien_moi.expected",
       "suite": "full"
@@ -1450,6 +1496,7 @@
     },
     {
       "id": "kiem_tra_noi_chuoi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_noi_chuoi.vi",
       "expected": "scripts/test/expected/kiem_tra_noi_chuoi.expected",
       "suite": "full"
@@ -1462,6 +1509,7 @@
     },
     {
       "id": "kiem_tra_object_model",
+      "jit": true,
       "source": "scripts/test/kiem_tra_object_model.vi",
       "expected": "scripts/test/expected/kiem_tra_object_model.expected",
       "suite": "full"
@@ -1559,24 +1607,28 @@
     },
     {
       "id": "kiem_tra_receiver_minh",
+      "jit": true,
       "source": "scripts/test/kiem_tra_receiver_minh.vi",
       "expected": "scripts/test/expected/kiem_tra_receiver_minh.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_receiver_minh_de_quy",
+      "jit": true,
       "source": "scripts/test/kiem_tra_receiver_minh_de_quy.vi",
       "expected": "scripts/test/expected/kiem_tra_receiver_minh_de_quy.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_receiver_minh_dieu_khien",
+      "jit": true,
       "source": "scripts/test/kiem_tra_receiver_minh_dieu_khien.vi",
       "expected": "scripts/test/expected/kiem_tra_receiver_minh_dieu_khien.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_receiver_minh_nhieu_instance",
+      "jit": true,
       "source": "scripts/test/kiem_tra_receiver_minh_nhieu_instance.vi",
       "expected": "scripts/test/expected/kiem_tra_receiver_minh_nhieu_instance.expected",
       "suite": "full"
@@ -1601,18 +1653,21 @@
     },
     {
       "id": "kiem_tra_semantics_gia_tri",
+      "jit": true,
       "source": "scripts/test/kiem_tra_semantics_gia_tri.vi",
       "expected": "scripts/test/expected/kiem_tra_semantics_gia_tri.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_so_chan_1-20",
+      "jit": true,
       "source": "scripts/test/kiem_tra_so_chan_1-20.vi",
       "expected": "scripts/test/expected/kiem_tra_so_chan_1-20.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_so_chia_het_cho_3_va_4",
+      "jit": true,
       "source": "scripts/test/kiem_tra_so_chia_het_cho_3_va_4.vi",
       "expected": "scripts/test/expected/kiem_tra_so_chia_het_cho_3_va_4.expected",
       "suite": "full"
@@ -1625,18 +1680,21 @@
     },
     {
       "id": "kiem_tra_so_le_chia_het_cho_5",
+      "jit": true,
       "source": "scripts/test/kiem_tra_so_le_chia_het_cho_5.vi",
       "expected": "scripts/test/expected/kiem_tra_so_le_chia_het_cho_5.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_so_nguyen",
+      "jit": true,
       "source": "scripts/test/kiem_tra_so_nguyen.vi",
       "expected": "scripts/test/expected/kiem_tra_so_nguyen.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_so_thuc",
+      "jit": true,
       "source": "scripts/test/kiem_tra_so_thuc.vi",
       "expected": "scripts/test/expected/kiem_tra_so_thuc.expected",
       "suite": "full"
@@ -1766,12 +1824,14 @@
     },
     {
       "id": "kiem_tra_ten_kieu_nhieu_tu",
+      "jit": true,
       "source": "scripts/test/kiem_tra_ten_kieu_nhieu_tu.vi",
       "expected": "scripts/test/expected/kiem_tra_ten_kieu_nhieu_tu.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_thoat_vong_lap",
+      "jit": true,
       "source": "scripts/test/kiem_tra_thoat_vong_lap.vi",
       "expected": "scripts/test/expected/kiem_tra_thoat_vong_lap.expected",
       "suite": "full"
@@ -1796,12 +1856,14 @@
     },
     {
       "id": "kiem_tra_toan_tu_bit",
+      "jit": true,
       "source": "scripts/test/kiem_tra_toan_tu_bit.vi",
       "expected": "scripts/test/expected/kiem_tra_toan_tu_bit.expected",
       "suite": "full"
     },
     {
       "id": "kiem_tra_toan_tu_moi",
+      "jit": true,
       "source": "scripts/test/kiem_tra_toan_tu_moi.vi",
       "expected": "scripts/test/expected/kiem_tra_toan_tu_moi.expected",
       "suite": "full"
@@ -1814,6 +1876,7 @@
     },
     {
       "id": "kiem_tra_tra_ve",
+      "jit": true,
       "source": "scripts/test/kiem_tra_tra_ve.vi",
       "expected": "scripts/test/expected/kiem_tra_tra_ve.expected",
       "suite": "full"
@@ -1850,6 +1913,7 @@
     },
     {
       "id": "kiem_tra_uu_tien_diem_vao",
+      "jit": true,
       "source": "scripts/test/kiem_tra_uu_tien_diem_vao.vi",
       "expected": "scripts/test/expected/kiem_tra_uu_tien_diem_vao.expected",
       "suite": "full"
@@ -1862,6 +1926,7 @@
     },
     {
       "id": "kiem_tra_visibility_instance",
+      "jit": true,
       "source": "scripts/test/kiem_tra_visibility_instance.vi",
       "expected": "scripts/test/expected/kiem_tra_visibility_instance.expected",
       "suite": "full"
@@ -1886,6 +1951,7 @@
     },
     {
       "id": "kiemtramacdinh",
+      "jit": true,
       "source": "scripts/test/kiemtramacdinh.vi",
       "expected": "scripts/test/expected/kiemtramacdinh.expected",
       "suite": "full"
@@ -1898,6 +1964,7 @@
     },
     {
       "id": "kiemtrathamsotrung",
+      "jit": true,
       "source": "scripts/test/kiemtrathamsotrung.vi",
       "expected": "scripts/test/expected/kiemtrathamsotrung.expected",
       "suite": "full"
@@ -1948,12 +2015,14 @@
     },
     {
       "id": "native_dynamic_vpp",
+      "jit": true,
       "source": "scripts/test/fixtures/native_dynamic_vpp.vi",
       "suite": "full",
       "expected": "scripts/test/expected/native_dynamic_vpp.expected"
     },
     {
       "id": "native_exit_scalar",
+      "jit": true,
       "source": "scripts/test/fixtures/native_exit_scalar.vi",
       "expected": "scripts/test/expected/native_exit_scalar.expected",
       "suite": "full",
@@ -2043,12 +2112,14 @@
     },
     {
       "id": "native_protected_loop",
+      "jit": true,
       "source": "scripts/test/fixtures/native_protected_loop.vi",
       "expected": "scripts/test/expected/native_protected_loop.expected",
       "suite": "full"
     },
     {
       "id": "native_return_semantics",
+      "jit": true,
       "source": "scripts/test/fixtures/native_return_semantics.vi",
       "expected": "scripts/test/expected/native_return_semantics.expected",
       "suite": "full",
@@ -2056,6 +2127,7 @@
     },
     {
       "id": "program",
+      "jit": true,
       "source": "scripts/test/program.vi",
       "expected": "scripts/test/expected/program.expected",
       "suite": "full"
@@ -2515,8 +2587,7 @@
       "expected": "scripts/test/expected/native_logical_side_effects_driver.expected",
       "sources": [
         "scripts/test/fixtures/native_logical_side_effects.vi"
-      ],
-      "pending": "Historical assignment expressions inside &&/|| are not supported by the current i32 parser (build exit 14); equivalent callable side effects are covered by i32-logical-call-side-effects."
+      ]
     },
     {
       "id": "i32-boundaries",
@@ -2525,8 +2596,7 @@
       "stdout": "-2147483648\n2147483647\n2147483647\n-2147483648\n",
       "sources": [
         "scripts/test/kiem_tra_native_i32_boundaries.vi"
-      ],
-      "pending": "Historical parenthesized -(2147483648) is rejected by the current i32 parser (build exit 14); direct INT32_MIN remains covered by i32-print and i32-runtime."
+      ]
     },
     {
       "id": "native-leaf-architectures",
@@ -2539,9 +2609,17 @@
       "source": "scripts/test/fixtures/native_logical_call_side_effects.vi",
       "suite": "i32",
       "expected": "scripts/test/expected/native_logical_side_effects_driver.expected"
+    },
+    {
+      "id": "native_jit_hot",
+      "jit": true,
+      "source": "scripts/test/fixtures/native_jit_hot.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_jit_hot.expected"
     }
   ],
   "unregistered_sources": {
+    "scripts/test/fixtures/native_jit_pressure.vi": "Dynamic JIT tier pressure fixture exercised by check_jit_dynamic.py",
     "scripts/test/bootstrapstage2.vi": "Standalone candidate without registered oracle; requires porting",
     "scripts/test/fixtures/anonymous_modules/counter.vi": "Module/support fixture or specialized entry; no standalone golden registered",
     "scripts/test/fixtures/api_project/controller.vi": "Module/support fixture or specialized entry; no standalone golden registered",

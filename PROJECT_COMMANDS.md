@@ -6,9 +6,18 @@ make test
 ./VPP phiên bản
 ./VPP build hello.vi -o hello
 ./VPP run hello.vi -- arg1 arg2
+./VPP jit hello.vi
+./VPP jit hello.vi --function cộng -- 19 23
 make benchmark
 cmake --install build-pure-vpp --prefix "$HOME/.local"
 ```
+
+`vpp jit` sử dụng bộ JIT đã build một lần; mỗi nguồn được biên dịch thành mã máy
+ngay trong bộ nhớ. Mặc định dùng tập i32; `./VPP jit --dynamic "$PWD/hello.vi"`
+hỗ trợ runtime kiểu động và import module, không cần assembler/linker khi thực thi.
+Đặt `VPP_JIT_PROFILE=1` để xem thống kê biên dịch lại hàm nóng trong chế độ dynamic.
+Đặt `VPP_JIT_TIER=0` để chạy baseline native, không thu thập hồ sơ hoặc biên dịch lại.
+Có thể gọi trực tiếp `build-pure-vpp/bin/vpp-jit hello.vi` hoặc xem `./VPP jit --help`.
 
 Chi tiết: [Cài đặt](docs/installation.md). Build đầy đủ hiện hỗ trợ macOS ARM64.
 
@@ -197,7 +206,21 @@ Nếu build bằng `scripts/macos/build-vpp-cli.sh`:
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
 ```
 
-CTest hiện chỉ đăng ký bộ regression V++ chạy các file `.vi` qua `vpp-integration`.
+CI macOS, Linux và Windows dùng bộ JIT trong gói V++ đã build.
+Runner mặc định chạy nguồn .vi bằng `vpp-jit --dynamic`, không build executable
+cho test thông thường, không tạo/giải nén artifact test và không fallback AOT.
+Các kiểm tra compiler/linker/VM/i32, tooling và các API JIT độc lập vẫn chạy theo
+hợp đồng riêng. Test từ chối biên dịch dùng `--check-dynamic`; test argv truyền
+đối số sau đường dẫn nguồn trong `--dynamic`.
+
+```bash
+python3 scripts/quality/run_native_regression.py --compiler "$PACKAGE/bin/vpp" \
+  --jit "$PACKAGE/bin/vpp-jit" --jobs 2
+```
+
+Để kiểm tra riêng đường biên dịch AOT, dùng `--backend aot`. Các tùy chọn
+`--phase build/run`, `--artifacts`, `--batch-size`, `--module-suites` chỉ
+phục vụ kiểm tra AOT và tương thích với artifact cũ.
 
 ## 6. Chạy chương trình V++
 

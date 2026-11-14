@@ -1,0 +1,14 @@
+// Measure guest execution only, after the adaptive threshold is reached.
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
+hàm hot_add(a, b) { trả về a + b; };
+hàm chính() {
+    tổng = 0;
+    lặp(i = 0; i < 64; i++) { tổng = hot_add(tổng, 1); };
+    lặp(mẫu = 0; mẫu < 5; mẫu++) {
+        bắt đầu = thời gian đơn điệu mili giây();
+        lặp(i = 0; i < 100000; i++) { tổng = hot_add(tổng, 1); };
+        elapsed = thời gian đơn điệu mili giây() - bắt đầu;
+        in elapsed;
+    };
+    in tổng;
+};

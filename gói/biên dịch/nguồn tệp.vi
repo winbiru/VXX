@@ -363,8 +363,8 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
 
 // Preserve the importer's directory without creating a .vi file beside it.
 // This also allows scripts to import modules from read-only directories.
-hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện) {
+hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện, số worker = rỗng) {
     bộ nạp = Bộ Nạp Nguồn(thư viện);
     trả về biên dịch liên kết đồ thị thuần(
-        bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn));
+        bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn), số worker);
 };

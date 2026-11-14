@@ -19,13 +19,14 @@ param(
     [ValidateSet('all', 'build', 'run')]
     [string]$Phase = 'all',
     [string]$Artifacts,
+    [string]$Jit,
     [switch]$ModuleSuites,
     [switch]$List,
     [switch]$Inventory
 )
 
 # Use the same manifest, platform gates, oracles and logs as Unix and CI.
-# The old host CLI, Bash arrays and interpreter/JIT modes have been retired.
+# Dynamic JIT is opt-in for reviewed full regression fixtures.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'runner-support.ps1')
@@ -72,6 +73,7 @@ $options += @('--compiler', $compiler, '--jobs', "$Jobs", '--batch-size', "$Batc
     '--timeout', "$Timeout", '--logs', $LogDirectory,
     '--shard-count', "$ShardCount", '--shard-index', "$ShardIndex")
 if ($ModuleSuites) { $options += '--module-suites' }
+if (-not [string]::IsNullOrWhiteSpace($Jit)) { $options += @('--jit', (Resolve-Path -LiteralPath $Jit).Path) }
 if ($Phase -ne 'all') {
     if ([string]::IsNullOrWhiteSpace($Artifacts)) { throw 'Phase build/run requires Artifacts' }
     $options += @('--phase', $Phase, '--artifacts', $Artifacts)

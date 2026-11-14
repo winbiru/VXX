@@ -164,7 +164,7 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         if prefix is None:
             seed_boundary = out / 'i32-boundary.obj'
             assemble(clang, ASM / 'windows/vpp_aot_primitives_windows_x86_64.S', seed_boundary,
-                     env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1')
+                     env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1', '-DVPP_JIT_DISABLED=1')
             command(['pwsh', '-NoProfile', '-File', ROOT / 'scripts/quality/check_windows_native_pe_selfhosting.ps1',
                      '-SeedCompiler', SEEDS / 'vpp-i32.exe', '-RuntimeObject', seed_boundary,
                      '-OutputDirectory', out / 'i32-bootstrap'], env, out / 'i32-bootstrap.log')
@@ -223,6 +223,8 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         link(clang, [out / 'vm.o', out / 'runtime.o', out / 'platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
         command([stage3, 'vm-build', ROOT / 'gói/máy ảo/nhà cung cấp DNS.vi',
                  '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
+        command([stage3, 'build', ROOT / 'gói/biên dịch/dòng lệnh JIT.vi',
+                 '-o', package / 'bin/vpp-jit.exe'], env, out / 'package-jit-build.log')
         shutil.copy2(ROOT / 'scripts/windows/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
         with zipfile.ZipFile(archive, 'x', zipfile.ZIP_DEFLATED) as z:
             for path in sorted(package.rglob('*')):
@@ -243,6 +245,20 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         run_env = clean_env()
         run_env['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
         command([binary], run_env, out / 'package-run.log', expected=b'42\n', cwd=smoke)
+        command([extracted / 'bin/vpp-jit.exe', probe], run_env, out / 'package-jit-run.log',
+                expected=b'42\n', cwd=smoke)
+        audit_pe(extracted / 'bin/vpp-jit.exe')
+        command([sys.executable, ROOT / 'scripts/quality/check_jit_cli.py', extracted / 'bin/vpp-jit.exe'],
+                run_env, out / 'package-jit-cli.log', cwd=smoke)
+        command([sys.executable, ROOT / 'scripts/quality/check_jit_dynamic.py',
+                 extracted / 'bin/vpp-jit.exe', extracted / 'share/vpp'],
+                run_env, out / 'package-jit-dynamic.log', cwd=smoke, timeout=3600)
+        jit_probe = smoke / 'thử JIT.vi'
+        jit_probe.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
+        jit_env = dict(run_env, PATH=str(extracted / 'bin') + os.pathsep + run_env['PATH'],
+                       VPP_AOT_ASSEMBLER='assembler-must-not-run.exe')
+        command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', jit_probe],
+                jit_env, out / 'package-jit-launcher.log', expected=b'42\n', cwd=smoke)
         command([compiler, 'vm-build', probe, '-o', bytecode], env, out / 'package-bytecode.log', cwd=smoke)
         command([extracted / 'bin/vpp-vm.exe', bytecode], run_env, out / 'package-vm.log',
                 expected=b'42\n', cwd=smoke)
@@ -307,6 +323,7 @@ def main():
     regress.add_argument('--module-suites', action='store_true')
     regress.add_argument('--phase', choices=('all', 'build', 'run'), default='all')
     regress.add_argument('--artifacts', type=Path)
+    regress.add_argument('--jit', type=Path)
     regress.add_argument('--logs', required=True, type=Path)
     raw = modes.add_parser('raw-build')
     raw.add_argument('i32', type=Path)
@@ -346,6 +363,7 @@ def main():
                                 *[arg for case in args.case for arg in ('--case', case)],
                                 '--phase', args.phase,
                                 *(['--artifacts', str(args.artifacts.resolve())] if args.artifacts is not None else []),
+                                *(['--jit', str(args.jit.resolve())] if args.jit is not None else []),
                                 *(['--module-suites'] if args.module_suites else [])], cwd=ROOT, env=env)
     return 0
 

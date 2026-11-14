@@ -10,6 +10,10 @@ else
 fi
 export VPP_HOME="${VPP_HOME:-$root}"
 export VPP_AOT_VPP_OBJECT="${VPP_AOT_VPP_OBJECT:-$runtime/runtime.o}"
+if [[ ${1:-} == jit ]]; then
+  shift
+  exec "$bin/vpp-jit" "$@"
+fi
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64)
     export VPP_AOT_PLATFORM_OBJECT="${VPP_AOT_PLATFORM_OBJECT:-$runtime/platform.o}"

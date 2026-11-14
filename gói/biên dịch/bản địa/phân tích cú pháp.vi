@@ -331,6 +331,7 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sao chép vùng nhớ") == 1) { trả về 82; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiền tố ascii") == 1) { trả về 83; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy dịch tệp mở") == 1) { trả về 84; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy JIT thô") == 1) { trả về 85; };
     trả về -1;
 };
 
@@ -419,7 +420,7 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 81) { trả về 2; };
     nếu (mã định danh == 82) { trả về 3; };
     nếu (mã định danh == 83) { trả về 2; };
-    nếu (mã định danh == 84) { trả về 3; };
+    nếu (mã định danh == 84 || mã định danh == 85) { trả về 3; };
     trả về -1;
 };
 
@@ -509,9 +510,18 @@ hàm phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái n�
         // The magnitude of INT32_MIN is one larger than INT32_MAX.
         // Recognize that exact token without overflowing p_number().
         biến kế tiếp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        biến ngoặc = 0;
+        khi (từ tố bằng(nguồn văn bản, các từ tố, kế tiếp, "(") == 1) {
+            ngoặc += 1; kế tiếp += 1;
+        };
         nếu (từ tố trường dữ liệu(các từ tố, kế tiếp, 2) == 2) {
             nếu (từ tố bằng(nguồn văn bản, các từ tố, kế tiếp, "2147483648") == 1) {
-                byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, kế tiếp + 1);
+                biến cuối = kế tiếp + 1;
+                lặp (i = 0; i < ngoặc; i++) {
+                    nếu (từ tố bằng(nguồn văn bản, các từ tố, cuối, ")") != 1) { trả về -1; };
+                    cuối += 1;
+                };
+                byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, cuối);
                 trả về phân tích phát(biểu diễn trung gian, 1, -2147483648);
             };
         };
@@ -654,6 +664,35 @@ hàm phân tích luận lý và(nguồn văn bản, các từ tố, trạng thá
     trả về 0;
 };
 hàm phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    biến tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, tại) == 1) {
+        biến op = -1;
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "=") == 1) { op = 0; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "+=") == 1) { op = 4; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "-=") == 1) { op = 5; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "*=") == 1) { op = 6; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "/=") == 1) { op = 26; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "%=") == 1) { op = 27; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "&=") == 1) { op = 30; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "|=") == 1) { op = 31; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "^=") == 1) { op = 32; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, "<<=") == 1) { op = 33; }
+        hoặc nếu (từ tố bằng(nguồn văn bản, các từ tố, tại + 1, ">>=") == 1) { op = 34; };
+        nếu (op >= 0) {
+            biến slot = phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, tại);
+            nếu (slot < 0) { trả về -1; };
+            byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, tại + 2);
+            nếu (op != 0) {
+                nếu (phân tích phát(biểu diễn trung gian, 2, slot) != 0) { trả về -1; };
+            };
+            nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+            nếu (op != 0) {
+                nếu (phân tích phát(biểu diễn trung gian, op, 0) != 0) { trả về -1; };
+            };
+            nếu (phân tích phát(biểu diễn trung gian, 3, slot) != 0) { trả về -1; };
+            trả về phân tích phát(biểu diễn trung gian, 2, slot);
+        };
+    };
     nếu (phân tích luận lý và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
     lặp(i = 0; i < từ tố số phần tử(các từ tố); i++) {
         nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "||") != 1) { thoát; };

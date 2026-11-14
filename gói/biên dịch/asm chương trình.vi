@@ -194,6 +194,27 @@ hàm riêng tư biên dịch asm hàm i32(mã, bảng, đã chứng minh) {
         "slotCount": độ dài(ô tham số), "maxStackDepth": sâu nhất, "instructions": lệnh}};
 };
 
+// Tier 1: only the exact pure expression a OP b, with mandatory arguments.
+// No call, capture, receiver access, default, branch or side effect can enter.
+hàm riêng tư biên dịch asm ứng viên jit(mã, bảng) {
+    dạng = biên dịch asm hàm i32(mã, bảng, {});
+    nếu (dạng == rỗng) { trả về 0; };
+    nếu (độ dài(dạng["ô"]) != 2) { trả về 0; };
+    lệnh = dạng["máy"]["instructions"];
+    nếu (độ dài(lệnh) != 4) { trả về 0; };
+    nếu (lệnh[0]["opcode"] != "LoadSlot" || lệnh[0]["operand"] != 0 ||
+        lệnh[1]["opcode"] != "LoadSlot" || lệnh[1]["operand"] != 1 ||
+        lệnh[3]["opcode"] != "Return") { trả về 0; };
+    phép = lệnh[2]["opcode"];
+    nếu (phép == "Add") { trả về 1; };
+    nếu (phép == "Sub") { trả về 2; };
+    nếu (phép == "Mul") { trả về 3; };
+    nếu (phép == "BitAnd") { trả về 4; };
+    nếu (phép == "BitOr") { trả về 5; };
+    nếu (phép == "BitXor") { trả về 6; };
+    trả về 0;
+};
+
 hàm riêng tư biên dịch asm phép i32 thuần(tên) {
     chọn(tên) {
         ca "OP_CONG": { trả về "Add"; }
@@ -2297,7 +2318,20 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
     máy = hạ.hạ();
     trực tiếp = lấy từ điển(bảng i32, "ASM trực tiếp", sai);
     nếu (đối tượng != rỗng) {
-        bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đúng));
+        nếu (thống kê != rỗng) {
+            thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+        };
+        phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đích["kiến trúc"] == "aarch64");
+        nếu (thống kê != rỗng) {
+            thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+        };
+        bỏ kết quả = đối tượng.ghi hàm(tên, phát);
+        nếu (thống kê != rỗng) {
+            thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            thống kê["count"] = thống kê["count"] + 1;
+        };
         trả về "";
     };
     nếu (trực tiếp && bộ đệm == rỗng && đích ghi != rỗng) {
@@ -2373,7 +2407,7 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
 // mnemonics straight to the assembler just like normal AOT bodies.
 hàm riêng tư biên dịch asm i32 máy(máy, tên, đích, trực tiếp, bảng byte, bảng hex, đối tượng = rỗng) {
     nếu (đối tượng != rỗng) {
-        bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đúng));
+        bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đích["kiến trúc"] == "aarch64"));
         trả về "";
     };
     nếu (trực tiếp) {
@@ -2396,7 +2430,7 @@ hàm riêng tư biên dịch asm phát phần(phần, đích ghi, văn bản) {
     trả về 0;
 };
 
-hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng, đích ghi = rỗng, đối tượng = rỗng) {
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng, đích ghi = rỗng, đối tượng = rỗng, ảnh jit = sai) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
@@ -2406,7 +2440,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
         ném "AOT V++: cần target aarch64/x86_64";
     };
     nếu (đối tượng != rỗng) {
-        nếu (đích["kiến trúc"] != "aarch64" || đích["hệ điều hành"] != "macos") { ném "Mach-O object: Darwin ARM64 only"; };
+        nếu (!ảnh jit && (đích["kiến trúc"] != "aarch64" || đích["hệ điều hành"] != "macos")) { ném "Mach-O object: Darwin ARM64 only"; };
         bộ đệm = rỗng;
     };
     bảng = biên dịch asm bảng mã();
@@ -2445,7 +2479,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             nếu (loại >= 0) { bảng i32["type_kind:" + i] = loại; };
         };
     };
-    nếu (!compiler) {
+    nếu (!compiler && !ảnh jit) {
         lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
             nếu (các hàm[i][1] >= 0 && biên dịch asm chuyển tiếp loại(các hàm[i][2], bảng)) {
                 bảng i32["type_forward:" + i] = đúng;
@@ -2454,7 +2488,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     };
     // Phân tích theo các lớp phụ thuộc; chu trình không có hàm lá sẽ
     // không bao giờ được chuyên biệt hóa, tránh đệ quy native không giới hạn.
-    lặp(lượt = 0; lượt < độ dài(các hàm); lượt = lượt + 1) {
+    lặp(lượt = 0; !ảnh jit && lượt < độ dài(các hàm); lượt = lượt + 1) {
         thêm mới = 0;
         lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
             nếu (các hàm[i][1] >= 0 && lấy từ điển(bảng i32, "" + i, rỗng) == rỗng) {
@@ -2471,7 +2505,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
         dạng = lấy từ điển(bảng i32, "" + i, rỗng);
         ký hiệu = "vpp_aot_i32_" + i;
-        nếu (dạng == rỗng) {
+        nếu (!ảnh jit && dạng == rỗng) {
             dạng = biên dịch asm hàm vô hộp(các hàm[i][2], bảng, chuỗi, đúng);
             ký hiệu = "vpp_aot_ascii_" + i;
         };
@@ -2601,7 +2635,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.functions", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     nếu (đối tượng != rỗng) {
-        bỏ kết quả = biên dịch asm metadata macho(đối tượng, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler);
+        bỏ kết quả = biên dịch asm metadata macho(đối tượng, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler, ảnh jit);
         bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.metadata", bắt đầu);
         trả về "";
     };
@@ -2678,7 +2712,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
 };
 
 // The binary metadata has the same ABI as the textual AOT spec.
-hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler) {
+hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler, ảnh jit = sai) {
     nếu (độ dài(ngoại) != 0) { ném "Mach-O object: foreign descriptors unavailable"; };
     o.bắt đầu dữ liệu();
     lặp(i = 0; i < độ dài(chuỗi); i++) {
@@ -2702,7 +2736,10 @@ hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi t�
             };
         };
         o.dữ liệu word(các hàm[i][1]); o.dữ liệu word(cần);
-        o.dữ liệu word(tối đa); o.dữ liệu word(0);
+        o.dữ liệu word(tối đa);
+        ứng viên = 0;
+        nếu (ảnh jit && các hàm[i][1] >= 0) { ứng viên = biên dịch asm ứng viên jit(mã, bảng); };
+        o.dữ liệu word(ứng viên);
         o.con trỏ("_vpp_aot_function_" + i);
     };
     o.nhãn(".Laot_initializers");

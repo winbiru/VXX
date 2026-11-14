@@ -3,6 +3,14 @@
 .att_syntax prefix
 .text
 .p2align 4
+// Every metadata consumer must select the same active program.
+.macro AOT_ACTIVE_SPEC
+    movq vpp_jit_active_spec(%rip), %r9
+    testq %r9, %r9
+    jne 9f
+    leaq vpp_aot_spec(%rip), %r9
+9:
+.endm
 .macro AOT_VPP ten, so_doi_so
     .globl vpp_native_dynamic_\ten
 vpp_native_dynamic_\ten:
@@ -16,7 +24,13 @@ vpp_native_dynamic_\ten:
 
 .globl vpp_native_aot_info
 vpp_native_aot_info:
-    leaq vpp_aot_spec(%rip), %r9
+    cmpl $108, %edi
+    je .Ljit_x86_address
+    cmpl $109, %edi
+    je .Ljit_x86_run
+    cmpl $110, %edi
+    je .Ljit_x86_active
+    AOT_ACTIVE_SPEC
     cmpl $4, %edi
     ja .Laot_thong_tin_bang_x
     cmpl $3, %edi
@@ -58,7 +72,7 @@ vpp_native_aot_info:
     cmpl $30, %edi
     jae .Laot_thong_tin_ham_i32_x
     subl $20, %edi
-    cmpl $2, %edi
+    cmpl $3, %edi
     ja .Laot_thong_tin_sai_x
     cmpq 16(%r9), %rsi
     jae .Laot_thong_tin_sai_x
@@ -83,7 +97,7 @@ vpp_native_aot_info:
 
 .globl vpp_native_aot_invoke
 vpp_native_aot_invoke:
-    leaq vpp_aot_spec(%rip), %r9
+    AOT_ACTIVE_SPEC
     cmpl $2, %edi
     je .Laot_goi_ham_muc_x
     testl %esi, %esi
@@ -114,7 +128,7 @@ vpp_native_aot_invoke:
 vpp_native_aot_invoke_i32:
     testl %edi, %edi
     js .Laot_goi_i32_sai_x
-    leaq vpp_aot_spec(%rip), %r9
+    AOT_ACTIVE_SPEC
     cmpq 80(%r9), %rdi
     jae .Laot_goi_i32_sai_x
     movq 88(%r9), %rax
@@ -142,7 +156,7 @@ vpp_native_aot_fold_i32:
     testl %edi, %edi
     js .Laot_gap_i32_sai_x
     movl %esi, (%rsp)
-    leaq vpp_aot_spec(%rip), %r9
+    AOT_ACTIVE_SPEC
     cmpq 80(%r9), %rdi
     jae .Laot_gap_i32_sai_x
     movq 88(%r9), %rax
@@ -202,4 +216,5 @@ vpp_native_aot_fold_i32:
     popq %rbx
     popq %rbp
     ret
+#include "../common/vpp_jit_dynamic_x86_64.inc"
 .section .note.GNU-stack,"",@progbits
