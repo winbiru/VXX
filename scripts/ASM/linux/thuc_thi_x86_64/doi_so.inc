@@ -4,10 +4,13 @@
 .globl vpp_native_argc
 vpp_native_argc:
     movl vpp_linux_argc(%rip), %eax
+    subl vpp_jit_argv_offset(%rip), %eax
     ret
 .Ldoi_so_con_tro:
     testl %edi, %edi
     js .Ldoi_so_thieu
+    addl vpp_jit_argv_offset(%rip), %edi
+    jo .Ldoi_so_thieu
     cmpl vpp_linux_argc(%rip), %edi
     jae .Ldoi_so_thieu
     movq vpp_linux_argv(%rip), %rax
@@ -64,4 +67,11 @@ vpp_native_os_argument_byte:
     movl $-1, %eax
     popq %rbx
     ret
+
+// JIT bỏ qua đối số của trình điều khiển khi chạy chương trình khách.
+.bss
+.p2align 2
+.globl vpp_jit_argv_offset
+vpp_jit_argv_offset: .zero 4
+.text
 

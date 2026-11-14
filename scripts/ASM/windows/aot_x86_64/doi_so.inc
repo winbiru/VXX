@@ -139,7 +139,10 @@ vpp_native_os_argument_byte:
 4:  leave
     ret
 
-.bss
+// The pinned i32 PE linker only supports empty COFF .bss sections.
+// Keep this zero-initialized state in file-backed writable data so that
+// the same boundary remains usable by the seed and subsequent stages.
+.data
 .p2align 2
 .globl vpp_jit_argv_offset
 vpp_jit_argv_offset: .zero 4

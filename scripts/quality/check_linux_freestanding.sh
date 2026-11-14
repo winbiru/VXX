@@ -19,7 +19,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
 "$CC" -c -o "$OUTPUT_DIR/start.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_start_x86_64.S"
 "$CC" -c -o "$OUTPUT_DIR/syscalls.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S"
-"$CC" -c -o "$OUTPUT_DIR/runtime-core.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_runtime_core_x86_64.S"
+"$CC" -DVPP_LINUX_SYSCALL_PROBE_ONLY=1 -c -o "$OUTPUT_DIR/runtime-core.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_runtime_core_x86_64.S"
 "$CC" -c -o "$OUTPUT_DIR/directory.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_directory_x86_64.S" \
     "-I$ROOT_DIR/scripts/ASM"
 "$CC" -c -o "$OUTPUT_DIR/sha256.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_sha256_x86_64.S"

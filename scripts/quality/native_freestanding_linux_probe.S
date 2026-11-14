@@ -103,6 +103,36 @@ vpp_freestanding_main:
     call vpp_native_os_argument_byte
     cmpl $99, %eax                // 'c'
     jne .Lbad_core
+    // The JIT exposes argv starting at the guest source, not the driver.
+    movl $1, vpp_jit_argv_offset(%rip)
+    call vpp_native_argc
+    cmpl $2, %eax
+    jne .Lbad_core
+    xorl %edi, %edi
+    call vpp_native_os_argument_length
+    cmpl $5, %eax                 // guest argv[0] == "check"
+    jne .Lbad_core
+    movl $1, %edi
+    xorl %esi, %esi
+    call vpp_native_os_argument_byte
+    cmpl $97, %eax                // guest argv[1] == "argv"
+    jne .Lbad_core
+    movl $2, %edi
+    call vpp_native_os_argument_length
+    cmpl $-1, %eax
+    jne .Lbad_core
+    movl $-1, %edi
+    call vpp_native_os_argument_length
+    cmpl $-1, %eax
+    jne .Lbad_core
+    movl $2147483647, %edi
+    call vpp_native_os_argument_length
+    cmpl $-1, %eax
+    jne .Lbad_core
+    movl $0, vpp_jit_argv_offset(%rip)
+    call vpp_native_argc
+    cmpl $3, %eax
+    jne .Lbad_core
     movl $4096, %edi
     movl $42, %esi
     call vpp_native_memory_write_i32
