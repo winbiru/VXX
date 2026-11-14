@@ -1,0 +1,14 @@
+// Keep 64 MiB of independent strings alive across GC. This exceeds the
+// old heap's 58,611,392 usable bytes and exercises the expanded Linux arena.
+hàm chính() {
+    biến seed = "a";
+    lặp(i = 0; i < 22; i++) { seed = seed + seed; };
+    biến blocks = [];
+    lặp(i = 0; i < 8; i++) { thêm(blocks, seed + seed); };
+    lặp(i = 0; i < 8; i++) {
+        nếu (độ dài(blocks[i]) != 8388608 || blocks[i][0] != "a") { ném "mất dữ liệu heap"; };
+    };
+    in độ dài(blocks);
+    in 1.25 + 2.5;
+    in "Linux heap capacity: PASS";
+};

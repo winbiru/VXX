@@ -1,0 +1,29 @@
+// Reproduce a fragmented heap with the same tail, last free block and
+// allocation size as the Linux stage-2 capacity failure.
+hàm kiểm tra bộ cấp phát() {
+    biến root = vm_alloc(8, 1);
+    biến a = vm_alloc(29999984, 0);
+    biến b = vm_alloc(27186512, 0);
+    vm_set(root, 0, a); vm_set(root, 1, b);
+    vm_set(a, 0, 123); vm_set(b, 0, 456);
+    biến dead = vm_alloc(759488, 0);
+    vm_set(dead, 0, 777); máy ghi byte(dead + 759487, 99);
+    nếu (vm_get(4198464, 0) != 66334672) { trả về 1; };
+    vm_set(4198464, 9, 830800);
+    nếu (!vm_gc_due()) { trả về 2; };
+    vm_collect(root);
+    nếu (vm_get(4198464, 0) != dead - 16) { trả về 3; };
+    biến merged = vm_alloc(817488, 0);
+    nếu (merged != dead || vm_get(4198464, 1) != 0) { trả về 4; };
+    nếu (vm_get(merged, 0) != 0 || máy đọc byte(merged + 759487) != 0) { trả về 5; };
+    nếu (vm_get(a, 0) != 123 || vm_get(b, 0) != 456) { trả về 6; };
+    // All blocks are now unreachable; the bitmap must not retain stale starts.
+    vm_collect(0);
+    nếu (vm_get(4198464, 0) != 8388608) { trả về 7; };
+    nếu (máy đọc byte(120000000 + máy chia số nguyên ba mươi hai bit(dead - 8388608, 16)) != 0) { trả về 8; };
+    trả về 0;
+};
+hàm chính() {
+    vm_init();
+    trả về kiểm tra bộ cấp phát();
+};

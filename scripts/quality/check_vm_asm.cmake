@@ -254,4 +254,25 @@ execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/identity-invalid.vmb"
 if (status STREQUAL "0" OR NOT errors MATCHES "error=2")
     message(FATAL_ERROR "VM accepted identity hash on scalar: ${status}\n${output}\n${errors}")
 endif()
+# The raw allocator test constructs the exact fragmented tail geometry
+# observed during the Linux full bootstrap, without running the compiler.
+set(heap_source "${VPP_OUTPUT_DIR}/native-heap-allocator.vi")
+set(heap_binary "${VPP_OUTPUT_DIR}/native-heap-allocator")
+if(WIN32)
+    string(APPEND heap_binary ".exe")
+endif()
+file(WRITE "${heap_source}" "")
+foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục máy" "tiến trình máy" "ổ cắm máy"
+        "phân giải máy" "host ABI" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
+    file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
+    file(APPEND "${heap_source}" "${contents}\n")
+endforeach()
+file(READ "${VPP_ROOT}/scripts/test/fixtures/native_heap_allocator.vi" contents)
+file(APPEND "${heap_source}" "${contents}\n")
+vpp_raw_build("${heap_source}" "${heap_binary}" --vm-core)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${heap_binary}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "VM heap allocator regression: ${status}\n${output}\n${errors}")
+endif()
 message(STATUS "V++/ASM VM: values, control flow, closures, OOP, exceptions, GC and no C++ symbols PASS")

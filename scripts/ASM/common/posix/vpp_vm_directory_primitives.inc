@@ -1,6 +1,13 @@
+// Freestanding Linux AOT can allocate above the legacy VM heap limit.
+#ifdef VPP_VM_DIRECTORY_FREESTANDING
+#define VM_DIR_X86_ARENA 135271424
+#else
+#define VM_DIR_X86_ARENA 68162560
+#endif
 // ABI i32: identity(loại), directory(lệnh, điều khiển, dữ liệu). Lệnh: 0 mở(đường, ô16), 1 đọc(ô16,
 // đệm8192), 2 đóng(ô16), 3 xóa thư mục(đường), 4 tạo thư mục(đường, 0777). Con trỏ DIR giữ tại đây;
 // V++ giải mã bản ghi. Lệnh 5 đọc liên kết (đường, đệm4096); 6 trả nền tảng (0 Darwin, 1 Linux), 7 realpath Darwin.
+// Linux freestanding: lệnh 6 với đối số thứ hai bằng 1 trả giới hạn heap mở rộng.
 #if defined(__APPLE__)
 #define VM_DIR_SYM(x) _##x
 #define VM_DIR_LIB(x) _##x
@@ -372,6 +379,13 @@ VM_DIR_SYM(vpp_native_os_directory):
     ja Lvm_thu_muc_sai_x86
     cmpl $6, %r15d
     jne 1f
+#ifdef VPP_VM_DIRECTORY_FREESTANDING
+    cmpl $1, %r13d
+    jne 2f
+    movl $120000000, %eax
+    VM_TRA_THU_MUC
+2:
+#endif
 #if defined(__APPLE__)
     xorl %eax, %eax
 #else
@@ -383,7 +397,7 @@ VM_DIR_SYM(vpp_native_os_directory):
     jz Lvm_thu_muc_duong_x86
     cmpl $3, %r15d
     jae Lvm_thu_muc_duong_x86
-    cmpl $68162544, %r13d
+    cmpl $(VM_DIR_X86_ARENA - 16), %r13d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r13d
     jnz Lvm_thu_muc_sai_x86
@@ -392,7 +406,7 @@ VM_DIR_SYM(vpp_native_os_directory):
     jne Lvm_thu_muc_da_dong_x86
     cmpl $2, %r15d
     je Lvm_thu_muc_dong_x86
-    cmpl $68154368, %r14d
+    cmpl $(VM_DIR_X86_ARENA - 8192), %r14d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r14
 #if defined(__APPLE__)
@@ -434,7 +448,7 @@ Lvm_thu_muc_dong_x86:
 #endif
     VM_TRA_THU_MUC
 Lvm_thu_muc_duong_x86:
-    cmpl $68158464, %r13d
+    cmpl $(VM_DIR_X86_ARENA - 4096), %r13d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r13
 #if !defined(__APPLE__)
@@ -458,7 +472,7 @@ Lvm_thu_muc_duong_x86:
     je Lvm_thu_muc_tao_thu_muc_x86
     cmpl $3, %r15d
     je Lvm_thu_muc_xoa_x86
-    cmpl $68162544, %r14d
+    cmpl $(VM_DIR_X86_ARENA - 16), %r14d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r14d
     jnz Lvm_thu_muc_sai_x86
@@ -491,7 +505,7 @@ Lvm_thu_muc_duong_x86:
 Lvm_thu_muc_tra_ve_x86:
     VM_TRA_THU_MUC
 Lvm_thu_muc_doc_lien_ket_x86:
-    cmpl $68158464, %r14d
+    cmpl $(VM_DIR_X86_ARENA - 4096), %r14d
     ja Lvm_thu_muc_sai_x86
     movq %r13, %rax
     movl $4096, %ecx

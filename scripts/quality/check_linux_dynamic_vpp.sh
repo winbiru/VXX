@@ -131,4 +131,8 @@ check_fixture return-semantics "$ROOT_DIR/scripts/test/fixtures/native_return_se
 check_fixture exit-scalar "$ROOT_DIR/scripts/test/fixtures/native_exit_scalar.vi" 42
 cp "$ROOT_DIR/scripts/test/expected/native_protected_loop.expected" "$OUTPUT_DIR/protected-loop.expected"
 check_fixture protected-loop "$ROOT_DIR/scripts/test/fixtures/native_protected_loop.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_frame_pool_gc.expected" "$OUTPUT_DIR/frame-pool-gc.expected"
+check_fixture frame-pool-gc "$ROOT_DIR/scripts/test/fixtures/native_frame_pool_gc.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_linux_heap_capacity.expected" "$OUTPUT_DIR/heap-capacity.expected"
+check_fixture heap-capacity "$ROOT_DIR/scripts/test/fixtures/native_linux_heap_capacity.vi"
 echo 'Linux freestanding V++ dynamic AOT: all tested fixtures PASS.'

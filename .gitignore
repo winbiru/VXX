@@ -129,4 +129,4 @@ node_modules/
 # Pinned Windows V++/ASM bootstrap executable.
 !/bootstrap/windows-x86_64/vpp-i32.exe
 
-.Graphify/
+*.Graphify*

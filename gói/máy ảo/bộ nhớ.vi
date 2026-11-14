@@ -1,10 +1,12 @@
 // Native i32 V++ only: every memory access is an ASM primitive.
 // Reserve byte slots 4..63. The byte/file runtime keeps slots 0..3.
-// Header at 4198464; allocation-start bitmap below 8388608;
-// nonmoving managed heap [8388608,67000000). No C/C++ allocator.
+// Header at 4198464; nonmoving managed heap starts at 8388608.
+// Default limit 67000000; Linux freestanding AOT may use 120000000.
+// Allocation-start bitmap [120000000,126975713), heap limit at 127000000.
+// Both are in reserved byte slots, below linker scratch at 134222848.
 hàm vm_get(p, i) { trả về máy đọc số nguyên ba mươi hai bit(p + i * 4); };
 hàm vm_set(p, i, v) { trả về máy ghi số nguyên ba mươi hai bit(p + i * 4, v); };
-// 128-byte gap before allocation bitmap: four independent CPU timers
+// 128-byte profiling region after the VM header: four independent CPU timers
 // (start timespec, accumulated seconds/nanoseconds, call count) plus one
 // shared end timespec. Each 64-bit tv_nsec has an unused high i32 word;
 // we use it as recursion depth. All timestamp reads use the low 32 bits.
@@ -151,7 +153,7 @@ hàm vm_capacity_error(reason, requested, limit) {
     nếu (vm_get(4198464, 1) != 0) { trả về 0; };
     vm_error(1);
     biến end = vm_get(4198464, 0);
-    biến free = 67000000 - end;
+    biến free = vm_heap_limit() - end;
     biến largest = free;
     biến p = 8388608;
     khi (p < end) {
@@ -187,7 +189,15 @@ hàm vm_init() {
     lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
     lặp(i = 0; i < 32; i++) { vm_set(4198592, i, 0); };
     vm_set(4198464, 0, 8388608);
+    vm_set(127000000, 0, 67000000);
     trả về 0;
+};
+hàm vm_heap_limit() { trả về vm_get(127000000, 0); };
+hàm vm_gc_due() {
+    biến allocated = vm_get(4198464, 9);
+    nếu (allocated >= 1048576) { trả về 1; };
+    // Collect earlier under pressure, but only at rooted safepoints.
+    trả về allocated >= 524288 && vm_heap_limit() - vm_get(4198464, 0) < 2097152;
 };
 hàm vm_free_bucket(size) {
     nếu (size <= 32) { trả về 0; };
@@ -247,15 +257,16 @@ hàm vm_alloc_body(bytes, scan) {
     };
     nếu (p == 0) { p = end; };
     nếu (p == end) {
-        nếu (size > 67000000 - end) { trả về vm_capacity_error(2, size, 67000000 - end); };
+        biến remaining = vm_heap_limit() - end;
+        nếu (size > remaining) { trả về vm_capacity_error(2, size, remaining); };
         vm_set(4198464, 0, end + size);
         // Vùng cấp phát tuần tự chưa từng sử dụng; hệ điều hành đã đặt về 0.
         // Chỉ xóa nội dung khi tái sử dụng vùng đã được thu gom.
     } hoặc {
-        lặp(i = 16; i < size; i = i + 4) { máy ghi số nguyên ba mươi hai bit(p + i, 0); };
+        máy xóa vùng nhớ(p + 16, size - 16);
     };
     vm_set(p, 0, size); vm_set(p, 1, scan); vm_set(p, 2, 0); vm_set(p, 3, 0);
-    máy ghi byte(4198720 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 1);
+    máy ghi byte(120000000 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 1);
     vm_set(4198464, 9, vm_get(4198464, 9) + size);
     nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 14, vm_get(4198464, 14) + 1); };
     trả về p + 16;
@@ -263,7 +274,7 @@ hàm vm_alloc_body(bytes, scan) {
 hàm vm_mark(p, epoch) {
     nếu (p < 8388624 || p >= vm_get(4198464, 0)) { trả về 0; };
     nếu (p - máy chia số nguyên ba mươi hai bit(p, 16) * 16 != 0) { trả về 0; };
-    nếu (máy đọc byte(4198720 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16)) != 1) { trả về 0; };
+    nếu (máy đọc byte(120000000 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16)) != 1) { trả về 0; };
     nếu (vm_get(p - 16, 2) == epoch) { trả về 0; };
     vm_set(p - 16, 2, epoch);
     // Field 3 links the pending mark stack. Slot 11 is reserved for GC.
@@ -315,7 +326,7 @@ hàm vm_collect(root) {
     khi (p < end) {
         biến size = vm_get(p, 0);
         nếu (vm_get(p, 2) != epoch || vm_get(p, 1) == -1) {
-            máy ghi byte(4198720 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 0);
+            máy ghi byte(120000000 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 0);
             vm_set(p, 1, -1);
             nếu (previous != 0) { vm_set(previous, 0, vm_get(previous, 0) + size); }
             hoặc { previous = p; };
@@ -325,7 +336,12 @@ hàm vm_collect(root) {
         };
         p = p + size;
     };
-    nếu (previous != 0) { vm_free_push(previous); };
+    nếu (previous != 0) {
+        // Merge the final dead run with the unused tail. Clear the reclaimed
+        // region so future bump allocations retain the zero-fill invariant.
+        máy xóa vùng nhớ(previous, end - previous);
+        vm_set(4198464, 0, previous);
+    };
     vm_set(4198464, 9, 0);
     trả về 0;
 };

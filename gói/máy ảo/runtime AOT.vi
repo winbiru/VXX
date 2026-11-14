@@ -2345,7 +2345,7 @@ hàm aot_handle_error(frame) {
 };
 hàm aot_safepoint(frame) {
     nếu (aot_status()) { trả về 1; };
-    nếu (vm_get(4198464, 9) >= 1048576) { vm_collect(aot_state()); }; trả về aot_status();
+    nếu (vm_gc_due()) { vm_collect(aot_state()); }; trả về aot_status();
 };
 hàm aot_condition(frame) { trả về vm_truth(vm_pop(aot_stack(frame))); };
 hàm aot_failed(frame) { trả về aot_status(); };
@@ -2363,6 +2363,8 @@ hàm chính() {
     biến platform = máy thư mục thô(6, 0, 0);
     nếu (platform < 0 || platform > 2) { trả về 1; };
     vm_set(4198464, 8, platform);
+    // Linux x86-64 AOT uses the full freestanding ASM arena.
+    nếu (platform == 1 && máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
     // Ô thứ 17 giữ kho khung AOT, để GC thấy tất cả khung rảnh.
     biến state = vm_alloc(80, 1); nếu (state == 0) { trả về 1; };
     vm_set(4198464, 2, state);

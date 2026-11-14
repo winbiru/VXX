@@ -169,7 +169,11 @@ Lvm_so_thuc_sai_bat:
 .macro VM_KIEM_TRA_SO_THUC offset
     testl \offset, \offset
     js Lvm_so_thuc_sai_x86
+#if defined(VPP_VM_F64_FREESTANDING)
+    cmpl $(135271424-512), \offset
+#else
     cmpl $68162048, \offset
+#endif
     ja Lvm_so_thuc_sai_x86
 .endm
 .macro VM_TRA_SO_THUC

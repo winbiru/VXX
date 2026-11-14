@@ -317,7 +317,7 @@ hàm vm_execute(state) {
                 profile_steps = 0;
             };
         };
-        nếu (máy đọc số nguyên ba mươi hai bit(4198500) >= 1048576) { vm_collect(state); };
+        nếu (vm_gc_due()) { vm_collect(state); };
     };
     trả về vm_get(state, 7);
 };
