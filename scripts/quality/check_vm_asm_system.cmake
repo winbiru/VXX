@@ -5,7 +5,7 @@ foreach(required IN ITEMS VPP_VM VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUT
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 
-set(source "${VPP_ROOT}/src/tests/fixtures/vm_asm_system.vi")
+set(source "${VPP_ROOT}/scripts/test/fixtures/vm_asm_system.vi")
 set(image "${VPP_OUTPUT_DIR}/system.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${source}" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
@@ -22,12 +22,12 @@ endif()
 # The raw open failure contract is shared by standalone VM and native AOT.
 set(file_image "${VPP_OUTPUT_DIR}/file-errors.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/kiem_tra_loi_tep_co_cau_truc.vi" -o "${file_image}"
+    "${VPP_ROOT}/scripts/test/kiem_tra_loi_tep_co_cau_truc.vi" -o "${file_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Structured file-error fixture compilation failed: ${status}\n${output}\n${errors}")
 endif()
-file(READ "${VPP_ROOT}/src/tests/expected/kiem_tra_loi_tep_co_cau_truc.expected" file_expected)
+file(READ "${VPP_ROOT}/scripts/test/expected/kiem_tra_loi_tep_co_cau_truc.expected" file_expected)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${file_image}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
@@ -62,7 +62,7 @@ set(boundary "${VPP_OUTPUT_DIR}/native-system-boundary")
 if(WIN32)
     string(APPEND boundary ".exe")
 endif()
-vpp_raw_build("${VPP_ROOT}/src/tests/fixtures/native_system_boundary.vi" "${boundary}")
+vpp_raw_build("${VPP_ROOT}/scripts/test/fixtures/native_system_boundary.vi" "${boundary}")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${boundary}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 10)
 if (NOT status STREQUAL "0")

@@ -39,8 +39,13 @@ vpp_native_os_open:
     leaq (%r11,%rdi), %rsi
     movl -8(%rbp), %edx         // Cờ mở tệp được yêu cầu
     cmpl $1537, %edx            // V++ Darwin O_WRONLY|O_CREAT|O_TRUNC
-    jne .Lmo_co
+    jne .Lmo_noi
     movl $577, %edx             // Linux O_WRONLY|O_CREAT|O_TRUNC
+    jmp .Lmo_co
+.Lmo_noi:
+    cmpl $521, %edx             // Darwin O_WRONLY|O_CREAT|O_APPEND
+    jne .Lmo_co
+    movl $1089, %edx            // Linux O_WRONLY|O_CREAT|O_APPEND
 .Lmo_co:
     movq $-100, %rdi            // AT_FDCWD
     movl $438, %ecx             // 0666, chịu ảnh hưởng umask

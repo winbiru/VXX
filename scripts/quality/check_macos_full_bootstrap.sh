@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Converge the full compiler using the direct V++ ARM64/Mach-O route.
-# Stage 1 is the current-source compiler produced by the CMake seed build.
+# Stage 1 is the audited pinned seed in CI, or the current-source compiler
+# from an ordinary CMake build. Stages 2/3 always rebuild current sources.
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 source "$root/scripts/build-vpp-progress.sh"
@@ -47,14 +48,14 @@ check_stage() {
   "$executable" --version
   mkdir -p "$out/stage$stage-fixtures"
   for fixture in native_dynamic_vpp native_aot_private_method native_loop_stack_gc native_path_kind; do
-    "$executable" build "$root/src/tests/fixtures/$fixture.vi" -o "$out/stage$stage-$fixture" > "$out/stage$stage-$fixture.build.log" 2>&1 || {
+    "$executable" build "$root/scripts/test/fixtures/$fixture.vi" -o "$out/stage$stage-$fixture" > "$out/stage$stage-$fixture.build.log" 2>&1 || {
       cat "$out/stage$stage-$fixture.build.log" >&2; return 1;
     }
     /usr/bin/codesign --verify "$out/stage$stage-$fixture"
     (cd "$out/stage$stage-fixtures" && "$out/stage$stage-$fixture") > "$out/stage$stage-$fixture.stdout.log" 2> "$out/stage$stage-$fixture.stderr.log" || {
       cat "$out/stage$stage-$fixture.stderr.log" >&2; return 1;
     }
-    diff -u "$root/src/tests/expected/$fixture.expected" "$out/stage$stage-$fixture.stdout.log"
+    diff -u "$root/scripts/test/expected/$fixture.expected" "$out/stage$stage-$fixture.stdout.log"
   done
 }
 if [[ "$phase" == all || "$phase" == stage1 ]]; then

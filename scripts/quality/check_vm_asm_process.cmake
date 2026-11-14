@@ -5,12 +5,12 @@ if(WIN32)
     foreach(stem IN ITEMS kiem_tra_ffi_process_spawn_windows kiem_tra_ffi_process_timeout_windows)
         set(image "${VPP_OUTPUT_DIR}/${stem}.vmb")
         execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-            "${VPP_ROOT}/src/tests/${stem}.vi" -o "${image}"
+            "${VPP_ROOT}/scripts/test/${stem}.vi" -o "${image}"
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
         if(NOT status STREQUAL "0")
             message(FATAL_ERROR "Windows process VM compile: ${status}\n${output}\n${errors}")
         endif()
-        file(READ "${VPP_ROOT}/src/tests/expected/${stem}.expected" expected)
+        file(READ "${VPP_ROOT}/scripts/test/expected/${stem}.expected" expected)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=$ENV{SystemRoot}/System32" "${VPP_VM}" "${image}"
             WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
@@ -21,7 +21,7 @@ if(WIN32)
     # An independent Python child checks exact UTF-16 argv and environment,
     # fills both pipes, closes pipes before exit, and verifies a descendant
     # really terminates after the V++ JobObject deadline.
-    set(probe_source "${VPP_ROOT}/src/tests/fixtures/vm_asm_process_windows.vi")
+    set(probe_source "${VPP_ROOT}/scripts/test/fixtures/vm_asm_process_windows.vi")
     set(probe_script "${VPP_ROOT}/scripts/quality/windows_process_probe.py")
     set(probe_image "${VPP_OUTPUT_DIR}/process-windows.vmb")
     set(probe_native "${VPP_OUTPUT_DIR}/process-windows.exe")
@@ -47,7 +47,7 @@ if(WIN32)
         endif()
     endforeach()
 else()
-set(process_fixture "${VPP_ROOT}/src/tests/fixtures/vm_asm_process.vi")
+set(process_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_process.vi")
 set(process_image "${VPP_OUTPUT_DIR}/process.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${process_fixture}" -o "${process_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)

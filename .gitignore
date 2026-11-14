@@ -36,10 +36,10 @@ bin/
 .DS_Store
 *.dmg
 # Test artifacts
-src/tests/.tmp/
-src/tests/.tmp_*
-src/tests/.tmp.*/
-src/tests/.perf_batch/
+scripts/test/.tmp/
+scripts/test/.tmp_*
+scripts/test/.tmp.*/
+scripts/test/.perf_batch/
 *.actual
 dist/
 *.vsix
@@ -128,3 +128,5 @@ node_modules/
 
 # Pinned Windows V++/ASM bootstrap executable.
 !/bootstrap/windows-x86_64/vpp-i32.exe
+
+.Graphify/

@@ -18,7 +18,7 @@
   VM handler fixture, parity gate và hai CLI dump checks; integration suite được đăng
   ký riêng qua CMake.
 - [x] Hồi quy end-to-end đã có run_tests.sh trên Unix, runner PowerShell trên Windows,
-  cùng các file expected trong src/tests/expected/.
+  cùng các file expected trong scripts/test/expected/.
 
 ## Việc còn lại
 
@@ -71,5 +71,5 @@
 
 - Các fixture HTTP dùng port cục bộ nên runner phải dọn process và thư mục tạm đáng
   tin cậy trên cả Unix lẫn Windows.
-- Unit test không được che giấu lỗi tích hợp: bộ src/tests/*.vi vẫn là regression
+- Unit test không được che giấu lỗi tích hợp: bộ scripts/test/*.vi vẫn là regression
   contract của CLI và package/gói chuẩn.

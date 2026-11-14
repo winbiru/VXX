@@ -274,7 +274,7 @@
 | `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | |
 | `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | — smoke, chưa bao phủ mọi opcode |
 | `pipeline_tests.cpp` | Parser báo unmatched `]`/unclosed `[` bằng `VPP-SYN-035` và span nguồn | |
-| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | — 61 file, compile-only; bắt buộc 61/61 dùng `DirectIr`; production không có test API |
+| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `scripts/test/**/*.vi` | — 61 file, compile-only; bắt buộc 61/61 dùng `DirectIr`; production không có test API |
 | `recursive_ir_tests.cpp` | Expression/default parameter/body/block lowering đệ quy và reachable fallback count | |
 | `direct_codegen_tests.cpp` | Direct IR emitter cho literal/operator/assignment/print/map và bridge selection | |
 

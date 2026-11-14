@@ -10,12 +10,12 @@ if(WIN32)
     set(stem kiem_tra_ffi_thu_muc_windows)
     set(image "${VPP_OUTPUT_DIR}/directory.vmb")
     execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-        "${VPP_ROOT}/src/tests/${stem}.vi" -o "${image}"
+        "${VPP_ROOT}/scripts/test/${stem}.vi" -o "${image}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Windows directory VM compile: ${status}\n${output}\n${errors}")
     endif()
-    file(READ "${VPP_ROOT}/src/tests/expected/${stem}.expected" expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/${stem}.expected" expected)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${image}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 90)
@@ -27,7 +27,7 @@ if(WIN32)
 else()
 find_program(VPP_DIR_SHELL NAMES sh REQUIRED)
 set(source "${VPP_OUTPUT_DIR}/directory.vi")
-configure_file("${VPP_ROOT}/src/tests/fixtures/vm_asm_directory.vi" "${source}" COPYONLY)
+configure_file("${VPP_ROOT}/scripts/test/fixtures/vm_asm_directory.vi" "${source}" COPYONLY)
 set(image "${VPP_OUTPUT_DIR}/directory.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${source}" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
@@ -140,7 +140,7 @@ foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục 
     file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
     file(APPEND "${native_source}" "${contents}\n")
 endforeach()
-file(READ "${VPP_ROOT}/src/tests/fixtures/native_directory_decode.vi" contents)
+file(READ "${VPP_ROOT}/scripts/test/fixtures/native_directory_decode.vi" contents)
 file(APPEND "${native_source}" "${contents}\n")
 vpp_raw_build("${native_source}" "${native}" --vm-core)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${native}"

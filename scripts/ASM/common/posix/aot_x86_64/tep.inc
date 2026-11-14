@@ -10,7 +10,12 @@ PUBLIC(vpp_native_os_open):
     cmpl $1537, %esi
     jne 1f
     movl $577, %esi
+    jmp 2f
 1:
+    cmpl $521, %esi             // Darwin O_WRONLY|O_CREAT|O_APPEND
+    jne 2f
+    movl $1089, %esi            // Linux O_WRONLY|O_CREAT|O_APPEND
+2:
 #endif
     movl $438, %edx             // 0666, chịu ảnh hưởng umask của tiến trình
 #ifdef __APPLE__

@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SEEDS = ROOT / 'bootstrap/windows-x86_64'
 SOURCE = ROOT / 'gói/biên dịch/dòng lệnh AOT tự chủ.vi'
 ASM = ROOT / 'scripts/ASM'
-FIXTURES = ROOT / 'src/tests/fixtures'
-EXPECTED = ROOT / 'src/tests/expected'
+FIXTURES = ROOT / 'scripts/test/fixtures'
+EXPECTED = ROOT / 'scripts/test/expected'
 
 
 def digest(path):
@@ -223,7 +223,7 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         link(clang, [out / 'vm.o', out / 'runtime.o', out / 'platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
         command([stage3, 'vm-build', ROOT / 'gói/máy ảo/nhà cung cấp DNS.vi',
                  '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
-        shutil.copy2(ROOT / 'scripts/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
+        shutil.copy2(ROOT / 'scripts/windows/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
         with zipfile.ZipFile(archive, 'x', zipfile.ZIP_DEFLATED) as z:
             for path in sorted(package.rglob('*')):
                 if path.is_file():
@@ -296,9 +296,13 @@ def main():
                                           'convergence', 'test', 'package'), default='all')
     regress = modes.add_parser('regression')
     regress.add_argument('package', type=Path)
-    regress.add_argument('--suite', choices=('full', 'i32'), default='full')
+    regress.add_argument('--suite', choices=('full', 'i32', 'smoke'), default='full')
+    regress.add_argument('--compiler', type=Path)
+    regress.add_argument('--case', action='append', default=[])
+    regress.add_argument('--timeout', type=int, default=900)
     regress.add_argument('--jobs', type=int, default=2)
     regress.add_argument('--batch-size', type=int, choices=range(1, 5), default=1)
+    regress.add_argument('--module-suites', action='store_true')
     regress.add_argument('--logs', required=True, type=Path)
     raw = modes.add_parser('raw-build')
     raw.add_argument('i32', type=Path)
@@ -328,10 +332,14 @@ def main():
         else:
             env = package_env(package, clang)
             compiler = package / 'bin/vpp-native.exe'
+        if args.compiler is not None:
+            compiler = args.compiler.resolve(strict=True)
         return subprocess.call([sys.executable, str(ROOT / 'scripts/quality/run_native_regression.py'),
                                 '--suite', args.suite, '--compiler', str(compiler),
                                 '--jobs', str(args.jobs), '--batch-size', str(args.batch_size),
-                                '--logs', str(args.logs.resolve())], cwd=ROOT, env=env)
+                                '--timeout', str(args.timeout), '--logs', str(args.logs.resolve()),
+                                *[arg for case in args.case for arg in ('--case', case)],
+                                *(['--module-suites'] if args.module_suites else [])], cwd=ROOT, env=env)
     return 0
 
 

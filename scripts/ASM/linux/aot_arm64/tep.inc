@@ -32,7 +32,12 @@ vpp_native_os_open:
     cmp w1, w10
     b.ne 1f
     mov w1, #577
+    b 2f
 1:
+    cmp w1, #521               // Darwin O_WRONLY|O_CREAT|O_APPEND
+    b.ne 2f
+    mov w1, #1089              // Linux O_WRONLY|O_CREAT|O_APPEND
+2:
     mov w2, #438               // Quyền open(2) Linux: 0666
     bl open
     TRA_BO_NHO

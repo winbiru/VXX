@@ -117,18 +117,18 @@ check_fixture() {
 }
 
 check_fixture hello "$OUTPUT_DIR/hello.vi"
-check_fixture vm "$ROOT_DIR/src/tests/fixtures/vm_asm.vi"
-check_fixture dynamic "$ROOT_DIR/src/tests/fixtures/native_dynamic_vpp.vi"
-cp "$ROOT_DIR/src/tests/expected/native_aot_private_method.expected" "$OUTPUT_DIR/private-method.expected"
-check_fixture private-method "$ROOT_DIR/src/tests/fixtures/native_aot_private_method.vi"
-cp "$ROOT_DIR/src/tests/expected/native_i32_direct_calls.expected" "$OUTPUT_DIR/direct-calls.expected"
-check_fixture direct-calls "$ROOT_DIR/src/tests/fixtures/native_i32_direct_calls.vi"
-cp "$ROOT_DIR/src/tests/expected/native_loop_stack_gc.expected" "$OUTPUT_DIR/loop-stack-gc.expected"
-check_fixture loop-stack-gc "$ROOT_DIR/src/tests/fixtures/native_loop_stack_gc.vi"
-cp "$ROOT_DIR/src/tests/expected/native_return_semantics.expected" "$OUTPUT_DIR/return-semantics.expected"
-check_fixture return-semantics "$ROOT_DIR/src/tests/fixtures/native_return_semantics.vi" 42
+check_fixture vm "$ROOT_DIR/scripts/test/fixtures/vm_asm.vi"
+check_fixture dynamic "$ROOT_DIR/scripts/test/fixtures/native_dynamic_vpp.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_aot_private_method.expected" "$OUTPUT_DIR/private-method.expected"
+check_fixture private-method "$ROOT_DIR/scripts/test/fixtures/native_aot_private_method.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_i32_direct_calls.expected" "$OUTPUT_DIR/direct-calls.expected"
+check_fixture direct-calls "$ROOT_DIR/scripts/test/fixtures/native_i32_direct_calls.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_loop_stack_gc.expected" "$OUTPUT_DIR/loop-stack-gc.expected"
+check_fixture loop-stack-gc "$ROOT_DIR/scripts/test/fixtures/native_loop_stack_gc.vi"
+cp "$ROOT_DIR/scripts/test/expected/native_return_semantics.expected" "$OUTPUT_DIR/return-semantics.expected"
+check_fixture return-semantics "$ROOT_DIR/scripts/test/fixtures/native_return_semantics.vi" 42
 : > "$OUTPUT_DIR/exit-scalar.expected"
-check_fixture exit-scalar "$ROOT_DIR/src/tests/fixtures/native_exit_scalar.vi" 42
-cp "$ROOT_DIR/src/tests/expected/native_protected_loop.expected" "$OUTPUT_DIR/protected-loop.expected"
-check_fixture protected-loop "$ROOT_DIR/src/tests/fixtures/native_protected_loop.vi"
+check_fixture exit-scalar "$ROOT_DIR/scripts/test/fixtures/native_exit_scalar.vi" 42
+cp "$ROOT_DIR/scripts/test/expected/native_protected_loop.expected" "$OUTPUT_DIR/protected-loop.expected"
+check_fixture protected-loop "$ROOT_DIR/scripts/test/fixtures/native_protected_loop.vi"
 echo 'Linux freestanding V++ dynamic AOT: all tested fixtures PASS.'

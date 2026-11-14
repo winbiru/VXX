@@ -18,7 +18,7 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/từ tố.vi"
     "gói/biên dịch/bản địa/phân tích cú pháp.vi"
     "gói/biên dịch/bản địa/biểu diễn trung gian.vi"
-    "src/tests/nativeparserharness.vi")
+    "scripts/test/nativeparserharness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
     # This harness is deliberately flattened into one unit. Imports in the
     # original modules would be interpreted as statements inside that unit.

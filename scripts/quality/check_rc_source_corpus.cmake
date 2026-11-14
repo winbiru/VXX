@@ -1,11 +1,11 @@
-# The test cases are .vi sources under src/tests. CMake only invokes the CLI
+# The test cases are .vi sources under scripts/test. CMake only invokes the CLI
 # and verifies compile rejection/dump stability; it cannot replace the compiler.
 if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT)
     message(FATAL_ERROR "missing VPP_EXEC or VPP_ROOT")
 endif()
 
-set(stress "${VPP_ROOT}/src/tests/kiem_tra_rc_hardening.vi")
-set(malformed_dir "${VPP_ROOT}/src/tests/fixtures/rc_malformed")
+set(stress "${VPP_ROOT}/scripts/test/kiem_tra_rc_hardening.vi")
+set(malformed_dir "${VPP_ROOT}/scripts/test/fixtures/rc_malformed")
 file(GLOB malformed "${malformed_dir}/rc-malformed*.vi")
 list(LENGTH malformed count)
 if (count LESS 2)

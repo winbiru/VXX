@@ -1,0 +1,204 @@
+nhập json;
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.hệ thống.nền tảng.ngủ mili giây;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.mạng.chính.*;
+
+hàm arg(i) {
+    h = đối số lấy(i); bytes = [];
+    lặp(j = 0; j < byte dài(h); j++) { máy ảo thêm cuối danh sách(bytes, byte lấy(h, j)); };
+    byte hủy(h); trả về chuỗi từ byte máy ảo(bytes);
+};
+hàm exe(name) {
+    nếu (ten nền tảng máy ảo() == "windows") { trả về name + ".exe"; };
+    trả về name;
+};
+hàm env(name) { trả về đọc biến môi trường(name, ""); };
+hàm norm(s) { trả về thay thế(s, "\r\n", "\n"); };
+hàm copy_exec(src, dst) {
+    k = chạy tiến trình(env("VPP_TEST_CMAKE"), ["-E", "copy", src, dst], {}, 10000);
+    khẳng định bằng(k["mã thoát"], 0, "copy executable: " + k["lỗi"]);
+};
+hàm publish(dst, label) {
+    copy_exec(env("VPP_TEST_SELF"), dst);
+    ghi tệp(dst + ".label", label);
+};
+hàm mark(name) { ghi tệp(env("VPP_TEST_STATE") + "/" + name, "1"); };
+hàm fake() {
+    mode = env("VPP_TEST_MODE"); state = env("VPP_TEST_STATE");
+    self = arg(0); name = đường dẫn tên(self);
+    nếu (name == exe("server")) {
+        mark("server-started");
+        server = mạng mở máy chủ giao diện lập trình(18080);
+        lặp(i = 0; i < 2147483647; i++) {
+            req = mạng lấy yêu cầu kế tiếp(server);
+            mạng trả phản hồi(req, 200, "{\"ok\":true}");
+        };
+        trả về 0;
+    };
+    nếu (name == exe("vpp") || name == exe("vpp-native") || name == exe("vpp-i32")) {
+        op = arg(1);
+        nếu (op == "batch-build") {
+            khẳng định bằng(env("VPP_NATIVE_NO_CACHE"), "0");
+            khẳng định bằng(env("VPP_COMPILER_PROFILE_FILE"), "");
+            lặp(i = 2; i < đối số đếm(); i += 2) {
+                source = đường dẫn tên(arg(i)); mark("build-" + source);
+                nếu (mode != "missing-output" || i != 2) { publish(arg(i + 1), source); };
+            };
+            nếu (mode == "out-of-order") { in "VPP_BATCH_BUILD 3 10"; trả về 0; };
+            nếu (mode == "nan") { in "VPP_BATCH_BUILD 1 NaN"; trả về 0; };
+            nếu (mode == "malformed") { in "VPP_BATCH_BUILD 1"; trả về 0; };
+            in "VPP_BATCH_BUILD 1 12.5";
+            nếu (mode == "timeout") { ngủ mili giây(5000); trả về 0; };
+            nếu (mode == "partial") { trả về 1; };
+            nếu (mode == "missing-marker") { trả về 0; };
+            in "VPP_BATCH_BUILD 3 2e3";
+            nếu (mode == "late-failure") { trả về 1; };
+            trả về 0;
+        };
+        khẳng định đúng(op == "build" || op == "object", "unexpected fake compiler command");
+        source = đường dẫn tên(arg(2)); out = arg(4);
+        mark("build-" + source);
+        nếu (source == "reject.vi" || source == "broken.vi" || (source == "chính.vi" && mode == "vm-fail") || (source == "http_fixture.vi" && mode == "http-fail")) { trả về 1; };
+        nếu (source == "suite.vi") {
+            khẳng định đúng(chứa chuỗi(đọc tệp(arg(2)), "ca2.kiểm thử()"));
+            khẳng định đúng(là tệp(đường dẫn cha(arg(2)) + "/case2.vi"));
+            nếu (mode == "module-fail") { in "module diagnostic"; trả về 1; };
+        };
+        publish(out, source); trả về 0;
+    };
+    label = đọc tệp(self + ".label");
+    nếu (mode == "barrier") {
+        names = ["first", "second", "reject", "broken"];
+        lặp(i = 0; i < độ dài(names); i++) { khẳng định đúng(là tệp(state + "/build-" + names[i] + ".vi"), "build barrier"); };
+    };
+    nếu (mode == "batch-groups") {
+        names = ["first", "second", "reject", "third", "fourth"];
+        lặp(i = 0; i < độ dài(names); i++) { khẳng định đúng(là tệp(state + "/build-" + names[i] + ".vi"), "batch barrier"); };
+    };
+    nếu (label == "suite.vi") {
+        selector = arg(1); ghi tệp(state + "/run-module-" + selector, thư mục hiện tại());
+        nếu (selector == "1") { in "wrong"; trả về 0; };
+    } hoặc {
+        mark("run-" + label);
+    };
+    nếu (label == "http1.vi" || label == "http2.vi") {
+        lock = state + "/http-active";
+        khẳng định sai(đường dẫn tồn tại(lock), "HTTP clients overlapped");
+        ghi tệp(lock, "active"); ngủ mili giây(150); xóa đường dẫn(lock);
+        khẳng định đúng(là tệp(state + "/server-started"));
+    };
+    in "ok"; trả về 0;
+};
+hàm fixture(root, work) {
+    tạo thư mục(work + "/scripts/quality"); tạo thư mục(work + "/scripts/test/fixtures");
+    tạo thư mục(work + "/gói/máy ảo"); tạo thư mục(work + "/bin");
+    files = ["run_native_regression.py", "check_windows_full_bootstrap.py", "native_golden_costs.tsv"];
+    lặp(i = 0; i < độ dài(files); i++) { sao chép tệp(root + "/scripts/quality/" + files[i], work + "/scripts/quality/" + files[i]); };
+    ghi tệp(work + "/gói/máy ảo/chính.vi", "");
+    ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nif(NOT parent STREQUAL VPP_OUTPUT_DIR)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
+    cases = []; unregistered = {"scripts/test/http_fixture.vi": "HTTP support"};
+    ghi tệp(work + "/scripts/test/http_fixture.vi", "");
+    names = ["first", "second", "reject", "broken", "third", "fourth", "http1", "http2"];
+    lặp(i = 0; i < độ dài(names); i++) {
+        id = names[i]; path = "scripts/test/" + id + ".vi";
+        ghi tệp(work + "/" + path, "hàm chính() { in \"ok\"; };");
+        c = {"id": id, "source": path, "suite": "full", "stdout": "ok\n"};
+        nếu (id == "reject") { c["compile_reject"] = đúng; };
+        nếu (id == "http1" || id == "http2") { c["http"] = đúng; };
+        máy ảo thêm cuối danh sách(cases, c);
+    };
+    modules = ["kiem_tra_bo_qua", "kiem_tra_boolean", "kiem_tra_so_thuc"];
+    lặp(i = 0; i < độ dài(modules); i++) {
+        id = modules[i]; path = "scripts/test/" + id + ".vi"; golden = "scripts/test/" + id + ".expected";
+        ghi tệp(work + "/" + path, "hàm chính() { in \"ok\"; };");
+        ghi tệp(work + "/" + golden, "ok\n");
+        máy ảo thêm cuối danh sách(cases, {"id": id, "source": path, "suite": "full", "expected": golden});
+    };
+    phases = ["core", "directory", "process", "resolver", "socket_negative", "system", "tls"];
+    lặp(i = 0; i < độ dài(phases); i++) {
+        id = "vm-" + phases[i]; path = "scripts/test/" + id + ".vi"; ghi tệp(work + "/" + path, "");
+        máy ảo thêm cuối danh sách(cases, {"id": id, "source": path, "suite": "full", "vm_phase": phases[i]});
+    };
+    ghi tệp(work + "/scripts/test/regression.json", json tạo({"cases": cases, "unregistered_sources": unregistered}));
+    copy_exec(env("VPP_TEST_SELF"), work + "/bin/" + exe("vpp"));
+    copy_exec(env("VPP_TEST_SELF"), work + "/bin/" + exe("vpp-i32"));
+};
+hàm scenario(work, mode, names, batch, module, expected_status) {
+    state = work + "/state-" + mode; logs = work + "/logs-" + mode; tạo thư mục(state);
+    args = [work + "/scripts/quality/run_native_regression.py", "--compiler", work + "/bin/" + exe("vpp"), "--jobs", "2", "--batch-size", thành chuỗi(batch), "--timeout", "2", "--logs", logs];
+    nếu (module) { máy ảo thêm cuối danh sách(args, "--module-suites"); };
+    lặp(i = 0; i < độ dài(names); i++) { máy ảo thêm cuối danh sách(args, "--case"); máy ảo thêm cuối danh sách(args, names[i]); };
+    k = chạy tiến trình(env("VPP_TEST_PYTHON"), args, {"VPP_TEST_FAKE": "1", "VPP_TEST_MODE": mode, "VPP_TEST_STATE": state, "VPP_TEST_SELF": env("VPP_TEST_SELF"), "VPP_TEST_CMAKE": env("VPP_TEST_CMAKE"), "VPP_COMPILER_PROFILE_FILE": state + "/profile"}, 60000);
+    khẳng định bằng(k["mã thoát"], expected_status, mode + ": " + k["đầu ra"] + k["lỗi"]);
+    dir = logs + "/" + liệt kê thư mục(logs)[0];
+    rows = json phân tích(đọc tệp(dir + "/results.json")); results = {};
+    lặp(i = 0; i < độ dài(rows); i++) { results[rows[i]["id"]] = rows[i]; };
+    khẳng định bằng(độ dài(rows), độ dài(names), mode + " count");
+    trả về {"rows": results, "dir": dir, "state": state, "output": k["đầu ra"]};
+};
+hàm status(r, name, expected) {
+    khẳng định bằng(r["rows"][name]["status"], expected, name + ": " + r["rows"][name]["detail"]);
+};
+hàm batch_tests(work) {
+    modes = ["batch-ok", "partial", "missing-marker", "late-failure", "out-of-order", "nan", "missing-output", "malformed", "timeout"];
+    lặp(i = 0; i < độ dài(modes); i++) {
+        mode = modes[i]; exitcode = 1; nếu (i == 0) { exitcode = 0; };
+        r = scenario(work, mode, ["first", "second"], 2, sai, exitcode);
+        first = "PASS"; nếu (i >= 4 && i <= 7) { first = "FAIL"; };
+        status(r, "first", first);
+        second = "FAIL"; nếu (i == 0) { second = "PASS"; }; status(r, "second", second);
+        khẳng định bằng(là tệp(r["state"] + "/run-first.vi"), first == "PASS");
+        khẳng định bằng(là tệp(r["state"] + "/run-second.vi"), second == "PASS");
+        nếu (i == 0) { khẳng định bằng(r["rows"]["second"]["stages"]["build"], 2.0); };
+    };
+    r = scenario(work, "batch-groups", ["first", "second", "reject", "third", "fourth"], 2, sai, 0);
+    khẳng định bằng(độ dài(liệt kê thư mục(r["dir"] + "/batches")), 2);
+    khẳng định sai(là tệp(r["dir"] + "/reject/build.batch"));
+};
+hàm chính() {
+    nếu (env("VPP_TEST_FAKE") == "1") { trả về fake(); };
+    root = env("VPP_TEST_ROOT"); work = env("VPP_TEST_WORK");
+    khẳng định đúng(root != "" && work != "" && env("VPP_TEST_SELF") != "");
+    fixture(root, work);
+    r = scenario(work, "barrier", ["first", "second", "reject", "broken"], 1, sai, 1);
+    status(r, "first", "PASS"); status(r, "second", "PASS"); status(r, "reject", "PASS"); status(r, "broken", "FAIL");
+    khẳng định sai(là tệp(r["state"] + "/run-reject.vi")); khẳng định sai(là tệp(r["state"] + "/run-broken.vi"));
+    batch_tests(work);
+    names = ["kiem_tra_bo_qua", "kiem_tra_boolean", "kiem_tra_so_thuc"];
+    r = scenario(work, "module-ok", names, 2, đúng, 1);
+    status(r, names[0], "PASS"); status(r, names[1], "FAIL"); status(r, names[2], "PASS");
+    khẳng định đúng(là tệp(r["dir"] + "/modules/core/members.json"));
+    a = đọc tệp(r["state"] + "/run-module-0"); b = đọc tệp(r["state"] + "/run-module-1"); c = đọc tệp(r["state"] + "/run-module-2");
+    khẳng định đúng(a != b && b != c && a != c);
+    r = scenario(work, "module-fail", names, 2, đúng, 1);
+    lặp(i = 0; i < độ dài(names); i++) { status(r, names[i], "FAIL"); khẳng định đúng(là tệp(r["dir"] + "/" + names[i] + "/build.stdout")); };
+    khẳng định sai(là tệp(r["state"] + "/run-module-0"));
+    r = scenario(work, "singleton", [names[0]], 2, đúng, 0);
+    khẳng định sai(đường dẫn tồn tại(r["dir"] + "/modules"));
+    phases = ["vm-core", "vm-directory", "vm-process", "vm-resolver", "vm-socket_negative", "vm-system", "vm-tls"];
+    nếu (ten nền tảng máy ảo() != "windows") {
+        r = scenario(work, "vm-built", phases, 1, sai, 0);
+        khẳng định đúng(là tệp(r["state"] + "/build-chính.vi"));
+        lặp(i = 0; i < độ dài(phases); i++) { status(r, phases[i], "PASS"); khẳng định đúng(là tệp(r["state"] + "/" + phases[i])); };
+    };
+    r = scenario(work, "vm-fail", phases, 1, sai, 1);
+    lặp(i = 0; i < độ dài(phases); i++) { status(r, phases[i], "FAIL"); khẳng định sai(là tệp(r["state"] + "/" + phases[i])); };
+    copy_exec(env("VPP_TEST_SELF"), work + "/bin/" + exe("vpp-vm"));
+    r = scenario(work, "vm-packaged", phases, 1, sai, 0);
+    khẳng định sai(là tệp(r["state"] + "/build-chính.vi"));
+    lặp(i = 0; i < độ dài(phases); i++) { status(r, phases[i], "PASS"); };
+    r = scenario(work, "http-fail", ["http1", "http2"], 2, đúng, 1);
+    status(r, "http1", "FAIL"); status(r, "http2", "FAIL");
+    khẳng định sai(là tệp(r["state"] + "/build-http1.vi")); khẳng định sai(là tệp(r["state"] + "/build-http2.vi"));
+    r = scenario(work, "http-ok", ["http1", "http2"], 1, sai, 0);
+    khẳng định đúng(là tệp(r["state"] + "/server-started"));
+    in "VPP REGRESSION RUNNER OK";
+    trả về 0;
+};

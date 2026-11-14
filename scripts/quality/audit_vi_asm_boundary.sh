@@ -192,17 +192,24 @@ done
 # The C comparison workload is an isolated benchmark reference, never a
 # production dependency. Deleted tracked paths and ignored historical build
 # artifacts do not participate in this audit.
-if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    python3 - "$root" <<'PY'
+python3 - "$root" <<'PY'
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-paths = subprocess.check_output(
-    ['git', '-C', str(root), 'ls-files', '-co', '--exclude-standard', '-z']
-).split(b'\0')
+try:
+    paths = subprocess.check_output(
+        ['git', '-C', str(root), 'ls-files', '-co', '--exclude-standard', '-z'],
+        stderr=subprocess.DEVNULL,
+    ).split(b'\0')
+except (FileNotFoundError, subprocess.CalledProcessError):
+    # Source archives have no Git inventory. Inspect source roots, including
+    # an optional legacy src/, without counting generated build artifacts.
+    paths = [os.fsencode(p.relative_to(root))
+             for name in ('gói', 'scripts', 'src', 'benchmark')
+             for p in (root / name).rglob('*') if p.is_file()]
 suffixes = ('.c', '.cc', '.cpp', '.cxx', '.c++', '.h', '.hh', '.hpp',
             '.hxx', '.h.in', '.hpp.in', '.mm')
 forbidden = sorted({p for raw in paths if (p := os.fsdecode(raw))
@@ -213,11 +220,7 @@ if forbidden:
     print('\n'.join(forbidden), file=sys.stderr)
     sys.exit(1)
 PY
-fi
-cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.h' -o -name '*.hpp' -o -name '*.hxx' -o -name '*.hh' \) | wc -l | tr -d '[:space:]')
 asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.s' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
-printf 'Remaining C/C++ source files in src/: %s\n' "$cpp_sources"
-test "$cpp_sources" -eq 0 || { echo "FAIL: legacy native sources present" >&2; exit 1; }
 printf 'ASM call instructions requiring boundary review: %s\n' "$asm_calls"
 
 binary=${VPP_AUDIT_BINARY:-"$root/build-pure-vpp/bin/vpp-native"}

@@ -33,7 +33,10 @@ def verify(compiler, env, logs, linux_objects_only=False):
                 settings.pop("VPP_AOT_LINUX_OBJECT_DIR", None)
             actual = execute([compiler, *args], ROOT, settings, directory, "build", 900)
             if actual != status:
-                raise RuntimeError(f"{label}: expected exit {status}, got {actual}; logs: {directory}")
+                diagnostics = "\n".join(
+                    f"{stream}: {(directory / f'build.{stream}').read_text(encoding='utf-8', errors='replace')}"
+                    for stream in ("stderr", "stdout"))
+                raise RuntimeError(f"{label}: expected exit {status}, got {actual}; logs: {directory}\n{diagnostics}")
             return directory
 
         def outputs(label):

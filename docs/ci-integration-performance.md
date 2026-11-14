@@ -633,3 +633,102 @@ một lượt đo chưa đủ chứng minh tăng tốc ổn định. Chưa đo n
 hay kiểm tra native Linux/Windows. Theo yêu cầu triển khai trên cả ba hệ
 điều hành, CI dùng batch mặc định 2 với parity bắt buộc; không coi kết quả
 macOS là bằng chứng cho tốc độ hay tính đúng đắn trên Linux/Windows.
+
+## macOS Stage 1 và batch parity ngày 2026-11-14
+
+Stage 1 macOS trước đây biên dịch toàn bộ mã nguồn compiler bằng seed cũ,
+trong khi Linux/Windows liên kết seed có sẵn. Stage 2 và 3 lại biên dịch
+cùng nguồn để kiểm tra hội tụ. CI macOS nay dùng seed Mach-O đã kiểm tra
+hội tụ trước đó, rebuild runtime chuẩn bằng i32 và giữ nguyên các fixture
+Stage 1; Stage 2/3 vẫn rebuild từ nguồn hiện tại và so sánh từng byte.
+CMake thông thường tiếp tục build compiler hiện tại. Chưa có số đo CI mới
+để kết luận thời gian thực tế sau thay đổi.
+
+Batch parity cold build bật `VPP_COMPILER_PROFILE_FILE` với đường dẫn mới.
+ABI tệp V++ dùng cờ append Darwin 521; các adapter Linux/Windows cần ánh
+xạ sang cờ mở tệp tương ứng để tạo tệp mới và ghi nối. Sửa cả runtime full,
+i32 và các adapter AOT liên quan; thêm kiểm tra golden ghi nối hai lần trên
+tệp chưa tồn tại. Checker vẫn yêu cầu đúng exit status và in thêm stderr/stdout
+khi thất bại. Không bỏ kiểm tra parity hoặc regression.
+
+## Regression theo module
+
+CI full trên macOS ARM64, Linux x86-64 và Windows x86-64 sử dụng
+`--module-suites` mặc định. Có thể tắt bằng input
+`regression_module_suites=false` khi chạy workflow thủ công; đặt thêm
+`regression_batch_size=1` để chẩn đoán bằng từng executable độc lập.
+
+Runner tạo các module nguồn tạm từ danh sách fixture đã duyệt, giữ nguyên
+import của từng fixture và chuyển hàm chính thành hàm kiểm thử công khai.
+Một dispatcher chọn đúng ca bằng đối số. Mỗi ca vẫn chạy trong tiến trình,
+thư mục, preferences và fixture riêng, kiểm tra exit status và golden như
+trước; các client HTTP vẫn được tuần tự hóa. Các module được build trước
+giai đoạn chạy. Không gom những ca kiểm tra entrypoint, lỗi biên dịch,
+linker, VM, đường dẫn import hoặc môi trường riêng.
+
+| Module | Số ca | Executable |
+| --- | ---: | ---: |
+| core | 7 | 1 |
+| stdlib | 7 | 1 |
+| text | 3 | 1 |
+| json | 7 | 1 |
+| network | 5 | 1 |
+| files | 6 | 1 |
+| collections | 2 | 1 |
+| application | 3 | 1 |
+| time | 2 | 1 |
+| Tổng | 42 | 9 |
+
+Giảm 33 lần codegen/link executable cho 42 ca được gom (không phải 33 lần
+build compiler). 316 ca full hoạt động còn lại tiếp tục dùng batch hoặc
+đường kiểm tra độc lập, trước khi lọc theo host; i32 không đổi. Nếu chọn
+một ca riêng lẻ, runner vẫn biên dịch executable gốc. Build module lỗi
+đánh dấu tất cả thành viên FAIL và giữ diagnostic, không fallback để che
+lỗi. Log `modules/<name>/members.json` ghi danh sách ca và `build.seconds`
+ghi thời gian build chung; mỗi ca có `build.module` trỏ về log đó.
+
+Kiểm chứng native macOS ARM64 với compiler/runtime local đã có từ ngày
+13-11 (chưa rebuild từ toàn bộ thay đổi ngày 14-11):
+
+| Module | Thời gian build chung | Kết quả |
+| --- | ---: | --- |
+| core | 17,51 s | 7/7 PASS |
+| collections | 26,36 s | 2/2 PASS |
+| time | 54,69 s | 1/2 PASS |
+| stdlib | 377,07 s | 7/7 PASS |
+| text | 373,57 s | 2/3 PASS trước khi sửa fixture |
+| json | 382,19 s | 7/7 PASS |
+| network | 366,74 s | 0/5 chạy được do HTTP server không thể listen trong sandbox |
+| files | 371,09 s | 3/6 PASS |
+| application | 293,05 s | 2/3 PASS |
+
+Cả chín module build thành công, 31/42 ca PASS trong lượt kiểm tra đầu
+tiên. Sáu module cuối được build trong lúc có các build song song khác;
+thời gian trên không phải phép đo A/B và không chứng minh mức giảm wall time.
+
+Ca `kiem_tra_goi_thoi_gian` lỗi `error=22 opcode=178` cả khi gom module
+và khi build độc lập (48,62 s). `OP_VM_MACHINE_TIME_LOCAL` có khai báo
+arity trong `gói/máy ảo/host ABI.vi`, nhưng dispatch hiện đi từ opcode 177
+sang 179, bỏ qua 178 và rơi vào `vm_error(22)`. Không thay golden hoặc
+chuyển ca này sang pending để che lỗi runtime.
+
+Hai ca `kiem_tra_loi_tep_co_cau_truc` và `kiem_tra_file_stream_oop`
+cho cùng sai lệch golden khi build riêng (77,65 s và 78,58 s build).
+`kiem_tra_stdlib_starter` và `kiem_tra_stdlib_io_config_time` cũng lỗi
+opcode 178 trong lượt gom module. Các lỗi runtime này vẫn được báo FAIL.
+`kiem_tra_quoc_te_hoa` ban đầu sai hai dòng giống nhau trong cả hai chế độ;
+fixture đọc nhầm khóa `vùng ngôn ngữ đã chọn` thay vì `locale đã chọn`
+của API gói tài nguyên. Đã sửa hai lần đọc khóa, giữ nguyên golden.
+Sau sửa, build lại module text mất 357,86 s và cả ba ca PASS,
+gồm `kiem_tra_quoc_te_hoa`.
+Lượt HTTP đầu tiên bị từ chối quyền listen của sandbox macOS (bind thử
+bằng Python cũng trả về EPERM); không dùng kết quả này để kết luận về
+tính đúng đắn của module mạng.
+
+18 unit test runner PASS, gồm kiểm tra danh sách module không trùng,
+giới hạn dispatcher, build/run barrier, lỗi build chung, lỗi setup HTTP
+và sai golden riêng. Tổng 26 unit test Python trong `scripts/quality`
+PASS. Chưa có số đo tổng suite hoặc kết quả native Linux/Windows cho cơ
+chế này; cần kiểm chứng bằng CI trên cả ba hệ điều hành.
+CTest full hiện vẫn dùng 16 shard độc lập; thay đổi gom module áp dụng
+cho ba job full regression của GitHub Actions và CLI có `--module-suites`.

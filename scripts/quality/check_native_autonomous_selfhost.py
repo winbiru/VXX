@@ -104,7 +104,7 @@ def verify_paged_object(path):
 def asm_stream_parity(compiler, root, out, env):
     # Capture the actual program.S passed to clang, without changing the
     # compiler's private-directory ownership or requiring PATH lookup.
-    fixture = root / 'src/tests/fixtures/native_return_semantics.vi'
+    fixture = root / 'scripts/test/fixtures/native_return_semantics.vi'
     for direct in ('1', '0'):
         captures = []
         executables = []
@@ -125,7 +125,7 @@ def asm_stream_parity(compiler, root, out, env):
                              {**env, 'VPP_AOT_ASSEMBLER': str(wrapper),
                               'VPP_AOT_ASM_STREAM': stream, 'VPP_AOT_ASM_DIRECT': direct})
             result, _ = run([target], env, code=42)
-            expected = (root / 'src/tests/expected/native_return_semantics.expected').read_bytes()
+            expected = (root / 'scripts/test/expected/native_return_semantics.expected').read_bytes()
             assert result.stdout == expected and not result.stderr
             assert capture.stat().st_size > 0
             captures.append(capture)
@@ -188,7 +188,7 @@ def verify_macho_reader(probe, path, env):
 
 def macho_reader_smoke(compiler, root, out, env):
     probe = out / 'native_macho_reader'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_macho_reader.vi', '-o', probe], env)
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_reader.vi', '-o', probe], env)
     # Build a structurally valid ARM64 object without an assembler. A symbol
     # name crosses a 4 KiB page and the file exceeds the restricted i32 arena.
     textoff, textsize = 208, 2 * 1024 * 1024 + 4096
@@ -237,7 +237,7 @@ def macho_reader_smoke(compiler, root, out, env):
 
 def file_seek_smoke(compiler, root, out, env):
     probe = out / 'native_file_seek'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_file_seek.vi', '-o', probe], env)
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_file_seek.vi', '-o', probe], env)
     path = out / 'seek-\u1ec7.bin'
     result, _ = run([probe, path], env)
     assert result.stdout == b'Native file seek: PASS\n' and not result.stderr
@@ -247,7 +247,7 @@ def file_seek_smoke(compiler, root, out, env):
 
 def direct_object_smoke(compiler, root, out, env):
     object_probe = out / 'native_macho_dynamic_object'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_macho_dynamic_object.vi', '-o', object_probe], env)
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_dynamic_object.vi', '-o', object_probe], env)
     first, second = out / 'dynamic-object-first.o', out / 'dynamic-object-second.o'
     for path in (first, second):
         run([object_probe, path], env)
@@ -259,13 +259,13 @@ def direct_object_smoke(compiler, root, out, env):
                        ('.local', 14, 1, 16), ('_table', 15, 1, 24)]
     print(f'DIRECT OBJECT PASS sha256={digest(first)}', flush=True)
     paged_probe = out / 'native_macho_paged_relocations'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_macho_paged_relocations.vi',
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_paged_relocations.vi',
          '-o', paged_probe], env)
     paged = out / 'paged-relocations.o'
     run([paged_probe, paged], env)
     verify_paged_object(paged)
     chunk_probe = out / 'native_arm64_chunked_object'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_arm64_chunked_object.vi',
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_arm64_chunked_object.vi',
          '-o', chunk_probe], env)
     flat, chunked = out / 'arm64-flat.o', out / 'arm64-chunked.o'
     result, _ = run([chunk_probe, flat, chunked], env)
@@ -348,30 +348,30 @@ def smoke(compiler, root, out, env):
     # including closures, exception unwinding and dynamic method dispatch.
     for name, code in (('native_return_semantics', 42), ('native_loop_stack_gc', 0),
                        ('native_protected_loop', 0)):
-        fixture = root / 'src/tests/fixtures' / (name + '.vi')
-        expected = (root / 'src/tests/expected' / (name + '.expected')).read_bytes()
+        fixture = root / 'scripts/test/fixtures' / (name + '.vi')
+        expected = (root / 'scripts/test/expected' / (name + '.expected')).read_bytes()
         target = out / name
         run([compiler, 'build', fixture, '-o', target], env)
         result, _ = run([target], env, code=code)
         assert result.stdout == expected and not result.stderr, name
     target = out / 'native_frame_pool_gc'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_frame_pool_gc.vi', '-o', target], env)
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_frame_pool_gc.vi', '-o', target], env)
     result, _ = run([target], env)
     assert result.stdout == '8388608\n8388608\n8388608\n8388608\n42\n43\n[lỗi, 42]\nFrame pool GC: PASS\n'.encode() and not result.stderr
     target = out / 'native_asm_join_gc'
-    run([compiler, 'build', root / 'src/tests/fixtures/native_asm_join_gc.vi', '-o', target], env)
+    run([compiler, 'build', root / 'scripts/test/fixtures/native_asm_join_gc.vi', '-o', target], env)
     result, _ = run([target], env)
     assert result.stdout == b'ASM join GC: PASS\n' and not result.stderr
     file_seek_smoke(compiler, root, out, env)
     macho_reader_smoke(compiler, root, out, env)
     layout_probe = out / "native_macho_layout"
-    run([compiler, "build", root / "src/tests/fixtures/native_macho_layout.vi", "-o", layout_probe], env)
+    run([compiler, "build", root / "scripts/test/fixtures/native_macho_layout.vi", "-o", layout_probe], env)
     layout_smoke(layout_probe, out, env)
     patch_probe = out / "native_macho_patch"
-    run([compiler, "build", root / "src/tests/fixtures/native_macho_patch.vi", "-o", patch_probe], env)
+    run([compiler, "build", root / "scripts/test/fixtures/native_macho_patch.vi", "-o", patch_probe], env)
     patch_smoke(patch_probe, out, env)
     exe_probe = out / "native_macho_executable"
-    run([compiler, "build", root / "src/tests/fixtures/native_macho_executable.vi", "-o", exe_probe], env)
+    run([compiler, "build", root / "scripts/test/fixtures/native_macho_executable.vi", "-o", exe_probe], env)
     executable_smoke(exe_probe, out, env)
     if not direct:
         asm_stream_parity(compiler, root, out, env)

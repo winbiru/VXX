@@ -48,7 +48,7 @@ ctest --test-dir build -R '^vpp-native-aot-workers$' --output-on-failure
 ```
 
 CTest sử dụng fixture `native-cli-compiler` để biên dịch và chạy
-`src/tests/kiem_tra_native_worker.vi` bằng `--compiler=vpp`.
+`scripts/test/kiem_tra_native_worker.vi` bằng `--compiler=vpp`.
 
 ## Worker trong bộ biên dịch V++
 

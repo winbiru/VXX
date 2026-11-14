@@ -20,8 +20,114 @@ import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
-TESTS = ROOT / "src/tests"
+TESTS = ROOT / "scripts/test"
 MANIFEST = TESTS / "regression.json"
+
+# Explicitly reviewed positive fixtures. Entrypoint, compiler, import-resolution,
+# diagnostic and other context-sensitive probes remain independent executables.
+# Each suite has at most nine entries so the dispatcher uses one ASCII digit.
+MODULE_SUITES = {
+    "core": ("bo_qua", "boolean", "ngoai_le", "nhanh_dieu_kien_moi",
+             "so_thuc", "thoat_vong_lap", "toan_tu_moi"),
+    "stdlib": ("stdlib", "stdlib_tinh_toan", "stdlib_mo_rong", "bo_noi_chuoi",
+               "stdlib_nen_tang", "gia_tri", "stdlib_crypto"),
+    "text": ("codec_uuid_bitset", "quet_tach_chuoi", "quoc_te_hoa"),
+    "json": ("json_phan_tich", "json_dieu_khien", "json_escape_span",
+             "json_key_scan", "json_utf8", "json_byte_view", "json_integer_overflow_scan"),
+    "network": ("ffi_socket", "goi_dau_noi_mang", "goi_http",
+                "stdlib_http", "stdlib_http_post_put"),
+    "files": ("ffi_tep", "ffi_thu_muc", "loi_tep_co_cau_truc", "file_dem",
+              "file_stream_oop", "stdlib_io_config_time"),
+    "collections": ("collections_oop", "ngan_xep_oop"),
+    "application": ("goi_dung", "nhat_ky", "stdlib_starter"),
+    "time": ("goi_thoi_gian", "goi_thoi_gian_1_0"),
+}
+HARNESS_KEYS = ("dump", "linker_phase", "vm_phase", "cmake")
+
+
+def module_source(case):
+    """Adapt a reviewed function-only fixture without merging its imports."""
+    if case.get("suite") != "full" or set(case) - {
+            "id", "suite", "source", "expected", "http", "smoke"} or "expected" not in case:
+        return None
+    source = (ROOT / case["source"]).read_text(encoding="utf-8")
+    # Only imports/comments before the entry function; no argument or relative
+    # import dependency. The allowlist is intentional, not automatic discovery.
+    prefix = re.match(r"(?m)\A(?:\s|//[^\n]*\n|nhập [^;\n]+;)*", source)
+    entry = re.match(r"hàm chính\(\)\s*\{", source[prefix.end():])
+    # Ignore comments and quoted literals when checking the function body.
+    # Keep the original source intact for compilation and diagnostics.
+    code = re.sub(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'',
+                  ' ', source, flags=re.S)
+    if (not entry or code.count("hàm chính()") != 1
+            or re.search(r"nhập\s+\.|đối số|đường dẫn thực thi|trả về", code)):
+        return None
+    body = code[code.index("hàm chính()") + len("hàm chính()"):].lstrip()
+    depth = 0
+    for i, char in enumerate(body):
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                if not re.fullmatch(r"\s*;?\s*", body[i + 1:]):
+                    return None
+                break
+    else:
+        return None
+    start = prefix.end()
+    return source[:start] + source[start:].replace(
+        "hàm chính()", "hàm công khai kiểm thử()", 1)
+
+
+def plan_module_suites(cases):
+    by_id = {case["id"]: case for case in cases}
+    if len(by_id) != len(cases):
+        raise ValueError("duplicate regression IDs in module selection")
+    suites = {}
+    seen = set()
+    for name, members in MODULE_SUITES.items():
+        if not 2 <= len(members) <= 9 or len(set(members)) != len(members) or seen.intersection(members):
+            raise ValueError(f"invalid module suite membership: {name}")
+        seen.update(members)
+        selected = []
+        for suffix in members:
+            case = by_id.get("kiem_tra_" + suffix)
+            if case is not None:
+                source = module_source(case)
+                if source is not None:
+                    selected.append((case, source))
+        if len(selected) >= 2:
+            suites[name] = selected
+    return suites
+
+
+def build_module_suite(name, members, compiler, output, logs, env, timeout):
+    """Compile one executable, dispatched in a new process for every case."""
+    logs.mkdir(parents=True, exist_ok=True)
+    imports, branches = [], []
+    for i, (case, source) in enumerate(members):
+        (logs / f"case{i}.vi").write_text(source, encoding="utf-8")
+        imports.append(f"nhập case{i} như ca{i};")
+        branches.append(f"    nếu (k == {48 + i}) {{ ca{i}.kiểm thử(); trả về 0; }};")
+    entry = logs / "suite.vi"
+    entry.write_text("\n".join(imports + [
+        "hàm chính() {",
+        "    nếu (đối số đếm() != 2) { trả về 97; };",
+        "    h = đối số lấy(1);",
+        "    nếu (byte dài(h) != 1) { byte hủy(h); trả về 97; };",
+        "    k = byte lấy(h, 0); byte hủy(h);",
+        *branches, "    trả về 97;", "};", "",
+    ]), encoding="utf-8")
+    (logs / "members.json").write_text(json.dumps(
+        [case["id"] for case, _ in members], ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"BUILD MODULE {name}: {len(members)} cases, one executable", flush=True)
+    module_env = dict(env, VPP_PREFERENCES_HOME=str(logs / "preferences"))
+    if module_env.get("VPP_COMPILER_PROFILE_FILE"):
+        module_env["VPP_COMPILER_PROFILE_FILE"] = str(logs / "compiler.profile")
+    status = build(compiler, entry, output, ROOT, module_env, logs, timeout * len(members))
+    if status or not output.is_file():
+        raise RuntimeError(f"module {name}: build exit {status} or missing executable; logs: {logs}")
 
 
 def normalize(data):
@@ -112,7 +218,7 @@ def batch_eligible(case):
     # Keep compiler rejection, custom environments and harnesses independent.
     return case["suite"] == "full" and not any(key in case for key in (
         "dump", "linker_phase", "vm_phase", "cmake", "compile_reject",
-        "diagnostic", "env", "timezone", "dns_mock"))
+        "diagnostic", "env", "timezone", "dns_mock", "tooling_test"))
 
 
 def build_batch(cases, compiler, directories, logs, env, timeout, group):
@@ -214,7 +320,8 @@ def verify_failure(case, status, logs, stage):
         raise RuntimeError(f"{stage} missing diagnostic: {case['diagnostic']}")
 
 
-def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=None):
+def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=None,
+             prepared_binary=None, selector=None):
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
@@ -224,9 +331,19 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
           else contextlib.nullcontext(work)) as work:
         cwd = Path(work)
         env["VPP_PREFERENCES_HOME"] = str(cwd / "preferences")
-        binary = cwd / executable_name("program")
+        binary = prepared_binary if prepared_binary is not None else cwd / executable_name("program")
+        if case.get("tooling_test"):
+            test_work = cwd / "tooling-test-work"
+            test_work.mkdir()
+            env.update(
+                VPP_TEST_ROOT=str(ROOT),
+                VPP_TEST_WORK=str(test_work),
+                VPP_TEST_PYTHON=sys.executable,
+                VPP_TEST_CMAKE=shutil.which("cmake") or "cmake",
+                VPP_TEST_SELF=str(binary),
+            )
         source = ROOT / case["source"]
-        if phase == "build" and any(key in case for key in ("dump", "linker_phase", "vm_phase", "cmake")):
+        if phase == "build" and any(key in case for key in HARNESS_KEYS):
             return True  # These harnesses exercise compilation as part of the test.
         if "dump" in case:
             for name in ("first", "second"):
@@ -297,13 +414,14 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             raise RuntimeError("missing prepared executable")
         if case["suite"] == "full":
             # Test programs may write relative paths; do not mutate the checkout.
-            shutil.copytree(TESTS, cwd / "src/tests", ignore=shutil.ignore_patterns(".*"))
+            shutil.copytree(TESTS, cwd / "scripts/test", ignore=shutil.ignore_patterns(".*"))
             shutil.copytree(ROOT / "gói", cwd / "gói")
             shutil.copytree(TESTS / "fixtures", cwd / "fixtures", ignore=shutil.ignore_patterns(".*"))
         if case.get("dns_mock"):
             run_dns_mock(binary, cwd, env, logs)
             return
-        status = execute([binary, *case.get("args", [])], cwd, env, logs, "run", timeout)
+        args = case.get("args", []) if selector is None else [selector]
+        status = execute([binary, *args], cwd, env, logs, "run", timeout)
         if "diagnostic" in case:
             if case.get("failure_phase") == "build":
                 raise RuntimeError("expected build rejection, but compiler produced an executable")
@@ -450,7 +568,8 @@ def stop_http(process):
             process.wait()
 
 
-def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_size=1):
+def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_size=1,
+                      module_suites=False):
     """Build each fixture once, then execute prepared binaries in parallel.
 
     Compiler/linker/VM harnesses intentionally compile their own inputs as
@@ -479,11 +598,18 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
         directories = {c["id"]: work / str(i) for i, c in enumerate(cases)}
         for directory in directories.values():
             directory.mkdir()
+        suites = plan_module_suites([c for c in cases if not any(k in c for k in setup_errors)]) if module_suites else {}
+        prepared = {}
+        for name, members in suites.items():
+            binary = work / executable_name("module-" + name)
+            for index, (case, _) in enumerate(members):
+                prepared[case["id"]] = (binary, str(index))
 
         def stage(case, phase):
             name = case["id"]
             start = time.monotonic()
-            print(f"{phase.upper()} {name}", flush=True)
+            label = "DEFER HARNESS" if phase == "build" and any(k in case for k in HARNESS_KEYS) else phase.upper()
+            print(f"{label} {name}", flush=True)
             try:
                 for key, detail in setup_errors.items():
                     if key in case:
@@ -492,8 +618,11 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
                 # state; serialize its clients while other cases run freely.
                 lock = http_lock if phase == "run" and case.get("http") else contextlib.nullcontext()
                 with lock:
+                    options = {}
+                    if name in prepared:
+                        options["prepared_binary"], options["selector"] = prepared[name]
                     ready = run_case(case, compiler, logs / name, env, timeout,
-                                     vm=vm, phase=phase, work=directories[name])
+                                     vm=vm, phase=phase, work=directories[name], **options)
                 return case, bool(ready), "", time.monotonic() - start
             except errors as exc:
                 return case, False, str(exc), time.monotonic() - start
@@ -501,8 +630,7 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
         def build_group(group, members):
             if len(members) == 1:
                 return [stage(members[0], "build")]
-            for case in members:
-                print(f"BUILD {case['id']} (batch {group})", flush=True)
+            print(f"BUILD BATCH {group}: " + ", ".join(c["id"] for c in members), flush=True)
             completed, failure = build_batch(members, compiler, directories, logs, env, timeout, group)
             results = []
             for case in members:
@@ -513,9 +641,35 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
                     results.append((case, False, f"{failure}; batch {group}", 0))
             return results
 
+        def build_suite(name, members):
+            start = time.monotonic()
+            module_logs = logs / "modules" / name
+            failure = ""
+            try:
+                build_module_suite(name, members, compiler,
+                                   prepared[members[0][0]["id"]][0], module_logs, env, timeout)
+            except errors as exc:
+                failure = str(exc)
+            seconds = time.monotonic() - start
+            results = []
+            for case, _ in members:
+                directory = logs / case["id"]
+                directory.mkdir(exist_ok=True)
+                (directory / "build.module").write_text(f"modules/{name}\n")
+                (directory / "build.status").write_text("1" if failure else "0")
+                if failure:
+                    for suffix in ("stdout", "stderr"):
+                        source = module_logs / f"build.{suffix}"
+                        if source.is_file():
+                            shutil.copyfile(source, directory / f"build.{suffix}")
+                results.append((case, not failure, failure, seconds / len(members)))
+            return results
+
         groups = []
         eligible = []
         for case in cases:
+            if case["id"] in prepared:
+                continue
             if batch_size > 1 and batch_eligible(case) and not any(k in case for k in setup_errors):
                 eligible.append(case)
                 if len(eligible) == batch_size:
@@ -525,10 +679,14 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
                 groups.append([case])
         if eligible:
             groups.append(eligible)
+        if suites:
+            print(f"PLAN: {len(prepared)} cases in {len(suites)} module executables; "
+                  f"{len(cases) - len(prepared)} independent/batch/harness cases", flush=True)
         ready = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-            for future in concurrent.futures.as_completed(
-                    [pool.submit(build_group, i, group) for i, group in enumerate(groups)]):
+            futures = [pool.submit(build_suite, name, members) for name, members in suites.items()]
+            futures += [pool.submit(build_group, i, group) for i, group in enumerate(groups)]
+            for future in concurrent.futures.as_completed(futures):
                 for case, needs_run, detail, seconds in future.result():
                     elapsed[case["id"]] = seconds
                     if detail or not needs_run:
@@ -578,6 +736,8 @@ def main():
     parser.add_argument("--jobs", type=int, help="staged build and run with this many concurrent workers")
     parser.add_argument("--batch-size", type=int, choices=range(1, 5), default=1,
                         help="experimental full compiler AST reuse, up to four builds per process")
+    parser.add_argument("--module-suites", action="store_true",
+                        help="compile reviewed full regression cases into shared executables")
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--logs", type=Path, default=ROOT / "build-pure-vpp/regression-logs")
     args = parser.parse_args()
@@ -607,6 +767,8 @@ def main():
         parser.error("--jobs must be positive")
     if args.batch_size > 1 and (args.suite != "full" or args.jobs is None):
         parser.error("--batch-size requires the full suite and --jobs")
+    if args.module_suites and (args.suite != "full" or args.jobs is None):
+        parser.error("--module-suites requires the full suite and --jobs")
     if args.compiler is None:
         parser.error("--compiler required")
     compiler = args.compiler.resolve()
@@ -652,7 +814,7 @@ def main():
 
     if args.jobs is not None:
         staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
-                          batch_size=args.batch_size)
+                          batch_size=args.batch_size, module_suites=args.module_suites)
     else:
         try:
             for case in cases:

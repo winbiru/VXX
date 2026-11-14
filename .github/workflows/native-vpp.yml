@@ -10,6 +10,10 @@ on:
         type: choice
         options: ['1', '2', '4']
         default: '2'
+      regression_module_suites:
+        description: 'Compile reviewed regression fixtures into shared module executables'
+        type: boolean
+        default: true
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -38,7 +42,7 @@ jobs:
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
           out="$RUNNER_TEMP/symbol-index"
           mkdir -p "$out"
-          "$RUNNER_TEMP/macos-i32/vpp-i32" build "$GITHUB_WORKSPACE/src/tests/fixtures/native_object_symbol_index.vi" -o "$out/probe"
+          "$RUNNER_TEMP/macos-i32/vpp-i32" build "$GITHUB_WORKSPACE/scripts/test/fixtures/native_object_symbol_index.vi" -o "$out/probe"
           "$out/probe" "$out/probe.elf.o" "$out/probe.coff.obj"
           python3 scripts/quality/check_native_object_symbol_index.py "$out/probe.elf.o" "$out/probe.coff.obj"
       - name: Package the rebuilt i32 compiler and runtime
@@ -64,7 +68,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
           tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
-          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix"
+          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=ON
       - name: Bootstrap full compiler (Stage 1)
         run: |
           cmake --build build-pure-vpp --parallel
@@ -204,7 +208,7 @@ jobs:
           install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
           install -m 644 scripts/quality/audit_linux_static_elf.sh "$package/share/vpp/scripts/quality/"
           install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
-          sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/vpp-native-launcher.sh.in > "$package/bin/vpp"
+          sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/macos/vpp-native-launcher.sh.in > "$package/bin/vpp"
           chmod 755 "$package/bin/vpp"
           VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 \
             "$package/bin/vpp-i32" build "$package/share/vpp/gói/máy ảo/chính.vi" -o "$package/bin/vpp-vm"
@@ -368,6 +372,7 @@ jobs:
     timeout-minutes: 360
     env:
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
+      VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -387,7 +392,9 @@ jobs:
       - name: Build and run all full V++ regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full
+          module_options=()
+          if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full "${module_options[@]}"
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
         run: |
@@ -406,6 +413,7 @@ jobs:
     timeout-minutes: 360
     env:
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
+      VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -428,7 +436,9 @@ jobs:
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' && steps.batch_parity.outcome == 'success' }}
         run: |
           export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full
+          module_options=()
+          if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full "${module_options[@]}"
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
         run: |
@@ -447,8 +457,17 @@ jobs:
     timeout-minutes: 360
     env:
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
+      VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check regression runner configuration
+        shell: pwsh
+        run: |
+          python scripts/quality/test_script_configuration.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./scripts/windows/test-runner-support.ps1
+          & ./scripts/windows/run-tests.ps1 -Inventory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/download-artifact@v4
         with:
           name: windows-x86_64-full
@@ -481,7 +500,8 @@ jobs:
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite full --jobs 2 --batch-size $env:VPP_REGRESSION_BATCH_SIZE --logs regression-logs/full
+          $moduleOptions = @{ ModuleSuites = ($env:VPP_REGRESSION_MODULE_SUITES -eq 'true') }
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$toolchain/clang.exe" -Suite full -Jobs 2 -BatchSize ([int]$env:VPP_REGRESSION_BATCH_SIZE) -LogDirectory regression-logs/full @moduleOptions
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
@@ -490,7 +510,7 @@ jobs:
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite i32 --jobs 2 --logs regression-logs/i32
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-i32.exe" -Clang "$toolchain/clang.exe" -Suite i32 -Jobs 2 -LogDirectory regression-logs/i32
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

@@ -16,7 +16,7 @@ progress 0 'Chuẩn bị mã nguồn và môi trường tự biên dịch'
 mkdir -p "$2"
 out="$(realpath "$2")"
 root="$out/source"
-mkdir -p "$root/scripts/ASM/linux" "$root/scripts/quality" "$root/src/tests/fixtures"
+mkdir -p "$root/scripts/ASM/linux" "$root/scripts/quality" "$root/scripts/test/fixtures"
 cp -R "$ROOT_DIR/gói" "$root/"
 cp "$ROOT_DIR/scripts/build-vpp-progress.sh" "$root/scripts/"
 cp "$ROOT_DIR/scripts/ASM/linux/vpp_linux_host_x86_64.s" "$root/scripts/ASM/linux/"
@@ -24,7 +24,7 @@ cp -R "$ROOT_DIR/scripts/ASM/linux/tu_chu_x86_64" "$root/scripts/ASM/linux/"
 for script in prepare_linux_freestanding_host.sh check_native_elf_linker.sh check_native_elf_partial_linker.py audit_linux_static_elf.sh check_native_assembler.py; do
     cp "$ROOT_DIR/scripts/quality/$script" "$root/scripts/quality/"
 done
-cp "$ROOT_DIR"/src/tests/fixtures/native_elf*.vi "$root/src/tests/fixtures/"
+cp "$ROOT_DIR"/scripts/test/fixtures/native_elf*.vi "$root/scripts/test/fixtures/"
 [[ -z "$(find "$root" -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.bin' \) -print)" ]]
 echo 'SOURCE_BOOTSTRAP_INPUT_OBJECTS=NONE'
 mkdir -p "$out/forbid-tools"

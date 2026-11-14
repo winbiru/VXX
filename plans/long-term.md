@@ -25,7 +25,7 @@ concurrency/async phức tạp không phải release blocker mặc định của
   nằm trong roadmap 1.0.
 - [x] Pipeline đã có expression AST mang span, scope tree, ExprId-based resolution,
   recursive untyped IR, optimizer và direct bytecode backend; production token bridge đã bị xóa.
-- [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
+- [x] Parity gate compile toàn bộ `scripts/test/**/*.vi` qua pipeline rồi đối chiếu
   fingerprint bytecode, StringPool và function registries với baseline legacy
   đóng băng dưới `test/data/`.
 - [x] Stdlib hardening đã khóa các lát cắt UTF-8 tiếng Việt, file/config/random,
@@ -240,12 +240,12 @@ concurrency/async phức tạp không phải release blocker mặc định của
      lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
      Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
      context-driven compile không đọc/ghi một active registry khác.
-   - [x] Malformed-source gate qua source V++ tại `src/tests/fixtures/rc_malformed/rc-malformed.vi`.
+   - [x] Malformed-source gate qua source V++ tại `scripts/test/fixtures/rc_malformed/rc-malformed.vi`.
      chạy 528 input ở public CLI boundary với seed `0x56505031`, đồng thời khóa deterministic
      AST/IR/disassembly qua ba lượt. Focused `vpp-rc-internal-hardening` khóa direct malformed
      AST/invalid IR và bytecode verifier trước dispatch.
    - [x] Stress source/project lớn và theo dõi compiler memory/time regression.
-     `src/tests/kiem_tra_rc_hardening.vi` khóa stress source lớn và determinism qua public CLI,
+     `scripts/test/kiem_tra_rc_hardening.vi` khóa stress source lớn và determinism qua public CLI,
      compile lặp năm lượt, áp timeout 30 giây/lượt + peak RSS budget 1 GiB trên Unix/macOS.
    - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
      bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.

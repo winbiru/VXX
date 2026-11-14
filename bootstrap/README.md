@@ -2,11 +2,11 @@
 
 ## macOS ARM64
 
-The two seed executables are generated V++/ASM Mach-O binaries, not the old C++ host. They are pinned by `macos-arm64/SHA256SUMS`. The full-language seed is the 2026-11-13 autonomous stage3 from `full-native-selfhost-v5`; the i32 seed is the 2026-11-13 refreshed benchmark runtime compiler. Both link only `/usr/lib/libSystem.B.dylib` and have an ad-hoc signature. These are bootstrap inputs, not the final compiler: the build regenerates the i32 compiler, runtime object and full compiler from the current `.vi` sources. The previous-generation full seed emits Assembly, so the first full compiler build may use the system assembler/linker as well as the two ASM platform objects. The generated current compiler uses the direct V++ ARM64/Mach-O route for user programs. No C or C++ source is compiled.
+The two seed executables are generated V++/ASM Mach-O binaries, not the old C++ host. They are pinned by `macos-arm64/SHA256SUMS`. The full seed is the locally verified 2026-11-14 stage3 from `vpp-macos-ci-split`, SHA-256 `832554cf16894f06a2a85e0aa21796e811334c1984ac98be424fe391e1cf8cd0`. Its stage2 and stage3 were byte-identical, both passed the four dynamic AOT golden fixtures, and it compiled and ran a direct Mach-O probe with the assembler unavailable as well as a legacy assembler/linker probe. It predates the current batch-build revision; the exact source commit of this local seed was not recorded. The i32 seed remains the 2026-11-13 refreshed benchmark runtime compiler. Both link only `/usr/lib/libSystem.B.dylib` and have an ad-hoc signature. No C or C++ source is compiled.
 
 The bootstrap runtime is kept separate from the published runtime: Apple `ld -r` adds symbol flags that the direct Mach-O linker rejects. The build regenerates the final runtime object with `VPP_NATIVE_MACHO_REL_LINK=1` using the freshly built i32 compiler.
 
-macOS native CI now has three jobs: `macos-i32` rebuilds i32 and the bootstrap runtime from source and uploads them as a tar archive; `macos-full` consumes that archive via `VPP_PREBUILT_I32_RUNTIME`, builds the current full compiler, and uses the direct V++ ARM64/Mach-O path to regenerate stages 2 and 3. Both stages must execute dynamic AOT fixtures, pass code signature and dependency checks, and match byte-for-byte (including their SHA-256 hashes). Stage 3 is the compiler published in the full package. `macos-regression` then runs both suites from that package. The system assembler/linker is permitted only for the initial bootstrap; subsequent full self-builds use the direct V++ route and the prebuilt runtime objects.
+macOS native CI has three jobs: `macos-i32` rebuilds i32 and the bootstrap runtime from source and uploads them as a tar archive; `macos-full` consumes that archive via `VPP_PREBUILT_I32_RUNTIME` and configures `VPP_CI_PINNED_FULL_STAGE1=ON`. Stage 1 publishes the audited pinned seed, regenerates the canonical runtime, builds the shared VM and runs the four existing fixtures. Stages 2 and 3 each build the full compiler from the current `.vi` sources using direct V++ ARM64/Mach-O with the external assembler disabled. Both stages must execute dynamic AOT fixtures, pass code signature and dependency checks, and match byte-for-byte (including their SHA-256 hashes). Stage 3 is the compiler published in the full package. `macos-regression` then runs batch parity and both suites from that package. This removes one redundant full-source build from CI, aligning the generation count with Linux and Windows. Ordinary CMake builds default to `VPP_CI_PINNED_FULL_STAGE1=OFF` and still compile the current full source before returning an executable.
 
 To reproduce the full convergence gate after a normal CMake build:
 
@@ -14,7 +14,7 @@ To reproduce the full convergence gate after a normal CMake build:
 bash scripts/quality/check_macos_full_bootstrap.sh build-pure-vpp /tmp/vpp-macos-full-bootstrap
 ```
 
-Use a fresh output directory. The initial CMake compiler is stage 1 for this gate; the pinned seed is an input to that build.
+Use a fresh output directory. The initial CMake compiler is stage 1 for this gate; in an ordinary build the pinned seed is an input to that build. In CI mode the pinned seed itself is stage 1.
 
 To use independently verified replacement seeds, set `VPP_BOOTSTRAP_FULL` and `VPP_BOOTSTRAP_I32` at CMake configure time. The build checks the target, signature and linked libraries of both seeds; the checksum manifest pins the bundled seeds only.
 

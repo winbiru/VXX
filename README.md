@@ -280,7 +280,7 @@ build/bin/vpp-cli
 Chạy trực tiếp:
 
 ```bash
-./build/bin/vpp-cli chạy src/tests/program.vi
+./build/bin/vpp-cli chạy scripts/test/program.vi
 ```
 
 Windows có thể build bằng MSVC/CMake; hướng dẫn chi tiết nằm trong
@@ -400,7 +400,7 @@ Theo dõi checklist đầy đủ tại [Roadmap V++ 1.0](plans/roadmap-1.0.md) v
 
 - `examples/hoa-don-cua-hang` — module, class/constructor và import tương đối.
 - `examples/quan-ly-kho-api` — sample backend/HTTP lớn hơn để kiểm tra package + runtime.
-- `src/tests/` — regression corpus của compiler và VM.
+- `scripts/test/` — regression corpus của compiler và VM.
 
 ## 🤝 Đóng góp
 

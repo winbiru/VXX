@@ -77,7 +77,14 @@ vpp_native_os_open:
     cmpl $1537, %esi
     jne 1f
     movl $577, %esi
+    jmp 2f
 1:
+    // Darwin O_WRONLY|O_CREAT|O_APPEND
+    cmpl $521, %esi
+    jne 2f
+    // Linux O_WRONLY|O_CREAT|O_APPEND
+    movl $1089, %esi
+2:
     movl $438, %edx
     call Llinux_mo
     leave

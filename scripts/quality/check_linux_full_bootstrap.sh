@@ -86,7 +86,7 @@ fi
 if [[ "$phase" == all || "$phase" == stage1 ]]; then
     progress 25 'Hợp dịch và liên kết seed Linux x86-64 trong repository'
     gzip -dc "$seed_dir/vpp-full.S.gz" > "$out/seed.S"
-    bash "$ROOT_DIR/scripts/build-linux-full-seed.sh" "$out/seed.S" "$out/runtime.o" "$out/vpp-native" 2>&1 | tee "$out/stage1-build.log"
+    bash "$ROOT_DIR/scripts/linux/build-linux-full-seed.sh" "$out/seed.S" "$out/runtime.o" "$out/vpp-native" 2>&1 | tee "$out/stage1-build.log"
     progress 35 'Kiểm tra thực thi compiler seed Linux'
     bash "$ROOT_DIR/scripts/quality/check_linux_dynamic_vpp.sh" "$out/fixtures" "$out/vpp-native" "$out/runtime.o"
 fi

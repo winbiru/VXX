@@ -40,17 +40,21 @@ export VPP_HOME="$ROOT_DIR" VPP_NATIVE_BUILD_PROGRESS="${VPP_NATIVE_BUILD_PROGRE
 # machine boundaries and runtime-object output mode. The seed uses V++/ASM.
 seed_output="$OUTPUT_DIR/vpp-i32"
 seed_needs_build=0
-if [[ ! -x "$seed_output" || "$SEED_COMPILER" -nt "$seed_output" ]]; then
+if [[ ! -x "$seed_output" || "$SEED_COMPILER" -nt "$seed_output" ||
+      "${BASH_SOURCE[0]}" -nt "$seed_output" ||
+      "$ROOT_DIR/scripts/build-vpp-progress.sh" -nt "$seed_output" ]]; then
   seed_needs_build=1
 else
   # When resuming after a slow emulated build, reuse the complete Stage 2
-  # compiler unless one of its native V++ inputs has changed.
-  for input in "$ROOT_DIR/gói/biên dịch/bản địa/"*.vi; do
+  # compiler unless a V++ dependency or an included ASM boundary changed.
+  # Match CMake's recursive input set, including transitive imports outside
+  # biên dịch/bản địa; checking only the entrypoint's siblings is insufficient.
+  while IFS= read -r -d '' input; do
     if [[ "$input" -nt "$seed_output" ]]; then
       seed_needs_build=1
       break
     fi
-  done
+  done < <(find "$ROOT_DIR/gói" "$ROOT_DIR/scripts/ASM" -type f -print0)
 fi
 if (( seed_needs_build )); then
   runtime_progress 0 'Biên dịch bộ biên dịch V++ i32 bằng bộ biên dịch giai đoạn 1'

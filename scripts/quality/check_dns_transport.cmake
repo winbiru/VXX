@@ -5,8 +5,8 @@ endif()
 if (NOT DEFINED VPP_SOURCE_ROOT)
     message(FATAL_ERROR "VPP_SOURCE_ROOT is missing")
 endif()
-set(fixture "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_dns_transport_day_du.vi")
-file(READ "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_dns_transport_day_du.expected" expected)
+set(fixture "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_dns_transport_day_du.vi")
+file(READ "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_dns_transport_day_du.expected" expected)
 foreach(jit IN ITEMS 0 1)
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env

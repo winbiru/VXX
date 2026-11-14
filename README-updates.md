@@ -19,7 +19,7 @@
 | CI chất lượng | Ubuntu chạy clang-tidy, coverage gate 45% và benchmark baseline quan sát. | .github/workflows/c-cpp.yml, scripts/quality/run-coverage.sh |
 | Đóng gói release | Đã có workflow tạo binary cho Ubuntu, macOS và Windows khi publish Release hoặc chạy thủ công. | .github/workflows/release-binaries.yml |
 | Hướng dẫn đóng góp | Đã có hướng dẫn cơ bản cho contributor. | CONTRIBUTING.md |
-| Hồi quy tích hợp | CTest gọi run_tests.sh trên Unix và scripts/windows/run-tests.ps1 trên Windows. Các chương trình V++ và output mong đợi nằm cạnh nhau. | run_tests.sh, scripts/windows/, src/tests/ |
+| Hồi quy tích hợp | CTest gọi run_tests.sh trên Unix và scripts/windows/run-tests.ps1 trên Windows. Các chương trình V++ và output mong đợi nằm cạnh nhau. | run_tests.sh, scripts/windows/, scripts/test/ |
 | Test C++/tooling | CMake đăng ký compiler support, opcode/native constants, runtime value, VM opcode matrix, VM handler fixture, pipeline/module graph/recursive IR/direct codegen/parity, tooling và CLI dump checks. | test/CMakeLists.txt |
 | VM handler test API | `VMRuntimeFixture` cho phép dựng stack/PC/variables/call frame/control state và gọi từng handler trực tiếp; output có sink riêng cho test. | src/include/vpp/runtime/vm_fixture.h, test/vm_handler_tests.cpp |
 | Native stdlib | Runtime đã có native helpers cho chuyển kiểu/type, random, path/filesystem, environment/platform/sleep ngoài HTTP/JSON/file/config/database/collections/text. | src/runtime/native/, gói/chuẩn/ |
@@ -40,8 +40,8 @@
   embedding API.
 - Tooling CLI: src/tooling/; các header theo namespace vpp đang được gom ở
   src/include/vpp/.
-- Test: chương trình hồi quy V++ ở src/tests/*.vi, output ở src/tests/expected/;
-  C++ unit test ở test/*.cpp. src/tests/.tmp/ chỉ là workspace tạm được tạo khi
+- Test: chương trình hồi quy V++ ở scripts/test/*.vi, output ở scripts/test/expected/;
+  C++ unit test ở test/*.cpp. scripts/test/.tmp/ chỉ là workspace tạm được tạo khi
   chạy test.
 - Package/gói chuẩn, template và ví dụ: gói/, templates/ và examples/.
 

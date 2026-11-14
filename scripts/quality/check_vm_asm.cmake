@@ -54,7 +54,7 @@ endfunction()
 if(DEFINED VPP_VM_PHASE AND NOT VPP_VM_PHASE STREQUAL "core")
     if(VPP_VM_PHASE STREQUAL "tls")
         include("${CMAKE_CURRENT_LIST_DIR}/check_vm_tls_crypto.cmake")
-    elseif(VPP_VM_PHASE MATCHES "^(system|directory|process|resolver|socket_negative)$")
+    elseif(VPP_VM_PHASE MATCHES "^(system|directory|process|resolver|socket|socket_negative)$")
         include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_${VPP_VM_PHASE}.cmake")
     else()
         message(FATAL_ERROR "Unknown VM regression phase: ${VPP_VM_PHASE}")
@@ -63,7 +63,7 @@ if(DEFINED VPP_VM_PHASE AND NOT VPP_VM_PHASE STREQUAL "core")
 endif()
 set(image "${VPP_OUTPUT_DIR}/runtime.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm.vi" -o "${image}"
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm.vi" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "VM image backend failed (${status}):\n${output}\n${errors}")
@@ -211,7 +211,7 @@ if (status STREQUAL "0" OR NOT errors MATCHES "error=4")
     message(FATAL_ERROR "VM accepted out-of-bounds UTF-8 index: ${status}\n${output}\n${errors}")
 endif()
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm_host.vi" -o "${VPP_OUTPUT_DIR}/host.vmb"
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm_host.vi" -o "${VPP_OUTPUT_DIR}/host.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Host fixture compilation failed: ${status}\n${output}\n${errors}")

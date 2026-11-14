@@ -1,5 +1,5 @@
 # Standalone VM numeric IP resolver requires no network or bind permission.
-set(resolver_fixture "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver.vi")
+set(resolver_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver.vi")
 set(resolver_image "${VPP_OUTPUT_DIR}/resolver.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${resolver_fixture}"
     -o "${resolver_image}"
@@ -65,7 +65,7 @@ if(NOT status STREQUAL "0")
 endif()
 set(dns_image "${VPP_OUTPUT_DIR}/resolver-dns.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "DNS resolver guest compile: ${status}\n${output}\n${errors}")

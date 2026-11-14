@@ -4,6 +4,10 @@ project(VPP VERSION 1.0.0 LANGUAGES NONE)
 set(VPP_BOOTSTRAP_FULL "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-native" CACHE FILEPATH "Autonomous V++ compiler seed")
 set(VPP_BOOTSTRAP_I32 "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-i32" CACHE FILEPATH "V++ i32 compiler seed")
 set(VPP_PREBUILT_I32_RUNTIME "" CACHE PATH "Prepared macOS i32 compiler and bootstrap runtime directory")
+option(VPP_CI_PINNED_FULL_STAGE1 "Use the audited pinned full seed for CI Stage 1; regenerate current sources in Stages 2/3" OFF)
+if(VPP_CI_PINNED_FULL_STAGE1 AND NOT VPP_PREBUILT_I32_RUNTIME)
+  message(FATAL_ERROR "VPP_CI_PINNED_FULL_STAGE1 requires VPP_PREBUILT_I32_RUNTIME")
+endif()
 set(VPP_PREBUILT_I32_INPUTS)
 if(VPP_PREBUILT_I32_RUNTIME)
   foreach(part vpp-i32 runtime.o platform.o dynamic-bridge.o)
@@ -16,11 +20,12 @@ endif()
 file(GLOB_RECURSE VPP_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/gói/*.vi" "${CMAKE_SOURCE_DIR}/scripts/ASM/*")
 set(VPP_BIN "${CMAKE_BINARY_DIR}/bin")
 set(VPP_RUNTIME "${CMAKE_BINARY_DIR}/native-vpp-runtime")
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/vpp-bootstrap-mode.txt" CONTENT "${VPP_CI_PINNED_FULL_STAGE1}\n")
 add_custom_command(OUTPUT "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"
   "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o"
-  COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/build-vpp-cli.sh" "${CMAKE_BINARY_DIR}" "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" "${VPP_PREBUILT_I32_RUNTIME}"
-  DEPENDS ${VPP_SOURCES} "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" ${VPP_PREBUILT_I32_INPUTS}
-    scripts/build-vpp-cli.sh scripts/build-vpp-aot-runtime.sh scripts/build-vpp-progress.sh scripts/vpp-native-launcher.sh.in bootstrap/macos-arm64/SHA256SUMS
+  COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/macos/build-vpp-cli.sh" "${CMAKE_BINARY_DIR}" "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" "${VPP_PREBUILT_I32_RUNTIME}" "${VPP_CI_PINNED_FULL_STAGE1}"
+  DEPENDS "${CMAKE_BINARY_DIR}/vpp-bootstrap-mode.txt" ${VPP_SOURCES} "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" ${VPP_PREBUILT_I32_INPUTS}
+    scripts/macos/build-vpp-cli.sh scripts/build-vpp-aot-runtime.sh scripts/build-vpp-progress.sh scripts/macos/vpp-native-launcher.sh.in bootstrap/macos-arm64/SHA256SUMS
   COMMENT "Khởi tạo bộ biên dịch V++ (xem các mốc tiến độ bên dưới)"
   VERBATIM USES_TERMINAL)
 add_custom_target(vpp-cli ALL DEPENDS "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"
@@ -45,14 +50,15 @@ if(BUILD_TESTING)
     add_test(NAME vpp-extension COMMAND "${VPP_NODE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_extension.js")
   endif()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME vpp-opcode-abi COMMAND "${CMAKE_COMMAND}" "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+    -P "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_opcodes.cmake")
+  add_test(NAME vpp-script-configuration COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/test_script_configuration.py")
+  set_tests_properties(vpp-opcode-abi vpp-script-configuration PROPERTIES LABELS smoke)
+  set_tests_properties(vpp-script-configuration PROPERTIES TIMEOUT 60)
   set(VPP_REGRESSION "${CMAKE_SOURCE_DIR}/scripts/quality/run_native_regression.py")
   add_test(NAME vpp-regression-inventory COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}" --inventory)
-  add_test(NAME vpp-regression-runner COMMAND "${Python3_EXECUTABLE}" -m unittest discover
-    -s "${CMAKE_SOURCE_DIR}/scripts/quality" -p test_run_native_regression.py)
-  add_test(NAME vpp-build-graph COMMAND "${Python3_EXECUTABLE}" -m unittest discover
-    -s "${CMAKE_SOURCE_DIR}/scripts/quality" -p test_cmake_build_graph.py)
-  set_tests_properties(vpp-source-boundary vpp-regression-inventory vpp-regression-runner vpp-build-graph PROPERTIES LABELS smoke)
-  set_tests_properties(vpp-build-graph PROPERTIES TIMEOUT 60)
+  set_tests_properties(vpp-source-boundary vpp-regression-inventory PROPERTIES LABELS smoke)
   if(VPP_NODE)
     set_tests_properties(vpp-extension PROPERTIES LABELS smoke)
   endif()

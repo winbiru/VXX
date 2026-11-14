@@ -72,7 +72,7 @@ status=$?
 set -e
 [[ "$status" -eq 42 ]]
 echo 'NATIVE_ELF_SMOKE_EXIT=42'
-compile "$seed" "$ROOT_DIR/src/tests/fixtures/native_elf_linker_runtime.vi" \
+compile "$seed" "$ROOT_DIR/scripts/test/fixtures/native_elf_linker_runtime.vi" \
     "$output_dir/runtime-smoke" "$output_dir/runtime-smoke.log"
 set +e
 timeout --kill-after=5 30 "$output_dir/runtime-smoke"
@@ -142,7 +142,7 @@ progress 75 'Kiểm tra bộ liên kết đối tượng và chương trình sau
 # Both harnesses use the in-tree V++ linker and the same preassembled host
 # object as the self-hosting smoke; the Python fixtures need no assembler.
 for harness in native_elf_partial_linker_archive native_elf_linker_archive; do
-    compile "$compiler" "$ROOT_DIR/src/tests/fixtures/$harness.vi" \
+    compile "$compiler" "$ROOT_DIR/scripts/test/fixtures/$harness.vi" \
         "$output_dir/$harness" "$output_dir/$harness.log"
 done
 python3 "$ROOT_DIR/scripts/quality/check_native_elf_partial_linker.py" \

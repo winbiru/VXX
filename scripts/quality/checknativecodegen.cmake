@@ -17,7 +17,7 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/biểu diễn trung gian.vi"
     "gói/biên dịch/bản địa/sinh mã.vi"
     "gói/biên dịch/bản địa/đối tượng.vi"
-    "src/tests/nativecodegenharness.vi")
+    "scripts/test/nativecodegenharness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
     # Modules are concatenated below, so strip their original import clauses.
     string(REGEX REPLACE "(^|\n)[ \t]*nhập[^\n]*;[ \t]*(\n|$)" "\\1"

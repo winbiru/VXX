@@ -5,7 +5,7 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
-set(source "${VPP_ROOT}/src/tests/fixtures/native_runtime.vi")
+set(source "${VPP_ROOT}/scripts/test/fixtures/native_runtime.vi")
 set(executable "${VPP_OUTPUT_DIR}/native-runtime-check")
 file(REMOVE "${executable}" "${VPP_OUTPUT_DIR}/runtime-owned.bin")
 if(NOT DEFINED ENV{VPP_HOME})

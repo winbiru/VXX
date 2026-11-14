@@ -959,7 +959,7 @@ là bằng chứng Stage 2/3 hội tụ).
 
 Sau cache host, regression VM/ASM vẫn **PASS**, bao gồm fixture host
 cache mới. Compiler Stage 1 `.vmb` chạy trên VM/ASM hiện tại biên dịch
-fixture `src/tests/fixtures/vm_asm.vi` byte-for-byte trùng với native
+fixture `scripts/test/fixtures/vm_asm.vi` byte-for-byte trùng với native
 compiler: SHA-256
 `a162af05c9c7464cf0a3e048a880e7a219188851b06992b5ba8114f6e4692498`;
 ảnh sinh ra cũng chạy đúng. Stage 2/3 của **compiler đầy đủ** chưa
@@ -1758,7 +1758,7 @@ Ngày 16/10/2026 đã bổ sung đường **native executable self-host thử ng
 
 ```sh
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-exe-selfhost \
-  src/tests/nativeaotprogram.vi /tmp/nativeaotprogram
+  scripts/test/nativeaotprogram.vi /tmp/nativeaotprogram
 /tmp/nativeaotprogram
 echo $? # 42
 ```
@@ -1935,7 +1935,7 @@ IR stack-based gồm các cặp `[i32 opcode, i32 operand]`: `PUSH=1`,
 để đối chiếu kết quả, chưa phát mã máy từ IR này. IR có thể lưu thành
 tệp nhị phân và nạp lại bằng ABI file native.
 
-Fixture `src/tests/nativeparserharness.vi` và
+Fixture `scripts/test/nativeparserharness.vi` và
 `scripts/quality/checknativeparser.cmake` ghép bốn mô-đun V++ native,
 build thành executable ARM64, kiểm tra offset Unicode, ưu tiên biểu thức,
 gán lại biến, semantic lỗi, token buffer bị sửa, i32 âm/biên 1 MiB,
@@ -2042,7 +2042,7 @@ sai arity, lời gọi không xác định và thiếu `chính` đều bị từ
 với mã 14. Các ca này đã được thêm vào
 `scripts/quality/checknativedriver.cmake` để kiểm tra hồi quy.
 
-Fixture `src/tests/nativeparserharness.vi` đã cập nhật theo cú pháp `i++`
+Fixture `scripts/test/nativeparserharness.vi` đã cập nhật theo cú pháp `i++`
 và `i--` mới, kiểm tra biến vòng lặp ngoài phạm vi và nhánh `hoặc nếu`.
 Evaluator IR tham chiếu `gói/biên dịch/bản địa/biểu diễn trung gian.vi` đã nhận `trả về`
 sớm trong nhánh, thống nhất với codegen ARM64. CTest
@@ -2067,7 +2067,7 @@ báo lỗi; không có fallback ngầm sang C++ compiler. Ví dụ:
 
 ```sh
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-obj-selfhost \
-  sum src/tests/nativeaotsmoke.vi /tmp/sum.o
+  sum scripts/test/nativeaotsmoke.vi /tmp/sum.o
 ```
 
 Khi chạy CLI từ thư mục khác repository, cấu hình `VPP_HOME` trỏ tới thư
@@ -2165,7 +2165,7 @@ ngầm chuyển sang compiler C++.
 
 ### Kiểm thử
 
-`src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi` kiểm tra AST, nhánh điều
+`scripts/test/kiem_tra_bien_dich_chuong_trinh_vi.vi` kiểm tra AST, nhánh điều
 kiện, vòng lặp, lỗi cú pháp và lỗi ngữ nghĩa. Đã đăng ký trong
 `run_tests.sh` cho cả interpreter và JIT.
 Fixture còn đối chiếu với semantic C++ khi hai `nhập ... như ...` trùng
@@ -2187,7 +2187,7 @@ trùng tên hàm toàn cục. Bộ phát còn truyền SymbolId của receiver n
 `mình`/`gốc` vào slot tham số của phương thức; trước bản sửa, phép gọi
 `gốc.value()` trong fixture kế thừa thất bại do đọc sai slot. Đã bỏ điều
 kiện từ chối direct IR lỗi thời với `bắt lỗi` trùng tên hàm. Fixture
-`src/tests/kiemtrathamsotrung.vi` hiện có **16 phép kiểm tra**, gồm hai
+`scripts/test/kiemtrathamsotrung.vi` hiện có **16 phép kiểm tra**, gồm hai
 khối `bắt lỗi` trùng tên, `bắt lỗi` che tham số/biến cục bộ, catch lồng
 nhau và kiểm tra hàm toàn cục vẫn gọi được; chạy đạt trên interpreter và
 JIT. Fixture kế thừa `kiem_tra_ke_thua.vi` cũng chạy
@@ -2237,7 +2237,7 @@ hàm chính() {
 };
 ```
 
-Kiểm thử hồi quy `src/tests/kiem_tra_doc_chi_so_ket_qua_goi.vi` bao phủ
+Kiểm thử hồi quy `scripts/test/kiem_tra_doc_chi_so_ket_qua_goi.vi` bao phủ
 `lấy từ điển(...)[0]`, chuỗi lấy chỉ số trên kết quả gọi hàm, hàm V++ tự định
 nghĩa trả về list, và phép lấy chỉ số trên biến. Fixture parser
 `kiem_tra_bien_dich_chuong_trinh_vi.vi` cũng trực tiếp dùng cú pháp
@@ -2300,7 +2300,7 @@ API có thể nhập trực tiếp:
 Loader kiểm tra dạng artifact, bốn trường lệnh, function ID liên tiếp,
 StringPool/runtime name index, initializer trùng/thiếu tên. Verifier VM
 tiếp tục kiểm tra opcode/operand trước khi thực thi initializer.
-`src/tests/kiem_tra_chay_bytecode_tu_chu.vi` đối chiếu đầu ra với compiler
+`scripts/test/kiem_tra_chay_bytecode_tu_chu.vi` đối chiếu đầu ra với compiler
 C++ cho chương trình đơn/đa mô-đun, đồng thời bao phủ import lặp,
 initializer, trùng tên hàm, StringPool xen kẽ, `chọn/ca`, opcode lỗi và
 metadata không hợp lệ. Ca này được đăng ký interpreter/JIT trong `run_tests.sh`.
@@ -2317,7 +2317,7 @@ không kiểm chứng toàn bộ descriptor nội tại/alias.
 Các module phát mã V++ dùng `biên dịch mã thao tác("OP_...")` thay vì
 tự đặt số opcode; ABI phụ thuộc đúng giá trị C++ đã định nghĩa.
 
-Fixture `src/tests/kiem_tra_ir_bytecode_tu_chu.vi` có **113 assertion**,
+Fixture `scripts/test/kiem_tra_ir_bytecode_tu_chu.vi` có **113 assertion**,
 bao gồm so sánh từng bộ bốn trường bytecode
 `op`, `toán hạng`, `chỉ số`, `giá trị` với oracle `biên dịch mã trung gian`
 do compiler C++ sinh. Các trường hợp đối chiếu có phép gán thường,
@@ -2347,7 +2347,7 @@ tag i/d/s/n/l/m, escape field), lưu StringPool và phát `OP_LIST_LITERAL`
 `toán hạng = số phần tử/cặp`. Map key là chuỗi/tên; tên được mã hóa như
 chuỗi, không đọc biến. Đầu vào sai và trường hợp chưa hỗ trợ sẽ ném lỗi.
 
-Fixture `src/tests/kiem_tra_tap_hop_bien_dich_tu_chu.vi` so cả bốn trường
+Fixture `scripts/test/kiem_tra_tap_hop_bien_dich_tu_chu.vi` so cả bốn trường
 opcode top-level/thân hàm với oracle C++, đối chiếu kết quả chạy bằng
 VM do V++ biên dịch và đường C++, kiểm tra wire format StringPool,
 opcode tĩnh/động, collection lồng nhau và lỗi cú pháp. Đã đăng ký
@@ -2358,7 +2358,7 @@ theo cùng quy tắc `stripQuotes` của C++ (cả escape `\\n`, `\\r`, `\\t`,
 `\\\\`, `\\'`, `\\"`, `\\0`, escape không nhận diện và hai kiểu dấu nháy).
 Emitter giải mã trước khi đưa vào StringPool và trước khi đóng gói list/map
 literal tĩnh; không giải mã hai lần. Fixture
-`src/tests/kiem_tra_escape_bien_dich_tu_chu.vi` kiểm tra decoder, bytecode
+`scripts/test/kiem_tra_escape_bien_dich_tu_chu.vi` kiểm tra decoder, bytecode
 ABI bốn trường, kết quả VM so với oracle C++, collection tĩnh/động
 và byte NUL; chạy cả interpreter/JIT trong `run_tests.sh`.
 
@@ -2381,7 +2381,7 @@ sau đó đến alias `main`, sinh `OP_GOI(0, slot, 0)` nếu tồn tại và lu
 thêm `OP_DUNG_CHUONG_TRINH(0, 0, 0)`. Nó giữ nguyên bytecode top-level
 và thân hàm và **ném lỗi** khi metadata không nhất quán.
 
-Fixture `src/tests/kiem_tra_lien_ket_tu_chu.vi` so bốn trường opcode
+Fixture `scripts/test/kiem_tra_lien_ket_tu_chu.vi` so bốn trường opcode
 top-level với snapshot C++ trước liên kết, kiểm tra vị trí nối
 entrypoint, ưu tiên `chính`/`main`, và các lỗi metadata. Có đăng ký
 fixture cho interpreter và JIT trong `run_tests.sh`.
@@ -2421,7 +2421,7 @@ Artifact graph hiện được dùng để dựng sổ hàm toàn phiên và đ�
 được giữ riêng (không nối bytecode), cùng bảng slot theo emitter;
 chưa có bộ nạp thực thi các initializer trong một VM độc lập.
 
-Fixture `src/tests/kiem_tra_do_thi_module_tu_chu.vi` bao phủ import
+Fixture `scripts/test/kiem_tra_do_thi_module_tu_chu.vi` bao phủ import
 đa cấp, import lặp, alias, re-export, thứ tự khởi tạo, chu trình,
 module vắng mặt và chuẩn hóa path. Đã đăng ký cả interpreter và JIT
 trong `run_tests.sh`.
@@ -2461,7 +2461,7 @@ chưa nhận `công khai hàm` / hàm private nên mọi hàm trực tiếp đ�
 xem là export mặc định. Những giới hạn đó phải được xử lý trước khi
 coi bộ biên dịch là self-host hoàn toàn.
 
-Fixture `src/tests/kiem_tra_so_ham_module_tu_chu.vi` kiểm tra 43 điều
+Fixture `scripts/test/kiem_tra_so_ham_module_tu_chu.vi` kiểm tra 43 điều
 kiện: ID, StringPool, thứ tự module, alias, re-export nhiều cấp,
 trường hợp nhập lặp, thứ tự giả mạo, cùng tên ở hai module, xung đột namespace, và
 đối chiếu sổ IR với emitter một đơn vị. Đăng ký cả interpreter/JIT
@@ -2487,7 +2487,7 @@ tự postorder. Linker xác nhận `OP_HAM` đúng một lần cho từng ID, đ
 metadata tên và mô-đun, cùng thân hàm có khối mở/đóng. Không nối
 initializer vào bytecode root bởi chỉ số jump và slot là cục bộ.
 
-`src/tests/kiem_tra_lien_ket_module_tu_chu.vi` chứa **71 phép kiểm**
+`scripts/test/kiem_tra_lien_ket_module_tu_chu.vi` chứa **71 phép kiểm**
 độc lập, kiểm tra đủ bốn trường của các opcode quan trọng, thứ tự
 initializer, alias/tái xuất đa cấp, tên trùng trong hai mô-đun,
 import lặp, root entrypoint, và lỗi tên chưa phân giải. Đã đăng ký
@@ -2505,7 +2505,7 @@ self-host hoàn chỉnh.
 
 ### Kiểm tra oracle C++ đa mô-đun và sửa lỗi bí danh import trùng
 
-`src/tests/kiem_tra_oracle_module_tu_chu.vi` đối chiếu snapshot bytecode
+`scripts/test/kiem_tra_oracle_module_tu_chu.vi` đối chiếu snapshot bytecode
 C++ với artifact V++ trên 3 đồ thị: import thường với re-export,
 import một dependency thêm lần nữa dưới alias khác, và import lại
 module cha dưới alias khác. So sánh thứ tự/function ID, tên runtime,
@@ -2521,7 +2521,7 @@ trùng canonical path, làm bí danh mới không vào lookup; `OP_GOI` của
 C++ bằng ánh xạ tên import → function ID cho từng alias, độc lập với
 `functionNameIndices` (metadata runtime chỉ giữ một tên trên ID).
 Import trùng vẫn chỉ khởi tạo dependency một lần. Fixture runtime
-`src/tests/kiem_tra_module_alias_trung.vi` kiểm chứng output
+`scripts/test/kiem_tra_module_alias_trung.vi` kiểm chứng output
 `99, 42, 42, 42` ở cả interpreter/JIT. Đây là sửa lỗi oracle/đường
 production, không phải chuyển thêm chức năng sang native C++.
 
@@ -2538,8 +2538,8 @@ module. `gói/biên dịch/liên kết.vi` thu initializer theo thứ tự
 postorder sau khi root đã được phát, bảo toàn function ID đã cấp.
 Đường đăng ký/emitter một đơn vị vẫn giữ hành vi cũ.
 
-`src/tests/kiem_tra_oracle_chuoi_module.vi` dùng oracle C++ và thư
-viện fixture `src/tests/fixtures/compiler_oracle/string_order/`, đối
+`scripts/test/kiem_tra_oracle_chuoi_module.vi` dùng oracle C++ và thư
+viện fixture `scripts/test/fixtures/compiler_oracle/string_order/`, đối
 chiếu đủ bốn trường bytecode root và thân hàm, function ID và tên
 runtime trong **bốn tình huống**: literal trước/sau import; biến chứa
 chuỗi bao quanh import; import lặp dưới hai alias; và khai báo hàm/literal
