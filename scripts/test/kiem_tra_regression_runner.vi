@@ -26,7 +26,7 @@ hàm copy_exec(src, dst) {
     khẳng định bằng(k["mã thoát"], 0, "copy executable: " + k["lỗi"]);
 };
 hàm publish(dst, label) {
-    copy_exec(env("VPP_TEST_SELF"), dst);
+    copy_exec(arg(0), dst);
     ghi tệp(dst + ".label", label);
 };
 hàm mark(name) { ghi tệp(env("VPP_TEST_STATE") + "/" + name, "1"); };
@@ -46,7 +46,10 @@ hàm fake() {
         op = arg(1);
         nếu (op == "batch-build") {
             khẳng định bằng(env("VPP_NATIVE_NO_CACHE"), "0");
-            khẳng định bằng(env("VPP_COMPILER_PROFILE_FILE"), "");
+            biến profile = env("VPP_COMPILER_PROFILE_FILE");
+            khẳng định bằng(đường dẫn tên(profile), "compiler.profile", "batch profile path");
+            khẳng định sai(profile == state + "/profile", "batch profile must be isolated");
+            ghi tệp(profile, "batch profile");
             lặp(i = 2; i < đối số đếm(); i += 2) {
                 source = đường dẫn tên(arg(i)); mark("build-" + source);
                 nếu (mode != "missing-output" || i != 2) { publish(arg(i + 1), source); };
@@ -74,6 +77,12 @@ hàm fake() {
         publish(out, source); trả về 0;
     };
     label = đọc tệp(self + ".label");
+    nếu (label == "tooling.vi") {
+        khẳng định bằng(đường dẫn tên(env("VPP_TEST_SELF")), đường dẫn tên(self));
+        khẳng định đúng(là tệp(env("VPP_TEST_SELF")));
+        ghi tệp(env("VPP_TEST_WORK") + "/tooling-marker", "ok");
+        mark("tooling-ran");
+    };
     nếu (mode == "barrier") {
         names = ["first", "second", "reject", "broken"];
         lặp(i = 0; i < độ dài(names); i++) { khẳng định đúng(là tệp(state + "/build-" + names[i] + ".vi"), "build barrier"); };
@@ -105,13 +114,14 @@ hàm fixture(root, work) {
     ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nif(NOT parent STREQUAL VPP_OUTPUT_DIR)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
     cases = []; unregistered = {"scripts/test/http_fixture.vi": "HTTP support"};
     ghi tệp(work + "/scripts/test/http_fixture.vi", "");
-    names = ["first", "second", "reject", "broken", "third", "fourth", "http1", "http2"];
+    names = ["first", "second", "reject", "broken", "third", "fourth", "http1", "http2", "tooling"];
     lặp(i = 0; i < độ dài(names); i++) {
         id = names[i]; path = "scripts/test/" + id + ".vi";
         ghi tệp(work + "/" + path, "hàm chính() { in \"ok\"; };");
         c = {"id": id, "source": path, "suite": "full", "stdout": "ok\n"};
         nếu (id == "reject") { c["compile_reject"] = đúng; };
         nếu (id == "http1" || id == "http2") { c["http"] = đúng; };
+        nếu (id == "tooling") { c["tooling_test"] = đúng; };
         máy ảo thêm cuối danh sách(cases, c);
     };
     modules = ["kiem_tra_bo_qua", "kiem_tra_boolean", "kiem_tra_so_thuc"];
@@ -159,7 +169,12 @@ hàm batch_tests(work) {
         nếu (i == 0) { khẳng định bằng(r["rows"]["second"]["stages"]["build"], 2.0); };
     };
     r = scenario(work, "batch-groups", ["first", "second", "reject", "third", "fourth"], 2, sai, 0);
-    khẳng định bằng(độ dài(liệt kê thư mục(r["dir"] + "/batches")), 2);
+    biến groups = liệt kê thư mục(r["dir"] + "/batches");
+    khẳng định bằng(độ dài(groups), 2);
+    lặp(i = 0; i < độ dài(groups); i++) {
+        khẳng định bằng(đọc tệp(r["dir"] + "/batches/" + groups[i] + "/compiler.profile"), "batch profile");
+    };
+    khẳng định sai(là tệp(r["state"] + "/profile"), "batch profile must not overwrite the parent path");
     khẳng định sai(là tệp(r["dir"] + "/reject/build.batch"));
 };
 hàm chính() {
@@ -170,6 +185,9 @@ hàm chính() {
     r = scenario(work, "barrier", ["first", "second", "reject", "broken"], 1, sai, 1);
     status(r, "first", "PASS"); status(r, "second", "PASS"); status(r, "reject", "PASS"); status(r, "broken", "FAIL");
     khẳng định sai(là tệp(r["state"] + "/run-reject.vi")); khẳng định sai(là tệp(r["state"] + "/run-broken.vi"));
+    r = scenario(work, "tooling-staged", ["tooling"], 2, đúng, 0);
+    status(r, "tooling", "PASS");
+    khẳng định đúng(là tệp(r["state"] + "/tooling-ran"));
     batch_tests(work);
     names = ["kiem_tra_bo_qua", "kiem_tra_boolean", "kiem_tra_so_thuc"];
     r = scenario(work, "module-ok", names, 2, đúng, 1);

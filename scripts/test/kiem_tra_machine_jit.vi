@@ -1,5 +1,5 @@
-// Parity test: literal regions, dynamic arithmetic, calls, loops, branching,
-// switch, and try/catch must behave identically in all three execution modes.
+// AOT regression: literal regions, dynamic arithmetic, calls, loops,
+// branching, switch, and try/catch retain the former JIT golden output.
 hàm tinh(a, b) {
     trả về a * b + (a - b);
 }

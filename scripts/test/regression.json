@@ -377,7 +377,6 @@
       "platforms": [
         "Darwin"
       ],
-      "pending": "CMake subprocess currently fails with V++ AOT process error=16 opcode=202.",
       "tooling_test": true
     },
     {
@@ -926,8 +925,7 @@
       "id": "kiem_tra_jit_mvp",
       "source": "scripts/test/kiem_tra_jit_mvp.vi",
       "expected": "scripts/test/expected/kiem_tra_jit_mvp.expected",
-      "suite": "full",
-      "pending": "Legacy JIT-specific execution mode removed"
+      "suite": "full"
     },
     {
       "id": "kiem_tra_json_an_toan",
@@ -1145,7 +1143,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_chuyen_so_thuc_that_bai.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: thành số thực: giá trị không thể chuyển đổi\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_doc_tep_that_bai",
@@ -1154,7 +1152,7 @@
       "historical_expected": "scripts/test/expected/kiem_tra_loi_doc_tep_that_bai.expected",
       "stdout": "",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: [\\s\\S]*đọc tệp: không thể mở tệp để đọc[\\s\\S]*\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_du_lieu_khong_the_danh_chi_so",
@@ -1268,7 +1266,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_tep_gia_thong_bao.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: đọc tệp: không thể mở tệp để đọc\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_thuoc_tinh_khong_ton_tai",
@@ -1334,8 +1332,7 @@
       "id": "kiem_tra_machine_jit",
       "source": "scripts/test/kiem_tra_machine_jit.vi",
       "expected": "scripts/test/expected/kiem_tra_machine_jit.expected",
-      "suite": "full",
-      "pending": "Legacy JIT-specific execution mode removed"
+      "suite": "full"
     },
     {
       "id": "kiem_tra_mang_3_chieu",
@@ -1558,7 +1555,6 @@
       "source": "scripts/test/kiem_tra_regression_runner.vi",
       "stdout": "VPP REGRESSION RUNNER OK\n",
       "suite": "full",
-      "pending": "CMake subprocess currently fails with V++ AOT process error=16 opcode=202.",
       "tooling_test": true
     },
     {

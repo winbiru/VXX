@@ -29,7 +29,7 @@ hàm graph_fixture(root, work, target) {
     bootstrap = "#!/bin/bash\nset -eu\nroot=$1\nmkdir -p \"$root\"\nprintf 'bootstrap\\n' >> \"$root/invocations.log\"\nprintf '%s' \"${@: -1}\" > \"$root/bootstrap-mode.log\"\nmkdir \"$root/bootstrap-active\"\ntrap 'rmdir \"$root/bootstrap-active\"' EXIT\nsleep 0.3\nmkdir -p \"$root/bin\" \"$root/native-vpp-runtime\"\nprintf 'compiler\\n' > \"$root/bin/vpp-native\"\nprintf 'compiler\\n' > \"$root/bin/vpp\"\ncp \"$(dirname \"$0\")/fake-vm.sh\" \"$root/bin/vpp-i32\"\nchmod +x \"$root/bin/vpp-i32\"\nfor part in runtime.o platform.o dynamic-bridge.o; do printf 'object\\n' > \"$root/native-vpp-runtime/$part\"; done\n";
     vm = "#!/bin/bash\nset -eu\noutput=${@: -1}\nroot=$(dirname \"$(dirname \"$output\")\")\ntest -f \"$root/bin/vpp-native\"\ntest -f \"$root/native-vpp-runtime/runtime.o\"\nprintf 'vm\\n' >> \"$root/invocations.log\"\nprintf 'shared VM\\n' > \"$output\"\nchmod +x \"$output\"\n";
     ghi tệp(source + "/scripts/macos/build-vpp-cli.sh", bootstrap);
-    ghi tệp(source + "/scripts/fake-vm.sh", vm);
+    ghi tệp(source + "/scripts/macos/fake-vm.sh", vm);
     cmake_run(["-G", "Unix Makefiles", "-S", source, "-B", build, "-DBUILD_TESTING=OFF"]);
     build_graph(build, target); graph_log(build, "bootstrap\nvm\n");
     build_graph(build, target); graph_log(build, "bootstrap\nvm\n");

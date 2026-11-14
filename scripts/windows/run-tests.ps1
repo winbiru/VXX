@@ -7,6 +7,10 @@ param(
     [string[]]$Case = @(),
     [ValidateRange(1, 2147483647)]
     [int]$Jobs = 2,
+    [ValidateRange(1, 2147483647)]
+    [int]$ShardCount = 1,
+    [ValidateRange(0, 2147483647)]
+    [int]$ShardIndex = 0,
     [ValidateRange(1, 4)]
     [int]$BatchSize = 1,
     [ValidateRange(1, 2147483647)]
@@ -62,7 +66,8 @@ if ([string]::IsNullOrWhiteSpace($Clang)) {
         Select-Object -First 1).Source
 }
 $options += @('--compiler', $compiler, '--jobs', "$Jobs", '--batch-size', "$BatchSize",
-    '--timeout', "$Timeout", '--logs', $LogDirectory)
+    '--timeout', "$Timeout", '--logs', $LogDirectory,
+    '--shard-count', "$ShardCount", '--shard-index', "$ShardIndex")
 if ($ModuleSuites) { $options += '--module-suites' }
 # The package helper establishes the Windows runtime/linker environment and
 # invokes run_native_regression.py. Native argument arrays preserve UTF-8

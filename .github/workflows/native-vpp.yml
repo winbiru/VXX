@@ -366,11 +366,17 @@ jobs:
           if-no-files-found: ignore
 
   macos-regression:
-    name: macOS ARM64 - full and i32 regression
+    name: macOS ARM64 - regression shard ${{ matrix.shard }} / 4
     needs: macos-full
     runs-on: macos-15
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
+      VPP_REGRESSION_SHARD_COUNT: 4
+      VPP_REGRESSION_SHARD_INDEX: ${{ matrix.shard }}
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
       VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
@@ -386,32 +392,38 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
       - name: Verify full compiler batch parity
         id: batch_parity
-        if: ${{ env.VPP_REGRESSION_BATCH_SIZE != '1' }}
+        if: ${{ matrix.shard == 0 && env.VPP_REGRESSION_BATCH_SIZE != '1' }}
         run: |
           python3 scripts/quality/check_full_batch.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs/batch-parity
-      - name: Build and run all full V++ regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
+      - name: Build and run full V++ regression shard
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (matrix.shard != 0 || steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
         run: |
           module_options=()
           if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full "${module_options[@]}"
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --shard-count "$VPP_REGRESSION_SHARD_COUNT" --shard-index "$VPP_REGRESSION_SHARD_INDEX" --logs regression-logs/full "${module_options[@]}"
       - name: Build and run all i32 regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.shard == 0 && steps.compiler.outcome == 'success' }}
         run: |
           export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
           python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: macos-regression-logs
+          name: macos-regression-logs-shard-${{ matrix.shard }}
           path: regression-logs/
 
   linux-regression:
-    name: Linux x86-64 - full and i32 regression
+    name: Linux x86-64 - regression shard ${{ matrix.shard }} / 4
     needs: linux-full
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
+      VPP_REGRESSION_SHARD_COUNT: 4
+      VPP_REGRESSION_SHARD_INDEX: ${{ matrix.shard }}
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
       VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
@@ -427,40 +439,48 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
       - name: Verify full compiler batch and packaged platform object parity
         id: batch_parity
+        if: ${{ matrix.shard == 0 }}
         run: |
           export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
           probe_options=()
           if [[ "$VPP_REGRESSION_BATCH_SIZE" == '1' ]]; then probe_options+=(--linux-objects-only); fi
           python3 scripts/quality/check_full_batch.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs/batch-parity "${probe_options[@]}"
-      - name: Build and run all full V++ regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && steps.batch_parity.outcome == 'success' }}
+      - name: Build and run full V++ regression shard
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (matrix.shard != 0 || steps.batch_parity.outcome == 'success') }}
         run: |
           export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
           module_options=()
           if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full "${module_options[@]}"
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --shard-count "$VPP_REGRESSION_SHARD_COUNT" --shard-index "$VPP_REGRESSION_SHARD_INDEX" --logs regression-logs/full "${module_options[@]}"
       - name: Build and run all i32 regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.shard == 0 && steps.compiler.outcome == 'success' }}
         run: |
           export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
           python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-regression-logs
+          name: linux-regression-logs-shard-${{ matrix.shard }}
           path: regression-logs/
 
   windows-regression:
-    name: Windows x86-64 - full and i32 regression
+    name: Windows x86-64 - regression shard ${{ matrix.shard }} / 4
     needs: windows-full
     runs-on: windows-2025
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     env:
+      VPP_REGRESSION_SHARD_COUNT: 4
+      VPP_REGRESSION_SHARD_INDEX: ${{ matrix.shard }}
       VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
       VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
     steps:
       - uses: actions/checkout@v4
       - name: Check regression runner configuration
+        if: ${{ matrix.shard == 0 }}
         shell: pwsh
         run: |
           python scripts/quality/test_script_configuration.py
@@ -486,25 +506,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
       - name: Verify full compiler batch parity
         id: batch_parity
-        if: ${{ env.VPP_REGRESSION_BATCH_SIZE != '1' }}
+        if: ${{ matrix.shard == 0 && env.VPP_REGRESSION_BATCH_SIZE != '1' }}
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           python scripts/quality/check_full_batch.py --compiler "$env:RUNNER_TEMP/regression-compiler/bin/vpp-native.exe" --clang "$toolchain/clang.exe" --logs regression-logs/batch-parity
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build and run all full V++ regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
+      - name: Build and run full V++ regression shard
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (matrix.shard != 0 || steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
           $moduleOptions = @{ ModuleSuites = ($env:VPP_REGRESSION_MODULE_SUITES -eq 'true') }
-          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$toolchain/clang.exe" -Suite full -Jobs 2 -BatchSize ([int]$env:VPP_REGRESSION_BATCH_SIZE) -LogDirectory regression-logs/full @moduleOptions
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$toolchain/clang.exe" -Suite full -Jobs 2 -BatchSize ([int]$env:VPP_REGRESSION_BATCH_SIZE) -ShardCount ([int]$env:VPP_REGRESSION_SHARD_COUNT) -ShardIndex ([int]$env:VPP_REGRESSION_SHARD_INDEX) -LogDirectory regression-logs/full @moduleOptions
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and run all i32 regression cases
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.shard == 0 && steps.compiler.outcome == 'success' }}
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
@@ -515,5 +535,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-regression-logs
+          name: windows-regression-logs-shard-${{ matrix.shard }}
           path: regression-logs/

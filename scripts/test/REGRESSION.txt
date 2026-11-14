@@ -24,7 +24,7 @@ On Windows, use the same manifest and package environment as CI:
   ./scripts/windows/run-tests.ps1 -VppExecutable C:/vpp/bin/vpp-i32.exe -Suite i32 -Clang C:/msys64/clang64/bin/clang.exe
 
 The PowerShell entrypoint also supports -Suite smoke, -Case, -List, -Timeout,
--Jobs, -BatchSize and -ModuleSuites. It forwards the selected compiler and
+-Jobs, -BatchSize, -ModuleSuites, -ShardCount and -ShardIndex. It forwards the selected compiler and
 preserves the regression runner's exit status. It requires Python and the
 packaged Windows runtime, not the retired host CLI or Bash test arrays.
 
@@ -50,16 +50,18 @@ compiler dumps, native linker oracles, and standalone VM core, system,
 directory, process, resolver, UDP socket, negative socket and TLS tests. The i32 bit
 driver compares 3249 results against the historical arithmetic oracle.
 
-CI uses packaged compilers in separate jobs: 16 full-native shards each on
-macOS ARM64 and Linux x86-64, and i32 regression on macOS, Linux and Windows.
-Shards are balanced using historical timing estimates; HTTP cases share
-shard 0 to avoid port conflicts. Mach-O codegen and linker oracles are
-Darwin-only; ELF partial-linker oracles are Linux-only. Windows runs full and
-i32 regression against the published full compiler package.
-The full regression matrix runs after compiler artifact publication, so
-individual failures cannot prevent other shards from running. Failures
-are retained in the workflow artifacts. The initial macOS package probe
-and source/extension/inventory checks remain the fast build gate.
+CI builds and publishes the full compiler once per platform, then runs four
+full-native shards on each of macOS ARM64, Linux x86-64 and Windows x86-64.
+Each shard downloads the same package and uses two workers. Shards balance
+historical timing estimates and keep reviewed module suites together. HTTP
+cases share shard 0; the nested regression-runner fixture runs before its
+shared HTTP server starts. Mach-O codegen and linker oracles are Darwin-only;
+ELF partial-linker oracles are Linux-only. Shard 0 also runs the batch parity
+probe and i32 regression once per platform; Linux always checks packaged
+platform objects. The other shards can run while parity is in progress.
+All shard jobs must pass, and fail-fast is disabled. Logs are uploaded with
+platform and shard-specific names. The initial package probes and
+source/extension/inventory checks remain in place.
 
 Pending and platform-unsupported cases are reported separately from passes.
 Pending cases include retired JIT execution modes and two historical i32 syntax forms (assignment inside

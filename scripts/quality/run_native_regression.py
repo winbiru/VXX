@@ -138,7 +138,7 @@ def executable_name(name):
     return name + ".exe" if platform.system() == "Windows" else name
 
 
-def partition(cases, count):
+def partition(cases, count, module_suites=False):
     # Historical timings are scheduling hints only; the new backend can differ.
     weights = {}
     for line in (ROOT / "scripts/quality/native_golden_costs.tsv").read_text(encoding="utf-8").splitlines():
@@ -155,11 +155,26 @@ def partition(cases, count):
         if case.get("http"):
             shards[0].append(case)
             totals[0] += cost(case)
-    for case in sorted((c for c in cases if not c.get("http")),
-                       key=lambda c: (-cost(c), c["id"])):
+    # Keep reviewed module executables intact across CI shards. Otherwise
+    # sharding turns a single shared build back into several independent ones.
+    units = []
+    grouped = set()
+    if module_suites and count > 1:
+        for members in plan_module_suites(cases).values():
+            group = [case for case, _ in members]
+            grouped.update(c["id"] for c in group)
+            if any(c.get("http") for c in group):
+                for c in group:
+                    if not c.get("http"):
+                        shards[0].append(c)
+                        totals[0] += cost(c)
+            else:
+                units.append(group)
+    units.extend([c] for c in cases if not c.get("http") and c["id"] not in grouped)
+    for unit in sorted(units, key=lambda u: (-sum(map(cost, u)), u[0]["id"])):
         index = min(range(count), key=lambda i: (totals[i], len(shards[i]), i))
-        shards[index].append(case)
-        totals[index] += cost(case)
+        shards[index].extend(unit)
+        totals[index] += sum(map(cost, unit))
     return shards
 
 
@@ -334,7 +349,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
         binary = prepared_binary if prepared_binary is not None else cwd / executable_name("program")
         if case.get("tooling_test"):
             test_work = cwd / "tooling-test-work"
-            test_work.mkdir()
+            test_work.mkdir(exist_ok=True)
             env.update(
                 VPP_TEST_ROOT=str(ROOT),
                 VPP_TEST_WORK=str(test_work),
@@ -686,8 +701,12 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
         with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
             futures = [pool.submit(build_suite, name, members) for name, members in suites.items()]
             futures += [pool.submit(build_group, i, group) for i, group in enumerate(groups)]
-            for future in concurrent.futures.as_completed(futures):
-                for case, needs_run, detail, seconds in future.result():
+            for completed, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                group_results = future.result()
+                print(f"BUILD PROGRESS {completed}/{len(futures)} groups: " +
+                      ", ".join(f"{c['id']} ({seconds:.2f}s)" for c, _, _, seconds in group_results),
+                      flush=True)
+                for case, needs_run, detail, seconds in group_results:
                     elapsed[case["id"]] = seconds
                     if detail or not needs_run:
                         record(case, "FAIL" if detail else "PASS", detail, seconds)
@@ -697,6 +716,15 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
         print(f"BUILD PHASE COMPLETE: {len(ready)} cases ready for execution", flush=True)
         server = None
         try:
+            # This tooling fixture starts its own runner/server on port 18080.
+            # Execute it before starting our shared HTTP server, even on a
+            # single shard, to avoid a collision with the nested fixture.
+            isolated = [c for c in ready if c["id"] == "kiem_tra_regression_runner"]
+            for c in isolated:
+                case, _, detail, seconds = stage(c, "run")
+                record(case, "FAIL" if detail else "PASS", detail, elapsed[case["id"]] + seconds)
+                shutil.rmtree(directories[case["id"]])
+                ready.remove(c)
             if http_binary is not None:
                 try:
                     server = start_prepared_http(http_binary, http_dir, env)
@@ -774,11 +802,15 @@ def main():
     compiler = args.compiler.resolve()
     if not compiler.is_file():
         parser.error(f"missing compiler: {compiler}")
-    cases = partition(cases, args.shard_count)[args.shard_index]
+    cases = partition(cases, args.shard_count, args.module_suites)[args.shard_index]
+    print(f"SHARD {args.shard_index + 1}/{args.shard_count}: {len(cases)} registered cases", flush=True)
+    host = platform.system()
+    quiet_platform_skips = host in ("Linux", "Windows")
     pending = [c for c in cases if "pending" in c]
-    unsupported = [c for c in cases if "pending" not in c and c.get("platforms") and platform.system() not in c["platforms"]]
-    for c in unsupported:
-        print(f"UNSUPPORTED {c['id']} on {platform.system()}", flush=True)
+    unsupported = [c for c in cases if "pending" not in c and c.get("platforms") and host not in c["platforms"]]
+    if not quiet_platform_skips:
+        for c in unsupported:
+            print(f"UNSUPPORTED {c['id']} on {host}", flush=True)
     if not cases:
         parser.error("no cases in selection")
     cases = [c for c in cases if c not in pending and c not in unsupported]
@@ -795,7 +827,9 @@ def main():
     vm = None
     vm_error = None
     results = [{"id": c["id"], "status": "PENDING", "detail": c["pending"], "seconds": 0} for c in pending]
-    results += [{"id": c["id"], "status": "UNSUPPORTED", "detail": platform.system(), "seconds": 0} for c in unsupported]
+    # Preserve platform exclusions in the machine-readable report, even when
+    # they are omitted from the Linux/Windows console output.
+    results += [{"id": c["id"], "status": "UNSUPPORTED", "detail": host, "seconds": 0} for c in unsupported]
     for c in pending:
         print(f"PENDING {c['id']}: {c['pending']}", flush=True)
     results_path = logs / "results.json"
@@ -830,6 +864,9 @@ def main():
                         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                             vm_error = str(exc)
                             raise
+                    if case["id"] == "kiem_tra_regression_runner" and server is not None:
+                        stop_http(server)
+                        server = None
                     if case.get("http") and server is None:
                         if http_error:
                             raise RuntimeError(http_error)
@@ -849,7 +886,10 @@ def main():
             results_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     failed = sum(c["status"] == "FAIL" for c in results)
     passed = sum(c["status"] == "PASS" for c in results)
-    print(f"{passed} passed, {failed} failed, {len(pending)} pending, {len(unsupported)} unsupported on this platform; logs: {logs}")
+    summary = f"{passed} passed, {failed} failed, {len(pending)} pending"
+    if not quiet_platform_skips:
+        summary += f", {len(unsupported)} unsupported on this platform"
+    print(f"{summary}; logs: {logs}")
     return int(failed != 0)
 
 

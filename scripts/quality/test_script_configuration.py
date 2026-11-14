@@ -134,6 +134,63 @@ class OpcodeAbiTests(unittest.TestCase):
         self.assertIn('ASM VM host ABI mismatch', result.stderr)
 
 
+class RegressionShardTests(unittest.TestCase):
+    def test_full_shards_keep_all_cases_and_module_groups(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        cases = [c for c in runner.load_manifest()['cases'] if c['suite'] == 'full']
+        for module_suites in (False, True):
+            shards = runner.partition(cases, 4, module_suites)
+            self.assertCountEqual([c['id'] for shard in shards for c in shard],
+                                  [c['id'] for c in cases])
+            self.assertTrue(all(shards))
+            self.assertTrue(all(not c.get('http') for shard in shards[1:] for c in shard))
+            for host in ('Darwin', 'Linux', 'Windows'):
+                def active(selection):
+                    return [c for c in selection if 'pending' not in c and
+                            (not c.get('platforms') or host in c['platforms'])]
+                applicable = active(cases)
+                self.assertCountEqual([c['id'] for shard in shards for c in active(shard)],
+                                      [c['id'] for c in applicable])
+                if module_suites:
+                    expected = runner.plan_module_suites(applicable)
+                    actual = {}
+                    for shard in shards:
+                        for name, members in runner.plan_module_suites(active(shard)).items():
+                            self.assertNotIn(name, actual)
+                            actual[name] = [c['id'] for c, _ in members]
+                    self.assertEqual(actual, {name: [c['id'] for c, _ in members]
+                                              for name, members in expected.items()})
+
+    def test_nested_runner_uses_http_port_before_outer_server(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        cases = [{'id': 'http-client', 'suite': 'full', 'http': True},
+                 {'id': 'kiem_tra_regression_runner', 'suite': 'full', 'tooling_test': True}]
+        events = []
+        def run_case(case, *args, phase, **kwargs):
+            events.append((phase, case['id']))
+            return True
+        def start_http(*args):
+            events.append(('start', 'http-server'))
+            return object()
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(runner, 'run_case', side_effect=run_case), \
+             mock.patch.object(runner, 'prepare_http', return_value=Path(tmp) / 'server'), \
+             mock.patch.object(runner, 'start_prepared_http', side_effect=start_http), \
+             mock.patch.object(runner, 'stop_http'):
+            record = mock.Mock()
+            runner.staged_regression(cases, Path(tmp) / 'vpp', Path(tmp), {}, 1, 2, record)
+        self.assertLess(events.index(('run', 'kiem_tra_regression_runner')),
+                        events.index(('start', 'http-server')))
+        self.assertLess(events.index(('start', 'http-server')),
+                        events.index(('run', 'http-client')))
+        self.assertEqual(record.call_count, 2)
+        self.assertTrue(all(c.args[1] == 'PASS' for c in record.call_args_list))
+
+
 class WindowsRunnerTests(unittest.TestCase):
     def test_packaged_runner_preserves_selection_paths_and_exit_code(self):
         spec = importlib.util.spec_from_file_location('windows_bootstrap', QUALITY / 'check_windows_full_bootstrap.py')
@@ -147,7 +204,8 @@ class WindowsRunnerTests(unittest.TestCase):
             compiler.touch()
             argv = ['runner', '--clang', str(clang), 'regression', str(package),
                     '--suite', 'smoke', '--compiler', str(compiler),
-                    '--case', 'kiem_tra_aot_i32_run', '--timeout', '37', '--logs', str(package / 'logs')]
+                    '--case', 'kiem_tra_aot_i32_run', '--timeout', '37', '--shard-count', '4',
+                    '--shard-index', '2', '--logs', str(package / 'logs')]
             with mock.patch.object(sys, 'argv', argv), \
                  mock.patch.object(module.platform, 'system', return_value='Windows'), \
                  mock.patch.object(module.platform, 'machine', return_value='AMD64'), \
@@ -155,7 +213,8 @@ class WindowsRunnerTests(unittest.TestCase):
                 self.assertEqual(module.main(), 7)
             command = run.call_args.args[0]
             for option, value in (('--compiler', str(compiler.resolve())), ('--suite', 'smoke'),
-                                  ('--case', 'kiem_tra_aot_i32_run'), ('--timeout', '37')):
+                                  ('--case', 'kiem_tra_aot_i32_run'), ('--timeout', '37'),
+                                  ('--shard-count', '4'), ('--shard-index', '2')):
                 self.assertEqual(command[command.index(option) + 1], value)
             env = run.call_args.kwargs['env']
             self.assertEqual(env['VPP_HOME'], (package.resolve() / 'share/vpp').as_posix())

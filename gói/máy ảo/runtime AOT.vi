@@ -2414,7 +2414,15 @@ hàm chính() {
     nếu (aot_status()) {
         vm_write(2, vm_concat(vm_literal("V++ AOT runtime: error="), vm_integer_text(vm_get(4198464, 1))));
         vm_write(2, vm_concat(vm_literal(" opcode="), vm_integer_text(vm_get(4198464, 5))));
-        vm_write(2, vm_literal("\n")); trả về 1;
+        vm_write(2, vm_literal("\n"));
+        nếu (vm_get(4198464, 1) == 16) {
+            biến message = vm_text(vm_get(4198464, 3));
+            nếu (vm_tag(message) == 3) {
+                vm_write(2, vm_literal("V++ AOT exception: "));
+                vm_write(2, message); vm_write(2, vm_literal("\n"));
+            };
+        };
+        trả về 1;
     };
     trả về exit_code;
 };

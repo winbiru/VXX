@@ -301,6 +301,8 @@ def main():
     regress.add_argument('--case', action='append', default=[])
     regress.add_argument('--timeout', type=int, default=900)
     regress.add_argument('--jobs', type=int, default=2)
+    regress.add_argument('--shard-count', type=int, default=1)
+    regress.add_argument('--shard-index', type=int, default=0)
     regress.add_argument('--batch-size', type=int, choices=range(1, 5), default=1)
     regress.add_argument('--module-suites', action='store_true')
     regress.add_argument('--logs', required=True, type=Path)
@@ -337,6 +339,7 @@ def main():
         return subprocess.call([sys.executable, str(ROOT / 'scripts/quality/run_native_regression.py'),
                                 '--suite', args.suite, '--compiler', str(compiler),
                                 '--jobs', str(args.jobs), '--batch-size', str(args.batch_size),
+                                '--shard-count', str(args.shard_count), '--shard-index', str(args.shard_index),
                                 '--timeout', str(args.timeout), '--logs', str(args.logs.resolve()),
                                 *[arg for case in args.case for arg in ('--case', case)],
                                 *(['--module-suites'] if args.module_suites else [])], cwd=ROOT, env=env)
