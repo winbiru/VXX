@@ -1,0 +1,26 @@
+nhập gói.chuẩn.chính.*;
+nhập gói.dữ liệu.json.json.*;
+hàm cp28 lấy(a, i) { trả về a[i + 1]; };
+hàm cp28 gán(a, i) { v = a[i + 1]; trả về v; };
+hàm cp28 so(a, i) { nếu (a[i + 1] <= 66) { trả về 1; }; trả về 0; };
+hàm cp28 bằng số(a, i) { nếu (a[i + 1] == 66) { trả về 1; }; trả về 0; };
+hàm cp28 gán lại(a, i) { i = a[i + 1]; trả về i; };
+hàm cp28 gán nguồn(a, i) { a = a[i + 1]; trả về a; };
+hàm chính() {
+    v = máy ảo xem byte chuỗi("ABC");
+    nếu (cp28 lấy(v, 0) != 66 || cp28 gán(v, 1) != 67 || cp28 so(v, 0) != 1 || cp28 so(v, 1) != 0 || cp28 bằng số(v, 0) != 1 || cp28 bằng số(v, 1) != 0) { ném "view"; };
+    nếu (cp28 gán lại(v, 0) != 66 || cp28 gán nguồn(v, 1) != 67) { ném "alias"; };
+    a = [0,66,67];
+    nếu (cp28 lấy(a,0) != 66 || cp28 gán(a,1) != 67 || cp28 so(a,0) != 1 || cp28 so(a,1) != 0) { ném "list"; };
+    b = bộ([0,66,67]);
+    nếu (cp28 gán(b,0) != 66 || cp28 so(b,1) != 0) { ném "tuple"; };
+    nếu (cp28 lấy("a𠮷b",0) != "𠮷" || cp28 gán("a𠮷b",1) != "b" || cp28 bằng số("a𠮷b",0) != 0) { ném "string"; };
+    m = json phân tích("{\"1\":66,\"x1\":67,\"-2147483648\":68}");
+    nếu (cp28 gán(m,0) != 66 || cp28 lấy(m,"x") != 67 || cp28 so(m,"x") != 0 || cp28 gán(m,2147483647) != 68) { ném "map"; };
+    nếu (cp28 gán([0,66.0],0) != 66.0 || cp28 so([0,66.0],0) != 1 || cp28 so([0,67.5],0) != 0) { ném "real value"; };
+    lặp(i = 0; i < 1024; i++) {
+        v = máy ảo xem byte chuỗi("ABC" + thành chuỗi(i));
+        nếu (cp28 lấy(v,0) != 66 || cp28 gán(v,1) != 67 || cp28 so(v,0) != 1) { ném "GC"; };
+    };
+    in "index offset: PASS";
+};

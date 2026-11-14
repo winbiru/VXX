@@ -91,7 +91,7 @@ unresolved="$OUTPUT_DIR/.freestanding-unresolved.tmp"
 trap 'rm -f "$defined" "$referenced" "$unresolved"' EXIT
 : > "$defined"
 : > "$referenced"
-for object in start syscalls runtime-core directory sha256 process socket probe socket-probe; do
+for object in start syscalls runtime-core directory sha256 process socket probe socket-probe numeric; do
     nm -g "$OUTPUT_DIR/$object.o" | awk \
         'NF >= 2 && $(NF-1) != "U" && $(NF-1) ~ /^[A-Za-z]$/ { print $NF }' \
         >> "$defined"

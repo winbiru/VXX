@@ -40,6 +40,8 @@ lớp công khai Bộ Hạ Mã Máy {
         nếu (mục ký hiệu == "vpp_native_memory_read_i32") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_memory_write_i32") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_zero") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_memory_copy") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_memory_ascii_prefix") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_bind") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_open") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_read") { trả về 3; };

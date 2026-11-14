@@ -6,6 +6,7 @@ nhập gói.lõi.chuyển kiểu.*;
 nhập gói.lõi.toán học.*;
 nhập gói.văn bản.chuỗi.*;
 nhập gói.dữ liệu.json.json.*;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
 
 hàm arithmetic(k, data) { trả về (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11; };
 hàm branch_loop(k, data) {
@@ -35,6 +36,140 @@ hàm json_parse(k, data) {
     lặp(i = 0; i < 16; i++) { sum += values[i]; };
     trả về sum;
 };
+// Extended native application workloads; one operation is one whole batch below.
+hàm gcd_64(k, data) {
+    sum = 0;
+    lặp(i = 1; i <= 64; i++) {
+        a = k * 97 + i * 31; b = k * 13 + i * 17;
+        khi (b != 0) { r = a % b; a = b; b = r; };
+        sum += a;
+    };
+    trả về sum;
+};
+hàm float_256(k, data) {
+    x = k * 0.5; sum = 0.0;
+    lặp(i = 0; i < 256; i++) {
+        x = x * 0.5 + (i % 8) * 0.25;
+        sum += x;
+    };
+    trả về thành số nguyên(làm tròn xuống(sum * 1024.0));
+};
+hàm recursive_fib(n) {
+    nếu (n < 2) { trả về n; };
+    trả về recursive_fib(n - 1) + recursive_fib(n - 2);
+};
+hàm recursion(k, data) { trả về recursive_fib(10 + k % 5); };
+hàm primes_256(k, data) {
+    count = 0;
+    lặp(n = 2; n <= 256 + k; n++) {
+        prime = đúng;
+        lặp(d = 2; d * d <= n; d++) {
+            nếu (n % d == 0) { prime = sai; thoát; };
+        };
+        nếu (prime) { count += 1; };
+    };
+    trả về count;
+};
+hàm matrix_4(k, data) {
+    a = []; b = [];
+    lặp(i = 0; i < 16; i++) {
+        máy ảo thêm cuối danh sách(a, (k + i * 3) % 17);
+        máy ảo thêm cuối danh sách(b, (k + i * 7) % 19);
+    };
+    sum = 0;
+    lặp(i = 0; i < 4; i++) {
+        lặp(j = 0; j < 4; j++) {
+            cell = 0;
+            lặp(t = 0; t < 4; t++) { cell += a[i * 4 + t] * b[t * 4 + j]; };
+            sum += (i * 4 + j + 1) * cell;
+        };
+    };
+    trả về sum;
+};
+hàm sort_64(k, data) {
+    values = [];
+    lặp(i = 0; i < 64; i++) { máy ảo thêm cuối danh sách(values, (i * 37 + k) % 64 + k); };
+    sắp xếp(values);
+    sum = 0;
+    lặp(i = 0; i < 64; i++) { sum += (i + 1) * values[i]; };
+    trả về sum;
+};
+hàm binary_search_128(k, data) {
+    values = data[k % 16]; target = k * 2 + 1;
+    low = 0; high = 128;
+    khi (low < high) {
+        mid = (low + high) >> 1;
+        nếu (values[mid] < target) { low = mid + 1; }
+        hoặc { high = mid; };
+    };
+    trả về low * 257 + values[low];
+};
+hàm map_64(k, data) {
+    lookup = {}; keys = data[k % 16];
+    lặp(i = 0; i < 64; i++) { lookup[keys[i]] = k + i * 3; };
+    sum = 0;
+    lặp(i = 63; i >= 0; i--) { sum += (i + 1) * lookup[keys[i]]; };
+    trả về sum;
+};
+hàm objects_32(k, data) {
+    objects = [];
+    lặp(i = 0; i < 32; i++) {
+        máy ảo thêm cuối danh sách(objects, {"id": i, "payload": [k + i, i * 2]});
+    };
+    sum = 0;
+    lặp(i = 0; i < 32; i++) {
+        obj = objects[i];
+        sum += (obj["id"] + 1) * (obj["payload"][0] + obj["payload"][1]);
+    };
+    trả về sum;
+};
+hàm concat_64(k, data) {
+    text = "";
+    lặp(i = 0; i < 64; i++) { text += "V++" + thành chuỗi(k + i); };
+    nếu (text != data[k % 16]) { ném "concat content"; };
+    trả về độ dài(text);
+};
+hàm split_32(k, data) {
+    parts = tách hằng văn bản(data[k % 16], ",");
+    sum = 0;
+    lặp(i = 0; i < độ dài(parts); i++) { sum += (i + 1) * thành số nguyên(parts[i]); };
+    trả về sum + độ dài(parts);
+};
+hàm unicode_normalize(k, data) {
+    text = chuẩn hóa unicode(data[k % 16]);
+    nếu (text != "Việt Nam " + thành chuỗi(k)) { ném "unicode NFC"; };
+    trả về độ dài(text);
+};
+hàm json_encode(k, data) {
+    values = [];
+    lặp(i = 0; i < 16; i++) { máy ảo thêm cuối danh sách(values, k + i); };
+    text = json tạo([k, "Việt", values]);
+    nếu (text != data[k % 16]) { ném "json encode content"; };
+    trả về độ dài(text);
+};
+hàm json_nested(k, data) {
+    value = json phân tích(data[k % 16]);
+    rows = value["rows"];
+    sum = 0;
+    lặp(i = 0; i < 8; i++) {
+        row = rows[i]; nums = row["v"];
+        sum += (i + 1) * (row["id"] + nums[0] + nums[1]);
+    };
+    trả về sum;
+};
+hàm exceptions_16(k, data) {
+    sum = 0;
+    lặp(i = 0; i < 16; i++) {
+        thử {
+            nếu ((i + k) % 4 == 0) { ném "benchmark exception"; };
+            sum += i;
+        } bắt lỗi(e) {
+            nếu (e != "benchmark exception") { ném e; };
+            sum += i * 3;
+        };
+    };
+    trả về sum;
+};
 hàm batch(fn, data, iterations, seed) {
     checksum = 0.0;
     lặp(i = 0; i < iterations; i++) { checksum += fn(seed + i % 16, data) % 997; };
@@ -62,6 +197,21 @@ hàm chính() {
     hoặc nếu (name == "list_128") { fn = list_128; }
     hoặc nếu (name == "unicode_replace") { fn = unicode_replace; }
     hoặc nếu (name == "json_parse") { fn = json_parse; }
+    hoặc nếu (name == "gcd_64") { fn = gcd_64; }
+    hoặc nếu (name == "float_256") { fn = float_256; }
+    hoặc nếu (name == "recursion") { fn = recursion; }
+    hoặc nếu (name == "primes_256") { fn = primes_256; }
+    hoặc nếu (name == "matrix_4") { fn = matrix_4; }
+    hoặc nếu (name == "sort_64") { fn = sort_64; }
+    hoặc nếu (name == "binary_search_128") { fn = binary_search_128; }
+    hoặc nếu (name == "map_64") { fn = map_64; }
+    hoặc nếu (name == "objects_32") { fn = objects_32; }
+    hoặc nếu (name == "concat_64") { fn = concat_64; }
+    hoặc nếu (name == "split_32") { fn = split_32; }
+    hoặc nếu (name == "unicode_normalize") { fn = unicode_normalize; }
+    hoặc nếu (name == "json_encode") { fn = json_encode; }
+    hoặc nếu (name == "json_nested") { fn = json_nested; }
+    hoặc nếu (name == "exceptions_16") { fn = exceptions_16; }
     hoặc nếu (name != "arithmetic") { ném "unknown benchmark"; };
     data = [];
     lặp(i = 0; i < 16; i++) { máy ảo thêm cuối danh sách(data, ""); };
@@ -75,6 +225,37 @@ hàm chính() {
             lặp(j = 0; j < 16; j++) {
                 nếu (j != 0) { text += ","; };
                 text += thành chuỗi(k + j);
+            };
+            text += "]}";
+        };
+        nếu (name == "binary_search_128" || name == "map_64") {
+            text = [];
+            nếu (name == "binary_search_128") {
+                lặp(j = 0; j < 128; j++) { máy ảo thêm cuối danh sách(text, j * 2); };
+            } hoặc {
+                lặp(j = 0; j < 64; j++) { máy ảo thêm cuối danh sách(text, "key-" + thành chuỗi(k + j)); };
+            };
+        } hoặc nếu (name == "concat_64") {
+            lặp(j = 0; j < 64; j++) { text += "V++" + thành chuỗi(k + j); };
+        } hoặc nếu (name == "split_32") {
+            lặp(j = 0; j < 32; j++) {
+                nếu (j != 0) { text += ","; };
+                text += thành chuỗi(k + j);
+            };
+        } hoặc nếu (name == "unicode_normalize") {
+            text = "Việt Nam " + thành chuỗi(k);
+        } hoặc nếu (name == "json_encode") {
+            text = "[" + thành chuỗi(k) + ",\"Việt\",[";
+            lặp(j = 0; j < 16; j++) {
+                nếu (j != 0) { text += ","; };
+                text += thành chuỗi(k + j);
+            };
+            text += "]]";
+        } hoặc nếu (name == "json_nested") {
+            text = "{\"rows\":[";
+            lặp(j = 0; j < 8; j++) {
+                nếu (j != 0) { text += ","; };
+                text += "{\"id\":" + thành chuỗi(j) + ",\"v\":[" + thành chuỗi(k + j) + "," + thành chuỗi(j * 2) + "]}";
             };
             text += "]}";
         };

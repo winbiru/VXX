@@ -1,5 +1,19 @@
 # Ranh giới thư viện V++ và primitive VM
 
+## Phạm vi kiểm thử linker hiện tại (14/11/2026)
+
+V++ đã có linker ELF và PE32+ AMD64 viết bằng V++; phạm vi PE/COFF và các
+giới hạn được mô tả trong [native-linker-selfhosting.md](native-linker-selfhosting.md).
+Năm ca `linker-reader`, `linker-layout`, `linker-patch`, `linker-executable`
+và `linker-direct-object` kiểm tra Mach-O nên chỉ chạy trên Darwin.
+Các ca không áp dụng cho Linux/Windows được bỏ qua im lặng trên console;
+`results.json` vẫn ghi `UNSUPPORTED` để kiểm toán phạm vi kiểm thử.
+Đây là bỏ qua theo định dạng đối tượng, không phải thất bại của linker ELF/PE.
+CI kiểm tra ELF qua `check_linux_source_bootstrap.sh` và `linker-elf-partial`,
+PE qua `check_windows_native_pe_selfhosting.ps1` và các pha của
+`check_windows_full_bootstrap.py`. Kết quả của từng gate cần được xác nhận
+riêng trên nền tảng tương ứng; không suy ra PASS từ việc có mã nguồn.
+
 ## Windows x64: runtime COFF qua Docker/Wine (02/11/2026)
 
 Gate `scripts/quality/check_windows_file_boundary_docker.sh` hiện PASS
@@ -13,7 +27,7 @@ Kiểm thử giới hạn bộ nhớ và PID Docker, có deadline Wine và trán
 đệ quy khi argv của child sai. `check_aot_primitives.sh` cũng PASS các
 target cross-assembly. Chưa xác minh runtime trên Windows thật bằng
 MSVC/UCRT/CNG, chưa có PE/COFF linker viết bằng V++ và chưa hội tụ compiler
-self-host Windows.
+self-host Windows tại thời điểm ghi nhận mục này; xem cập nhật phía trên.
 
 ## DNS V++, mã hóa bản ghi TLS và bootstrap hội tụ (28/10/2026)
 

@@ -80,10 +80,10 @@ không còn cần cờ `VPP_WINDOWS_PROCESS_FFI`; fixture dùng `cmd.exe` thay `
 | System public | POSIX dùng FFI cho env, PID/PPID, UID/GID, sleep/EINTR, monotonic/realtime/local clock và DST, entropy, tồn tại/phân loại tệp/thư mục, liệt kê, tạo/xóa đường dẫn, DNS và phân giải địa chỉ kết nối; năm API đọc/ghi/ghi nối tệp điều phối chunk/EOF/partial write/close từ V++ qua stdio; TCP/UDP dùng V++/FFI mặc định trên POSIX và Windows; TLS client POSIX qua binding theo capability/token VM, trong đó TLS handshake và mật mã chạy qua adapter provider đã kiểm chứng; `chạy tiến trình` dựng argv/env, multiplex hai pipe và dọn dẹp trong V++ qua FFI cả POSIX/Windows | Provider TLS POSIX vẫn là native (SecureTransport/OpenSSL), chưa có integration xác minh server/chứng chỉ với fixture TLS độc lập; worker/scheduler, socket/process FFI cần xác nhận trên Windows, Windows TLS vẫn native; spawn POSIX và Win32 vẫn cần adapter C++ cho ABI/OS; chưa có CI đa nền tảng |
 | Đa nền tảng | macOS POSIX chạy thực tế; Windows đã có FFI adapter cho env, sleep, file, clock, entropy, process, thư mục, metadata, DNS resolver và socket TCP/UDP (public `.vi` mặc định); CMake yêu cầu `libffi`/pkg-config trên POSIX; hai handler DNS C++ đã gỡ và opcode DNS cũ bị chặn trên cả hai OS | Windows FFI chưa được kiểm chứng đầy đủ bằng CI; rollback TCP/UDP và Schannel Windows còn native; Linux và toàn bộ matrix ABI chưa được chứng minh cho tới khi runner thực thi thành công |
 
-Kiểm thử: `src/tests/kiem_tra_ffi_moi_truong.vi` (fixture biến môi trường
-deterministic qua `run_tests.sh`), `src/tests/kiem_tra_ffi_tien_trinh.vi`
+Kiểm thử: `scripts/test/kiem_tra_ffi_moi_truong.vi` (fixture biến môi trường
+deterministic qua `run_tests.sh`), `scripts/test/kiem_tra_ffi_tien_trinh.vi`
 (PID dương, giữ nguyên trong tiến trình, đúng kiểu),
-`src/tests/kiem_tra_ffi_ngu.vi` (0 ms, 2 ms, 1001 ms và đối số lỗi),
+`scripts/test/kiem_tra_ffi_ngu.vi` (0 ms, 2 ms, 1001 ms và đối số lỗi),
 `vpp-runtime-p0-hardening` (quyền riêng cho `getpid`/`getppid`, symbol, chữ
 ký ABI, interpreter/JIT),
 và `vpp-rc-internal-hardening`
@@ -875,7 +875,7 @@ Socket bind bị hạn chế có thể skip locally, nhưng gate network cần �
 | Verifier | Descriptor/library/layout out-of-range, reserved operands, target mismatch, bad ownership | Internal hardening; chưa chạy loader/call khi metadata lỗi |
 | Runtime | Tag/range/bounds lỗi, stale handle, double close, cleanup/unwind và error snapshot | `scripts/quality/runtime_p0_hardening.cpp` + VM fixture |
 | GC/JIT | Interval 1, nested call/module initializer, roots trong native call, cache lifetime, mode parity | Runtime hardening; ép mode qua fixture |
-| Stdlib | Public result/error/side effect theo nhóm, direct path không helper cũ | `src/tests/kiem_tra_ffi_*.vi` đề xuất và test gói hiện có |
+| Stdlib | Public result/error/side effect theo nhóm, direct path không helper cũ | `scripts/test/kiem_tra_ffi_*.vi` đề xuất và test gói hiện có |
 | Resource | Lặp open/close/call, exception giữa chừng, buffer/provider allocation balance | Fixture counters + OS handle/fd metrics; ASan/UBSan khi target hỗ trợ |
 | Isolation | Hai CompilationContext, hai VM/worker, không lẫn table/handle/errno | Internal/runtime hardening theo invariant hiện có |
 

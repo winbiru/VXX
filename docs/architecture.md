@@ -232,7 +232,7 @@ IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận
 được direct emitter hỗ trợ. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow,
 không parse token lần nữa; một IR opcode vẫn có thể phát nhiều VM instruction.
 
-Regression runtime/behavior chính được khóa bằng các chương trình `.vi` trong `src/tests/`
+Regression runtime/behavior chính được khóa bằng các chương trình `.vi` trong `scripts/test/`
 cùng expected output tương ứng qua CTest `vpp-integration`. CTest còn giữ một target C++ nhỏ
 `vpp-rc-internal-hardening` cho invariant không thể dựng từ source hợp lệ: malformed AST/IR và
 bytecode verifier metadata. Bộ unit/smoke C++ rộng trước đây vẫn không được khôi phục.
@@ -312,16 +312,16 @@ Các package này được bundle cùng runtime nhưng chưa có dependency/vers
 examples/api_project/              # ví dụ HTTP chạy độc lập
 templates/backend/                 # nguồn cho `vpp khởi tạo backend <tên>`
 test/*.cpp                         # source C++ cho CTest unit/tooling
-src/tests/fixtures/api_project/    # fixture DTO/repository/database deterministic
-src/tests/*.vi                     # regression entrypoints
-src/tests/expected/*.expected      # output của entrypoint
+scripts/test/fixtures/api_project/    # fixture DTO/repository/database deterministic
+scripts/test/*.vi                     # regression entrypoints
+scripts/test/expected/*.expected      # output của entrypoint
 ```
 
-`src/tests/` chỉ chứa chương trình regression V++ (`.vi`), expected output và
+`scripts/test/` chỉ chứa chương trình regression V++ (`.vi`), expected output và
 fixture runtime; source C++ của CTest nằm ở `test/`. Không đặt application
-sample trong `src/tests/`. Regression có vài fixture legacy được track
-(`src/tests/api_project.db`, `.tmp_*`); dữ liệu runtime mới phải dùng
-`src/tests/.tmp/` đã ignore, không thêm artifact database mới vào Git.
+sample trong `scripts/test/`. Regression có vài fixture legacy được track
+(`scripts/test/api_project.db`, `.tmp_*`); dữ liệu runtime mới phải dùng
+`scripts/test/.tmp/` đã ignore, không thêm artifact database mới vào Git.
 
 ## Build và phát hành
 

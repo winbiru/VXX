@@ -4,6 +4,7 @@
 hàm bộ nhớ đệm biên dịch khóa tra cứu(loại từ tố, nguồn văn bản, sổ đăng ký, đầu tiên, cuối cùng, điểm vào) {
     // One wire format for Mach-O/AArch64 and ELF64/x86-64; `kind` keeps
     // their emitted-object namespaces distinct.
+    nếu (thực thi bộ nhớ đệm đã tắt() == 1) { trả về -1; };
     biến khóa tra cứu = "vpp-native-object-cache-v3-bit-i32";
     nếu (khóa tra cứu <= 0) { trả về -1; };
     biến mã trạng thái = byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, loại từ tố);
@@ -66,7 +67,8 @@ hàm bộ nhớ đệm biên dịch lưu lại(khóa tra cứu, dữ liệu đ�
 
 hàm biên dịch đơn vị có đệm(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng, điểm vào) {
     biến khóa tra cứu = bộ nhớ đệm biên dịch khóa tra cứu(1, nguồn văn bản, sổ đăng ký, đầu tiên, cuối cùng, điểm vào);
-    biến dữ liệu đầu vào = byte mới();
+    biến dữ liệu đầu vào = -1;
+    nếu (khóa tra cứu > 0) { dữ liệu đầu vào = byte mới(); };
     biến kết quả trả về = -1;
     nếu (khóa tra cứu > 0) {
         nếu (dữ liệu đầu vào > 0) {

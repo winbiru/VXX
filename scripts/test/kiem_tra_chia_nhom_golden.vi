@@ -1,0 +1,55 @@
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.văn bản.chuỗi.*;
+hàm norm(s) { trả về thay thế(s, "\r\n", "\n"); };
+
+hàm chia_nhom(root, work, sources, ordered, costs, auto, status) {
+    ghi tệp(work + "/sources.list", sources);
+    ghi tệp(work + "/ordered.list", ordered);
+    ghi tệp(work + "/costs.tsv", costs);
+    args = [root + "/scripts/quality/shard_native_golden.py", "--workers", "2", "--costs", work + "/costs.tsv", "--output", work + "/groups", "--sources-file", work + "/sources.list"];
+    nếu (auto) { máy ảo thêm cuối danh sách(args, "--auto-classify"); }
+    hoặc { máy ảo thêm cuối danh sách(args, "--ordered-file"); máy ảo thêm cuối danh sách(args, work + "/ordered.list"); };
+    k = chạy tiến trình(đọc biến môi trường("VPP_TEST_PYTHON", "python3"), args, {}, 30000);
+    khẳng định đúng(k["khởi chạy"], "sharder launch failed");
+    khẳng định bằng(k["mã thoát"], status, "sharder status: " + k["lỗi"]);
+    nếu (status != 0) { trả về k["lỗi"]; };
+    trả về [norm(đọc tệp(work + "/groups/0.list")), norm(đọc tệp(work + "/groups/1.list")), norm(k["đầu ra"])];
+};
+
+hàm chính() {
+    root = đọc biến môi trường("VPP_TEST_ROOT", "");
+    work = đọc biến môi trường("VPP_TEST_WORK", "");
+    khẳng định đúng(root != "" && work != "", "missing test paths");
+    tạo thư mục(work);
+    k = chia_nhom(root, work, "scripts/test/slow_a.vi\nscripts/test/fast_a.vi\nscripts/test/slow_b.vi\nscripts/test/fast_b.vi\n", "", "# comment\nslow_a\t9000\nslow_b\t9000\n", sai, 0);
+    khẳng định bằng(k[0], "scripts/test/slow_a.vi\nscripts/test/fast_a.vi\n", "balanced lane 0");
+    khẳng định bằng(k[1], "scripts/test/slow_b.vi\nscripts/test/fast_b.vi\n", "balanced lane 1");
+    khẳng định bằng(k[2], "Native golden shard estimates (ms): 11000, 11000\n");
+    dup = "scripts/test/kiểm tra tên tiếng Việt.vi\n";
+    k = chia_nhom(root, work, dup + "x.vi\n" + dup + "y.vi\n", "", "", sai, 0);
+    khẳng định bằng(k[0], dup + dup, "duplicate ownership");
+    khẳng định bằng(k[1], "x.vi\ny.vi\n");
+    khẳng định bằng(k[2], "Native golden shard estimates (ms): 4000, 4000\n");
+    ordered = "scripts/test/state_a.vi\nscripts/test/state_b.vi\n";
+    k = chia_nhom(root, work, "scripts/test/slow.vi\nscripts/test/small_a.vi\nscripts/test/small_b.vi\n", ordered, "state_a\t1000\nstate_b\t1000\nslow\t4000\nsmall_a\t1000\nsmall_b\t1000\n", sai, 0);
+    khẳng định bằng(k[0], ordered + "scripts/test/small_a.vi\nscripts/test/small_b.vi\n");
+    khẳng định bằng(k[1], "scripts/test/slow.vi\n");
+    khẳng định bằng(k[2], "Native golden shard estimates (ms): 4000, 4000\n");
+    khẳng định đúng(chứa chuỗi(chia_nhom(root, work, "x.vi\n", "x.vi\n", "", sai, 1), "overlap"));
+    khẳng định đúng(chứa chuỗi(chia_nhom(root, work, "x.vi\n", "", "slow\t10000\nslow\t20000\n", sai, 1), "duplicate fixture cost"));
+    k = chia_nhom(root, work, "slow.vi\n", "", "# comment\nslow\t10000\n", sai, 0);
+    khẳng định bằng(k[2], "Native golden shard estimates (ms): 10000, 0\n");
+    external = "scripts/test/kiem_tra_ffi_socket.vi\nscripts/test/kiem_tra_goi_thoi_gian.vi\nscripts/test/kiem_tra_api_db_project.vi\nscripts/test/kiem_tra_ffi_tep.vi\nscripts/test/kiem_tra_goi_dong_thoi.vi\nscripts/test/kiem_tra_http_transport_bat_loi.vi\n";
+    independent = "scripts\\test\\kiem_tra_su_kien.vi\nscripts\\test\\kiem_tra_goi_luong_tu.vi\nscripts\\test\\kiem_tra_socket_ip.vi\nscripts\\test\\kiem_tra_http_thuan_vpp.vi\nscripts\\test\\kiem_tra_so_nguyen.vi\nscripts\\test\\kiem_tra_ham.vi\n";
+    k = chia_nhom(root, work, external + independent, "", "", đúng, 0);
+    khẳng định bằng(k[0], external, "external-state lane");
+    khẳng định bằng(k[1], independent, "Windows-style independent paths");
+    k = chia_nhom(root, work, "scripts/test/kiem_tra_ffi_tep.vi\nscripts/test/kiem_tra_ham.vi\nscripts/test/kiem_tra_goi_thoi_gian.vi\nscripts/test/kiem_tra_so_nguyen.vi\n", "", "kiem_tra_ham\t2000\n", đúng, 0);
+    khẳng định bằng(k[0], "scripts/test/kiem_tra_ffi_tep.vi\nscripts/test/kiem_tra_goi_thoi_gian.vi\n");
+    khẳng định bằng(k[1], "scripts/test/kiem_tra_ham.vi\nscripts/test/kiem_tra_so_nguyen.vi\n");
+    in "VPP GOLDEN SHARDING OK";
+};

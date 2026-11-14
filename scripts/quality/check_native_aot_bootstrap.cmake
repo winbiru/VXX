@@ -56,7 +56,7 @@ endif()
 
 run_native_stage("Stage 3 native code generation"
     "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-    "${stage3}" build "${VPP_SOURCE_ROOT}/src/tests/nativeaotprint.vi" -o "${probe}")
+    "${stage3}" build "${VPP_SOURCE_ROOT}/scripts/test/nativeaotprint.vi" -o "${probe}")
 if (NOT EXISTS "${probe}")
     message(FATAL_ERROR "Stage 3 did not produce a native probe")
 endif()
@@ -93,43 +93,43 @@ endfunction()
 
 # Imported foreign declarations, buffers, descriptor IDs, and lexical shadowing.
 check_stage3_fixture("FFI sleep"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_ngu.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_ngu.expected" "ffi-probe")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_ngu.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_ngu.expected" "ffi-probe")
 check_stage3_fixture("FFI lexical binding"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_ffi_binding.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_ffi_binding.expected" "ffi-binding")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_native_ffi_binding.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_native_ffi_binding.expected" "ffi-binding")
 
 # Bare-name package imports (phân giải dns -> gói/mạng/phân giải tên miền.vi).
 check_stage3_fixture("FFI DNS package alias"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_dns.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_dns.expected" "ffi-dns")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_dns.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_dns.expected" "ffi-dns")
 check_stage3_fixture("package facade re-export"
-    "${VPP_SOURCE_ROOT}/src/tests/fixtures/native_aot_facade/entry.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_facade.expected" "facade")
+    "${VPP_SOURCE_ROOT}/scripts/test/fixtures/native_aot_facade/entry.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_native_facade.expected" "facade")
 
 # Compile the original fixture from outside the checkout, forcing package
 # lookup through the installed VPP_HOME SDK with its unmodified facade import.
 set(installed_file_fixture "${VPP_OUTPUT_DIR}/ffi-file-facade.vi")
-configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_tep.vi"
+configure_file("${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_tep.vi"
     "${installed_file_fixture}" COPYONLY)
 check_stage3_fixture("FFI file IO"
     "${installed_file_fixture}"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_tep.expected" "ffi-file")
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_tep.expected" "ffi-file")
 check_stage3_fixture("FFI directory IO"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_thu_muc.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_thu_muc.expected" "ffi-directory")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_thu_muc.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_thu_muc.expected" "ffi-directory")
 check_stage3_fixture("FFI TLS validation"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_tls.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_tls.expected" "ffi-tls")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_tls.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_tls.expected" "ffi-tls")
 check_stage3_fixture("FFI socket error handling"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_socket_loi.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_socket_loi.expected" "ffi-socket-error")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_socket_loi.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_socket_loi.expected" "ffi-socket-error")
 check_stage3_fixture("FFI UTC"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_utc.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_utc.expected" "ffi-utc")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_utc.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_utc.expected" "ffi-utc")
 check_stage3_fixture("FFI entropy"
-    "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_entropy.vi"
-    "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_entropy.expected" "ffi-entropy")
+    "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_ffi_entropy.vi"
+    "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_ffi_entropy.expected" "ffi-entropy")
 
 # Exercise the remaining public Process, clock, environment and time Machine
 # APIs with the actual self-hosted Stage 3 compiler, not a stale native binary.
@@ -140,8 +140,8 @@ foreach(case IN ITEMS
         kiem_tra_ffi_ngu
         kiem_tra_ffi_process_spawn)
     check_stage3_fixture("Machine ${case}"
-        "${VPP_SOURCE_ROOT}/src/tests/${case}.vi"
-        "${VPP_SOURCE_ROOT}/src/tests/expected/${case}.expected" "${case}")
+        "${VPP_SOURCE_ROOT}/scripts/test/${case}.vi"
+        "${VPP_SOURCE_ROOT}/scripts/test/expected/${case}.expected" "${case}")
 endforeach()
 
 message(STATUS "Native AOT Stage 1 -> Stage 2 -> Stage 3, FFI and package imports: PASS (${stage3_hash})")

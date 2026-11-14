@@ -4,7 +4,7 @@ foreach(required IN ITEMS VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
     endif()
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
-file(READ "${VPP_ROOT}/src/tests/expected/native_i32_expression.expected" expected)
+file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_expression.expected" expected)
 set(runtimes cpp)
 if(DEFINED VPP_AOT_PREPARED_OBJECT)
     list(APPEND runtimes vpp)
@@ -15,7 +15,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_expression.vi" -o "${output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_expression.vi" -o "${output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được biểu thức i32/${runtime}: ${stdout}\n${stderr}")
@@ -39,11 +39,33 @@ foreach(runtime IN LISTS runtimes)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL expected)
         message(FATAL_ERROR "Sai kết quả biểu thức i32/${runtime}: ${status}\n${stdout}\n${stderr}")
     endif()
+    set(backend_calls "${VPP_OUTPUT_DIR}/i32-backend-calls-${runtime}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
+        "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
+        "${VPP_NATIVE_COMPILER}" build
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_backend_calls.vi" -o "${backend_calls}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Không dựng được backend i32 dùng chung/${runtime}: ${stdout}\n${stderr}")
+    endif()
+    file(READ "${backend_calls}.S" backend_asm)
+    foreach(id IN ITEMS 1 2 4)
+        if(NOT backend_asm MATCHES "vpp_aot_i32_${id}:")
+            message(FATAL_ERROR "Thiếu thân native có lời gọi trong vòng/nhánh ${id}/${runtime}")
+        endif()
+    endforeach()
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_backend_calls.expected" backend_expected)
+    execute_process(COMMAND "${backend_calls}" RESULT_VARIABLE status
+        OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
+    if(NOT status STREQUAL "0" OR NOT stdout STREQUAL backend_expected)
+        message(FATAL_ERROR "Sai backend i32 hoặc nhánh động/${runtime}: ${status}\n${stdout}\n${stderr}")
+    endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_expression_error.vi" -o "${output}-error"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_expression_error.vi" -o "${output}-error"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được kiểm tra lỗi chia: ${stdout}\n${stderr}")
@@ -58,7 +80,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_direct_calls.vi" -o "${calls_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_direct_calls.vi" -o "${calls_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được lời gọi i32 tĩnh/${runtime}: ${stdout}\n${stderr}")
@@ -77,7 +99,7 @@ foreach(runtime IN LISTS runtimes)
             message(FATAL_ERROR "Chuyên biệt hóa nhầm hàm 5 đối số hoặc tham số mặc định/${runtime}")
         endif()
     endforeach()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_i32_direct_calls.expected" calls_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_direct_calls.expected" calls_expected)
     execute_process(COMMAND "${calls_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL calls_expected)
@@ -102,7 +124,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_expression_calls.vi"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_expression_calls.vi"
         -o "${expr_calls_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
@@ -115,7 +137,7 @@ foreach(runtime IN LISTS runtimes)
             message(FATAL_ERROR "Không hạ biểu thức i32 vào thanh ghi của hàm ${id}/${runtime}")
         endif()
     endforeach()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_i32_expression_calls.expected" expr_calls_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_expression_calls.expected" expr_calls_expected)
     execute_process(COMMAND "${expr_calls_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL expr_calls_expected)
@@ -140,7 +162,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_nested_calls.vi" -o "${nested_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_nested_calls.vi" -o "${nested_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được lời gọi i32 lồng nhau/${runtime}: ${stdout}\n${stderr}")
@@ -160,7 +182,7 @@ foreach(runtime IN LISTS runtimes)
     if(nested_outer_count LESS 5)
         message(FATAL_ERROR "Chỉ hạ ${nested_outer_count}/5 lời gọi i32 ngoài cùng/${runtime}")
     endif()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_i32_nested_calls.expected" nested_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_nested_calls.expected" nested_expected)
     execute_process(COMMAND "${nested_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL nested_expected)
@@ -186,7 +208,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_i32_call_chain.vi" -o "${chain_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_i32_call_chain.vi" -o "${chain_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được chuỗi hàm i32/${runtime}: ${stdout}\n${stderr}")
@@ -203,7 +225,7 @@ foreach(runtime IN LISTS runtimes)
     if(chain_asm MATCHES "vpp_aot_i32_5:")
         message(FATAL_ERROR "Đã đưa hàm có hiệu ứng phụ vào đường thuần i32/${runtime}")
     endif()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_i32_call_chain.expected" chain_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_i32_call_chain.expected" chain_expected)
     execute_process(COMMAND "${chain_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL chain_expected)
@@ -214,12 +236,12 @@ foreach(runtime IN LISTS runtimes)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env
             "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
             "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
-            "${VPP_NATIVE_COMPILER}" build "${VPP_ROOT}/src/tests/fixtures/${test}.vi" -o "${output}"
+            "${VPP_NATIVE_COMPILER}" build "${VPP_ROOT}/scripts/test/fixtures/${test}.vi" -o "${output}"
             RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
         if(NOT status STREQUAL "0")
             message(FATAL_ERROR "Không dựng được ${test}/${runtime}: ${stdout}\n${stderr}")
         endif()
-        file(READ "${VPP_ROOT}/src/tests/expected/${test}.expected" fused_expected)
+        file(READ "${VPP_ROOT}/scripts/test/expected/${test}.expected" fused_expected)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env VPP_VM_PROFILE=1 "${output}"
             RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 60)
         if(NOT status STREQUAL "0" OR NOT stdout STREQUAL fused_expected)
@@ -258,7 +280,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_aot_private_method.vi" -o "${private_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_aot_private_method.vi" -o "${private_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được private method trực tiếp/${runtime}: ${stdout}\n${stderr}")
@@ -270,7 +292,7 @@ foreach(runtime IN LISTS runtimes)
     if(private_call_count LESS 5)
         message(FATAL_ERROR "Chỉ hạ ${private_call_count}/5 private method trực tiếp/${runtime}")
     endif()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_aot_private_method.expected" private_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_aot_private_method.expected" private_expected)
     execute_process(COMMAND "${private_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL private_expected)
@@ -284,7 +306,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_aot_indirect_slot.vi" -o "${indirect_slot_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_aot_indirect_slot.vi" -o "${indirect_slot_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được indirect slot/${runtime}: ${stdout}\n${stderr}")
@@ -300,7 +322,7 @@ foreach(runtime IN LISTS runtimes)
        NOT indirect_slot_asm MATCHES "vpp_aot_fast_s2:")
         message(FATAL_ERROR "Thiếu selector slot i32 cho lời gọi gián tiếp/${runtime}")
     endif()
-    file(READ "${VPP_ROOT}/src/tests/expected/native_aot_indirect_slot.expected" indirect_slot_expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/native_aot_indirect_slot.expected" indirect_slot_expected)
     execute_process(COMMAND "${indirect_slot_output}" RESULT_VARIABLE status
         OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 30)
     if(NOT status STREQUAL "0" OR NOT stdout STREQUAL indirect_slot_expected)
@@ -312,7 +334,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_aot_indirect_slot_error.vi"
+        "${VPP_ROOT}/scripts/test/fixtures/native_aot_indirect_slot_error.vi"
         -o "${indirect_slot_error_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
@@ -333,7 +355,7 @@ foreach(runtime IN LISTS runtimes)
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}" "VPP_AOT_KEEP_ASM=1"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
         "${VPP_NATIVE_COMPILER}" build
-        "${VPP_ROOT}/src/tests/fixtures/native_aot_private_shadow.vi" -o "${shadow_output}"
+        "${VPP_ROOT}/scripts/test/fixtures/native_aot_private_shadow.vi" -o "${shadow_output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được kiểm tra private method bị che/${runtime}: ${stdout}\n${stderr}")
@@ -353,7 +375,7 @@ foreach(runtime IN LISTS runtimes)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env
         "VPP_HOME=${VPP_ROOT}" "VPP_AOT_RUNTIME=${runtime}"
         "VPP_AOT_VPP_OBJECT=${VPP_AOT_PREPARED_OBJECT}"
-        "${VPP_NATIVE_COMPILER}" build "${VPP_ROOT}/src/tests/fixtures/native_aot_index_error.vi" -o "${output}"
+        "${VPP_NATIVE_COMPILER}" build "${VPP_ROOT}/scripts/test/fixtures/native_aot_index_error.vi" -o "${output}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 180)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "Không dựng được kiểm tra lỗi chỉ số/${runtime}: ${stdout}\n${stderr}")

@@ -32,13 +32,36 @@ vpp_native_os_open:
     cmp w1, w10
     b.ne 1f
     mov w1, #577
+    b 2f
 1:
+    cmp w1, #521               // Darwin O_WRONLY|O_CREAT|O_APPEND
+    b.ne 2f
+    mov w1, #1089              // Linux O_WRONLY|O_CREAT|O_APPEND
+2:
     mov w2, #438               // Quyền open(2) Linux: 0666
     bl open
     TRA_BO_NHO
 .globl vpp_native_os_close
 vpp_native_os_close:
     b close
+// Signed i32 offset; do not truncate a successful 64-bit OS position.
+// On EOVERFLOW the underlying file cursor may already have moved.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    str x30, [sp, #-16]!
+    sxtw x1, w1
+    bl lseek
+    cmp x0, #0
+    b.lt 1f
+    lsr x9, x0, #31
+    cbz x9, 1f
+    bl __errno_location
+    mov w9, #75
+    str w9, [x0]
+    mov w0, #-1
+1:
+    ldr x30, [sp], #16
+    ret
 .globl vpp_native_os_errno
 vpp_native_os_errno:
     str x30, [sp, #-16]!

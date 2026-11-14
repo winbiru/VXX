@@ -23,6 +23,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 "$CC" -c -o "$OUTPUT_DIR/directory.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_directory_x86_64.S" \
     "-I$ROOT_DIR/scripts/ASM"
 "$CC" -c -o "$OUTPUT_DIR/sha256.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_sha256_x86_64.S"
+"$CC" -c -o "$OUTPUT_DIR/numeric.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_f64_x86_64.S"
 "$CC" -c -o "$OUTPUT_DIR/process.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_process_x86_64.S"
 "$CC" -c -o "$OUTPUT_DIR/socket.o" "$ROOT_DIR/scripts/ASM/linux/vpp_linux_socket_x86_64.S"
 "$CC" -c -o "$OUTPUT_DIR/probe.o" "$ROOT_DIR/scripts/quality/native_freestanding_linux_probe.S"
@@ -32,7 +33,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
     "$OUTPUT_DIR/start.o" "$OUTPUT_DIR/syscalls.o" \
     "$OUTPUT_DIR/runtime-core.o" "$OUTPUT_DIR/directory.o" \
     "$OUTPUT_DIR/sha256.o" "$OUTPUT_DIR/process.o" "$OUTPUT_DIR/socket.o" \
-    "$OUTPUT_DIR/probe.o" "$OUTPUT_DIR/socket-probe.o"
+    "$OUTPUT_DIR/probe.o" "$OUTPUT_DIR/socket-probe.o" "$OUTPUT_DIR/numeric.o"
 
 bash "$ROOT_DIR/scripts/quality/audit_linux_static_elf.sh" "$OUTPUT_DIR/vpp-freestanding-probe"
 

@@ -610,50 +610,56 @@ vpp_freestanding_main:
     testl %eax, %eax
     js .Lbad_core
 
-    COPY_TO_ARENA 16384, .Lnative_directory, .Lnative_directory_end
+    movl $6, %edi
+    movl $1, %esi
+    xorl %edx, %edx
+    call vpp_native_os_directory
+    cmpl $120000000, %eax
+    jne .Lbad_core
+    COPY_TO_ARENA 70000000, .Lnative_directory, .Lnative_directory_end
     movl $4, %edi
-    movl $16384, %esi
+    movl $70000000, %esi
     xorl %edx, %edx
     call vpp_native_os_directory
     testl %eax, %eax
     jne .Lbad_core
     xorl %edi, %edi
-    movl $16384, %esi
-    movl $57392, %edx          // aligned 16-byte directory handle
+    movl $70000000, %esi
+    movl $70008192, %edx          // aligned 16-byte directory handle
     call vpp_native_os_directory
     testl %eax, %eax
     jne .Lbad_core
     movl $1, %edi
-    movl $57392, %esi
-    movl $58368, %edx          // 8192-byte dirent buffer
+    movl $70008192, %esi
+    movl $70016384, %edx          // 8192-byte dirent buffer
     call vpp_native_os_directory
     testl %eax, %eax
     jle .Lbad_core             // at least '.' and '..' must be returned
     cmpl $8192, %eax
     ja .Lbad_core
     movq vpp_native_arena_base(%rip), %r8
-    cmpb $'.', 58368+19(%r8) // first linux_dirent64 name
+    cmpb $'.', 70016384+19(%r8) // first linux_dirent64 name
     jne .Lbad_core
     movl $1, %edi
-    movl $57392, %esi
-    movl $68154369, %edx      // buffer cannot fit 8192 bytes
+    movl $70008192, %esi
+    movl $(PROBE_ARENA_SIZE - 8191), %edx      // buffer cannot fit 8192 bytes
     call vpp_native_os_directory
     cmpl $-22, %eax
     jne .Lbad_core
     movl $2, %edi
-    movl $57392, %esi
+    movl $70008192, %esi
     xorl %edx, %edx
     call vpp_native_os_directory
     testl %eax, %eax
     jne .Lbad_core
     movl $1, %edi
-    movl $57392, %esi
-    movl $58368, %edx
+    movl $70008192, %esi
+    movl $70016384, %edx
     call vpp_native_os_directory
     cmpl $-9, %eax             // revoked handle reports EBADF
     jne .Lbad_core
     movl $3, %edi
-    movl $16384, %esi
+    movl $70000000, %esi
     xorl %edx, %edx
     call vpp_native_os_directory
     testl %eax, %eax
@@ -667,9 +673,40 @@ vpp_freestanding_main:
     cmpl $-22, %eax
     jne .Lbad_core
     xorl %edi, %edi
-    movl $68158465, %esi
+    movl $(PROBE_ARENA_SIZE - 4095), %esi
     movl $57392, %edx
     call vpp_native_os_directory
+    cmpl $-22, %eax
+    jne .Lbad_core
+
+    // Numeric and system primitives must accept live heap buffers above 67 MB.
+    movl $70040000, %edi
+    movl $17, %esi
+    call vpp_native_f64_from_i32
+    testl %eax, %eax
+    jne .Lbad_core
+    movl $70040000, %edi
+    call vpp_native_f64_to_i32
+    cmpl $17, %eax
+    jne .Lbad_core
+    movl $(PROBE_ARENA_SIZE - 511), %edi
+    movl $17, %esi
+    call vpp_native_f64_from_i32
+    cmpl $-1, %eax
+    jne .Lbad_core
+    xorl %edi, %edi
+    movl $70041024, %esi
+    call vpp_native_os_clock
+    testl %eax, %eax
+    jne .Lbad_core
+    movl $70041056, %edi
+    movl $16, %esi
+    call vpp_native_os_entropy
+    testl %eax, %eax
+    jle .Lbad_core
+    movl $(PROBE_ARENA_SIZE - 15), %edi
+    movl $16, %esi
+    call vpp_native_os_entropy
     cmpl $-22, %eax
     jne .Lbad_core
 
@@ -678,12 +715,12 @@ vpp_freestanding_main:
     call vpp_native_sha_begin
     testl %eax, %eax
     jne .Lbad_core
-    movl $64512, %edi
+    movl $70032768, %edi
     call vpp_native_sha_end
     testl %eax, %eax
     jne .Lbad_core
     movq vpp_native_arena_base(%rip), %rdi
-    addq $64512, %rdi
+    addq $70032768, %rdi
     leaq .Lsha_empty_expected(%rip), %rsi
     movl $32, %ecx
     cld
@@ -704,12 +741,12 @@ vpp_freestanding_main:
     call vpp_native_sha_update
     testl %eax, %eax
     jne .Lbad_core
-    movl $64512, %edi
+    movl $70032768, %edi
     call vpp_native_sha_end
     testl %eax, %eax
     jne .Lbad_core
     movq vpp_native_arena_base(%rip), %rdi
-    addq $64512, %rdi
+    addq $70032768, %rdi
     leaq .Lsha_abc_expected(%rip), %rsi
     movl $32, %ecx
     cld
@@ -735,12 +772,12 @@ vpp_freestanding_main:
     call vpp_native_sha_update
     testl %eax, %eax
     jne .Lbad_core
-    movl $64512, %edi
+    movl $70032768, %edi
     call vpp_native_sha_end
     testl %eax, %eax
     jne .Lbad_core
     movq vpp_native_arena_base(%rip), %rdi
-    addq $64512, %rdi
+    addq $70032768, %rdi
     leaq .Lsha_100a_expected(%rip), %rsi
     movl $32, %ecx
     cld

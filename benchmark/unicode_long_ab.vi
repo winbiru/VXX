@@ -1,0 +1,27 @@
+nhập gói.văn bản.chuỗi.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
+hàm chính() {
+    n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "256"));
+    tên = đọc biến môi trường("BENCH_CASE", "ascii_length");
+    mẫu = "0123456789abcdef";
+    lặp(i = 0; i < 9; i++) { mẫu = mẫu + mẫu; };
+    nguồn = [];
+    lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(nguồn, mẫu + thành chuỗi(i)); };
+    nếu (tên == "long_replace") {
+        nguồn = [];
+        mảnh = "Việt 🚀";
+        lặp(i = 0; i < 6; i++) { mảnh = mảnh + mảnh; };
+        mẫu = mảnh + mảnh + mảnh + mảnh;
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(nguồn, mẫu + thành chuỗi(i)); };
+    };
+    kiểm = 0;
+    bắt đầu = thời gian đơn điệu mili giây();
+    lặp(i = 0; i < n; i++) {
+        nếu (tên == "ascii_length") { kiểm += độ dài(nguồn[i]); }
+        hoặc { kiểm += độ dài(thay chính xác(nguồn[i], mẫu, "X")); };
+    };
+    in thời gian đơn điệu mili giây() - bắt đầu;
+    in kiểm;
+};

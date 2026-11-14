@@ -6,7 +6,7 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 // 131..134) và OP_FFI_CALL (156) không nằm trong bảng intrinsic.
 // Chỉ gọi kiểm tra này khi lệnh có immediate khác 0, như verifier C++.
 hàm công khai biên dịch là mã nội tại(mã) {
-    nếu (mã == 214 || mã == 216 || mã == 217 || (mã >= 218 && mã <= 229)) { trả về đúng; };
+    nếu (mã == 214 || mã == 216 || mã == 217 || (mã >= 218 && mã <= 232)) { trả về đúng; };
     nếu (mã < 98 || mã > 208) { trả về sai; };
     trả về mã != 110 && mã != 115 && mã != 119 &&
         (mã < 131 || mã > 134) && mã != 156;
@@ -109,6 +109,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy_đường_đặt_hiện_tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_SET_CURRENT"), 1, đúng]; }
         ca "máy_đường_tạm": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_TEMP"), 0, đúng]; }
         ca "máy_đường_thực_thi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EXECUTABLE"), 1, đúng]; }
+        ca "chuoi_byte_view_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTE_VIEW"), 1, đúng]; }
+        ca "chuoi_utf8_valid_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_UTF8_VALID"), 1, đúng]; }
+        ca "quet_day_i32_vm": { trả về [biên dịch mã thao tác("OP_VM_SCAN_I32_RUN"), 4, đúng]; }
         ca "máy_tệp_khóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LOCK"), 1, đúng]; }
         ca "máy_socket_loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
         ca "máy_socket_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
@@ -226,6 +229,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "máy đường đặt hiện tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_SET_CURRENT"), 1, đúng]; }
         ca "máy đường tạm": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_TEMP"), 0, đúng]; }
         ca "máy đường thực thi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_EXECUTABLE"), 1, đúng]; }
+        ca "máy ảo xem byte chuỗi": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTE_VIEW"), 1, đúng]; }
+        ca "máy ảo kiểm tra utf8": { trả về [biên dịch mã thao tác("OP_VM_STRING_UTF8_VALID"), 1, đúng]; }
+        ca "máy ảo quét dãy số nguyên": { trả về [biên dịch mã thao tác("OP_VM_SCAN_I32_RUN"), 4, đúng]; }
         ca "máy tệp khóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_LOCK"), 1, đúng]; }
         ca "máy đầu nối loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
         ca "máy đầu nối đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full ARM64 compiler bootstrap through the V++ executable linker and dyld.
+# Native i32 ARM64 compiler bootstrap through the V++ executable linker and dyld.
 # Clang prepares the platform boundary once; no assembler/linker runs in stages.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -42,6 +42,19 @@ shasum -a 256 "$out/stage1" "$out/stage2"
 echo 'MACOS_NATIVE_EXECUTABLE_SELFHOST_EXACT_CMP=PASS'
 python3 "$root/scripts/quality/check_native_executable_layout.py" "$out/stage1" "$out/stage2"
 
+# The dynamic AOT compiler consumes the relocatable V++ runtime separately
+# from the platform ASM boundary. Require the direct-linked compiler to
+# reproduce it across both generations, without the module cache.
+runtime_source="$root/gói/máy ảo/runtime AOT.vi"
+for stage in 1 2; do
+    "$out/stage$stage" runtime-object "$runtime_source" -o "$out/runtime-stage$stage.o"
+    test -s "$out/runtime-stage$stage.o"
+    file "$out/runtime-stage$stage.o" | grep -q 'Mach-O 64-bit object arm64'
+done
+cmp "$out/runtime-stage1.o" "$out/runtime-stage2.o"
+shasum -a 256 "$out/runtime-stage1.o" "$out/runtime-stage2.o"
+echo 'MACOS_NATIVE_RUNTIME_OBJECT_EXACT_CMP=PASS'
+
 printf 'hàm chính() { trả về 52; };\n' > "$out/gói thử nghiệm 𠮷.vi"
 "$compiler" build "$out/gói thử nghiệm 𠮷.vi" -o "$out/probe"
 set +e
@@ -73,5 +86,5 @@ if find "$out" -type f \( -name '*.vpp-exe-*' -o -name '*.vpp-module-*' \) | gre
     echo 'Native Mach-O linker left temporary files' >&2; exit 1
 fi
 test ! -s "$VPP_FORBIDDEN_TOOL_LOG"
-echo 'MACOS_NATIVE_EXECUTABLE_EXTERNAL_BUILD_TOOLS=NONE'
+echo 'MACOS_NATIVE_EXECUTABLE_PATH_TOOL_GUARD=PASS'
 echo 'MACOS_NATIVE_EXECUTABLE_SELFHOST=PASS (preassembled ASM; dyld/libSystem; codesign)'

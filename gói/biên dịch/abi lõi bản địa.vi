@@ -63,5 +63,6 @@ hàm công khai biên dịch ABI lõi bản địa(tên) {
     nếu (tên == "máy sha kết") { trả về {"id": 60, "symbol": "vpp_native_sha_end", "arity": 1}; };
     nếu (tên == "máy báo cáo bộ nhớ đệm") { trả về {"id": 61, "symbol": "vpp_native_os_register_cache_report", "arity": 0}; };
     nếu (tên == "máy đặt quyền tệp mở") { trả về {"id": 78, "symbol": "vpp_native_os_fchmod", "arity": 2}; };
+    nếu (tên == "máy dịch tệp mở") { trả về {"id": 84, "symbol": "vpp_native_os_seek", "arity": 3}; };
     trả về rỗng;
 };

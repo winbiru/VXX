@@ -1,0 +1,46 @@
+nhập gói.biên dịch.đọc macho.Đối Tượng MachO;
+
+// Core argv returns an owned byte handle; convert before using dynamic APIs.
+hàm đối số văn bản(i) {
+    h = đối số lấy(i);
+    bytes = [];
+    lặp(j = 0; j < byte dài(h); j++) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(bytes, byte lấy(h, j));
+    };
+    bỏ kết quả = byte hủy(h);
+    trả về chuỗi từ byte máy ảo(bytes);
+};
+
+hàm chính() {
+    o = rỗng;
+    thử {
+        o = Đối Tượng MachO(đối số văn bản(1));
+        in [o.số phần(), o.số ký hiệu()];
+        in o.đọc vùng(4090, 16);
+        lặp(i = 0; i < o.số phần(); i++) {
+            s = o.lấy phần(i);
+            in s;
+            n = s["relocationCount"];
+            nếu (n > 0) {
+                in o.lấy tái định vị(i, 0);
+                in o.lấy tái định vị(i, n - 1);
+            };
+        };
+        n = o.số ký hiệu();
+        nếu (n > 0) {
+            lặp(i = 0; i < 2; i++) {
+                vị = 0;
+                nếu (i == 1) { vị = n - 1; };
+                s = o.lấy ký hiệu(vị);
+                in s;
+                in {"name": o.tên ký hiệu(s["nameOffset"])};
+            };
+        };
+        bỏ kết quả = o.đóng();
+        in "Mach-O reader: PASS";
+    } bắt lỗi(e) {
+        nếu (o != rỗng) { bỏ kết quả = o.đóng(); };
+        in "Mach-O reader: REJECT";
+        trả về 1;
+    };
+};

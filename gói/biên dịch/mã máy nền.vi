@@ -174,10 +174,11 @@ lớp công khai Tiện Ích Mã Máy {
 
     // Bản V++ của validateMachineStack C++: kiểm tra các đường CFG, nhảy lùi,
     // độ sâu tại điểm hợp nhánh, return và fallthrough.
+    // Bỏ kết quả phụ và dùng phép gán cập nhật để stack không tăng theo IR.
     hàm riêng tư biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, đích, sâu) {
         nếu (độ sâu đến[đích] == -1) {
             độ sâu đến[đích] = sâu;
-            máy ảo thêm cuối danh sách(hàng đợi, đích);
+            bỏ kết quả = máy ảo thêm cuối danh sách(hàng đợi, đích);
         };
         nếu (độ sâu đến[đích] != sâu) {
             ném "machine IR stack không khớp tại CFG join/branch";
@@ -192,13 +193,13 @@ lớp công khai Tiện Ích Mã Máy {
         sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
         sau = [];
         độ sâu đến = [];
-        lặp (i = 0; i < n; i++) {
-            máy ảo thêm cuối danh sách(sau, mình.biên dịch mã máy stack sau(lệnh[i], ô nhớ, sâu nhất, n));
-            máy ảo thêm cuối danh sách(độ sâu đến, -1);
+        lặp (i = 0; i < n; i += 1) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(sau, mình.biên dịch mã máy stack sau(lệnh[i], ô nhớ, sâu nhất, n));
+            bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu đến, -1);
         };
         độ sâu đến[0] = 0;
         hàng đợi = [0];
-        lặp (head = 0; head < máy ảo lấy độ dài(hàng đợi); head++) {
+        lặp (head = 0; head < máy ảo lấy độ dài(hàng đợi); head += 1) {
             i = hàng đợi[head];
             mã phép toán = lệnh[i];
             nếu (độ sâu đến[i] != mã phép toán["depthBefore"]) {
@@ -207,11 +208,11 @@ lớp công khai Tiện Ích Mã Máy {
             mã = mã phép toán["opcode"];
             nếu (mã == "Return" || mã == "Trap") { bỏ qua; };
             nếu (mã == "Jump" || mã == "BranchZero") {
-                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, mã phép toán["operand"], sau[i]);
+                bỏ kết quả = mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, mã phép toán["operand"], sau[i]);
             };
             nếu (mã != "Jump") {
                 nếu (i + 1 >= n) { ném "machine IR fallthrough vượt cuối hàm"; };
-                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, i + 1, sau[i]);
+                bỏ kết quả = mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, i + 1, sau[i]);
             };
         };
         trả về đúng;

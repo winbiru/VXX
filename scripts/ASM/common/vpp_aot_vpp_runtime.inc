@@ -1,5 +1,7 @@
 #if defined(__linux__) && defined(__x86_64__)
 #include "../linux/vpp_aot_vpp_runtime_x86_64.inc"
+#elif defined(_WIN32) && defined(__x86_64__)
+#include "../windows/vpp_aot_vpp_runtime_x86_64.inc"
 #else
 // ASM đổi con trỏ, đọc siêu dữ liệu và gọi máy gián tiếp. Giá trị động, khung gọi, bao đóng, ngoại
 // lệ và GC được viết bằng V++.

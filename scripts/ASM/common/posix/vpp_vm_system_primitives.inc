@@ -7,6 +7,11 @@
 #define VM_SYS_SYM(x) x
 #define VM_SYS_LIB(x) x@PLT
 #endif
+#ifdef VPP_VM_SYSTEM_FREESTANDING
+#define VM_SYS_X86_ARENA 135271424
+#else
+#define VM_SYS_X86_ARENA 68162560
+#endif
 .text
 #if defined(__aarch64__) || defined(__arm64__)
 .macro VM_VAO_HE_THONG
@@ -165,7 +170,7 @@ VM_SYS_SYM(vpp_native_os_clock):
     VM_VAO_HE_THONG
     cmpl $1, %edi
     ja Lvm_he_thong_sai_x86
-    cmpl $68162544, %esi
+    cmpl $(VM_SYS_X86_ARENA - 16), %esi
     ja Lvm_he_thong_sai_x86
     addq %r10, %rsi
     testl %edi, %edi
@@ -190,7 +195,7 @@ VM_SYS_SYM(vpp_native_os_thread_cpu_clock):
     movl %edi, %esi
     xorl %edi, %edi
     VM_VAO_HE_THONG
-    cmpl $68162544, %esi
+    cmpl $(VM_SYS_X86_ARENA - 16), %esi
     ja Lvm_he_thong_sai_x86
     addq %r10, %rsi
 #if defined(__APPLE__)
@@ -247,7 +252,7 @@ VM_SYS_SYM(vpp_native_os_entropy):
     js Lvm_he_thong_sai_x86
     movl %edi, %eax
     addq %rsi, %rax
-    cmpq $68162560, %rax
+    cmpq $VM_SYS_X86_ARENA, %rax
     ja Lvm_he_thong_sai_x86
     addq %r10, %rdi
 #if defined(__APPLE__)

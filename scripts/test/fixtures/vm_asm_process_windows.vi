@@ -1,0 +1,28 @@
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.*;
+
+hàm yêu cầu tiến trình windows(điều kiện) {
+    nếu (!điều kiện) { ném "Windows process regression"; };
+};
+
+hàm chính() {
+    python = đọc biến môi trường("VPP_PROCESS_TEST_PYTHON", "");
+    probe = đọc biến môi trường("VPP_PROCESS_TEST_PROBE", "");
+    yêu cầu tiến trình windows(python != "" && probe != "");
+    r = chạy tiến trình(python, [probe, "io", "A B", "á🐱", "", "quote\"inside", "space \\"],
+                       {"VPP_CHILD_TEST": "mới"}, 60000);
+    yêu cầu tiến trình windows(r["khởi chạy"] && r["mã thoát"] == 7);
+    yêu cầu tiến trình windows(độ dài(r["đầu ra"]) == 65536 && độ dài(r["lỗi"]) == 65536);
+    yêu cầu tiến trình windows(r["đầu ra"][65535] == "A" && r["lỗi"][65535] == "B");
+
+    r = chạy tiến trình(python, [probe, "closed"], {}, 5000);
+    yêu cầu tiến trình windows(r["khởi chạy"] && r["mã thoát"] == -1);
+    yêu cầu tiến trình windows(r["đầu ra"] == "closed\n" && r["lỗi"] == "chạy tiến trình: quá thời hạn");
+
+    r = chạy tiến trình(python, [probe, "tree"], {}, 5000);
+    yêu cầu tiến trình windows(r["khởi chạy"] && r["mã thoát"] == -1);
+    yêu cầu tiến trình windows(r["đầu ra"] != "" && r["lỗi"] == "chạy tiến trình: quá thời hạn");
+    chết = chạy tiến trình(python, [probe, "check-dead", r["đầu ra"]], {}, 10000);
+    yêu cầu tiến trình windows(chết["khởi chạy"] && chết["mã thoát"] == 0);
+    in "WINDOWS PROCESS OK";
+};

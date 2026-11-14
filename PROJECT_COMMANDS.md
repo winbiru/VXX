@@ -1,3 +1,20 @@
+# V++ — Các lệnh phát triển bản tự chủ
+
+```sh
+make build
+make test
+./VPP phiên bản
+./VPP build hello.vi -o hello
+./VPP run hello.vi -- arg1 arg2
+make benchmark
+cmake --install build-pure-vpp --prefix "$HOME/.local"
+```
+
+Chi tiết: [Cài đặt](docs/installation.md). Build đầy đủ hiện hỗ trợ macOS ARM64.
+
+<details>
+<summary>Lệnh của kiến trúc host trước đây (tham khảo lịch sử)</summary>
+
 # V++ — Các lệnh phát triển thường dùng
 
 File này tập hợp các lệnh build, test, chạy V++, đóng gói/cài extension và các
@@ -88,7 +105,7 @@ cmake --build build --parallel
 Project có script build CLI trực tiếp bằng C++ compiler:
 
 ```bash
-./scripts/build-vpp-cli.sh
+./scripts/macos/build-vpp-cli.sh
 ```
 
 Binary được tạo tại:
@@ -174,7 +191,7 @@ Chạy regression V++ trực tiếp:
 VPP_EXEC=./build/bin/vpp-cli ./run_tests.sh
 ```
 
-Nếu build bằng `scripts/build-vpp-cli.sh`:
+Nếu build bằng `scripts/macos/build-vpp-cli.sh`:
 
 ```bash
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
@@ -187,24 +204,24 @@ CTest hiện chỉ đăng ký bộ regression V++ chạy các file `.vi` qua `vp
 Chạy một file `.vi`:
 
 ```bash
-./build/bin/vpp-cli src/tests/program.vi
+./build/bin/vpp-cli scripts/test/program.vi
 ```
 
 Hoặc dùng wrapper của project:
 
 ```bash
-./VPP chạy src/tests/program.vi
+./VPP chạy scripts/test/program.vi
 ```
 
 Các lệnh tooling thường dùng:
 
 ```bash
-./build/bin/vpp-cli --giải-mã src/tests/program.vi
-./build/bin/vpp-cli --dump-ast src/tests/program.vi
-./build/bin/vpp-cli --dump-ir src/tests/program.vi
-./build/bin/vpp-cli --lint src/tests/program.vi
-./build/bin/vpp-cli --định-dạng src/tests/program.vi
-./build/bin/vpp-cli --định-dạng src/tests/program.vi --in-place
+./build/bin/vpp-cli --giải-mã scripts/test/program.vi
+./build/bin/vpp-cli --dump-ast scripts/test/program.vi
+./build/bin/vpp-cli --dump-ir scripts/test/program.vi
+./build/bin/vpp-cli --lint scripts/test/program.vi
+./build/bin/vpp-cli --định-dạng scripts/test/program.vi
+./build/bin/vpp-cli --định-dạng scripts/test/program.vi --in-place
 ./build/bin/vpp-cli --repl
 ./build/bin/vpp-cli --lsp
 ```
@@ -464,7 +481,7 @@ Chạy một chương trình:
 Build CLI nhanh khi không có CMake:
 
 ```bash
-./scripts/build-vpp-cli.sh
+./scripts/macos/build-vpp-cli.sh
 ```
 
 Đóng gói extension:
@@ -478,3 +495,6 @@ Cài lại extension VS Code:
 ```bash
 ./scripts/vpp-lang install --editor vscode
 ```
+
+
+</details>

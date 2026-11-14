@@ -1,0 +1,54 @@
+nhập gói.nhập xuất.tệp thô.*;
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+
+hàm đối số văn bản(i) {
+    h = đối số lấy(i);
+    bytes = [];
+    lặp(j = 0; j < byte dài(h); j++) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(bytes, byte lấy(h, j));
+    };
+    bỏ kết quả = byte hủy(h);
+    trả về chuỗi từ byte máy ảo(bytes);
+};
+
+hàm chính() {
+    đường = đối số văn bản(1);
+    t = tệp thô mở(đường, 1);
+    nếu (tệp thô ghi(t, [0, 255, 65, 66, 67, 68, 69, 70], 8) != 8) { trả về 1; };
+    nếu (tệp thô vị trí(t) != 8 || tệp thô dịch(t, -2, 1) != 6) { trả về 2; };
+    nếu (tệp thô dịch(t, -1, 2) != 7 || tệp thô dịch(t, 0, 0) != 0) { trả về 3; };
+    nếu (tệp thô dịch(t, -1, 0) != -1 || tệp thô mã lỗi() == 0) { trả về 4; };
+    nếu (tệp thô vị trí(t) != 0 || tệp thô mã lỗi() != 0) { trả về 5; };
+    // Exercise overflow without writing or allocating a large file.
+    nếu (tệp thô dịch(t, 2147483647, 0) != 2147483647) { trả về 6; };
+    nếu (tệp thô dịch(t, 1, 1) != -1 || tệp thô mã lỗi() != 84) { trả về 7; };
+    nếu (tệp thô vị trí(t) != -1 || tệp thô mã lỗi() != 84) { trả về 8; };
+    nếu (tệp thô dịch(t, 0, 0) != 0 || tệp thô đóng(t) != 0) { trả về 9; };
+
+    đọc = Bộ Đệm Tệp(đường, "đọc", 4);
+    nếu (đọc.đọc các byte(1)[0] != 0 || đọc.vị trí() != 1) { trả về 10; };
+    nếu (!đọc.dịch(1, 1) || đọc.vị trí() != 2 || đọc.đọc các byte(1)[0] != 65) { trả về 11; };
+    nếu (!đọc.dịch(-2, 1) || đọc.vị trí() != 1 || đọc.đọc các byte(1)[0] != 255) { trả về 12; };
+    nếu (!đọc.dịch(-1, 2) || đọc.đọc các byte(4)[0] != 70 || độ dài(đọc.đọc các byte(1)) != 0) { trả về 13; };
+    nếu (!đọc.dịch(0) || đọc.đọc các byte(1)[0] != 0) { trả về 14; };
+    bỏ kết quả = đọc.đóng();
+    ghi = Bộ Đệm Tệp(đường, "ghi", 4);
+    bỏ kết quả = ghi.ghi các byte([0]);
+    khối = [255, 65];
+    bỏ kết quả = ghi.ghi khối trực tiếp(khối);
+    khối[0] = 1;
+    nếu (ghi.vị trí() != 3) { trả về 16; };
+    lỗi byte = sai;
+    thử { bỏ kết quả = ghi.ghi khối trực tiếp([66, 256]); }
+    bắt lỗi(e) { lỗi byte = đúng; };
+    nếu (!lỗi byte || ghi.vị trí() != 3) { trả về 17; };
+    bỏ kết quả = ghi.ghi khối trực tiếp([]);
+    bỏ kết quả = ghi.ghi các byte([66]);
+    bỏ kết quả = ghi.đóng();
+    đọc = Bộ Đệm Tệp(đường, "đọc", 4);
+    khối = đọc.đọc các byte(8);
+    nếu (độ dài(khối) != 4 || khối[0] != 0 || khối[1] != 255 || khối[2] != 65 || khối[3] != 66) { trả về 18; };
+    bỏ kết quả = đọc.đóng();
+    nếu (tệp thô xóa(đường) != 0) { trả về 15; };
+    in "Native file seek: PASS";
+};

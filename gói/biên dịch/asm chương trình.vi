@@ -4,6 +4,8 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
 nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh asm;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh byte;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp mã máy;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
@@ -52,6 +54,9 @@ hàm công khai biên dịch asm tên nội tại() {
         "OP_VM_MACHINE_PATH_TEMP",
         "OP_VM_MACHINE_PATH_EXECUTABLE",
         "OP_VM_MACHINE_FILE_LOCK",
+        "OP_VM_STRING_BYTE_VIEW",
+        "OP_VM_STRING_UTF8_VALID",
+        "OP_VM_SCAN_I32_RUN",
         "OP_VM_STRING_SLICE", "OP_VM_STRING_REPLACE_EXACT", "OP_VM_STRING_BYTE_SLICE"
     ];
     // END native intrinsic opcodes.
@@ -79,6 +84,22 @@ hàm riêng tư biên dịch asm bảng mã() {
     nội tại = biên dịch asm tên nội tại();
     lặp(i = 0; i < độ dài(nội tại); i++) { bảng[biên dịch mã thao tác(nội tại[i])] = "intrinsic"; };
     trả về bảng;
+};
+
+// Chứng minh hàm có đúng một tham số bắt buộc và chỉ trả về TYPE_OF.
+// Không suy luận từ tên hàm: receiver, default, capture, nhánh và tác dụng
+// phụ đều không thể xuất hiện trong chuỗi bảy lệnh này.
+hàm riêng tư biên dịch asm chuyển tiếp loại(mã, bảng) {
+    nếu (độ dài(mã) != 7) { trả về sai; };
+    nếu (bảng[mã[0][0]] != "OP_MO_KHOI" ||
+        bảng[mã[1][0]] != "OP_KHOI_TAO" ||
+        bảng[mã[2][0]] != "OP_PARAM" ||
+        bảng[mã[3][0]] != "OP_TEN_BIEN_GIA_TRI" ||
+        mã[4][0] != 145 ||
+        bảng[mã[5][0]] != "OP_TRA_VE" ||
+        bảng[mã[6][0]] != "OP_DONG_KHOI") { trả về sai; };
+    ô = mã[1][2];
+    trả về ô >= 0 && mã[2][2] == ô && mã[2][3] == 0 && mã[3][2] == ô;
 };
 
 // Chỉ nhận hàm có tham số bắt buộc, không đọc ô ngoài và trả về đúng
@@ -198,9 +219,11 @@ lớp công khai Bộ Hạ ASM Động {
         // Tra opcode một lần theo vị trí bytecode. Các bộ nhận dạng mẫu
         // nhìn trước nhiều lệnh sẽ dùng lại tên đã giải mã.
         mình.tên mã = [];
-        lặp(i = 0; i < độ dài(lệnh); i++) {
+        mình.vùng ngoại lệ = sai;
+        lặp(i = 0; i < độ dài(lệnh); i = i + 1) {
             tên mã = bảng[lệnh[i][0]];
-            máy ảo thêm cuối danh sách(mình.tên mã, tên mã);
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.tên mã, tên mã);
+            nếu (tên mã == "OP_THU") { mình.vùng ngoại lệ = đúng; };
             nếu (tên mã == "OP_PARAM" && lệnh[i][3] == -1 && lệnh[i][2] >= 0) {
                 mình.ô receiver["" + lệnh[i][2]] = đúng;
             };
@@ -211,7 +234,7 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (id hàm >= 0) {
             có closure = sai;
             số lần khởi tạo = {};
-            lặp(i = 0; i < độ dài(lệnh); i++) {
+            lặp(i = 0; i < độ dài(lệnh); i = i + 1) {
                 tên lệnh = mình.tên mã[i];
                 nếu (tên lệnh == "OP_TAO_DONG_BAO") { có closure = đúng; };
                 nếu (tên lệnh == "OP_KHOI_TAO" && lệnh[i][2] >= 0) {
@@ -258,14 +281,19 @@ lớp công khai Bộ Hạ ASM Động {
         mình.dự phòng đến = 0;
     };
     hàm riêng tư phát(mã, hằng = 0, ô = 0, ký hiệu = "") {
-        máy ảo thêm cuối danh sách(mình.lệnh, biên dịch mã máy lệnh(mã, hằng, ô, mình.sâu, ký hiệu));
+        máy ảo thêm cuối danh sách(mình.lệnh, {"opcode": mã, "immediate": hằng,
+            "operand": ô, "depthBefore": mình.sâu, "symbol": ký hiệu});
+        // Các toán tử logic đánh giá cả hai vế. Tách nhóm lệnh thường gặp
+        // để không thực hiện chuỗi so sánh của các phép tính mỗi lần phát.
         nếu (mã == "PushConstant" || mã == "LoadSlot") { mình.sâu = mình.sâu + 1; }
         hoặc nếu (mã == "Call") { mình.sâu = mình.sâu - ô + 1; }
-        hoặc nếu (mã == "Drop" || mã == "BranchZero" || mã == "Return" ||
-            mã == "Add" || mã == "Sub" || mã == "Mul" || mã == "Equal" ||
-            mã == "BitAnd" || mã == "BitOr" || mã == "BitXor" || mã == "ShiftLeft" || mã == "ShiftRight" ||
-            mã == "NotEqual" || mã == "Less" || mã == "LessEqual" ||
-            mã == "Greater" || mã == "GreaterEqual") { mình.sâu = mình.sâu - 1; };
+        hoặc nếu (mã == "Drop" || mã == "BranchZero" || mã == "Return") { mình.sâu = mình.sâu - 1; }
+        hoặc nếu (mã != "Jump" && mã != "StoreSlot") {
+            nếu (mã == "Add" || mã == "Sub" || mã == "Mul" || mã == "Equal" ||
+                mã == "BitAnd" || mã == "BitOr" || mã == "BitXor" || mã == "ShiftLeft" || mã == "ShiftRight" ||
+                mã == "NotEqual" || mã == "Less" || mã == "LessEqual" ||
+                mã == "Greater" || mã == "GreaterEqual") { mình.sâu = mình.sâu - 1; };
+        };
         nếu (mình.sâu < 0) { ném "AOT V++: stack lowering không hợp lệ"; };
         nếu (mình.sâu > mình.sâu nhất) { mình.sâu nhất = mình.sâu; };
     };
@@ -443,8 +471,13 @@ lớp công khai Bộ Hạ ASM Động {
     // Không được gộp qua bất kỳ điểm vào nào của đồ thị điều khiển.
     hàm riêng tư đánh dấu đích nhánh() {
         nguồn = mình.nguồn;
-        lặp(j = 0; j <= độ dài(nguồn); j++) { máy ảo thêm cuối danh sách(mình.đích nhánh, 0); };
-        lặp(j = 0; j < độ dài(nguồn); j++) {
+        n = độ dài(nguồn);
+        // Gán kết quả intrinsic và dùng phép gán cho bộ đếm: không giữ
+        // một giá trị null và một số nguyên trên stack cho mỗi bytecode.
+        lặp(j = 0; j <= n; j = j + 1) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.đích nhánh, 0);
+        };
+        lặp(j = 0; j < n; j = j + 1) {
             v = nguồn[j];
             tên = mình.tên mã[j];
             đích = -1;
@@ -646,6 +679,149 @@ lớp công khai Bộ Hạ ASM Động {
         trả về [đúng, bộ đếm, nguồn[từ + 2][1], giá trị,
             nguồn[từ + 7][1], nguồn[từ + 13][1], từ + 28];
     };
+    // Quét byte bất biến: thoát khi gặp byte ngoài khoảng hoặc một trong
+    // hai byte cấm. Chỉ nhận bytecode thuần, không dựa vào tên hàm.
+    hàm riêng tư vòng quét byte(từ) {
+        nguồn = mình.nguồn;
+        nếu (từ + 30 > độ dài(nguồn)) { trả về [sai]; };
+        đầu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI",
+            "OP_NHO_HON", "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_NEU"];
+        lặp(j = 0; j < 7; j++) {
+            nếu (mình.tên mã[từ + j] != đầu[j]) { trả về [sai]; };
+        };
+        vị = nguồn[từ + 1][2]; giới hạn = nguồn[từ + 2][2];
+        dữ liệu = nguồn[từ + 7][2];
+        nếu (vị < 0 || giới hạn < 0 || dữ liệu < 0 ||
+            vị == giới hạn || vị == dữ liệu || giới hạn == dữ liệu) { trả về [sai]; };
+        thấp = 0; cao = 255; cấm một = 256; cấm hai = 256;
+        số = 2;
+        tập = mình.tên mã[từ + 11] == "OP_KHAC_BANG";
+        nếu (mình.tên mã[từ + 11] == "OP_SO_SANH_BANG") { số = 3; };
+        nếu (tập) { số = 4; };
+        giữa = từ + 7;
+        lặp(j = 0; j < số; j++) {
+            nếu (giữa + 5 >= độ dài(nguồn)) { trả về [sai]; };
+            nếu (mình.tên mã[giữa] != "OP_TEN_BIEN_GIA_TRI" ||
+                mình.tên mã[giữa + 1] != "OP_TEN_BIEN_GIA_TRI" ||
+                mình.tên mã[giữa + 2] != "OP_DOC_CHI_SO" ||
+                mình.tên mã[giữa + 3] != "OP_BIEN_SO" ||
+                nguồn[giữa][2] != dữ liệu || nguồn[giữa + 1][2] != vị) { trả về [sai]; };
+            hằng = nguồn[giữa + 3][1]; phép = mình.tên mã[giữa + 4];
+            nếu (hằng < 0 || hằng > 255) { trả về [sai]; };
+            nếu (tập) {
+                nếu (phép != "OP_KHAC_BANG") { trả về [sai]; };
+                nếu (j == 0) { thấp = hằng; }
+                hoặc nếu (j == 1) { cao = hằng; }
+                hoặc nếu (j == 2) { cấm một = hằng; }
+                hoặc { cấm hai = hằng; };
+            } hoặc nếu (số == 2) {
+                nếu (j == 0 && phép == "OP_NHO_HON") { thấp = hằng; }
+                hoặc nếu (j == 1 && phép == "OP_LON_HON") { cao = hằng; }
+                hoặc { trả về [sai]; };
+            } hoặc {
+                nếu (j == 0 && phép == "OP_SO_SANH_BANG") { cấm một = hằng; }
+                hoặc nếu (j == 1 && phép == "OP_SO_SANH_BANG") { cấm hai = hằng; }
+                hoặc nếu (j == 2 && phép == "OP_NHO_HON") { thấp = hằng; }
+                hoặc { trả về [sai]; };
+            };
+            giữa += 5;
+            nếu (j > 0) {
+                nếu (tập) {
+                    nếu (mình.tên mã[giữa] != "OP_Logic_VA") { trả về [sai]; };
+                } hoặc nếu (mình.tên mã[giữa] != "OP_Logic_HOAC") { trả về [sai]; };
+                giữa += 1;
+            };
+        };
+        đuôi = ["OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_THOAT", "OP_DONG_KHOI",
+            "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_CONG", "OP_TEN_BIEN_ID",
+            "OP_GAN", "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_JUMP"];
+        đích = giữa + 12; trong = giữa + 4;
+        nếu (đích >= độ dài(nguồn)) { trả về [sai]; };
+        lặp(j = 0; j < 12; j++) {
+            nếu (mình.tên mã[giữa + j] != đuôi[j]) { trả về [sai]; };
+        };
+        nếu (nguồn[từ + 4][1] != đích || nguồn[giữa][1] != trong ||
+            nguồn[giữa + 2][1] != đích || nguồn[giữa + 2][2] >= 0 ||
+            nguồn[giữa + 4][2] != vị || nguồn[giữa + 5][1] != 1 ||
+            nguồn[giữa + 7][2] != vị || nguồn[giữa + 11][1] != từ) { trả về [sai]; };
+        lặp(j = từ + 1; j < đích; j++) {
+            nếu (j != trong && mình.đích nhánh[j] != 0) { trả về [sai]; };
+        };
+        // Điểm vào nội bộ chỉ được phép đến từ chính nhánh điều kiện.
+        lặp(j = 0; j < độ dài(nguồn); j++) {
+            nếu (j != giữa) {
+                tên = mình.tên mã[j]; nhánh = -1;
+                nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE" || tên == "OP_THOAT" ||
+                    tên == "OP_THU" || tên == "OP_THU_KET_THUC" || tên == "OP_CHON") { nhánh = nguồn[j][1]; }
+                hoặc nếu (tên == "OP_CA" || tên == "OP_MAC_DINH") { nhánh = nguồn[j][3]; }
+                hoặc nếu (tên == "OP_BO_QUA") { nhánh = mình.đích tiếp tục(j); };
+                nếu (nhánh == trong) { trả về [sai]; };
+            };
+        };
+        // Range âm mã hóa tập bốn byte cho phép, dùng chung ABI.
+        nếu (tập) {
+            trả về [đúng, vị, giới hạn, dữ liệu, -1 - thấp - cao * 256,
+                cấm một + cấm hai * 256, đích];
+        };
+        trả về [đúng, vị, giới hạn, dữ liệu, thấp + cao * 256,
+            cấm một + cấm hai * 512, đích];
+    };
+    // Nhận vòng tích lũy thập phân âm có kiểm tra i32 theo cấu trúc bytecode.
+    hàm riêng tư vòng quét thập phân(từ) {
+        nguồn = mình.nguồn;
+        đích = từ + 62;
+        nếu (đích >= độ dài(nguồn)) { trả về [sai]; };
+        mẫu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_NHO_HON", "OP_JUMP_IF_FALSE",
+            "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_DOC_CHI_SO", "OP_TEN_BIEN_ID",
+            "OP_GAN", "OP_NEU", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+            "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_LON_HON", "OP_Logic_HOAC", "OP_JUMP_IF_FALSE",
+            "OP_MO_KHOI", "OP_THOAT", "OP_DONG_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO",
+            "OP_TRU", "OP_TEN_BIEN_ID", "OP_GAN", "OP_NEU", "OP_TEN_BIEN_GIA_TRI",
+            "OP_BIEN_SO", "OP_NHO_HON", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_SO_SANH_BANG",
+            "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_LON_HON", "OP_Logic_VA", "OP_Logic_HOAC",
+            "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN",
+            "OP_THOAT", "OP_DONG_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHAN",
+            "OP_TEN_BIEN_GIA_TRI", "OP_TRU", "OP_TEN_BIEN_ID", "OP_GAN", "OP_TEN_BIEN_GIA_TRI",
+            "OP_BIEN_SO", "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN", "OP_DONG_KHOI",
+            "OP_CAP_NHAT", "OP_JUMP"];
+        lặp(j = 0; j < 62; j++) {
+            nếu (mình.tên mã[từ + j] != mẫu[j]) { trả về [sai]; };
+            nếu (j > 0 && j != 23 && j != 47 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
+        };
+        vị = nguồn[từ + 1][2]; giới hạn = nguồn[từ + 2][2];
+        dữ liệu = nguồn[từ + 6][2]; số = nguồn[từ + 9][2];
+        tổng = nguồn[từ + 29][2]; cờ = nguồn[từ + 43][2];
+        cuối = nguồn[từ + 36][2];
+        ô = [vị, giới hạn, dữ liệu, số, tổng, cờ, cuối];
+        lặp(j = 0; j < 7; j++) {
+            nếu (ô[j] < 0) { trả về [sai]; };
+            lặp(k = 0; k < j; k++) { nếu (ô[j] == ô[k]) { trả về [sai]; }; };
+        };
+        nếu (nguồn[từ + 7][2] != vị || nguồn[từ + 12][2] != số ||
+            nguồn[từ + 15][2] != số || nguồn[từ + 23][2] != số ||
+            nguồn[từ + 26][2] != số || nguồn[từ + 32][2] != tổng ||
+            nguồn[từ + 35][2] != số || nguồn[từ + 47][2] != tổng ||
+            nguồn[từ + 50][2] != số || nguồn[từ + 52][2] != tổng ||
+            nguồn[từ + 54][2] != vị || nguồn[từ + 57][2] != vị ||
+            nguồn[từ + 13][1] != 48 || nguồn[từ + 16][1] != 57 ||
+            nguồn[từ + 24][1] != 48 || nguồn[từ + 30][1] != -214748364 ||
+            nguồn[từ + 33][1] != -214748364 || nguồn[từ + 42][1] != 0 ||
+            nguồn[từ + 48][1] != 10 || nguồn[từ + 55][1] != 1 ||
+            nguồn[từ + 4][1] != đích || nguồn[từ + 19][1] != từ + 23 ||
+            nguồn[từ + 40][1] != từ + 47 || nguồn[từ + 21][1] != đích ||
+            nguồn[từ + 45][1] != đích || nguồn[từ + 21][2] != -3 ||
+            nguồn[từ + 45][2] != -3 || nguồn[từ + 61][1] != từ) { trả về [sai]; };
+        lặp(j = 0; j < độ dài(nguồn); j++) {
+            tên = mình.tên mã[j]; nhánh = -1;
+            nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE" || tên == "OP_THOAT" ||
+                tên == "OP_THU" || tên == "OP_THU_KET_THUC" || tên == "OP_CHON") { nhánh = nguồn[j][1]; }
+            hoặc nếu (tên == "OP_CA" || tên == "OP_MAC_DINH") { nhánh = nguồn[j][3]; }
+            hoặc nếu (tên == "OP_BO_QUA") { nhánh = mình.đích tiếp tục(j); };
+            nếu ((nhánh == từ + 23 && j != từ + 19) ||
+                (nhánh == từ + 47 && j != từ + 40)) { trả về [sai]; };
+        };
+        trả về [đúng, vị, giới hạn, dữ liệu, số, tổng, cờ, cuối, đích];
+    };
     // Vòng lặp số học đơn giản: x = x (+|-|*) hằng.
     // Chỉ tối ưu khi toàn bộ vùng có một điểm vào duy nhất.
     hàm riêng tư vòng đếm đơn giản(từ) {
@@ -697,6 +873,7 @@ lớp công khai Bộ Hạ ASM Động {
     // lại nguyên bytecode từ đầu vòng.
     hàm riêng tư vòng gập gọi i32(từ) {
         nguồn = mình.nguồn;
+        nếu (mình.vùng ngoại lệ) { trả về [sai]; };
         nếu (từ + 25 > độ dài(nguồn)) { trả về [sai]; };
         mẫu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_NHO_HON",
             "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI",
@@ -726,7 +903,8 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (đích + 1 >= độ dài(nguồn) ||
             mình.tên mã[đích] != "OP_TEN_BIEN_GIA_TRI" ||
             nguồn[đích][2] != tổng ||
-            mình.tên mã[đích + 1] != "OP_TRA_VE") {
+            mình.tên mã[đích + 1] != "OP_TRA_VE" ||
+            mình.đích nhánh[đích + 1] != 0) {
             trả về [sai];
         };
         trả về [đúng, bộ đếm, giới hạn, tổng, ô gọi, dữ liệu, hạt, chu kỳ, chia, đích];
@@ -735,6 +913,7 @@ lớp công khai Bộ Hạ ASM Động {
     // và trả về một giá trị được nạp tường minh.
     hàm riêng tư bỏ kết quả đếm(đích) {
         nguồn = mình.nguồn;
+        nếu (mình.vùng ngoại lệ) { trả về sai; };
         nếu (đích < 0 || đích >= độ dài(nguồn)) { trả về sai; };
         i = đích;
         khi (i < độ dài(nguồn)) {
@@ -751,6 +930,47 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (mình.đích nhánh[j] != 0) { trả về sai; };
         };
         trả về đúng;
+    };
+    // Chỉ bỏ kết quả ở update của một vòng for có thân tuyến tính,
+    // stack-neutral. Không được đọc giá trị tồn từ các vòng trước, nhảy
+    // vào giữa biểu thức, hoặc quan sát kết quả bằng implicit return.
+    hàm riêng tư cập nhật đếm chết(từ) {
+        nguồn = mình.nguồn; n = độ dài(nguồn);
+        nếu (từ < 1 || từ + 2 >= n) { trả về sai; };
+        nếu (mình.tên mã[từ - 1] != "OP_CAP_NHAT" || mình.tên mã[từ + 2] != "OP_JUMP" ||
+            mình.đích nhánh[từ - 1] != 0 || mình.đích nhánh[từ] != 0 ||
+            mình.đích nhánh[từ + 1] != 0 || mình.đích nhánh[từ + 2] != 0) { trả về sai; };
+        đầu = nguồn[từ + 2][1];
+        nếu (đầu < 0 || đầu + 5 >= từ - 1) { trả về sai; };
+        nếu (mình.tên mã[đầu] != "OP_DIEU_KIEN" ||
+            mình.tên mã[đầu + 1] != "OP_TEN_BIEN_GIA_TRI" || nguồn[đầu + 1][2] != nguồn[từ][2] ||
+            (mình.tên mã[đầu + 2] != "OP_BIEN_SO" && mình.tên mã[đầu + 2] != "OP_TEN_BIEN_GIA_TRI") ||
+            !mình.phép so sánh gộp(mình.tên mã[đầu + 3]) || mình.tên mã[đầu + 4] != "OP_JUMP_IF_FALSE" ||
+            nguồn[đầu + 4][1] != từ + 3 || mình.tên mã[đầu + 5] != "OP_MO_KHOI") { trả về sai; };
+        nếu (!mình.bỏ kết quả đếm(từ + 3)) { trả về sai; };
+        lặp(j = đầu + 1; j <= đầu + 4; j++) { nếu (mình.đích nhánh[j] != 0) { trả về sai; }; };
+        sâu = 0;
+        lặp(j = đầu + 5; j < từ - 1; j++) {
+            nếu (mình.đích nhánh[j] != 0) { trả về sai; };
+            tên = mình.tên mã[j];
+            nếu (tên == "OP_MO_KHOI" || tên == "OP_DONG_KHOI" || tên == "OP_DONG_LENH" || tên == "OP_KHOI_TAO") { bỏ qua; };
+            nếu (tên == "OP_BIEN_SO" || tên == "OP_BIEN_SO_FLOAT" || tên == "OP_CHUOI" ||
+                tên == "OP_RONG_GIA_TRI" || tên == "OP_DUNG_GIA_TRI" || tên == "OP_SAI_GIA_TRI" ||
+                tên == "OP_TEN_BIEN_GIA_TRI" || tên == "OP_TEN_BIEN_ID") { sâu += 1; bỏ qua; };
+            nếu (tên == "OP_GOI") {
+                số = nguồn[j][1]; nếu (số < 0 || sâu < số) { trả về sai; };
+                sâu = sâu - số + 1; bỏ qua;
+            };
+            nếu (tên == "OP_GAN") { nếu (sâu < 2) { trả về sai; }; sâu -= 2; bỏ qua; };
+            nếu (tên == "OP_IN") { nếu (sâu < 1) { trả về sai; }; sâu -= 1; bỏ qua; };
+            nếu (tên == "OP_KHONG" || tên == "OP_PHU_DINH") { nếu (sâu < 1) { trả về sai; }; bỏ qua; };
+            nếu (mình.phép toán i32(tên) != "" || tên == "OP_CHIA" || tên == "OP_MODULO" ||
+                tên == "OP_Logic_VA" || tên == "OP_Logic_HOAC") {
+                nếu (sâu < 2) { trả về sai; }; sâu -= 1; bỏ qua;
+            };
+            trả về sai;
+        };
+        trả về sâu == 0;
     };
     hàm riêng tư phép toán i32(tên) {
         chọn(tên) {
@@ -1009,12 +1229,42 @@ lớp công khai Bộ Hạ ASM Động {
         trả về cuối - từ + 1;
     };
     hàm công khai hạ() {
+        // Các lời gọi tạo IR là câu lệnh; không giữ kết quả trên stack
+        // khi hạ hàng nghìn opcode. Hàm luôn trả bản IR tường minh.
         nguồn = mình.nguồn;
-        mình.đánh dấu đích nhánh();
-        lặp(i = 0; i < độ dài(nguồn); i++) {
-            máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
+        bỏ kết quả = mình.đánh dấu đích nhánh();
+        lặp(i = 0; i < độ dài(nguồn); i = i + 1) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
             v = nguồn[i];
             tên = mình.tên mã[i];
+            // TYPE_OF + tên kiểu chuẩn + so sánh + nhánh: không tạo chuỗi tên kiểu.
+            // Hạ lời gọi tĩnh một đối số khi thân hàm đã được chứng minh chuyển tiếp TYPE_OF.
+            nếu (!lấy từ điển(mình.bảng i32, "compiler", sai) &&
+                tên == "OP_TEN_BIEN_GIA_TRI" && i + 4 < độ dài(nguồn)) {
+                nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
+                    mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0) {
+                    v2 = nguồn[i + 1]; v3 = nguồn[i + 2];
+                    v4 = nguồn[i + 3]; v5 = nguồn[i + 4];
+                    chuyển tiếp = sai;
+                    nếu (mình.tên mã[i + 1] == "OP_GOI" && v2[1] == 1 && v2[2] >= 0) {
+                        chuyển tiếp = lấy từ điển(mình.bảng i32, "type_forward:" + v2[2], sai);
+                    };
+                    nếu ((v2[0] == 145 || chuyển tiếp) && mình.tên mã[i + 2] == "OP_CHUOI" &&
+                        (mình.tên mã[i + 3] == "OP_SO_SANH_BANG" || mình.tên mã[i + 3] == "OP_KHAC_BANG") &&
+                        mình.tên mã[i + 4] == "OP_JUMP_IF_FALSE") {
+                        loại = lấy từ điển(mình.bảng i32, "type_kind:" + v3[2], -1);
+                        nếu (loại >= 0) {
+                            nếu (chuyển tiếp) {
+                                bỏ kết quả = mình.so sánh rồi nhảy("compare_type_forward_slot", [v[2], loại, v4[0]], v5[1]);
+                            } hoặc {
+                                bỏ kết quả = mình.so sánh rồi nhảy("compare_type_slot", [v[2], loại, v4[0]], v5[1]);
+                            };
+                            lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                            i += 4; bỏ qua;
+                        };
+                    };
+                };
+            };
             // Các matcher chỉ có thể bắt đầu bằng một lệnh nạp giá trị
             // hoặc OP_GOI không đối số. Bỏ qua lời gọi hàm/mẫu cho opcode
             // còn lại, vốn chiếm phần lớn các thân bytecode.
@@ -1039,16 +1289,16 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.bảng[đích gán[0]] == "OP_TEN_BIEN_ID" &&
                     mình.bảng[phép gán[0]] == "OP_GAN") {
-                    mình.gọi("copy_slot", [v[2], đích gán[2]]);
-                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
-                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    bỏ kết quả = mình.gọi("copy_slot", [v[2], đích gán[2]]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                     i += 2; bỏ qua;
                 };
             };
             // Gộp x = x op danh_sách[i], với op là cộng, trừ hoặc nhân.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 6 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 6; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 6; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                     v5 = nguồn[i + 4]; v6 = nguồn[i + 5]; v7 = nguồn[i + 6];
@@ -1059,8 +1309,8 @@ lớp công khai Bộ Hạ ASM Động {
                         (phép == "OP_CONG" || phép == "OP_TRU" || phép == "OP_NHAN") &&
                         mình.bảng[v6[0]] == "OP_TEN_BIEN_ID" && v6[2] == v[2] &&
                         mình.bảng[v7[0]] == "OP_GAN") {
-                        mình.gọi("index_update", [v[2], v2[2], v3[2], v5[0]]);
-                        lặp(j = 0; j < 6; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_update", [v[2], v2[2], v3[2], v5[0]]);
+                        lặp(j = 0; j < 6; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 6; bỏ qua;
                     };
                 };
@@ -1079,9 +1329,9 @@ lớp công khai Bộ Hạ ASM Động {
                         t3 == "OP_TEN_BIEN_GIA_TRI" && t4 == "OP_CONG" &&
                         v2[2] >= 0 && v3[2] >= 0 &&
                         v5[0] == biên dịch mã thao tác("OP_VM_LIST_APPEND")) {
-                        mình.gọi("list_append_add", [v[2], v2[2], v3[2]]);
-                        lặp(j = 0; j < 4; j++) {
-                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        bỏ kết quả = mình.gọi("list_append_add", [v[2], v2[2], v3[2]]);
+                        lặp(j = 0; j < 4; j = j + 1) {
+                            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         };
                         i += 4; bỏ qua;
                     };
@@ -1094,7 +1344,7 @@ lớp công khai Bộ Hạ ASM Động {
             nếu (!lấy từ điển(mình.bảng i32, "compiler", sai) &&
                 tên == "OP_TEN_BIEN_GIA_TRI" && i + 4 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 4; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 4; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     nguồn chữ = nguồn[i + 1]; chỉ số chữ = nguồn[i + 2];
                     đọc chữ = nguồn[i + 3]; lệnh phương thức = nguồn[i + 4];
@@ -1105,25 +1355,25 @@ lớp công khai Bộ Hạ ASM Động {
                         lệnh phương thức[1] == 1 &&
                         lấy từ điển(mình.bảng i32, "method_ascii:" + lệnh phương thức[2], sai)) {
                         // Đánh giá receiver trước source/index đúng thứ tự bytecode gốc.
-                        mình.gọi("load", [v[2]]);
-                        mình.phát("LoadSlot", 0, 0);
-                        mình.phát("PushConstant", lệnh phương thức[2]);
-                        mình.phát("PushConstant", lệnh phương thức[3]);
-                        mình.phát("PushConstant", nguồn chữ[2]);
-                        mình.phát("PushConstant", chỉ số chữ[2]);
-                        mình.phát("Call", 0, 5, "vpp_aot_fast_ascii_index_m1");
-                        mình.phát("StoreSlot", 0, 1); mình.phát("Drop");
-                        mình.phát("LoadSlot", 0, 1);
-                        chậm chữ = độ dài(mình.lệnh); mình.phát("BranchZero");
-                        mình.phát("LoadSlot", 0, 1); mình.phát("PushConstant", 1); mình.phát("Equal");
-                        máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh)); mình.phát("BranchZero");
-                        xong chữ = độ dài(mình.lệnh); mình.phát("Jump");
+                        bỏ kết quả = mình.gọi("load", [v[2]]);
+                        bỏ kết quả = mình.phát("LoadSlot", 0, 0);
+                        bỏ kết quả = mình.phát("PushConstant", lệnh phương thức[2]);
+                        bỏ kết quả = mình.phát("PushConstant", lệnh phương thức[3]);
+                        bỏ kết quả = mình.phát("PushConstant", nguồn chữ[2]);
+                        bỏ kết quả = mình.phát("PushConstant", chỉ số chữ[2]);
+                        bỏ kết quả = mình.phát("Call", 0, 5, "vpp_aot_fast_ascii_index_m1");
+                        bỏ kết quả = mình.phát("StoreSlot", 0, 1); bỏ kết quả = mình.phát("Drop");
+                        bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                        chậm chữ = độ dài(mình.lệnh); bỏ kết quả = mình.phát("BranchZero");
+                        bỏ kết quả = mình.phát("LoadSlot", 0, 1); bỏ kết quả = mình.phát("PushConstant", 1); bỏ kết quả = mình.phát("Equal");
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh)); bỏ kết quả = mình.phát("BranchZero");
+                        xong chữ = độ dài(mình.lệnh); bỏ kết quả = mình.phát("Jump");
                         mình.lệnh[chậm chữ]["operand"] = độ dài(mình.lệnh);
                         // Receiver vẫn còn trên stack khi selector trả 0.
-                        mình.gọi("index_slot", [nguồn chữ[2], chỉ số chữ[2], 1]);
-                        mình.gọi("method", [lệnh phương thức[2], 1, lệnh phương thức[3]]);
+                        bỏ kết quả = mình.gọi("index_slot", [nguồn chữ[2], chỉ số chữ[2], 1]);
+                        bỏ kết quả = mình.gọi("method", [lệnh phương thức[2], 1, lệnh phương thức[3]]);
                         mình.lệnh[xong chữ]["operand"] = độ dài(mình.lệnh);
-                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 4; bỏ qua;
                     };
                 };
@@ -1134,7 +1384,7 @@ lớp công khai Bộ Hạ ASM Động {
             // chuỗi và nhánh sai phải đi thẳng qua thân if.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 16 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 16; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 16; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; chia = nguồn[i + 3];
                     modulo = nguồn[i + 4]; phải = nguồn[i + 5]; so = nguồn[i + 6]; lệnh rẽ = nguồn[i + 7];
@@ -1157,8 +1407,8 @@ lớp công khai Bộ Hạ ASM Động {
                         mình.bảng[id đích[0]] == "OP_TEN_BIEN_ID" && id đích[2] == đích[2] &&
                         mình.bảng[gán[0]] == "OP_GAN" &&
                         mình.bảng[đóng[0]] == "OP_DONG_KHOI") {
-                        mình.gọi("index_mod_add_if_equal", [v[2], chỉ số[2], đích[2], chia[1], phải[1]]);
-                        lặp(j = 0; j < 16; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_mod_add_if_equal", [v[2], chỉ số[2], đích[2], chia[1], phải[1]]);
+                        lặp(j = 0; j < 16; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 16; bỏ qua;
                     };
                 };
@@ -1167,7 +1417,7 @@ lớp công khai Bộ Hạ ASM Động {
             // và kết quả so sánh động trong vòng lặp lọc số nguyên.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 6 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 6; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 6; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; chia = nguồn[i + 3];
                     modulo = nguồn[i + 4]; phải = nguồn[i + 5]; so = nguồn[i + 6];
@@ -1185,9 +1435,42 @@ lớp công khai Bộ Hạ ASM Động {
                         mặt nạ = 0; số = chỉ số[1];
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") { mặt nạ += 1; số = chỉ số[2]; };
                         nếu (tên so == "OP_KHAC_BANG") { mặt nạ += 2; };
-                        mình.gọi("index_mod_equal", [v[2], số, chia[1], phải[1], mặt nạ]);
-                        lặp(j = 0; j < 6; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_mod_equal", [v[2], số, chia[1], phải[1], mặt nạ]);
+                        lặp(j = 0; j < 6; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 6; bỏ qua;
+                    };
+                };
+            };
+            // container[ô + hằng] — giữ chỉ số i32 và hợp nhất store/nhánh.
+            // Không gộp khi có đích nhánh ở giữa các lệnh đã tiêu thụ.
+            nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 4 < độ dài(nguồn) &&
+                !lấy từ điển(mình.bảng i32, "compiler", sai)) {
+                liền mạch = đúng;
+                lặp(j = 1; j <= 4; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                nếu (liền mạch) {
+                    a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
+                    nếu (mình.bảng[a1[0]] == "OP_TEN_BIEN_GIA_TRI" &&
+                        mình.bảng[a2[0]] == "OP_BIEN_SO" && mình.bảng[a3[0]] == "OP_CONG" &&
+                        mình.bảng[a4[0]] == "OP_DOC_CHI_SO") {
+                        số lệnh = 4;
+                        nếu (i + 6 < độ dài(nguồn)) {
+                            nếu (mình.đích nhánh[i + 5] == 0 && mình.đích nhánh[i + 6] == 0 &&
+                                mình.bảng[nguồn[i + 5][0]] == "OP_TEN_BIEN_ID" && mình.bảng[nguồn[i + 6][0]] == "OP_GAN") {
+                                bỏ kết quả = mình.gọi("index_offset", [v[2], a1[2], a2[1], 1, nguồn[i + 5][2], 0]);
+                                số lệnh = 6;
+                            };
+                        };
+                        nếu (số lệnh == 4 && i + 7 < độ dài(nguồn)) {
+                            nếu (mình.đích nhánh[i + 5] == 0 && mình.đích nhánh[i + 6] == 0 &&
+                                mình.đích nhánh[i + 7] == 0 && mình.bảng[nguồn[i + 5][0]] == "OP_BIEN_SO" &&
+                                mình.phép so sánh gộp(mình.bảng[nguồn[i + 6][0]]) && mình.bảng[nguồn[i + 7][0]] == "OP_JUMP_IF_FALSE") {
+                                bỏ kết quả = mình.so sánh rồi nhảy("index_offset", [v[2], a1[2], a2[1], 2, nguồn[i + 5][1], nguồn[i + 6][0]], nguồn[i + 7][1]);
+                                số lệnh = 7;
+                            };
+                        };
+                        nếu (số lệnh == 4) { bỏ kết quả = mình.gọi("index_offset", [v[2], a1[2], a2[1], 0, 0, 0]); };
+                        lặp(j = 0; j < số lệnh; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        i += số lệnh; bỏ qua;
                     };
                 };
             };
@@ -1196,7 +1479,7 @@ lớp công khai Bộ Hạ ASM Động {
                 // Mẫu này phải chạy trước index_slot + assign_slot để tránh
                 // biến cục bộ quay lại đường giá trị động ngay trong parser.
                 liền mạch = đúng;
-                lặp(j = 1; j <= 4; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 4; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; đích = nguồn[i + 3]; gán = nguồn[i + 4];
                     tên chỉ số = mình.bảng[chỉ số[0]];
@@ -1207,8 +1490,8 @@ lớp công khai Bộ Hạ ASM Động {
                         tên đọc == "OP_DOC_CHI_SO" && tên đích == "OP_TEN_BIEN_ID" && tên gán == "OP_GAN") {
                         số = chỉ số[1]; là ô = 0;
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") { số = chỉ số[2]; là ô = 1; };
-                        mình.gọi("index_store_slot", [v[2], số, là ô, đích[2]]);
-                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_store_slot", [v[2], số, là ô, đích[2]]);
+                        lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 4; bỏ qua;
                     };
                 };
@@ -1217,7 +1500,7 @@ lớp công khai Bộ Hạ ASM Động {
             // source vẫn là i32; runtime giữ đường dự phòng cho kiểu động.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 5 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 5; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 5; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                     v5 = nguồn[i + 4]; v6 = nguồn[i + 5];
@@ -1229,8 +1512,8 @@ lớp công khai Bộ Hạ ASM Động {
                     nếu (t2 == "OP_BIEN_SO" && t3 == "OP_TEN_BIEN_GIA_TRI" &&
                         t4 == "OP_BIEN_SO" && mình.phép toán gộp(t5) &&
                         t6 == "OP_GAN_CHI_SO") {
-                        mình.gọi("index_store_integer_op", [v[2], v2[1], v3[2], v4[1], v5[0]]);
-                        lặp(j = 0; j < 5; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_store_integer_op", [v[2], v2[1], v3[2], v4[1], v5[0]]);
+                        lặp(j = 0; j < 5; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 5; bỏ qua;
                     };
                 };
@@ -1238,7 +1521,7 @@ lớp công khai Bộ Hạ ASM Động {
             // Gộp cùng một container[index] < thấp || container[index] > cao.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 11 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 11; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 11; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                     a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
@@ -1264,9 +1547,9 @@ lớp công khai Bộ Hạ ASM Động {
                         t10 == "OP_Logic_HOAC" && t11 == "OP_JUMP_IF_FALSE") {
                         số = a1[1]; là ô = 0;
                         nếu (t1 == "OP_TEN_BIEN_GIA_TRI") { số = a1[2]; là ô = 1; };
-                        mình.so sánh rồi nhảy("index_compare_integer_outside_range",
+                        bỏ kết quả = mình.so sánh rồi nhảy("index_compare_integer_outside_range",
                             [v[2], số, là ô, a3[1], a8[1]], a11[1]);
-                        lặp(j = 0; j < 11; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        lặp(j = 0; j < 11; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 11; bỏ qua;
                     };
                 };
@@ -1274,7 +1557,7 @@ lớp công khai Bộ Hạ ASM Động {
             // Gộp cùng một container[index] == a || container[index] == b.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 11 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 11; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 11; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                     a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
@@ -1300,9 +1583,9 @@ lớp công khai Bộ Hạ ASM Động {
                         t10 == "OP_Logic_HOAC" && t11 == "OP_JUMP_IF_FALSE") {
                         số = a1[1]; là ô = 0;
                         nếu (t1 == "OP_TEN_BIEN_GIA_TRI") { số = a1[2]; là ô = 1; };
-                        mình.so sánh rồi nhảy("index_compare_integer_pair",
+                        bỏ kết quả = mình.so sánh rồi nhảy("index_compare_integer_pair",
                             [v[2], số, là ô, a3[1], a8[1]], a11[1]);
-                        lặp(j = 0; j < 11; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        lặp(j = 0; j < 11; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 11; bỏ qua;
                     };
                 };
@@ -1322,8 +1605,8 @@ lớp công khai Bộ Hạ ASM Động {
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") { mặt nạ += 1; số = chỉ số[2]; };
                         nếu (tên phải == "OP_TEN_BIEN_GIA_TRI") { mặt nạ += 2; };
                         nếu (tên so == "OP_KHAC_BANG") { mặt nạ += 4; };
-                        mình.gọi("index_equal", [v[2], số, phải[2], mặt nạ]);
-                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("index_equal", [v[2], số, phải[2], mặt nạ]);
+                        lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 4; bỏ qua;
                     };
                 };
@@ -1332,7 +1615,7 @@ lớp công khai Bộ Hạ ASM Động {
             // Chỉ gộp khi không có nhánh vào giữa ba lệnh nguồn.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 5 < độ dài(nguồn)) {
                 liền mạch = đúng;
-                lặp(j = 1; j <= 5; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+                lặp(j = 1; j <= 5; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
                 nếu (liền mạch) {
                     chỉ số = nguồn[i + 1]; đọc = nguồn[i + 2]; phải = nguồn[i + 3];
                     so = nguồn[i + 4]; lệnh nhảy = nguồn[i + 5];
@@ -1346,9 +1629,9 @@ lớp công khai Bộ Hạ ASM Động {
                         mình.phép so sánh gộp(tên so) && tên nhảy == "OP_JUMP_IF_FALSE") {
                         số = chỉ số[1]; là ô = 0;
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") { số = chỉ số[2]; là ô = 1; };
-                        mình.so sánh rồi nhảy("index_compare_integer",
+                        bỏ kết quả = mình.so sánh rồi nhảy("index_compare_integer",
                             [v[2], số, là ô, phải[1], so[0]], lệnh nhảy[1]);
-                        lặp(j = 0; j < 5; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        lặp(j = 0; j < 5; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 5; bỏ qua;
                     };
                 };
@@ -1360,16 +1643,16 @@ lớp công khai Bộ Hạ ASM Động {
                     tên đọc = mình.bảng[đọc[0]];
                     nếu (tên đọc == "OP_DOC_CHI_SO") {
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI") {
-                            mình.gọi("index_slot", [v[2], chỉ số[2], 1]);
+                            bỏ kết quả = mình.gọi("index_slot", [v[2], chỉ số[2], 1]);
                         } hoặc nếu (tên chỉ số == "OP_BIEN_SO") {
-                            mình.gọi("index_slot", [v[2], chỉ số[1], 0]);
+                            bỏ kết quả = mình.gọi("index_slot", [v[2], chỉ số[1], 0]);
                         } hoặc nếu (tên chỉ số == "OP_CHUOI") {
-                            mình.gọi("index_string_slot", [v[2], chỉ số[2]]);
+                            bỏ kết quả = mình.gọi("index_string_slot", [v[2], chỉ số[2]]);
                         };
                         nếu (tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO" ||
                             tên chỉ số == "OP_CHUOI") {
-                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
-                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                             i += 2; bỏ qua;
                         };
                     };
@@ -1377,27 +1660,66 @@ lớp công khai Bộ Hạ ASM Động {
             };
             nếu (i >= mình.dự phòng đến && (tên == "OP_BIEN_SO" || tên == "OP_TEN_BIEN_GIA_TRI")) {
                 cuối = mình.cuối biểu thức i32(i);
-                nếu (cuối > i) { mình.phát biểu thức i32(i, cuối); };
+                nếu (cuối > i) { bỏ kết quả = mình.phát biểu thức i32(i, cuối); };
+            };
+            nếu (tên == "OP_DIEU_KIEN" && !lấy từ điển(mình.bảng i32, "compiler", sai)) {
+                thập phân = mình.vòng quét thập phân(i);
+                nếu (thập phân[0]) {
+                    bỏ kết quả = mình.gọi thô("decimal_scan_loop", [thập phân[1], thập phân[2], thập phân[3],
+                        thập phân[4], thập phân[5], thập phân[6], thập phân[7]]);
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
+                    hợp lệ thập phân = độ dài(mình.lệnh);
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
+                    mình.lệnh[hợp lệ thập phân]["operand"] = độ dài(mình.lệnh);
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), thập phân[8]]);
+                    bỏ kết quả = mình.phát("BranchZero");
+                    mình.vị trí[i] = độ dài(mình.lệnh);
+                };
+                quét = mình.vòng quét byte(i);
+                nếu (quét[0]) {
+                    bỏ kết quả = mình.gọi thô("byte_scan_loop", [quét[1], quét[2], quét[3], quét[4], quét[5]]);
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
+                    hợp lệ quét = độ dài(mình.lệnh);
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
+                    mình.lệnh[hợp lệ quét]["operand"] = độ dài(mình.lệnh);
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), quét[6]]);
+                    bỏ kết quả = mình.phát("BranchZero");
+                    mình.vị trí[i] = độ dài(mình.lệnh);
+                };
             };
             nếu (tên == "OP_DIEU_KIEN") {
                 vòng gọi = mình.vòng gập gọi i32(i);
                 nếu (vòng gọi[0]) {
                     gói vòng = vòng gọi[7] * 65536 + vòng gọi[8];
-                    mình.gọi thô("indirect_i32_fold_loop", [vòng gọi[1], vòng gọi[2],
+                    bỏ kết quả = mình.gọi thô("indirect_i32_fold_loop", [vòng gọi[1], vòng gọi[2],
                         vòng gọi[3], vòng gọi[4], vòng gọi[5], vòng gọi[6], gói vòng]);
-                    mình.phát("StoreSlot", 0, 1);
-                    mình.phát("Drop");
-                    mình.phát("LoadSlot", 0, 1);
-                    mình.phát("PushConstant", 2);
-                    mình.phát("Equal");
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
                     hợp lệ vòng gọi = độ dài(mình.lệnh);
-                    mình.phát("BranchZero");
-                    máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
-                    mình.phát("Jump");
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
                     mình.lệnh[hợp lệ vòng gọi]["operand"] = độ dài(mình.lệnh);
-                    mình.phát("LoadSlot", 0, 1);
-                    máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng gọi[9]]);
-                    mình.phát("BranchZero");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng gọi[9]]);
+                    bỏ kết quả = mình.phát("BranchZero");
                     // Guard chỉ thử một lần. Nếu callee/kiểu không phù hợp,
                     // cạnh lùi của vòng đi thẳng vào bytecode gốc.
                     mình.vị trí[i] = độ dài(mình.lệnh);
@@ -1413,8 +1735,8 @@ lớp công khai Bộ Hạ ASM Động {
                     sau = nguồn[i + 1];
                     tên sau = mình.bảng[sau[0]];
                     nếu (mình.đích nhánh[i + 1] == 0 && tên sau == "OP_GOI" && sau[1] == 1) {
-                        mình.gọi("call_small", [sau[2], 1, đầu, 0, mặt nạ]);
-                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        bỏ kết quả = mình.gọi("call_small", [sau[2], 1, đầu, 0, mặt nạ]);
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         i += 1; bỏ qua;
                     };
                 };
@@ -1427,9 +1749,9 @@ lớp công khai Bộ Hạ ASM Động {
                         tên sau == "OP_GOI" && sau[1] == 2) {
                         thứ hai = giữa[1];
                         nếu (tên giữa == "OP_TEN_BIEN_GIA_TRI") { thứ hai = giữa[2]; mặt nạ += 2; };
-                        mình.gọi("call_small", [sau[2], 2, đầu, thứ hai, mặt nạ]);
-                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
-                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        bỏ kết quả = mình.gọi("call_small", [sau[2], 2, đầu, thứ hai, mặt nạ]);
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         i += 2; bỏ qua;
                     };
                 };
@@ -1438,21 +1760,21 @@ lớp công khai Bộ Hạ ASM Động {
                 vòng dãy = mình.vòng dãy lọc tổng i32(i);
                 nếu (vòng dãy[0]) {
                     // 0=đã tính xong, 1=chạy bytecode gốc, 2=bắt lỗi.
-                    mình.gọi thô("range_mod_sum_i32_loop", [vòng dãy[1], vòng dãy[2],
+                    bỏ kết quả = mình.gọi thô("range_mod_sum_i32_loop", [vòng dãy[1], vòng dãy[2],
                         vòng dãy[3], vòng dãy[4], vòng dãy[5]]);
-                    mình.phát("StoreSlot", 0, 1);
-                    mình.phát("Drop");
-                    mình.phát("LoadSlot", 0, 1);
-                    mình.phát("PushConstant", 2);
-                    mình.phát("Equal");
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
                     thành công dãy = độ dài(mình.lệnh);
-                    mình.phát("BranchZero");
-                    máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
-                    mình.phát("Jump");
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
                     mình.lệnh[thành công dãy]["operand"] = độ dài(mình.lệnh);
-                    mình.phát("LoadSlot", 0, 1);
-                    máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng dãy[6]]);
-                    mình.phát("BranchZero");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng dãy[6]]);
+                    bỏ kết quả = mình.phát("BranchZero");
                 };
                 vòng danh sách = mình.vòng thêm danh sách(i);
                 kiểu danh sách = "list_append_i32_loop";
@@ -1475,20 +1797,20 @@ lớp công khai Bộ Hạ ASM Động {
                 };
                 nếu (vòng danh sách[0]) {
                     // 0=đã chạy hết vòng, 1=quay lại bytecode, 2=bắt lỗi.
-                    mình.gọi thô(kiểu danh sách, đối số danh sách);
-                    mình.phát("StoreSlot", 0, 1);
-                    mình.phát("Drop");
-                    mình.phát("LoadSlot", 0, 1);
-                    mình.phát("PushConstant", 2);
-                    mình.phát("Equal");
+                    bỏ kết quả = mình.gọi thô(kiểu danh sách, đối số danh sách);
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
                     thành công danh sách = độ dài(mình.lệnh);
-                    mình.phát("BranchZero");
-                    máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
-                    mình.phát("Jump");
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
                     mình.lệnh[thành công danh sách]["operand"] = độ dài(mình.lệnh);
-                    mình.phát("LoadSlot", 0, 1);
-                    máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), đích danh sách]);
-                    mình.phát("BranchZero");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), đích danh sách]);
+                    bỏ kết quả = mình.phát("BranchZero");
                     mình.vị trí[i] = độ dài(mình.lệnh);
                 };
             };
@@ -1506,20 +1828,20 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (vòng[0]) {
                     nếu (mình.bỏ kết quả đếm(vòng[6])) { kiểu vòng += "_tail"; };
                     // 0=thành công, 1=quay lại bytecode, 2=bắt lỗi.
-                    mình.gọi thô(kiểu vòng, [vòng[1], vòng[2], vòng[3], vòng[4], vòng[5]]);
-                    mình.phát("StoreSlot", 0, 1);
-                    mình.phát("Drop");
-                    mình.phát("LoadSlot", 0, 1);
-                    mình.phát("PushConstant", 2);
-                    mình.phát("Equal");
+                    bỏ kết quả = mình.gọi thô(kiểu vòng, [vòng[1], vòng[2], vòng[3], vòng[4], vòng[5]]);
+                    bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+                    bỏ kết quả = mình.phát("Drop");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = mình.phát("PushConstant", 2);
+                    bỏ kết quả = mình.phát("Equal");
                     thành công = độ dài(mình.lệnh);
-                    mình.phát("BranchZero");
-                    máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
-                    mình.phát("Jump");
+                    bỏ kết quả = mình.phát("BranchZero");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
                     mình.lệnh[thành công]["operand"] = độ dài(mình.lệnh);
-                    mình.phát("LoadSlot", 0, 1);
-                    máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng[6]]);
-                    mình.phát("BranchZero");
+                    bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng[6]]);
+                    bỏ kết quả = mình.phát("BranchZero");
                     // Nhánh quay lại luôn chạy bytecode gốc, tránh thử lại
                     // guard nếu giá trị đã đổi kiểu trong cùng một vòng.
                     mình.vị trí[i] = độ dài(mình.lệnh);
@@ -1533,9 +1855,9 @@ lớp công khai Bộ Hạ ASM Động {
                     nếu (t2 == "OP_BIEN_SO") {
                         kết quả = mình.gập hằng i32(t3, v[1], v2[1]);
                         nếu (kết quả[0]) {
-                            mình.gọi("integer", [kết quả[1]]);
-                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
-                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            bỏ kết quả = mình.gọi("integer", [kết quả[1]]);
+                            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                             i += 2; bỏ qua;
                         };
                     };
@@ -1548,9 +1870,9 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
                     mình.bảng[v2[0]] == "OP_TEN_BIEN_ID" &&
                     mình.bảng[v3[0]] == "OP_GAN") {
-                    mình.gọi("store_integer", [v2[2], v[1]]);
-                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
-                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    bỏ kết quả = mình.gọi("store_integer", [v2[2], v[1]]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                     i += 2; bỏ qua;
                 };
             };
@@ -1562,10 +1884,10 @@ lớp công khai Bộ Hạ ASM Động {
                     mình.bảng[v2[0]] == "OP_TEN_BIEN_GIA_TRI" &&
                     mình.bảng[v3[0]] == "OP_TRU" &&
                     mình.bảng[v4[0]] == "OP_TRA_VE") {
-                    mình.gọi("return_negated_slot", [v2[2]]);
-                    máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
-                    mình.phát("Jump");
-                    lặp(j = 0; j < 3; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                    bỏ kết quả = mình.gọi("return_negated_slot", [v2[2]]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
+                    lặp(j = 0; j < 3; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                     i += 3; bỏ qua;
                 };
             };
@@ -1576,13 +1898,13 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0 &&
                     mình.tên mã[i + 1] == "OP_TRA_VE") {
                     nếu (tên == "OP_BIEN_SO") {
-                        mình.gọi("return_integer", [v[1]]);
+                        bỏ kết quả = mình.gọi("return_integer", [v[1]]);
                     } hoặc {
-                        mình.gọi("return_slot", [v[2]]);
+                        bỏ kết quả = mình.gọi("return_slot", [v[2]]);
                     };
-                    máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
-                    mình.phát("Jump");
-                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
+                    bỏ kết quả = mình.phát("Jump");
+                    bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                     i += 1; bỏ qua;
                 };
               };
@@ -1600,13 +1922,13 @@ lớp công khai Bộ Hạ ASM Động {
                     mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0 &&
                     mình.phép toán gộp(t3) && t4 == "OP_TEN_BIEN_ID" && t5 == "OP_GAN") {
                     nếu (t2 == "OP_BIEN_SO") {
-                        mình.gọi("update_integer_slot", [v[2], v2[1], v3[0], v4[2]]);
-                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("update_integer_slot", [v[2], v2[1], v3[0], v4[2]]);
+                        lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 4; bỏ qua;
                     };
                     nếu (t2 == "OP_TEN_BIEN_GIA_TRI") {
-                        mình.gọi("update_numeric_slots", [v[2], v2[2], v3[0], v4[2]]);
-                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.gọi("update_numeric_slots", [v[2], v2[2], v3[0], v4[2]]);
+                        lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 4; bỏ qua;
                     };
                 };
@@ -1616,15 +1938,17 @@ lớp công khai Bộ Hạ ASM Động {
                 nếu (mình.đích nhánh[i + 1] == 0) {
                     t2 = mình.tên mã[i + 1];
                     nếu (t2 == "OP_GAN") {
-                        mình.gọi("assign_slot", [v[2]]);
-                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        bỏ kết quả = mình.gọi("assign_slot", [v[2]]);
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         i += 1; bỏ qua;
                     };
                     nếu (t2 == "OP_CONG_MOT" || t2 == "OP_TRU_MOT") {
                         delta = 1;
                         nếu (t2 == "OP_TRU_MOT") { delta = -1; };
-                        mình.gọi("increment_slot", [v[2], delta]);
-                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        tên tăng = "increment_slot";
+                        nếu (mình.cập nhật đếm chết(i)) { tên tăng = "increment_slot_discard"; };
+                        bỏ kết quả = mình.gọi(tên tăng, [v[2], delta]);
+                        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         i += 1; bỏ qua;
                     };
                 };
@@ -1634,7 +1958,7 @@ lớp công khai Bộ Hạ ASM Động {
             // một khối riêng trước khi đọc ba phần tử kế tiếp.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 7 < độ dài(nguồn)) {
               hợp lệ = đúng;
-              lặp(j = 1; j <= 7; j++) {
+              lặp(j = 1; j <= 7; j = j + 1) {
                   nếu (mình.đích nhánh[i + j] != 0) { hợp lệ = sai; };
               };
               nếu (hợp lệ) {
@@ -1651,8 +1975,8 @@ lớp công khai Bộ Hạ ASM Động {
                     t4 == "OP_TEN_BIEN_GIA_TRI" && v4[2] == v[2] &&
                     t5 == "OP_BIEN_SO" && t6 == "OP_NHO_HON_HOAC_BANG" &&
                     t7 == "OP_Logic_VA" && t8 == "OP_JUMP_IF_FALSE") {
-                    mình.so sánh rồi nhảy("compare_integer_range", [v[2], v2[1], v5[1]], v8[1]);
-                    lặp(j = 0; j < 7; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                    bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_range", [v[2], v2[1], v5[1]], v8[1]);
+                    lặp(j = 0; j < 7; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                     i += 7; bỏ qua;
                 };
               };
@@ -1661,7 +1985,7 @@ lớp công khai Bộ Hạ ASM Động {
             // Đường dự phòng runtime vẫn đánh giá đủ hai vế theo ngữ nghĩa V++.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 7 < độ dài(nguồn)) {
               liền mạch = đúng;
-              lặp(j = 1; j <= 7; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+              lặp(j = 1; j <= 7; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
               nếu (liền mạch) {
                 v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
                 v5 = nguồn[i + 4]; v6 = nguồn[i + 5]; v7 = nguồn[i + 6]; v8 = nguồn[i + 7];
@@ -1676,8 +2000,8 @@ lớp công khai Bộ Hạ ASM Động {
                     t4 == "OP_TEN_BIEN_GIA_TRI" && v4[2] == v[2] &&
                     t5 == "OP_BIEN_SO" && t6 == "OP_LON_HON" &&
                     t7 == "OP_Logic_HOAC" && t8 == "OP_JUMP_IF_FALSE") {
-                    mình.so sánh rồi nhảy("compare_integer_outside_range", [v[2], v2[1], v5[1]], v8[1]);
-                    lặp(j = 0; j < 7; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                    bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_outside_range", [v[2], v2[1], v5[1]], v8[1]);
+                    lặp(j = 0; j < 7; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                     i += 7; bỏ qua;
                 };
               };
@@ -1686,7 +2010,7 @@ lớp công khai Bộ Hạ ASM Động {
             // trong một helper i32, vẫn giữ đầy đủ đánh giá eager của V++.
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 11 < độ dài(nguồn)) {
               liền mạch = đúng;
-              lặp(j = 1; j <= 11; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+              lặp(j = 1; j <= 11; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
               nếu (liền mạch) {
                 a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                 a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
@@ -1709,16 +2033,16 @@ lớp công khai Bộ Hạ ASM Động {
                     t7 == "OP_BIEN_SO" && t8 == "OP_NHO_HON_HOAC_BANG" &&
                     t9 == "OP_Logic_VA" && t10 == "OP_Logic_HOAC" &&
                     t11 == "OP_JUMP_IF_FALSE") {
-                    mình.so sánh rồi nhảy("compare_integer_or_range",
+                    bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_or_range",
                         [v[2], a1[1], a4[1], a7[1]], lệnh nhảy[1]);
-                    lặp(j = 0; j < 11; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                    lặp(j = 0; j < 11; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                     i += 11; bỏ qua;
                 };
               };
             };
             nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 11 < độ dài(nguồn)) {
               liền mạch = đúng;
-              lặp(j = 1; j <= 11; j++) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
+              lặp(j = 1; j <= 11; j = j + 1) { nếu (mình.đích nhánh[i + j] != 0) { liền mạch = sai; }; };
               nếu (liền mạch) {
                 a1 = nguồn[i + 1]; a2 = nguồn[i + 2]; a3 = nguồn[i + 3]; a4 = nguồn[i + 4];
                 a5 = nguồn[i + 5]; a6 = nguồn[i + 6]; a7 = nguồn[i + 7]; a8 = nguồn[i + 8];
@@ -1740,9 +2064,9 @@ lớp công khai Bộ Hạ ASM Động {
                     t6 == "OP_TEN_BIEN_GIA_TRI" && t7 == "OP_TEN_BIEN_GIA_TRI" &&
                     mình.phép so sánh gộp(t8) && t9 == "OP_Logic_VA" &&
                     t10 == "OP_Logic_HOAC" && t11 == "OP_JUMP_IF_FALSE") {
-                    mình.so sánh rồi nhảy("compare_integer_or_and",
+                    bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_or_and",
                         [v[2], a1[1], a2[0], a6[2], a7[2], a8[0]], lệnh nhảy[1]);
-                    lặp(j = 0; j < 11; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                    lặp(j = 0; j < 11; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                     i += 11; bỏ qua;
                 };
               };
@@ -1752,9 +2076,9 @@ lớp công khai Bộ Hạ ASM Động {
               nếu (tập == rỗng) { tập = mình.so sánh tập số nguyên(i, 3); };
               nếu (tập == rỗng) { tập = mình.so sánh tập số nguyên(i, 2); };
               nếu (tập != rỗng) {
-                  mình.so sánh rồi nhảy("compare_integer_set",
+                  bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_set",
                       [tập[1], tập[0], tập[2], tập[3], tập[4], tập[5]], tập[6]);
-                  lặp(j = 0; j < tập[7]; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                  lặp(j = 0; j < tập[7]; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                   i += tập[7]; bỏ qua;
               };
             };
@@ -1770,8 +2094,8 @@ lớp công khai Bộ Hạ ASM Động {
                   nếu (t2 == "OP_PHU_DINH" && t3 == "OP_TEN_BIEN_GIA_TRI" &&
                       t4 == "OP_Logic_VA" && t5 == "OP_JUMP_IF_FALSE") {
                       // Helper vẫn đánh giá cả hai vế theo đúng thứ tự của V++.
-                      mình.so sánh rồi nhảy("not_slot_and", [v[2], v3[2]], v5[1]);
-                      lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                      bỏ kết quả = mình.so sánh rồi nhảy("not_slot_and", [v[2], v3[2]], v5[1]);
+                      lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                       i += 4; bỏ qua;
                   };
                 };
@@ -1792,8 +2116,8 @@ lớp công khai Bộ Hạ ASM Động {
                   nếu (t2 == "OP_TEN_BIEN_GIA_TRI" && mình.phép so sánh gộp(t3) &&
                       t4 == "OP_TEN_BIEN_GIA_TRI" && t5 == "OP_Logic_VA" &&
                       t6 == "OP_JUMP_IF_FALSE") {
-                      mình.so sánh rồi nhảy("compare_numeric_slots_and", [v[2], v2[2], v3[0], v4[2]], v6[1]);
-                      lặp(j = 0; j < 5; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                      bỏ kết quả = mình.so sánh rồi nhảy("compare_numeric_slots_and", [v[2], v2[2], v3[0], v4[2]], v6[1]);
+                      lặp(j = 0; j < 5; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                       i += 5; bỏ qua;
                   };
                 };
@@ -1806,13 +2130,13 @@ lớp công khai Bộ Hạ ASM Động {
                 t4 = mình.bảng[v4[0]];
                 nếu (mình.phép so sánh gộp(t3) && t4 == "OP_JUMP_IF_FALSE") {
                     nếu (t2 == "OP_BIEN_SO") {
-                        mình.so sánh rồi nhảy("compare_integer_slot", [v[2], v2[1], v3[0]], v4[1]);
-                        lặp(j = 0; j < 3; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.so sánh rồi nhảy("compare_integer_slot", [v[2], v2[1], v3[0]], v4[1]);
+                        lặp(j = 0; j < 3; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 3; bỏ qua;
                     };
                     nếu (t2 == "OP_TEN_BIEN_GIA_TRI") {
-                        mình.so sánh rồi nhảy("compare_numeric_slots", [v[2], v2[2], v3[0]], v4[1]);
-                        lặp(j = 0; j < 3; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        bỏ kết quả = mình.so sánh rồi nhảy("compare_numeric_slots", [v[2], v2[2], v3[0]], v4[1]);
+                        lặp(j = 0; j < 3; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
                         i += 3; bỏ qua;
                     };
                 };
@@ -1822,21 +2146,21 @@ lớp công khai Bộ Hạ ASM Động {
                 ca "OP_HAM": {} ca "OP_NEU": {} ca "OP_DIEU_KIEN": {} ca "OP_LAP": {}
                 ca "OP_CAP_NHAT": {} ca "OP_DONG_LENH": {} ca "OP_MO_NGOAC": {}
                 ca "OP_DONG_NGOAC": {} ca "OP_MO_KHOI": {} ca "OP_DONG_KHOI": {}
-                ca "OP_BIEN_SO": { mình.gọi("integer", [v[1]]); }
-                ca "OP_TEN_BIEN_ID": { mình.gọi("integer", [v[2]]); }
+                ca "OP_BIEN_SO": { bỏ kết quả = mình.gọi("integer", [v[1]]); }
+                ca "OP_TEN_BIEN_ID": { bỏ kết quả = mình.gọi("integer", [v[2]]); }
                 ca "OP_TEN_BIEN_GIA_TRI": {
                     ô nhanh = lấy từ điển(mình.ô nội tuyến, "" + v[2], rỗng);
                     nếu (ô nhanh != rỗng) {
-                        mình.gọi("load_inline", [v[2], ô nhanh[0], ô nhanh[1]]);
+                        bỏ kết quả = mình.gọi("load_inline", [v[2], ô nhanh[0], ô nhanh[1]]);
                     } hoặc {
-                        mình.gọi("load", [v[2]]);
+                        bỏ kết quả = mình.gọi("load", [v[2]]);
                     };
                 }
-                ca "OP_CHUOI": { mình.gọi("string", [v[2]]); }
-                ca "OP_BIEN_SO_FLOAT": { mình.gọi("floating", [v[2]]); }
-                ca "OP_RONG_GIA_TRI": { mình.gọi("null"); }
-                ca "OP_DUNG_GIA_TRI": { mình.gọi("integer", [1]); }
-                ca "OP_SAI_GIA_TRI": { mình.gọi("integer", [0]); }
+                ca "OP_CHUOI": { bỏ kết quả = mình.gọi("string", [v[2]]); }
+                ca "OP_BIEN_SO_FLOAT": { bỏ kết quả = mình.gọi("floating", [v[2]]); }
+                ca "OP_RONG_GIA_TRI": { bỏ kết quả = mình.gọi("null"); }
+                ca "OP_DUNG_GIA_TRI": { bỏ kết quả = mình.gọi("integer", [1]); }
+                ca "OP_SAI_GIA_TRI": { bỏ kết quả = mình.gọi("integer", [0]); }
                 ca "OP_KHOI_TAO": {
                     // Tham số kế tiếp tự tạo binding; bỏ ô tạm để tham số
                     // i32 có thể lưu trực tiếp trong khung hàm.
@@ -1847,105 +2171,106 @@ lớp công khai Bộ Hạ ASM Động {
                             bỏ khởi tạo = tên sau == "OP_PARAM" || tên sau == "OP_PARAM_MAC_DINH";
                         };
                     };
-                    nếu (!bỏ khởi tạo) { mình.gọi("initialize", [v[2]]); };
+                    nếu (!bỏ khởi tạo) { bỏ kết quả = mình.gọi("initialize", [v[2]]); };
                 }
-                ca "OP_GAN": { mình.gọi("assign"); }
-                ca "OP_PARAM": { mình.gọi("parameter", [v[2], v[3], -1]); }
-                ca "OP_PARAM_MAC_DINH": { mình.gọi("parameter", [v[2], v[3], v[1]]); }
-                ca "OP_CONG_MOT": { mình.gọi("increment", [1]); }
-                ca "OP_TRU_MOT": { mình.gọi("increment", [-1]); }
-                ca "OP_CONG": { mình.gọi("binary", [v[0]]); }
-                ca "OP_TRU": { mình.gọi("binary", [v[0]]); }
-                ca "OP_NHAN": { mình.gọi("binary", [v[0]]); }
-                ca "OP_CHIA": { mình.gọi("binary", [v[0]]); }
-                ca "OP_BIT_VA": { mình.gọi("binary", [v[0]]); }
-                ca "OP_BIT_HOAC": { mình.gọi("binary", [v[0]]); }
-                ca "OP_BIT_XOR": { mình.gọi("binary", [v[0]]); }
-                ca "OP_DICH_TRAI": { mình.gọi("binary", [v[0]]); }
-                ca "OP_DICH_PHAI": { mình.gọi("binary", [v[0]]); }
-                ca "OP_MODULO": { mình.gọi("binary", [v[0]]); }
-                ca "OP_Logic_VA": { mình.gọi("binary", [v[0]]); }
-                ca "OP_Logic_HOAC": { mình.gọi("binary", [v[0]]); }
-                ca "OP_SO_SANH_BANG": { mình.gọi("binary", [v[0]]); }
-                ca "OP_KHAC_BANG": { mình.gọi("binary", [v[0]]); }
-                ca "OP_LON_HON": { mình.gọi("binary", [v[0]]); }
-                ca "OP_NHO_HON": { mình.gọi("binary", [v[0]]); }
-                ca "OP_LON_HON_HOAC_BANG": { mình.gọi("binary", [v[0]]); }
-                ca "OP_NHO_HON_HOAC_BANG": { mình.gọi("binary", [v[0]]); }
-                ca "OP_KHONG": { mình.gọi("negate"); }
-                ca "OP_PHU_DINH": { mình.gọi("negate"); }
-                ca "OP_LIST_LITERAL": { mình.gọi("list", [v[1], v[2]]); }
-                ca "OP_MAP_LITERAL": { mình.gọi("map", [v[1], v[2]]); }
-                ca "OP_DOC_CHI_SO": { mình.gọi("index"); }
-                ca "OP_GAN_CHI_SO": { mình.gọi("set_index"); }
-                ca "OP_GOI": { mình.gọi("call", [v[2], v[1]]); }
-                ca "OP_GOI_LOI_BAN_DIA": { mình.gọi("native_core", [v[2], v[1]]); }
-                ca "OP_GOI_GIAN_TIEP": { nếu (!mình.gọi vô hộp(v, sai)) { mình.gọi("indirect", [v[1]]); }; }
-                ca "OP_TAO_DONG_BAO": { mình.gọi("closure", [v[1], v[2]]); }
-                ca "OP_TAO_LOP": { mình.gọi("define_class", [v[2], v[3]]); }
-                ca "OP_THEM_PHUONG_THUC": { mình.gọi("define_method", [v[1], v[2], v[3]]); }
-                ca "OP_TAO_DOI_TUONG": { mình.gọi("construct", [v[2], v[1]]); }
-                ca "OP_DOC_THUOC_TINH": { mình.gọi("property", [v[2], 0]); }
-                ca "OP_GAN_THUOC_TINH": { mình.gọi("property", [v[2], 1]); }
-                ca "OP_GOI_PHUONG_THUC": { nếu (!mình.gọi vô hộp(v, đúng)) { mình.gọi("method", [v[2], v[1], v[3]]); }; }
-                ca "OP_IN": { mình.gọi("print"); }
-                ca "OP_TRA_VE": { mình.gọi("return_value"); máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); mình.phát("Jump"); }
-                ca "OP_DUNG_CHUONG_TRINH": { mình.gọi("return_value"); máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); mình.phát("Jump"); }
-                ca "OP_JUMP": { mình.nhảy(v[1], i); }
-                ca "OP_JUMP_IF_FALSE": { mình.gọi("condition"); mình.điều kiện(v[1]); }
-                ca "OP_BO_QUA": { mình.nhảy(mình.đích tiếp tục(i), i); }
+                ca "OP_GAN": { bỏ kết quả = mình.gọi("assign"); }
+                ca "OP_PARAM": { bỏ kết quả = mình.gọi("parameter", [v[2], v[3], -1]); }
+                ca "OP_PARAM_MAC_DINH": { bỏ kết quả = mình.gọi("parameter", [v[2], v[3], v[1]]); }
+                ca "OP_CONG_MOT": { bỏ kết quả = mình.gọi("increment", [1]); }
+                ca "OP_TRU_MOT": { bỏ kết quả = mình.gọi("increment", [-1]); }
+                ca "OP_CONG": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_TRU": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_NHAN": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_CHIA": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_BIT_VA": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_BIT_HOAC": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_BIT_XOR": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_DICH_TRAI": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_DICH_PHAI": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_MODULO": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_Logic_VA": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_Logic_HOAC": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_SO_SANH_BANG": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_KHAC_BANG": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_LON_HON": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_NHO_HON": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_LON_HON_HOAC_BANG": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_NHO_HON_HOAC_BANG": { bỏ kết quả = mình.gọi("binary", [v[0]]); }
+                ca "OP_KHONG": { bỏ kết quả = mình.gọi("negate"); }
+                ca "OP_PHU_DINH": { bỏ kết quả = mình.gọi("negate"); }
+                ca "OP_LIST_LITERAL": { bỏ kết quả = mình.gọi("list", [v[1], v[2]]); }
+                ca "OP_MAP_LITERAL": { bỏ kết quả = mình.gọi("map", [v[1], v[2]]); }
+                ca "OP_DOC_CHI_SO": { bỏ kết quả = mình.gọi("index"); }
+                ca "OP_GAN_CHI_SO": { bỏ kết quả = mình.gọi("set_index"); }
+                ca "OP_GOI": { bỏ kết quả = mình.gọi("call", [v[2], v[1]]); }
+                ca "OP_GOI_LOI_BAN_DIA": { bỏ kết quả = mình.gọi("native_core", [v[2], v[1]]); }
+                ca "OP_GOI_GIAN_TIEP": { nếu (!mình.gọi vô hộp(v, sai)) { bỏ kết quả = mình.gọi("indirect", [v[1]]); }; }
+                ca "OP_TAO_DONG_BAO": { bỏ kết quả = mình.gọi("closure", [v[1], v[2]]); }
+                ca "OP_TAO_LOP": { bỏ kết quả = mình.gọi("define_class", [v[2], v[3]]); }
+                ca "OP_THEM_PHUONG_THUC": { bỏ kết quả = mình.gọi("define_method", [v[1], v[2], v[3]]); }
+                ca "OP_TAO_DOI_TUONG": { bỏ kết quả = mình.gọi("construct", [v[2], v[1]]); }
+                ca "OP_DOC_THUOC_TINH": { bỏ kết quả = mình.gọi("property", [v[2], 0]); }
+                ca "OP_GAN_THUOC_TINH": { bỏ kết quả = mình.gọi("property", [v[2], 1]); }
+                ca "OP_GOI_PHUONG_THUC": { nếu (!mình.gọi vô hộp(v, đúng)) { bỏ kết quả = mình.gọi("method", [v[2], v[1], v[3]]); }; }
+                ca "OP_IN": { bỏ kết quả = mình.gọi("print"); }
+                ca "OP_TRA_VE": { bỏ kết quả = mình.gọi("return_value"); bỏ kết quả = máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); bỏ kết quả = mình.phát("Jump"); }
+                ca "OP_DUNG_CHUONG_TRINH": { bỏ kết quả = mình.gọi("return_value"); bỏ kết quả = máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); bỏ kết quả = mình.phát("Jump"); }
+                ca "OP_JUMP": { bỏ kết quả = mình.nhảy(v[1], i); }
+                ca "OP_JUMP_IF_FALSE": { bỏ kết quả = mình.gọi("condition"); bỏ kết quả = mình.điều kiện(v[1]); }
+                ca "OP_BO_QUA": { bỏ kết quả = mình.nhảy(mình.đích tiếp tục(i), i); }
                 ca "OP_THOAT": {
                     đích = v[1];
                     nếu (v[2] >= 0) {
                         nếu (độ dài(mình.chuyển) == 0) { ném "AOT V++: break outside switch"; };
                         đích = mình.chuyển[độ dài(mình.chuyển) - 1];
                     };
-                    mình.nhảy(đích, i);
+                    bỏ kết quả = mình.nhảy(đích, i);
                 }
-                ca "OP_CHON": { máy ảo thêm cuối danh sách(mình.chuyển, v[1]); mình.gọi("switch_begin"); }
-                ca "OP_CA": { mình.gọi("case", [v[1], v[2]]); mình.điều kiện(v[3]); }
-                ca "OP_MAC_DINH": { mình.gọi("default"); mình.điều kiện(v[3]); }
+                ca "OP_CHON": { bỏ kết quả = máy ảo thêm cuối danh sách(mình.chuyển, v[1]); bỏ kết quả = mình.gọi("switch_begin"); }
+                ca "OP_CA": { bỏ kết quả = mình.gọi("case", [v[1], v[2]]); bỏ kết quả = mình.điều kiện(v[3]); }
+                ca "OP_MAC_DINH": { bỏ kết quả = mình.gọi("default"); bỏ kết quả = mình.điều kiện(v[3]); }
                 ca "OP_KET_THUC_CHUYEN": {
                     nếu (độ dài(mình.chuyển) == 0) { ném "AOT V++: switch end"; };
-                    máy ảo xóa vị trí danh sách(mình.chuyển, độ dài(mình.chuyển) - 1);
-                    mình.gọi("switch_end");
+                    bỏ kết quả = máy ảo xóa vị trí danh sách(mình.chuyển, độ dài(mình.chuyển) - 1);
+                    bỏ kết quả = mình.gọi("switch_end");
                 }
-                ca "OP_THU": { máy ảo thêm cuối danh sách(mình.bắt, v[1]); mình.gọi("try_begin", [v[1], v[2]]); }
-                ca "OP_THU_KET_THUC": { mình.gọi("try_end"); mình.nhảy(v[1], i); }
-                ca "OP_BAT_LOI": { mình.gọi("catch_value", [v[2]]); }
-                ca "OP_NEM": { mình.gọi("throw_value"); }
-                ca "OP_FFI_CALL": { mình.gọi("foreign", [v[2], v[1]]); }
-                ca "intrinsic": { mình.gọi("intrinsic", [v[0]]); }
+                ca "OP_THU": { bỏ kết quả = máy ảo thêm cuối danh sách(mình.bắt, v[1]); bỏ kết quả = mình.gọi("try_begin", [v[1], v[2]]); }
+                ca "OP_THU_KET_THUC": { bỏ kết quả = mình.gọi("try_end"); bỏ kết quả = mình.nhảy(v[1], i); }
+                ca "OP_BAT_LOI": { bỏ kết quả = mình.gọi("catch_value", [v[2]]); }
+                ca "OP_NEM": { bỏ kết quả = mình.gọi("throw_value"); }
+                ca "OP_FFI_CALL": { bỏ kết quả = mình.gọi("foreign", [v[2], v[1]]); }
+                ca "intrinsic": { bỏ kết quả = mình.gọi("intrinsic", [v[0]]); }
                 mặc định: { ném "AOT V++: unsupported opcode " + v[0]; }
             };
         };
-        máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
-        máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
-        mình.phát("Jump");
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
+        // Như VM V++/ASM, kết thúc hàm không có trả về giữ kết quả rỗng.
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
+        bỏ kết quả = mình.phát("Jump");
         lỗi = độ dài(mình.lệnh);
-        mình.gọi thô("handle_error");
-        mình.phát("StoreSlot", 0, 1);
-        mình.phát("Drop");
-        lặp(i = 0; i < độ dài(mình.bắt); i++) {
-            mình.phát("LoadSlot", 0, 1);
-            mình.phát("PushConstant", mình.bắt[i]);
-            mình.phát("Equal");
+        bỏ kết quả = mình.gọi thô("handle_error");
+        bỏ kết quả = mình.phát("StoreSlot", 0, 1);
+        bỏ kết quả = mình.phát("Drop");
+        lặp(i = 0; i < độ dài(mình.bắt); i = i + 1) {
+            bỏ kết quả = mình.phát("LoadSlot", 0, 1);
+            bỏ kết quả = mình.phát("PushConstant", mình.bắt[i]);
+            bỏ kết quả = mình.phát("Equal");
             bỏ = độ dài(mình.lệnh);
-            mình.phát("BranchZero");
-            máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), mình.bắt[i]]);
-            mình.phát("Jump");
+            bỏ kết quả = mình.phát("BranchZero");
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), mình.bắt[i]]);
+            bỏ kết quả = mình.phát("Jump");
             mình.lệnh[bỏ]["operand"] = độ dài(mình.lệnh);
         };
         xong = độ dài(mình.lệnh);
-        mình.phát("PushConstant", 0);
-        mình.phát("Return");
-        lặp(i = 0; i < độ dài(mình.vá); i++) {
+        bỏ kết quả = mình.phát("PushConstant", 0);
+        bỏ kết quả = mình.phát("Return");
+        lặp(i = 0; i < độ dài(mình.vá); i = i + 1) {
             vá = mình.vá[i];
             nếu (vá[1] < 0 || vá[1] > độ dài(nguồn)) { ném "AOT V++: branch target"; };
             mình.lệnh[vá[0]]["operand"] = mình.vị trí[vá[1]];
         };
-        lặp(i = 0; i < độ dài(mình.lỗi); i++) { mình.lệnh[mình.lỗi[i]]["operand"] = lỗi; };
-        lặp(i = 0; i < độ dài(mình.trả); i++) { mình.lệnh[mình.trả[i]]["operand"] = xong; };
+        lặp(i = 0; i < độ dài(mình.lỗi); i = i + 1) { mình.lệnh[mình.lỗi[i]]["operand"] = lỗi; };
+        lặp(i = 0; i < độ dài(mình.trả); i = i + 1) { mình.lệnh[mình.trả[i]]["operand"] = xong; };
         trả về {"parameterCount": 1, "slotCount": mình.số ô, "maxStackDepth": mình.sâu nhất, "instructions": mình.lệnh};
     };
 };
@@ -1965,12 +2290,30 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng, đối tượng = rỗng, đích ghi = rỗng) {
     bắt đầu bước = 0;
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
     máy = hạ.hạ();
     trực tiếp = lấy từ điển(bảng i32, "ASM trực tiếp", sai);
+    nếu (đối tượng != rỗng) {
+        bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đúng));
+        trả về "";
+    };
+    nếu (trực tiếp && bộ đệm == rỗng && đích ghi != rỗng) {
+        nếu (thống kê != rỗng) {
+            thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+        };
+        bỏ kết quả = đích ghi.ghi(biên dịch lắp ráp đầu(đích["hệ điều hành"], tên));
+        bỏ kết quả = biên dịch asm động trực tiếp(máy, tên, đích["kiến trúc"], đích["hệ điều hành"], đúng, đích ghi);
+        bỏ kết quả = đích ghi.đẩy đệm();
+        nếu (thống kê != rỗng) {
+            thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            thống kê["count"] = thống kê["count"] + 1;
+        };
+        trả về "";
+    };
     khóa = "";
     nếu (bộ đệm != rỗng) {
         // Machine IR do lowerer vừa tạo chỉ chứa i32 và symbol ASCII ABI.
@@ -2028,17 +2371,32 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
 
 // Fast i32 functions and selectors already produce Machine IR. Route their
 // mnemonics straight to the assembler just like normal AOT bodies.
-hàm riêng tư biên dịch asm i32 máy(máy, tên, đích, trực tiếp, bảng byte, bảng hex) {
-    nếu (trực tiếp) {
-        trả về biên dịch lắp ráp đầu(đích["hệ điều hành"], tên) +
-            biên dịch asm động trực tiếp(máy, tên, đích["kiến trúc"], đích["hệ điều hành"], sai);
+hàm riêng tư biên dịch asm i32 máy(máy, tên, đích, trực tiếp, bảng byte, bảng hex, đối tượng = rỗng) {
+    nếu (đối tượng != rỗng) {
+        bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đúng));
+        trả về "";
     };
-    phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]);
+    nếu (trực tiếp) {
+        trả về biên dịch i32 sinh asm(máy, tên, đích["kiến trúc"], đích["hệ điều hành"]);
+    };
+    phát = biên dịch i32 sinh byte(máy, đích["kiến trúc"], đích["hệ điều hành"]);
     trả về biên dịch lắp ráp mã máy(đích["kiến trúc"],
         đích["hệ điều hành"], tên, phát, bảng byte, bảng hex);
 };
 
-hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng) {
+// Keep the legacy string API; streaming releases each emitted body before
+// lowering the next one. Flush each fragment to avoid per-byte buffer merges.
+hàm riêng tư biên dịch asm phát phần(phần, đích ghi, văn bản) {
+    nếu (đích ghi == rỗng) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(phần, văn bản);
+    } hoặc {
+        bỏ kết quả = đích ghi.ghi(văn bản);
+        bỏ kết quả = đích ghi.đẩy đệm();
+    };
+    trả về 0;
+};
+
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng, đích ghi = rỗng, đối tượng = rỗng) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
@@ -2046,6 +2404,10 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     đích = biên dịch phân tích đích(bộ ba);
     nếu (đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
         ném "AOT V++: cần target aarch64/x86_64";
+    };
+    nếu (đối tượng != rỗng) {
+        nếu (đích["kiến trúc"] != "aarch64" || đích["hệ điều hành"] != "macos") { ném "Mach-O object: Darwin ARM64 only"; };
+        bộ đệm = rỗng;
     };
     bảng = biên dịch asm bảng mã();
     các hàm = dây[2];
@@ -2060,12 +2422,12 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     bảng byte = [];
     bảng hex = rỗng;
     nếu (!trực tiếp) {
-        lặp(i = 0; i < 256; i++) { máy ảo thêm cuối danh sách(bảng byte, "" + i); };
+        lặp(i = 0; i < 256; i = i + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(bảng byte, "" + i); };
         nếu (đích["kiến trúc"] == "aarch64" && đích["hệ điều hành"] == "macos") {
             bảng hex = [];
             chữ hex = "0123456789abcdef";
-            lặp(i = 0; i < 256; i++) {
-                máy ảo thêm cuối danh sách(bảng hex, chữ hex[i / 16] + chữ hex[i % 16]);
+            lặp(i = 0; i < 256; i = i + 1) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(bảng hex, chữ hex[i / 16] + chữ hex[i % 16]);
             };
         };
     };
@@ -2075,23 +2437,38 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     // Machine IR trực tiếp ra ASM: compiler và chương trình dùng cùng ABI.
     bảng i32["compiler"] = compiler;
     bảng i32["ASM trực tiếp"] = trực tiếp;
+    nếu (!compiler) {
+        tên kiểu = {"rỗng": 0, "số nguyên": 1, "số thực": 2, "chuỗi": 3,
+            "danh sách": 4, "từ điển": 5, "tuple": 6, "hàm": 7, "lớp": 8, "đối tượng": 9};
+        lặp(i = 0; i < độ dài(chuỗi); i = i + 1) {
+            loại = lấy từ điển(tên kiểu, chuỗi[i], -1);
+            nếu (loại >= 0) { bảng i32["type_kind:" + i] = loại; };
+        };
+    };
+    nếu (!compiler) {
+        lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
+            nếu (các hàm[i][1] >= 0 && biên dịch asm chuyển tiếp loại(các hàm[i][2], bảng)) {
+                bảng i32["type_forward:" + i] = đúng;
+            };
+        };
+    };
     // Phân tích theo các lớp phụ thuộc; chu trình không có hàm lá sẽ
     // không bao giờ được chuyên biệt hóa, tránh đệ quy native không giới hạn.
-    lặp(lượt = 0; lượt < độ dài(các hàm); lượt++) {
+    lặp(lượt = 0; lượt < độ dài(các hàm); lượt = lượt + 1) {
         thêm mới = 0;
-        lặp(i = 0; i < độ dài(các hàm); i++) {
+        lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
             nếu (các hàm[i][1] >= 0 && lấy từ điển(bảng i32, "" + i, rỗng) == rỗng) {
                 dạng = biên dịch asm hàm i32(các hàm[i][2], bảng, bảng i32);
-                nếu (dạng == rỗng) { dạng = biên dịch asm hàm vô hộp(các hàm[i][2], bảng, chuỗi, sai); };
+                nếu (dạng == rỗng) { dạng = biên dịch asm hàm vô hộp(các hàm[i][2], bảng, chuỗi, sai, bảng i32); };
                 nếu (dạng != rỗng) { bảng i32["" + i] = dạng; thêm mới += 1; };
             };
         };
         nếu (thêm mới == 0) { thoát; };
     };
-    biên dịch hồ sơ ghi(đường hồ sơ, "asm.specialize", bắt đầu);
+    bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.specialize", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     nhanh = {};
-    lặp(i = 0; i < độ dài(các hàm); i++) {
+    lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
         dạng = lấy từ điển(bảng i32, "" + i, rỗng);
         ký hiệu = "vpp_aot_i32_" + i;
         nếu (dạng == rỗng) {
@@ -2101,24 +2478,24 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
         nếu (dạng != rỗng) {
             nếu (lấy từ điển(dạng, "dùng", -1) < 0) {
                 dùng = 0; lệnh máy = dạng["máy"]["instructions"];
-                lặp(j = 0; j < độ dài(lệnh máy); j++) {
+                lặp(j = 0; j < độ dài(lệnh máy); j = j + 1) {
                     nếu (lệnh máy[j]["opcode"] == "LoadSlot") { dùng = dùng | (1 << lệnh máy[j]["operand"]); };
                 };
                 dạng["dùng"] = dùng; dạng["ascii"] = sai;
             };
             dạng["ký hiệu"] = ký hiệu; nhanh["" + i] = dạng;
-            máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(dạng["máy"], ký hiệu,
-                đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
+            bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm i32 máy(dạng["máy"], ký hiệu,
+                đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex, đối tượng));
         };
     };
     // Chỉ thử bộ chọn ở tên phương thức có ít nhất một thân hàm đã chứng minh.
     mã đăng ký = [dây[0]];
-    lặp(i = 0; i < độ dài(khởi tạo); i++) { máy ảo thêm cuối danh sách(mã đăng ký, khởi tạo[i][1]); };
-    lặp(i = 0; i < độ dài(các hàm); i++) { máy ảo thêm cuối danh sách(mã đăng ký, các hàm[i][2]); };
+    lặp(i = 0; i < độ dài(khởi tạo); i = i + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mã đăng ký, khởi tạo[i][1]); };
+    lặp(i = 0; i < độ dài(các hàm); i = i + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mã đăng ký, các hàm[i][2]); };
     số_lớp = 0;
-    lặp(i = 0; i < độ dài(mã đăng ký); i++) {
+    lặp(i = 0; i < độ dài(mã đăng ký); i = i + 1) {
         mã = mã đăng ký[i];
-        lặp(j = 0; j < độ dài(mã); j++) {
+        lặp(j = 0; j < độ dài(mã); j = j + 1) {
             tên_đăng_ký = bảng[mã[j][0]];
             nếu (tên_đăng_ký == "OP_TAO_LOP") {
                 lớp_id = mã[j][2];
@@ -2152,95 +2529,100 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     };
     bảng i32["số_lớp"] = số_lớp;
     nếu (!compiler) {
-        lặp(số = 0; số <= 4; số++) {
+        lặp(số = 0; số <= 4; số = số + 1) {
             ids = [];
-            lặp(i = 0; i < độ dài(các hàm); i++) {
+            lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
                 dạng = lấy từ điển(nhanh, "" + i, rỗng);
-                nếu (dạng != rỗng) { nếu (độ dài(dạng["ô"]) == số) { máy ảo thêm cuối danh sách(ids, i); }; };
+                nếu (dạng != rỗng) { nếu (độ dài(dạng["ô"]) == số) { bỏ kết quả = máy ảo thêm cuối danh sách(ids, i); }; };
             };
-            lặp(chế độ = 0; chế độ < 2; chế độ++) {
+            lặp(chế độ = 0; chế độ < 2; chế độ = chế độ + 1) {
                 máy chọn = biên dịch asm bộ chọn vô hộp(ids, nhanh, số, chế độ);
                 hậu tố = "i"; nếu (chế độ == 1) { hậu tố = "m"; };
-                máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn,
-                    "vpp_aot_fast_" + hậu tố + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
+                bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm i32 máy(máy chọn,
+                    "vpp_aot_fast_" + hậu tố + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex, đối tượng));
             };
             máy chọn ô = biên dịch asm bộ chọn vô hộp(ids, nhanh, số, sai, đúng);
-            máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn ô,
-                "vpp_aot_fast_s" + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
+            bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm i32 máy(máy chọn ô,
+                "vpp_aot_fast_s" + số, đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex, đối tượng));
         };
         ids ascii = [];
-        lặp(i = 0; i < độ dài(các hàm); i++) {
+        lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
             dạng = lấy từ điển(nhanh, "" + i, rỗng);
             // V++ hiện đánh giá cả hai vế &&. Tách kiểm tra rỗng để không gọi
             // lấy từ điển trên một hàm không có specialization.
             nếu (dạng != rỗng) {
                 nếu (lấy từ điển(dạng, "ascii", sai) && độ dài(dạng["ô"]) == 1) {
-                    máy ảo thêm cuối danh sách(ids ascii, i);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(ids ascii, i);
                 };
             };
         };
         máy chọn ascii = biên dịch asm bộ chọn ascii chỉ số(ids ascii, nhanh);
-        máy ảo thêm cuối danh sách(phần, biên dịch asm i32 máy(máy chọn ascii,
-            "vpp_aot_fast_ascii_index_m1", đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex));
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm i32 máy(máy chọn ascii,
+            "vpp_aot_fast_ascii_index_m1", đích, bảng i32["ASM trực tiếp"], bảng byte, bảng hex, đối tượng));
     };
-    biên dịch hồ sơ ghi(đường hồ sơ, "asm.fast_paths", bắt đầu);
+    bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.fast_paths", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     thống kê = rỗng;
     nếu (đường hồ sơ != "") {
         thống kê = {"lower_ms": 0, "machine_ms": 0, "assemble_ms": 0, "count": 0};
     };
-    lặp(i = 0; i < độ dài(các hàm); i++) {
+    lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
         hạ trước = 0; máy trước = 0; lắp ráp trước = 0;
         nếu (thống kê != rỗng) {
             hạ trước = thống kê["lower_ms"];
             máy trước = thống kê["machine_ms"];
             lắp ráp trước = thống kê["assemble_ms"];
         };
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm));
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
         nếu (thống kê != rỗng) {
             tên = "<anonymous>";
             nếu (các hàm[i][1] >= 0) { tên = chuỗi[các hàm[i][1]]; };
-            biên dịch hồ sơ ghi thân(đường hồ sơ, i, tên,
+            bỏ kết quả = biên dịch hồ sơ ghi thân(đường hồ sơ, i, tên,
                 thống kê["lower_ms"] - hạ trước,
                 thống kê["machine_ms"] - máy trước,
                 thống kê["assemble_ms"] - lắp ráp trước);
         };
     };
-    lặp(i = 0; i < độ dài(khởi tạo); i++) {
-        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm));
+    lặp(i = 0; i < độ dài(khởi tạo); i = i + 1) {
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
     };
-    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm));
+    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
     nếu (thống kê != rỗng) {
-        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
-        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);
-        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.machine_ms", thống kê["machine_ms"]);
-        biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.assemble_ms", thống kê["assemble_ms"]);
+        bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
+        bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);
+        bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.machine_ms", thống kê["machine_ms"]);
+        bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.assemble_ms", thống kê["assemble_ms"]);
         nếu (bộ đệm != rỗng) {
-            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.hits", bộ đệm["trúng"]);
-            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.misses", bộ đệm["trượt"]);
-            biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.bytes", bộ đệm["byte"]);
+            bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.hits", bộ đệm["trúng"]);
+            bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.misses", bộ đệm["trượt"]);
+            bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.cache.bytes", bộ đệm["byte"]);
         };
     };
-    biên dịch hồ sơ ghi(đường hồ sơ, "asm.functions", bắt đầu);
+    bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.functions", bắt đầu);
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+    nếu (đối tượng != rỗng) {
+        bỏ kết quả = biên dịch asm metadata macho(đối tượng, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler);
+        bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.metadata", bắt đầu);
+        trả về "";
+    };
     tiền tố = "";
     meta = ".section .data.rel.ro,\"aw\",@progbits\n";
     nếu (đích["hệ điều hành"] == "macos") { tiền tố = "_"; meta = ".section __DATA,__const\n"; };
     nếu (đích["hệ điều hành"] == "windows") { meta = ".section .rdata,\"dr\"\n"; };
-    lặp(i = 0; i < độ dài(chuỗi); i++) {
+    lặp(i = 0; i < độ dài(chuỗi); i = i + 1) {
         meta += ".Laot_string_" + i + ": .asciz " + biên dịch asm nháy(chuỗi[i]) + "\n";
-        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+        nếu (i % 32 == 31) { bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, meta); meta = ""; };
     };
     meta += ".p2align 3\n.Laot_strings:\n";
-    lặp(i = 0; i < độ dài(chuỗi); i++) {
+    lặp(i = 0; i < độ dài(chuỗi); i = i + 1) {
         meta += ".quad .Laot_string_" + i + "," + độ dài(chuỗi thành byte máy ảo(chuỗi[i])) + "\n";
-        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+        nếu (i % 32 == 31) { bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, meta); meta = ""; };
     };
     meta += ".p2align 3\n.Laot_functions:\n";
-    lặp(i = 0; i < độ dài(các hàm); i++) {
+    lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
         cần = 0; tối đa = 0;
         mã = các hàm[i][2];
-        lặp(j = 0; j < độ dài(mã); j++) {
+        lặp(j = 0; j < độ dài(mã); j = j + 1) {
             tên = bảng[mã[j][0]];
             nếu ((tên == "OP_PARAM" || tên == "OP_PARAM_MAC_DINH") && mã[j][3] >= 0) {
                 nếu (tối đa < mã[j][3] + 1) { tối đa = mã[j][3] + 1; };
@@ -2248,31 +2630,31 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             };
         };
         meta += ".long " + các hàm[i][1] + "," + cần + "," + tối đa + ",0\n.quad " + tiền tố + "vpp_aot_function_" + i + "\n";
-        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+        nếu (i % 32 == 31) { bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, meta); meta = ""; };
     };
     meta += ".Laot_initializers:\n";
-    lặp(i = 0; i < độ dài(khởi tạo); i++) { meta += ".quad " + tiền tố + "vpp_aot_init_" + i + "\n"; };
-    lặp(i = 0; i < độ dài(ngoại); i++) {
+    lặp(i = 0; i < độ dài(khởi tạo); i = i + 1) { meta += ".quad " + tiền tố + "vpp_aot_init_" + i + "\n"; };
+    lặp(i = 0; i < độ dài(ngoại); i = i + 1) {
         d = ngoại[i];
         meta += ".Laot_foreign_lib_" + i + ":.asciz " + biên dịch asm nháy(d[1]) + "\n.Laot_foreign_sym_" + i + ":.asciz " + biên dịch asm nháy(d[2]) +
             "\n.Laot_foreign_abi_" + i + ":.asciz " + biên dịch asm nháy(d[6]) + "\n.Laot_foreign_cap_" + i + ":.asciz " + biên dịch asm nháy(d[7]) +
             "\n.p2align 3\n.Laot_foreign_params_" + i + ":\n";
-        lặp(j = 0; j < độ dài(d[3]); j++) { meta += ".long " + d[3][j] + "\n"; };
+        lặp(j = 0; j < độ dài(d[3]); j = j + 1) { meta += ".long " + d[3][j] + "\n"; };
         meta += ".p2align 3\n.Laot_foreign_extents_" + i + ":\n";
-        lặp(j = 0; j < độ dài(d[4]); j++) {
+        lặp(j = 0; j < độ dài(d[4]); j = j + 1) {
             e = d[4][j];
             meta += ".quad " + e[0] + "\n.long " + e[1] + ",0\n.quad " + e[2] + "\n";
         };
     };
     meta += ".p2align 3\n.Laot_foreign:\n";
-    lặp(i = 0; i < độ dài(ngoại); i++) {
+    lặp(i = 0; i < độ dài(ngoại); i = i + 1) {
         d = ngoại[i];
         meta += ".long " + d[0] + "," + d[5] + "\n.quad .Laot_foreign_lib_" + i + ",.Laot_foreign_sym_" + i +
             ",.Laot_foreign_abi_" + i + ",.Laot_foreign_cap_" + i + "\n.quad " + độ dài(d[3]) + ",.Laot_foreign_params_" + i +
             "," + độ dài(d[4]) + ",.Laot_foreign_extents_" + i + "\n";
     };
     meta += ".p2align 3\n.Laot_i32_functions:\n";
-    lặp(i = 0; i < độ dài(các hàm); i++) {
+    lặp(i = 0; i < độ dài(các hàm); i = i + 1) {
         dạng = lấy từ điển(nhanh, "" + i, rỗng);
         nếu (dạng == rỗng) {
             meta += ".quad 0\n.long 0,0\n";
@@ -2288,8 +2670,62 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     meta += ".p2align 3\n" + tiền tố + "vpp_aot_spec:\n.quad " + độ dài(chuỗi) + ",.Laot_strings," + độ dài(các hàm) + ",.Laot_functions," +
         độ dài(khởi tạo) + ",.Laot_initializers," + tiền tố + "vpp_aot_entry\n.long " + cờ + ",1\n.quad " + độ dài(ngoại) + ",.Laot_foreign\n.quad " +
         độ dài(các hàm) + ",.Laot_i32_functions\n";
-    máy ảo thêm cuối danh sách(phần, meta + "\n#define VPP_NATIVE_DYNAMIC_RUNTIME 1\n#include \"common/vpp_aot_dynamic_runtime.inc\"\n");
-    kết quả = biên dịch lắp ráp nối các phần(phần);
-    biên dịch hồ sơ ghi(đường hồ sơ, "asm.metadata", bắt đầu);
+    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, meta + "\n#define VPP_NATIVE_DYNAMIC_RUNTIME 1\n#include \"common/vpp_aot_dynamic_runtime.inc\"\n");
+    kết quả = "";
+    nếu (đích ghi == rỗng) { kết quả = biên dịch lắp ráp nối các phần(phần); };
+    bỏ kết quả = biên dịch hồ sơ ghi(đường hồ sơ, "asm.metadata", bắt đầu);
     trả về kết quả;
+};
+
+// The binary metadata has the same ABI as the textual AOT spec.
+hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler) {
+    nếu (độ dài(ngoại) != 0) { ném "Mach-O object: foreign descriptors unavailable"; };
+    o.bắt đầu dữ liệu();
+    lặp(i = 0; i < độ dài(chuỗi); i++) {
+        o.nhãn(".Laot_string_" + i);
+        o.dữ liệu byte(chuỗi thành byte máy ảo(chuỗi[i]));
+        o.dữ liệu byte([0]);
+    };
+    o.căn dữ liệu(); o.nhãn(".Laot_strings");
+    lặp(i = 0; i < độ dài(chuỗi); i++) {
+        o.con trỏ(".Laot_string_" + i);
+        o.dữ liệu dài(độ dài(chuỗi thành byte máy ảo(chuỗi[i])));
+    };
+    o.căn dữ liệu(); o.nhãn(".Laot_functions");
+    lặp(i = 0; i < độ dài(các hàm); i++) {
+        cần = 0; tối đa = 0; mã = các hàm[i][2];
+        lặp(j = 0; j < độ dài(mã); j++) {
+            tên = bảng[mã[j][0]];
+            nếu ((tên == "OP_PARAM" || tên == "OP_PARAM_MAC_DINH") && mã[j][3] >= 0) {
+                nếu (tối đa < mã[j][3] + 1) { tối đa = mã[j][3] + 1; };
+                nếu (tên == "OP_PARAM" && cần < mã[j][3] + 1) { cần = mã[j][3] + 1; };
+            };
+        };
+        o.dữ liệu word(các hàm[i][1]); o.dữ liệu word(cần);
+        o.dữ liệu word(tối đa); o.dữ liệu word(0);
+        o.con trỏ("_vpp_aot_function_" + i);
+    };
+    o.nhãn(".Laot_initializers");
+    lặp(i = 0; i < độ dài(khởi tạo); i++) { o.con trỏ("_vpp_aot_init_" + i); };
+    o.căn dữ liệu(); o.nhãn(".Laot_foreign");
+    o.nhãn(".Laot_i32_functions");
+    lặp(i = 0; i < độ dài(các hàm); i++) {
+        dạng = lấy từ điển(nhanh, "" + i, rỗng);
+        nếu (dạng == rỗng) { o.dữ liệu dài(0); o.dữ liệu dài(0); }
+        hoặc nếu (lấy từ điển(dạng, "ascii", sai)) { o.dữ liệu dài(0); o.dữ liệu dài(0); }
+        hoặc {
+            o.con trỏ("_" + dạng["ký hiệu"]);
+            o.dữ liệu word(độ dài(dạng["ô"])); o.dữ liệu word(lấy từ điển(dạng, "dùng", 0));
+        };
+    };
+    o.căn dữ liệu(); o.nhãn("_vpp_aot_spec", đúng);
+    o.dữ liệu dài(độ dài(chuỗi)); o.con trỏ(".Laot_strings");
+    o.dữ liệu dài(độ dài(các hàm)); o.con trỏ(".Laot_functions");
+    o.dữ liệu dài(độ dài(khởi tạo)); o.con trỏ(".Laot_initializers");
+    o.con trỏ("_vpp_aot_entry");
+    cờ = 0; nếu (compiler) { cờ = 1; };
+    o.dữ liệu word(cờ); o.dữ liệu word(1);
+    o.dữ liệu dài(0); o.con trỏ(".Laot_foreign");
+    o.dữ liệu dài(độ dài(các hàm)); o.con trỏ(".Laot_i32_functions");
+    trả về 0;
 };

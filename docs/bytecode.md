@@ -223,7 +223,7 @@ Mã byte (hex, ULEB128 for indices small => single byte):
 2. Thêm serializer/deserializer `.vbc` và một assembler; chọn vị trí module trong cây `src/` khi thiết kế được chấp thuận.
 3. Thêm disassembler `.vbc` riêng; giữ disassembler in-memory hiện có ở `src/tooling/` hoạt động độc lập.
 4. Thêm loader + verifier cho format đã chốt, thay vì giả định một path chưa tồn tại.
-5. Tạo test round-trip assemble → disassemble và test chạy chương trình nhỏ dưới `src/tests/`.
+5. Tạo test round-trip assemble → disassemble và test chạy chương trình nhỏ dưới `scripts/test/`.
 6. Sau khi có implementation, thay phần proposal này bằng spec versioned và fixture `.vbc` thật.
 
 ---

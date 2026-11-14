@@ -40,6 +40,7 @@ hàm công khai biên dịch hướng dẫn dòng lệnh máy() {
         "  format <source.vi>\n" +
         "  lint <source.vi> [--base <directory>]\n" +
         "  embed <source.vi> --base <directory>\n" +
+        "  emit-program-asm --target <triple> <source.vi> -o <output.S>\n" +
         "  build --target <triple> --emit-obj|--emit-obj-selfhost <function> <source.vi> <output.o>\n" +
         "  build --target <triple> --emit-raw <function> <source.vi> <output.bin>\n" +
         "  build --target <triple> --emit-asm <function> <source.vi> <output.s>\n";
@@ -57,7 +58,7 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
     nếu (n == 1 && (lệnh == "--version" || lệnh == "phiên bản")) {
         trả về ["message", "V++ native compiler\n", "", sai, sai, "", "", ""];
     };
-    nếu (lệnh != "vm-build" && lệnh != "build" && lệnh != "run" && lệnh != "artifact" && lệnh != "embed" &&
+    nếu (lệnh != "vm-build" && lệnh != "build" && lệnh != "emit-program-asm" && lệnh != "run" && lệnh != "artifact" && lệnh != "embed" &&
         lệnh != "disassemble" && lệnh != "dump-ast" && lệnh != "dump-ir" &&
         lệnh != "format" && lệnh != "lint") {
         ném "Native CLI: unknown command " + lệnh;
@@ -107,6 +108,19 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
             nếu (!hết tùy chọn && mục[0] == "-") { ném "Native CLI: unknown option " + mục; };
             máy ảo thêm cuối danh sách(vị trí, mục);
         };
+    };
+    nếu (lệnh == "emit-program-asm") {
+        nếu (máy ảo lấy độ dài(vị trí) != 1 || đầu ra == "" || bộ ba == "" ||
+            tên hàm != "" || mã trung gian || compiler || gốc nhúng != "") {
+            ném "Native CLI: emit-program-asm requires --target, source and -o output";
+        };
+        đích = biên dịch phân tích đích(bộ ba);
+        nếu (!(đích["hệ điều hành"] == "linux" && đích["kiến trúc"] == "x86_64") &&
+            !(đích["hệ điều hành"] == "windows" && đích["kiến trúc"] == "x86_64") &&
+            !(đích["hệ điều hành"] == "macos" && đích["kiến trúc"] == "aarch64")) {
+            ném "Native CLI: full program assembly requires macOS ARM64 or Linux/Windows x86-64";
+        };
+        trả về [lệnh, vị trí[0], đầu ra, sai, sai, "", bộ ba, ""];
     };
     nếu (tên hàm != "" || bộ ba != "") {
         nếu (lệnh != "build" || tên hàm == "" || bộ ba == "" ||
@@ -240,7 +254,7 @@ hàm công khai biên dịch xuất lắp ráp máy(đường, đầu ra, bộ b
 // Việc đọc nguồn/artifact, chọn pipeline, kiểm tra wire và phát ASM ở V++.
 // assemble/execute được nối với trình điều khiển AOT.vi; host không chọn
 // assembler, runtime hay linker cho các yêu cầu của compiler tự chủ.
-hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm = rỗng) {
+hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm = rỗng, số worker = rỗng, runtime thuần = sai, đích ghi = rỗng, đối tượng = rỗng, cache ASM = đúng) {
     lệnh = kế hoạch[0];
     đường = kế hoạch[1];
     đầu ra = kế hoạch[2];
@@ -271,7 +285,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
             đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0")];
     };
     nếu (lệnh == "disassemble") {
-        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, rỗng, bộ đệm);
+        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, số worker, bộ đệm);
         dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
         trả về ["complete", biên dịch giải mã chương trình(dây)];
     };
@@ -290,16 +304,28 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     } hoặc nếu (kế hoạch[3]) {
         trả về ["complete", biên dịch dòng lệnh(đường, thư viện, "build", đầu ra)];
     } hoặc {
-        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, rỗng, bộ đệm);
+        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, số worker, bộ đệm);
     };
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
     biên dịch hồ sơ ghi(đường hồ sơ, "artifact.to_wire", bắt đầu);
     nếu (lệnh == "vm-build") { trả về ["complete", biên dịch VM ghi(dây, đầu ra)]; };
+    nếu (runtime thuần) {
+        nếu (kế hoạch[4]) {
+            ném "Native AOT: compiler-host and foreign descriptors are unavailable in the V++ runtime";
+        };
+        nếu (độ dài(dây) == 5) {
+            nếu (độ dài(dây[4]) != 0) {
+                ném "Native AOT: compiler-host and foreign descriptors are unavailable in the V++ runtime";
+            };
+        };
+    };
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm,
-        đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0");
+    bộ đệm ASM = rỗng;
+    nếu (cache ASM) { bộ đệm ASM = bộ đệm; };
+    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm ASM,
+        đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0", đích ghi, đối tượng);
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.total", bắt đầu);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };
     trả về ["execute", asm];

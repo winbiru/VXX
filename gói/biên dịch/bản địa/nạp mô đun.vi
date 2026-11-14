@@ -244,12 +244,9 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
             // The parser now lexes each payload independently.
             nếu (byte đẩy số nguyên ba mươi hai bit(đã kết hợp, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) { mã trạng thái = -1; };
             nếu (mã trạng thái == 0) {
-                lặp (i = điểm bắt đầu; i < byte dài(nguồn đầu vào); i++) {
-                    nếu (byte thêm(đã kết hợp, byte lấy(nguồn đầu vào, i)) != 0) {
-                        mã trạng thái = -1;
-                        thoát;
-                    };
-                };
+                nếu (thực thi các byte nối đoạn(đã kết hợp, nguồn đầu vào, điểm bắt đầu, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) {
+                    mã trạng thái = -1;
+                } hoặc { thực thi tiến độ nguồn(đường tệp); };
             };
         };
     };
@@ -263,16 +260,86 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
     trả về mã trạng thái;
 };
 
+// Give relative entry paths the same identity as the implicit runtime.
+// Preserve ".." components: collapsing them can change symlink semantics.
+// Normalize Windows separators only on Windows; a POSIX backslash is a name.
+hàm nạp mô đun đường tuyệt đối(đường tệp) {
+    nếu (byte dài(đường tệp) <= 0) { trả về -1; };
+    biến thư mục = thực thi hệ điều hành đường tệp(1);
+    nếu (thư mục <= 0) { trả về -1; };
+    biến windows = thực thi máy đích windows();
+    biến kết quả trả về = byte mới();
+    nếu (kết quả trả về <= 0) { byte hủy(thư mục); trả về -1; };
+    biến dấu đầu = byte lấy(đường tệp, 0);
+    nếu (windows == 1 && dấu đầu == 92) { dấu đầu = 47; };
+    biến tuyệt đối = 0;
+    nếu (dấu đầu == 47) { tuyệt đối = 1; };
+    nếu (windows == 1 && byte dài(đường tệp) >= 2) {
+        nếu (byte lấy(đường tệp, 1) == 58) {
+            // Drive-relative paths such as C:foo use a separate OS cwd.
+            // Keep their original spelling rather than inventing a root.
+            tuyệt đối = 1;
+        };
+    };
+    biến mã trạng thái = 0;
+    nếu (tuyệt đối == 0) {
+        lặp (i = 0; i < byte dài(thư mục); i++) {
+            biến ký tự = byte lấy(thư mục, i);
+            nếu (windows == 1 && ký tự == 92) { ký tự = 47; };
+            nếu (byte thêm(kết quả trả về, ký tự) != 0) { mã trạng thái = -1; thoát; };
+        };
+        nếu (mã trạng thái == 0 && byte lấy(kết quả trả về, byte dài(kết quả trả về) - 1) != 47) {
+            mã trạng thái = byte thêm(kết quả trả về, 47);
+        };
+    } hoặc nếu (windows == 1 && dấu đầu == 47) {
+        // A single leading slash is relative to the current Windows drive.
+        biến unc = 0;
+        nếu (byte dài(đường tệp) >= 2) {
+            biến dấu thứ hai = byte lấy(đường tệp, 1);
+            nếu (dấu thứ hai == 47 || dấu thứ hai == 92) { unc = 1; };
+        };
+        nếu (unc == 0) {
+            mã trạng thái = byte thêm(kết quả trả về, byte lấy(thư mục, 0));
+            nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(kết quả trả về, 58); };
+        };
+    };
+    byte hủy(thư mục);
+    nếu (mã trạng thái == 0) {
+        biến đầu = 0;
+        nếu (tuyệt đối == 0) {
+            khi (đầu + 1 < byte dài(đường tệp)) {
+                nếu (byte lấy(đường tệp, đầu) != 46) { thoát; };
+                biến dấu = byte lấy(đường tệp, đầu + 1);
+                nếu (dấu != 47 && !(windows == 1 && dấu == 92)) { thoát; };
+                đầu = đầu + 2;
+            };
+        };
+        lặp (i = đầu; i < byte dài(đường tệp); i++) {
+            biến ký tự = byte lấy(đường tệp, i);
+            nếu (windows == 1 && ký tự == 92) { ký tự = 47; };
+            nếu (byte thêm(kết quả trả về, ký tự) != 0) { mã trạng thái = -1; thoát; };
+        };
+    };
+    nếu (mã trạng thái != 0 || byte dài(kết quả trả về) >= 4096) {
+        byte hủy(kết quả trả về); trả về -1;
+    };
+    trả về kết quả trả về;
+};
+
 hàm nạp mô đun chuẩn bị(đường tệp, đã kết hợp) {
     nếu (byte làm rỗng(đã kết hợp) != 0) { trả về -1; };
     biến bảng = byte mới();
     nếu (bảng <= 0) { trả về -1; };
     biến môi trường thực thi = môi trường thực thi nguồn();
+    biến nguồn tuyệt đối = nạp mô đun đường tuyệt đối(đường tệp);
     biến mã trạng thái = -1;
     biến số đơn vị runtime = 0;
-    nếu (môi trường thực thi > 0) {
-        mã trạng thái = nạp mô đun nạp(môi trường thực thi, đã kết hợp, bảng, 0);
-        byte hủy(môi trường thực thi);
+    nếu (môi trường thực thi > 0 && nguồn tuyệt đối > 0) {
+        biến runtime tuyệt đối = nạp mô đun đường tuyệt đối(môi trường thực thi);
+        nếu (runtime tuyệt đối > 0) {
+            mã trạng thái = nạp mô đun nạp(runtime tuyệt đối, đã kết hợp, bảng, 0);
+            byte hủy(runtime tuyệt đối);
+        };
         nếu (mã trạng thái == 0) {
             biến nơi = 0;
             khi (nơi < byte dài(đã kết hợp)) {
@@ -284,8 +351,10 @@ hàm nạp mô đun chuẩn bị(đường tệp, đã kết hợp) {
                 số đơn vị runtime = số đơn vị runtime + 1;
             };
         };
-        nếu (mã trạng thái == 0) { mã trạng thái = nạp mô đun nạp(đường tệp, đã kết hợp, bảng, 0); };
+        nếu (mã trạng thái == 0) { mã trạng thái = nạp mô đun nạp(nguồn tuyệt đối, đã kết hợp, bảng, 0); };
     };
+    nếu (môi trường thực thi > 0) { byte hủy(môi trường thực thi); };
+    nếu (nguồn tuyệt đối > 0) { byte hủy(nguồn tuyệt đối); };
     byte hủy(bảng);
     nếu (mã trạng thái != 0) { byte làm rỗng(đã kết hợp); trả về -1; };
     nếu (byte dài(đã kết hợp) <= 0) { trả về -1; };

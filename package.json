@@ -72,18 +72,18 @@
       "properties": {
         "vpp.vm.autoPromptInstall": {
           "type": "boolean",
-          "default": true,
-          "description": "Đề nghị cài V++ VM từ GitHub Releases khi extension chưa quản lý VM nào."
+          "default": false,
+          "description": "Hiện hướng dẫn build V++ native nếu chưa có compiler trong workspace."
         },
         "vpp.lsp.enabled": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Bật máy chủ ngôn ngữ V++ cho diagnostic, completion, go-to-definition, hover, rename và format."
         },
         "vpp.lsp.executable": {
           "type": "string",
           "default": "",
-          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Để trống sẽ ưu tiên compiler build trong workspace V++, sau đó VM do extension quản lý, rồi vpp trong PATH."
+          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Bản tự chủ chưa có LSP; cần cấu hình máy chủ tương thích một cách tường minh."
         }
       }
     },

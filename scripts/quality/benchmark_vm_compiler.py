@@ -4,7 +4,7 @@
 Example:
     python3 scripts/quality/benchmark_vm_compiler.py \
         --vm build/vm-asm-check/vpp-vm \
-        --source src/tests/kiem_tra_ffi_tep.vi \
+        --source scripts/test/kiem_tra_ffi_tep.vi \
         baseline=build/vm-asm-selfhost/compiler-stage1.vmb \
         optimized=build/ci-investigation/compiler-lexer-column.vmb
 

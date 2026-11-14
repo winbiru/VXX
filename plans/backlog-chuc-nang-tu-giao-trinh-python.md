@@ -219,7 +219,7 @@ list; iteration MVP vẫn là `lặp(i = 0; i < độ dài(ds); i++)` cùng `ds[
 primitive hiện tại, rồi mới cân nhắc helper thực sự thiếu: `join`/tokenizer,
 flatten/slice/chunk, map entry iteration/HOF và Unicode.
 
-Regression `src/tests/kiem_tra_collection_bai_63_75.vi` hiện đã bao phủ bài
+Regression `scripts/test/kiem_tra_collection_bai_63_75.vi` hiện đã bao phủ bài
 63–75 bằng primitive P1. Bài 72 dùng danh sách token đã tách sẵn để kiểm tra phần
 dictionary; tokenizer câu tự do vẫn thuộc P2. Các thuật toán cần kiểm tra biên index
 phải dùng nhánh lồng nhau vì `&&`/`||` hiện không có short-circuit ở VM.

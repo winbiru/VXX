@@ -57,8 +57,9 @@ hàm công khai biên dịch mã máy lá(kiến trúc, loại, hằng = 0, hệ
 
 // Phát hàm MachineOpcode i32 qua thư viện V++; kết quả gồm bytes và relocations.
 // Chỉ công bố target đã có encoder tổng quát thuần V++ và kiểm tra parity.
-hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu diễn trung gian, hệ điều hành = "linux") {
+hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai) {
     tên = biên dịch thông tin kiến trúc(kiến trúc)["tên"];
+    nếu (phân khối && tên != "aarch64") { ném "Machine IR: phân khối chỉ hỗ trợ AArch64"; };
     biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian);
     chọn (tên) {
         ca "x86_64": {
@@ -72,7 +73,7 @@ hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu 
             nếu (hệ điều hành != "linux" && hệ điều hành != "macos") {
                 ném "AArch64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ điều hành;
             };
-            trả về biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành);
+            trả về biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành, phân khối);
         }
         mặc định: { ném "Machine IR V++ chưa có backend tổng quát: " + tên; }
     };

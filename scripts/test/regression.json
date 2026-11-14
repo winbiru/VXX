@@ -1,0 +1,2657 @@
+{
+  "cases": [
+    {
+      "id": "anonymous_functions",
+      "source": "scripts/test/fixtures/anonymous_functions/entry.vi",
+      "expected": "scripts/test/expected/anonymous_functions.expected",
+      "suite": "full"
+    },
+    {
+      "id": "dns-mock",
+      "source": "scripts/test/kiem_tra_dns_vpp_mock.vi",
+      "suite": "full",
+      "dns_mock": true
+    },
+    {
+      "id": "import_main",
+      "source": "scripts/test/import_main.vi",
+      "expected": "scripts/test/expected/import_main.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_byte_scan",
+      "source": "scripts/test/kiem_tra_aot_byte_scan.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_byte_scan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_byte_scan_heap",
+      "source": "scripts/test/kiem_tra_aot_byte_scan_heap.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_byte_scan_heap.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_byte_scan_set",
+      "source": "scripts/test/kiem_tra_aot_byte_scan_set.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_byte_scan_set.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_decimal_long_source",
+      "source": "scripts/test/kiem_tra_aot_decimal_long_source.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_decimal_long_source.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_decimal_scan",
+      "source": "scripts/test/kiem_tra_aot_decimal_scan.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_decimal_scan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_i32_run",
+      "source": "scripts/test/kiem_tra_aot_i32_run.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_i32_run.expected",
+      "suite": "full",
+      "smoke": true
+    },
+    {
+      "id": "kiem_tra_aot_index_offset",
+      "source": "scripts/test/kiem_tra_aot_index_offset.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_index_offset.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_map_remove_value",
+      "source": "scripts/test/kiem_tra_aot_map_remove_value.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_map_remove_value.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_replace_single_pass",
+      "source": "scripts/test/kiem_tra_aot_replace_single_pass.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_replace_single_pass.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_string_intrinsics",
+      "source": "scripts/test/kiem_tra_aot_string_intrinsics.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_string_intrinsics.expected",
+      "suite": "full",
+      "smoke": true
+    },
+    {
+      "id": "kiem_tra_aot_tang",
+      "source": "scripts/test/kiem_tra_aot_tang.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_tang.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_type_branch",
+      "source": "scripts/test/kiem_tra_aot_type_branch.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_type_branch.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_type_branch_edge",
+      "source": "scripts/test/kiem_tra_aot_type_branch_edge.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_type_branch_edge.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_type_branch_missing",
+      "source": "scripts/test/kiem_tra_aot_type_branch_missing.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_type_branch_missing.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_type_forward",
+      "source": "scripts/test/kiem_tra_aot_type_forward.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_type_forward.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_aot_utf8_word_scan",
+      "source": "scripts/test/kiem_tra_aot_utf8_word_scan.vi",
+      "expected": "scripts/test/expected/kiem_tra_aot_utf8_word_scan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_api_db_project",
+      "source": "scripts/test/kiem_tra_api_db_project.vi",
+      "expected": "scripts/test/expected/kiem_tra_api_db_project.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_api_thuc_thu",
+      "source": "scripts/test/kiem_tra_api_thuc_thu.vi",
+      "expected": "scripts/test/expected/kiem_tra_api_thuc_thu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_application_server",
+      "source": "scripts/test/kiem_tra_application_server.vi",
+      "expected": "scripts/test/expected/kiem_tra_application_server.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ast_oop",
+      "source": "scripts/test/kiem_tra_ast_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_ast_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_backend_i32",
+      "source": "scripts/test/kiem_tra_backend_i32.vi",
+      "expected": "scripts/test/expected/kiem_tra_backend_i32.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_bieu_thuc_vi",
+      "source": "scripts/test/kiem_tra_bien_dich_bieu_thuc_vi.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_bieu_thuc_vi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_chuong_trinh_vi",
+      "source": "scripts/test/kiem_tra_bien_dich_chuong_trinh_vi.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_chuong_trinh_vi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_chuong_trinh_vm",
+      "source": "scripts/test/kiem_tra_bien_dich_chuong_trinh_vm.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_chuong_trinh_vm.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_khi",
+      "source": "scripts/test/kiem_tra_bien_dich_khi.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_khi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_khi_vm",
+      "source": "scripts/test/kiem_tra_bien_dich_khi_vm.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_khi_vm.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bien_dich_tu_vung_vi",
+      "source": "scripts/test/kiem_tra_bien_dich_tu_vung_vi.vi",
+      "expected": "scripts/test/expected/kiem_tra_bien_dich_tu_vung_vi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bo_dang_ky_ham",
+      "source": "scripts/test/kiem_tra_bo_dang_ky_ham.vi",
+      "expected": "scripts/test/expected/kiem_tra_bo_dang_ky_ham.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bo_noi_chuoi",
+      "source": "scripts/test/kiem_tra_bo_noi_chuoi.vi",
+      "expected": "scripts/test/expected/kiem_tra_bo_noi_chuoi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_bo_qua",
+      "source": "scripts/test/kiem_tra_bo_qua.vi",
+      "expected": "scripts/test/expected/kiem_tra_bo_qua.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_boolean",
+      "source": "scripts/test/kiem_tra_boolean.vi",
+      "expected": "scripts/test/expected/kiem_tra_boolean.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_chay_bytecode_tu_chu",
+      "source": "scripts/test/kiem_tra_chay_bytecode_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_chay_bytecode_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_chi_muc_ast_bo_kiem_thu",
+      "source": "scripts/test/kiem_tra_chi_muc_ast_bo_kiem_thu.vi",
+      "expected": "scripts/test/expected/kiem_tra_chi_muc_ast_bo_kiem_thu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_chia_nhom_golden",
+      "source": "scripts/test/kiem_tra_chia_nhom_golden.vi",
+      "stdout": "VPP GOLDEN SHARDING OK\n",
+      "suite": "full",
+      "tooling_test": true
+    },
+    {
+      "id": "kiem_tra_chon_ca",
+      "source": "scripts/test/kiem_tra_chon_ca.vi",
+      "expected": "scripts/test/expected/kiem_tra_chon_ca.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_chuoi_co_ban",
+      "source": "scripts/test/kiem_tra_chuoi_co_ban.vi",
+      "expected": "scripts/test/expected/kiem_tra_chuoi_co_ban.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_chuoi_nen_tang",
+      "source": "scripts/test/kiem_tra_chuoi_nen_tang.vi",
+      "expected": "scripts/test/expected/kiem_tra_chuoi_nen_tang.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_closure_capture",
+      "source": "scripts/test/kiem_tra_closure_capture.vi",
+      "expected": "scripts/test/expected/kiem_tra_closure_capture.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_codec_uuid_bitset",
+      "source": "scripts/test/kiem_tra_codec_uuid_bitset.vi",
+      "expected": "scripts/test/expected/kiem_tra_codec_uuid_bitset.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_collection_bai_63_75",
+      "source": "scripts/test/kiem_tra_collection_bai_63_75.vi",
+      "expected": "scripts/test/expected/kiem_tra_collection_bai_63_75.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_collections_oop",
+      "source": "scripts/test/kiem_tra_collections_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_collections_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_constructor_tham_so",
+      "source": "scripts/test/kiem_tra_constructor_tham_so.vi",
+      "expected": "scripts/test/expected/kiem_tra_constructor_tham_so.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_cu_phap_modifier_cu",
+      "source": "scripts/test/kiem_tra_cu_phap_modifier_cu.vi",
+      "expected": "scripts/test/expected/kiem_tra_cu_phap_modifier_cu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_database_oop",
+      "source": "scripts/test/kiem_tra_database_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_database_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_de_quy",
+      "source": "scripts/test/kiem_tra_de_quy.vi",
+      "expected": "scripts/test/expected/kiem_tra_de_quy.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_de_quy_vuot_gioi_han",
+      "source": "scripts/test/kiem_tra_de_quy_vuot_gioi_han.vi",
+      "expected": "scripts/test/expected/kiem_tra_de_quy_vuot_gioi_han.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dich_vu",
+      "source": "scripts/test/kiem_tra_dich_vu.vi",
+      "expected": "scripts/test/expected/kiem_tra_dich_vu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_diem_vao_ke_thua",
+      "source": "scripts/test/kiem_tra_diem_vao_ke_thua.vi",
+      "expected": "scripts/test/expected/kiem_tra_diem_vao_ke_thua.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_diem_vao_lop_chinh",
+      "source": "scripts/test/kiem_tra_diem_vao_lop_chinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_diem_vao_lop_chinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dieu_kien_long_nhieu_cap",
+      "source": "scripts/test/kiem_tra_dieu_kien_long_nhieu_cap.vi",
+      "expected": "scripts/test/expected/kiem_tra_dieu_kien_long_nhieu_cap.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dieu_kien_phu_dinh",
+      "source": "scripts/test/kiem_tra_dieu_kien_phu_dinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_dieu_kien_phu_dinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dinh_dang",
+      "source": "scripts/test/kiem_tra_dinh_dang.vi",
+      "expected": "scripts/test/expected/kiem_tra_dinh_dang.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_cache",
+      "source": "scripts/test/kiem_tra_dns_cache.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_cache.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_cau_hinh",
+      "source": "scripts/test/kiem_tra_dns_cau_hinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_cau_hinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_goi_tin",
+      "source": "scripts/test/kiem_tra_dns_goi_tin.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_goi_tin.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_hosts",
+      "source": "scripts/test/kiem_tra_dns_hosts.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_hosts.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_search",
+      "source": "scripts/test/kiem_tra_dns_search.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_search.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_dns_transport_day_du",
+      "source": "scripts/test/kiem_tra_dns_transport_day_du.vi",
+      "expected": "scripts/test/expected/kiem_tra_dns_transport_day_du.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_do_thi_build",
+      "source": "scripts/test/kiem_tra_do_thi_build.vi",
+      "stdout": "VPP BUILD GRAPH OK\n",
+      "suite": "full",
+      "platforms": [
+        "Darwin"
+      ],
+      "tooling_test": true
+    },
+    {
+      "id": "kiem_tra_do_thi_module_tu_chu",
+      "source": "scripts/test/kiem_tra_do_thi_module_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_do_thi_module_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_doc_chi_so_ket_qua_goi",
+      "source": "scripts/test/kiem_tra_doc_chi_so_ket_qua_goi.vi",
+      "expected": "scripts/test/expected/kiem_tra_doc_chi_so_ket_qua_goi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_du_lieu_oop",
+      "source": "scripts/test/kiem_tra_du_lieu_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_du_lieu_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_duong_dan_windows",
+      "source": "scripts/test/kiem_tra_duong_dan_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_duong_dan_windows.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_escape_bien_dich_tu_chu",
+      "source": "scripts/test/kiem_tra_escape_bien_dich_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_escape_bien_dich_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_dns",
+      "source": "scripts/test/kiem_tra_ffi_dns.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_dns.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_don_dieu",
+      "source": "scripts/test/kiem_tra_ffi_don_dieu.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_don_dieu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_entropy",
+      "source": "scripts/test/kiem_tra_ffi_entropy.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_entropy.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_gio_dia_phuong",
+      "source": "scripts/test/kiem_tra_ffi_gio_dia_phuong.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_gio_dia_phuong.expected",
+      "suite": "full",
+      "timezone": "EST5EDT,M3.2.0/2,M11.1.0/2"
+    },
+    {
+      "id": "kiem_tra_ffi_http_transport_bat_loi",
+      "source": "scripts/test/kiem_tra_ffi_http_transport_bat_loi.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_http_transport_bat_loi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_local_windows",
+      "source": "scripts/test/kiem_tra_ffi_local_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_local_windows.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_moi_truong",
+      "source": "scripts/test/kiem_tra_ffi_moi_truong.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_moi_truong.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_ngu",
+      "source": "scripts/test/kiem_tra_ffi_ngu.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_ngu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_process_spawn",
+      "source": "scripts/test/kiem_tra_ffi_process_spawn.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_process_spawn.expected",
+      "suite": "full",
+      "platforms": [
+        "Darwin",
+        "Linux"
+      ]
+    },
+    {
+      "id": "kiem_tra_ffi_process_spawn_windows",
+      "source": "scripts/test/kiem_tra_ffi_process_spawn_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_process_spawn_windows.expected",
+      "suite": "full",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    {
+      "id": "kiem_tra_ffi_process_timeout_windows",
+      "source": "scripts/test/kiem_tra_ffi_process_timeout_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_process_timeout_windows.expected",
+      "suite": "full",
+      "platforms": [
+        "Windows"
+      ]
+    },
+    {
+      "id": "kiem_tra_ffi_socket",
+      "source": "scripts/test/kiem_tra_ffi_socket.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_socket.expected",
+      "suite": "full",
+      "http": true
+    },
+    {
+      "id": "kiem_tra_ffi_socket_loi",
+      "source": "scripts/test/kiem_tra_ffi_socket_loi.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_socket_loi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_tep",
+      "source": "scripts/test/kiem_tra_ffi_tep.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_tep.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_thu_muc",
+      "source": "scripts/test/kiem_tra_ffi_thu_muc.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_thu_muc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_thu_muc_windows",
+      "source": "scripts/test/kiem_tra_ffi_thu_muc_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_thu_muc_windows.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_tien_trinh",
+      "source": "scripts/test/kiem_tra_ffi_tien_trinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_tien_trinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_tls",
+      "source": "scripts/test/kiem_tra_ffi_tls.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_tls.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ffi_utc",
+      "source": "scripts/test/kiem_tra_ffi_utc.vi",
+      "expected": "scripts/test/expected/kiem_tra_ffi_utc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_file_dem",
+      "source": "scripts/test/kiem_tra_file_dem.vi",
+      "expected": "scripts/test/expected/kiem_tra_file_dem.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_file_stream_oop",
+      "source": "scripts/test/kiem_tra_file_stream_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_file_stream_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_gc_mvp",
+      "source": "scripts/test/kiem_tra_gc_mvp.vi",
+      "expected": "scripts/test/expected/kiem_tra_gc_mvp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_gia_tri",
+      "source": "scripts/test/kiem_tra_gia_tri.vi",
+      "expected": "scripts/test/expected/kiem_tra_gia_tri.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_giao_dien_trien_khai",
+      "source": "scripts/test/kiem_tra_giao_dien_trien_khai.vi",
+      "expected": "scripts/test/expected/kiem_tra_giao_dien_trien_khai.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_ban_dia_hoa",
+      "source": "scripts/test/kiem_tra_goi_ban_dia_hoa.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_ban_dia_hoa.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_bang_ma",
+      "source": "scripts/test/kiem_tra_goi_bang_ma.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_bang_ma.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_bien_dich",
+      "source": "scripts/test/kiem_tra_goi_bien_dich.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_bien_dich.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_bien_dich_moi",
+      "source": "scripts/test/kiem_tra_goi_bien_dich_moi.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_bien_dich_moi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_bo_suu_tap",
+      "source": "scripts/test/kiem_tra_goi_bo_suu_tap.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_bo_suu_tap.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_cau_hinh",
+      "source": "scripts/test/kiem_tra_goi_cau_hinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_cau_hinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_cong_cu_luu_tru",
+      "source": "scripts/test/kiem_tra_goi_cong_cu_luu_tru.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_cong_cu_luu_tru.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_dau_noi_mang",
+      "source": "scripts/test/kiem_tra_goi_dau_noi_mang.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_dau_noi_mang.expected",
+      "suite": "full",
+      "http": true
+    },
+    {
+      "id": "kiem_tra_goi_db_config",
+      "source": "scripts/test/kiem_tra_goi_db_config.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_db_config.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_dns",
+      "source": "scripts/test/kiem_tra_goi_dns.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_dns.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_dong_goi_ung_dung",
+      "source": "scripts/test/kiem_tra_goi_dong_goi_ung_dung.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_dong_goi_ung_dung.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_dong_thoi",
+      "source": "scripts/test/kiem_tra_goi_dong_thoi.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_dong_thoi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_dung",
+      "source": "scripts/test/kiem_tra_goi_dung.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_dung.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_ham",
+      "source": "scripts/test/kiem_tra_goi_ham.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_ham.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_hoa_hoc",
+      "source": "scripts/test/kiem_tra_goi_hoa_hoc.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_hoa_hoc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_http",
+      "source": "scripts/test/kiem_tra_goi_http.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_http.expected",
+      "suite": "full",
+      "http": true
+    },
+    {
+      "id": "kiem_tra_goi_json",
+      "source": "scripts/test/kiem_tra_goi_json.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_json.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_kich_ban",
+      "source": "scripts/test/kiem_tra_goi_kich_ban.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_kich_ban.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_kiem_thu",
+      "source": "scripts/test/kiem_tra_goi_kiem_thu.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_kiem_thu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_luong_tu",
+      "source": "scripts/test/kiem_tra_goi_luong_tu.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_luong_tu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_luu_tru",
+      "source": "scripts/test/kiem_tra_goi_luu_tru.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_luu_tru.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_mang",
+      "source": "scripts/test/kiem_tra_goi_mang.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_mang.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_mat_ma",
+      "source": "scripts/test/kiem_tra_goi_mat_ma.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_mat_ma.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_may_chu_http",
+      "source": "scripts/test/kiem_tra_goi_may_chu_http.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_may_chu_http.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_ngau_nhien",
+      "source": "scripts/test/kiem_tra_goi_ngau_nhien.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_ngau_nhien.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_nhat_ky_1_0",
+      "source": "scripts/test/kiem_tra_goi_nhat_ky_1_0.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_nhat_ky_1_0.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_nhat_ky_moi",
+      "source": "scripts/test/kiem_tra_goi_nhat_ky_moi.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_nhat_ky_moi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_phan_tich_phu_thuoc",
+      "source": "scripts/test/kiem_tra_goi_phan_tich_phu_thuoc.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_phan_tich_phu_thuoc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_quan_ly_goi",
+      "source": "scripts/test/kiem_tra_goi_quan_ly_goi.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_quan_ly_goi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_regex",
+      "source": "scripts/test/kiem_tra_goi_regex.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_regex.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_repl",
+      "source": "scripts/test/kiem_tra_goi_repl.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_repl.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_soan_thao_tuong_tac",
+      "source": "scripts/test/kiem_tra_goi_soan_thao_tuong_tac.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_soan_thao_tuong_tac.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_tai_lieu",
+      "source": "scripts/test/kiem_tra_goi_tai_lieu.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_tai_lieu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_tap_ban_ghi",
+      "source": "scripts/test/kiem_tra_goi_tap_ban_ghi.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_tap_ban_ghi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_thoi_gian",
+      "source": "scripts/test/kiem_tra_goi_thoi_gian.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_thoi_gian.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_thoi_gian_1_0",
+      "source": "scripts/test/kiem_tra_goi_thoi_gian_1_0.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_thoi_gian_1_0.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_toan_hoc",
+      "source": "scripts/test/kiem_tra_goi_toan_hoc.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_toan_hoc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_tuy_chon",
+      "source": "scripts/test/kiem_tra_goi_tuy_chon.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_tuy_chon.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_van_ban",
+      "source": "scripts/test/kiem_tra_goi_van_ban.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_van_ban.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_vat_ly",
+      "source": "scripts/test/kiem_tra_goi_vat_ly.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_vat_ly.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_xml",
+      "source": "scripts/test/kiem_tra_goi_xml.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_xml.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_xml_dom",
+      "source": "scripts/test/kiem_tra_goi_xml_dom.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_xml_dom.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_goi_zipfs",
+      "source": "scripts/test/kiem_tra_goi_zipfs.vi",
+      "expected": "scripts/test/expected/kiem_tra_goi_zipfs.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ha_tang_oop",
+      "source": "scripts/test/kiem_tra_ha_tang_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_ha_tang_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham",
+      "source": "scripts/test/kiem_tra_ham.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_4_tham_so",
+      "source": "scripts/test/kiem_tra_ham_4_tham_so.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_4_tham_so.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_an_danh",
+      "source": "scripts/test/fixtures/anonymous_functions/entry.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_an_danh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_an_danh_module",
+      "source": "scripts/test/fixtures/anonymous_modules/entry.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_an_danh_module.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_an_danh_tu_chu",
+      "source": "scripts/test/kiem_tra_ham_an_danh_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_an_danh_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_da_tu_khong_nhay",
+      "source": "scripts/test/kiem_tra_ham_da_tu_khong_nhay.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_da_tu_khong_nhay.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ham_tham_so",
+      "source": "scripts/test/kiem_tra_ham_tham_so.vi",
+      "expected": "scripts/test/expected/kiem_tra_ham_tham_so.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_hoi_quy_tong_hop",
+      "source": "scripts/test/kiem_tra_hoi_quy_tong_hop.vi",
+      "expected": "scripts/test/expected/kiem_tra_hoi_quy_tong_hop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_http_client_oop",
+      "source": "scripts/test/kiem_tra_http_client_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_http_client_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_http_may_chu_thuan_vpp",
+      "source": "scripts/test/kiem_tra_http_may_chu_thuan_vpp.vi",
+      "expected": "scripts/test/expected/kiem_tra_http_may_chu_thuan_vpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_http_response_vpp",
+      "source": "scripts/test/kiem_tra_http_response_vpp.vi",
+      "expected": "scripts/test/expected/kiem_tra_http_response_vpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_http_thuan_vpp",
+      "source": "scripts/test/kiem_tra_http_thuan_vpp.vi",
+      "expected": "scripts/test/expected/kiem_tra_http_thuan_vpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_http_transport_bat_loi",
+      "source": "scripts/test/kiem_tra_http_transport_bat_loi.vi",
+      "expected": "scripts/test/expected/kiem_tra_http_transport_bat_loi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_inline_chuoi_gc",
+      "source": "scripts/test/kiem_tra_inline_chuoi_gc.vi",
+      "expected": "scripts/test/expected/kiem_tra_inline_chuoi_gc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ir_bytecode_tu_chu",
+      "source": "scripts/test/kiem_tra_ir_bytecode_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_ir_bytecode_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_jit_mvp",
+      "source": "scripts/test/kiem_tra_jit_mvp.vi",
+      "expected": "scripts/test/expected/kiem_tra_jit_mvp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_an_toan",
+      "source": "scripts/test/kiem_tra_json_an_toan.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_an_toan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_byte_view",
+      "source": "scripts/test/kiem_tra_json_byte_view.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_byte_view.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_byte_view_gc",
+      "source": "scripts/test/kiem_tra_json_byte_view_gc.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_byte_view_gc.expected",
+      "suite": "full",
+      "smoke": true
+    },
+    {
+      "id": "kiem_tra_json_dieu_khien",
+      "source": "scripts/test/kiem_tra_json_dieu_khien.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_dieu_khien.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_escape_byte_view",
+      "source": "scripts/test/kiem_tra_json_escape_byte_view.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_escape_byte_view.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_escape_span",
+      "source": "scripts/test/kiem_tra_json_escape_span.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_escape_span.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_file_roundtrip",
+      "source": "scripts/test/kiem_tra_json_file_roundtrip.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_file_roundtrip.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_integer_overflow_scan",
+      "source": "scripts/test/kiem_tra_json_integer_overflow_scan.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_integer_overflow_scan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_key_scan",
+      "source": "scripts/test/kiem_tra_json_key_scan.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_key_scan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_member_lookup",
+      "source": "scripts/test/kiem_tra_json_member_lookup.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_member_lookup.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_mixed_i32_run",
+      "source": "scripts/test/kiem_tra_json_mixed_i32_run.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_mixed_i32_run.expected",
+      "suite": "full",
+      "smoke": true
+    },
+    {
+      "id": "kiem_tra_json_phan_tich",
+      "source": "scripts/test/kiem_tra_json_phan_tich.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_phan_tich.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_json_utf8",
+      "source": "scripts/test/kiem_tra_json_utf8.vi",
+      "expected": "scripts/test/expected/kiem_tra_json_utf8.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ke_thua",
+      "source": "scripts/test/kiem_tra_ke_thua.vi",
+      "expected": "scripts/test/expected/kiem_tra_ke_thua.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_khai_bao_bien_runtime",
+      "source": "scripts/test/kiem_tra_khai_bao_bien_runtime.vi",
+      "expected": "scripts/test/expected/kiem_tra_khai_bao_bien_runtime.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_khai_bao_kieu_ffi_tu_chu",
+      "source": "scripts/test/kiem_tra_khai_bao_kieu_ffi_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_khai_bao_kieu_ffi_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_khi",
+      "source": "scripts/test/kiem_tra_khi.vi",
+      "expected": "scripts/test/expected/kiem_tra_khi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_khung_bien_module",
+      "source": "scripts/test/kiem_tra_khung_bien_module.vi",
+      "expected": "scripts/test/expected/kiem_tra_khung_bien_module.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_kien_truc_oop_compiler",
+      "source": "scripts/test/kiem_tra_kien_truc_oop_compiler.vi",
+      "expected": "scripts/test/expected/kiem_tra_kien_truc_oop_compiler.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_kieu_dong_call_boundary",
+      "source": "scripts/test/kiem_tra_kieu_dong_call_boundary.vi",
+      "expected": "scripts/test/expected/kiem_tra_kieu_dong_call_boundary.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lambda_hof_mac_dinh",
+      "source": "scripts/test/kiem_tra_lambda_hof_mac_dinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_lambda_hof_mac_dinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lexer_bang_byte",
+      "source": "scripts/test/kiem_tra_lexer_bang_byte.vi",
+      "expected": "scripts/test/expected/kiem_tra_lexer_bang_byte.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lexer_token_gon",
+      "source": "scripts/test/kiem_tra_lexer_token_gon.vi",
+      "expected": "scripts/test/expected/kiem_tra_lexer_token_gon.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lien_ket_module_tu_chu",
+      "source": "scripts/test/kiem_tra_lien_ket_module_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_lien_ket_module_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lien_ket_tu_chu",
+      "source": "scripts/test/kiem_tra_lien_ket_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_lien_ket_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_list_literal",
+      "source": "scripts/test/kiem_tra_list_literal.vi",
+      "expected": "scripts/test/expected/kiem_tra_list_literal.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_logger_oop",
+      "source": "scripts/test/kiem_tra_logger_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_logger_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_loi_can_so_nguyen",
+      "source": "scripts/test/kiem_tra_loi_can_so_nguyen.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_can_so_nguyen.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_chi_so_vuot_pham_vi",
+      "source": "scripts/test/kiem_tra_loi_chi_so_vuot_pham_vi.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_chi_so_vuot_pham_vi.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_chia_cho_0",
+      "source": "scripts/test/kiem_tra_loi_chia_cho_0.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_cho_0.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_chia_du_cho_0",
+      "source": "scripts/test/kiem_tra_loi_chia_du_cho_0.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_du_cho_0.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_chia_du_so_thuc",
+      "source": "scripts/test/kiem_tra_loi_chia_du_so_thuc.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_du_so_thuc.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_chuyen_so_thuc_that_bai",
+      "source": "scripts/test/kiem_tra_loi_chuyen_so_thuc_that_bai.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_chuyen_so_thuc_that_bai.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: thành số thực: giá trị không thể chuyển đổi\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_doc_tep_that_bai",
+      "source": "scripts/test/kiem_tra_loi_doc_tep_that_bai.vi",
+      "suite": "full",
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_doc_tep_that_bai.expected",
+      "stdout": "",
+      "exit": 1,
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: [\\s\\S]*đọc tệp: không thể mở tệp để đọc[\\s\\S]*\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_du_lieu_khong_the_danh_chi_so",
+      "source": "scripts/test/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_gia_tri_khong_the_goi",
+      "source": "scripts/test/kiem_tra_loi_gia_tri_khong_the_goi.vi",
+      "suite": "full",
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_gia_tri_khong_the_goi.expected",
+      "stdout": "",
+      "exit": 1,
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_giam_sai_kieu",
+      "source": "scripts/test/kiem_tra_loi_giam_sai_kieu.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_giam_sai_kieu.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_ham_khong_ton_tai",
+      "source": "scripts/test/kiem_tra_loi_ham_khong_ton_tai.vi",
+      "expected": "scripts/test/expected/kiem_tra_loi_ham_khong_ton_tai.expected",
+      "suite": "full",
+      "diagnostic": "lời gọi chưa phân giải 'hamKhongTonTai'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "kiem_tra_loi_khong_phai_doi_tuong",
+      "source": "scripts/test/kiem_tra_loi_khong_phai_doi_tuong.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_khong_phai_doi_tuong.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_kieu_chi_so",
+      "source": "scripts/test/kiem_tra_loi_kieu_chi_so.vi",
+      "suite": "full",
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_kieu_chi_so.expected",
+      "stdout": "",
+      "exit": 1,
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_phep_tinh_can_so",
+      "source": "scripts/test/kiem_tra_loi_phep_tinh_can_so.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_phep_tinh_can_so.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_phuong_thuc_khong_ton_tai",
+      "source": "scripts/test/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_phuong_thuc_khong_ton_tai.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_sai_so_luong_doi_so",
+      "source": "scripts/test/kiem_tra_loi_sai_so_luong_doi_so.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_sai_so_luong_doi_so.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_so_sanh_khac_kieu",
+      "source": "scripts/test/kiem_tra_loi_so_sanh_khac_kieu.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_so_sanh_khac_kieu.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_tang_sai_kieu",
+      "source": "scripts/test/kiem_tra_loi_tang_sai_kieu.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_tang_sai_kieu.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_tep_co_cau_truc",
+      "source": "scripts/test/kiem_tra_loi_tep_co_cau_truc.vi",
+      "expected": "scripts/test/expected/kiem_tra_loi_tep_co_cau_truc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_loi_tep_gia_thong_bao",
+      "source": "scripts/test/kiem_tra_loi_tep_gia_thong_bao.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_tep_gia_thong_bao.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: đọc tệp: không thể mở tệp để đọc\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_thuoc_tinh_khong_ton_tai",
+      "source": "scripts/test/kiem_tra_loi_thuoc_tinh_khong_ton_tai.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_thuoc_tinh_khong_ton_tai.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_truy_cap_thanh_vien_bi_cam",
+      "source": "scripts/test/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.vi",
+      "suite": "full",
+      "exit": 1,
+      "historical_expected": "scripts/test/expected/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.expected",
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_lop_mo_rong_compiler",
+      "source": "scripts/test/kiem_tra_lop_mo_rong_compiler.vi",
+      "expected": "scripts/test/expected/kiem_tra_lop_mo_rong_compiler.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lop_phuong_thuc_forward",
+      "source": "scripts/test/kiem_tra_lop_phuong_thuc_forward.vi",
+      "expected": "scripts/test/expected/kiem_tra_lop_phuong_thuc_forward.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_lop_truy_cap",
+      "source": "scripts/test/kiem_tra_lop_truy_cap.vi",
+      "expected": "scripts/test/expected/kiem_tra_lop_truy_cap.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_luong_du_lieu",
+      "source": "scripts/test/kiem_tra_luong_du_lieu.vi",
+      "expected": "scripts/test/expected/kiem_tra_luong_du_lieu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_luong_tu_openqasm",
+      "source": "scripts/test/kiem_tra_luong_tu_openqasm.vi",
+      "expected": "scripts/test/expected/kiem_tra_luong_tu_openqasm.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_luong_tu_qiskit",
+      "source": "scripts/test/kiem_tra_luong_tu_qiskit.vi",
+      "expected": "scripts/test/expected/kiem_tra_luong_tu_qiskit.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_luong_vm",
+      "source": "scripts/test/kiem_tra_luong_vm.vi",
+      "expected": "scripts/test/expected/kiem_tra_luong_vm.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_machine_jit",
+      "source": "scripts/test/kiem_tra_machine_jit.vi",
+      "expected": "scripts/test/expected/kiem_tra_machine_jit.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_mang_3_chieu",
+      "source": "scripts/test/kiem_tra_mang_3_chieu.vi",
+      "expected": "scripts/test/expected/kiem_tra_mang_3_chieu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_module_alias_lifecycle",
+      "source": "scripts/test/kiem_tra_module_alias_lifecycle.vi",
+      "expected": "scripts/test/expected/kiem_tra_module_alias_lifecycle.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_module_alias_trung",
+      "source": "scripts/test/kiem_tra_module_alias_trung.vi",
+      "expected": "scripts/test/expected/kiem_tra_module_alias_trung.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_module_khoi_tao_mot_lan",
+      "source": "scripts/test/kiem_tra_module_khoi_tao_mot_lan.vi",
+      "expected": "scripts/test/expected/kiem_tra_module_khoi_tao_mot_lan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_module_lifecycle",
+      "source": "scripts/test/kiem_tra_module_lifecycle.vi",
+      "expected": "scripts/test/expected/kiem_tra_module_lifecycle.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_module_reexport",
+      "source": "scripts/test/kiem_tra_module_reexport.vi",
+      "expected": "scripts/test/expected/kiem_tra_module_reexport.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_namespace_module",
+      "source": "scripts/test/kiem_tra_namespace_module.vi",
+      "expected": "scripts/test/expected/kiem_tra_namespace_module.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_control_flow",
+      "source": "scripts/test/kiem_tra_native_control_flow.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_control_flow.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_facade",
+      "source": "scripts/test/fixtures/native_aot_facade/entry.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_facade.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_ffi_binding",
+      "source": "scripts/test/kiem_tra_native_ffi_binding.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_ffi_binding.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_kich_ban_loi",
+      "source": "scripts/test/kiem_tra_native_kich_ban_loi.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_kich_ban_loi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_oop",
+      "source": "scripts/test/kiem_tra_native_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_oop_snapshot",
+      "source": "scripts/test/kiem_tra_native_oop_snapshot.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_oop_snapshot.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_native_worker",
+      "source": "scripts/test/kiem_tra_native_worker.vi",
+      "expected": "scripts/test/expected/kiem_tra_native_worker.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ngan_xep_oop",
+      "source": "scripts/test/kiem_tra_ngan_xep_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_ngan_xep_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ngoai_le",
+      "source": "scripts/test/kiem_tra_ngoai_le.vi",
+      "expected": "scripts/test/expected/kiem_tra_ngoai_le.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ngoai_le_xuyen_ham",
+      "source": "scripts/test/kiem_tra_ngoai_le_xuyen_ham.vi",
+      "expected": "scripts/test/expected/kiem_tra_ngoai_le_xuyen_ham.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_nhanh_dieu_kien_moi",
+      "source": "scripts/test/kiem_tra_nhanh_dieu_kien_moi.vi",
+      "expected": "scripts/test/expected/kiem_tra_nhanh_dieu_kien_moi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_nhat_ky",
+      "source": "scripts/test/kiem_tra_nhat_ky.vi",
+      "expected": "scripts/test/expected/kiem_tra_nhat_ky.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_noi_chuoi",
+      "source": "scripts/test/kiem_tra_noi_chuoi.vi",
+      "expected": "scripts/test/expected/kiem_tra_noi_chuoi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_o_cam_tcp_oop",
+      "source": "scripts/test/kiem_tra_o_cam_tcp_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_o_cam_tcp_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_object_model",
+      "source": "scripts/test/kiem_tra_object_model.vi",
+      "expected": "scripts/test/expected/kiem_tra_object_model.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_oop_bytecode_tu_chu",
+      "source": "scripts/test/kiem_tra_oop_bytecode_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_oop_bytecode_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_oop_module_tu_chu",
+      "source": "scripts/test/kiem_tra_oop_module_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_oop_module_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_opcode_chon_ca",
+      "source": "scripts/test/kiem_tra_opcode_chon_ca.vi",
+      "expected": "scripts/test/expected/kiem_tra_opcode_chon_ca.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_oracle_chuoi_module",
+      "source": "scripts/test/kiem_tra_oracle_chuoi_module.vi",
+      "expected": "scripts/test/expected/kiem_tra_oracle_chuoi_module.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_oracle_module_tu_chu",
+      "source": "scripts/test/kiem_tra_oracle_module_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_oracle_module_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_package_09",
+      "source": "scripts/test/kiem_tra_package_09.vi",
+      "expected": "scripts/test/expected/kiem_tra_package_09.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_package_modules",
+      "source": "scripts/test/kiem_tra_package_modules.vi",
+      "expected": "scripts/test/expected/kiem_tra_package_modules.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_package_tieng_viet",
+      "source": "scripts/test/kiem_tra_package_tieng_viet.vi",
+      "expected": "scripts/test/expected/kiem_tra_package_tieng_viet.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_phien_bien_dich_oop",
+      "source": "scripts/test/kiem_tra_phien_bien_dich_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_phien_bien_dich_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_process_quote_windows",
+      "source": "scripts/test/kiem_tra_process_quote_windows.vi",
+      "expected": "scripts/test/expected/kiem_tra_process_quote_windows.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_quet_tach_chuoi",
+      "source": "scripts/test/kiem_tra_quet_tach_chuoi.vi",
+      "expected": "scripts/test/expected/kiem_tra_quet_tach_chuoi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_quoc_te_hoa",
+      "source": "scripts/test/kiem_tra_quoc_te_hoa.vi",
+      "expected": "scripts/test/expected/kiem_tra_quoc_te_hoa.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_quy_trinh_oop",
+      "source": "scripts/test/kiem_tra_quy_trinh_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_quy_trinh_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_rc_hardening",
+      "source": "scripts/test/kiem_tra_rc_hardening.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/kiem_tra_rc_hardening.expected"
+    },
+    {
+      "id": "kiem_tra_regression_runner",
+      "source": "scripts/test/kiem_tra_regression_runner.vi",
+      "stdout": "VPP REGRESSION RUNNER OK\n",
+      "suite": "full",
+      "tooling_test": true
+    },
+    {
+      "id": "kiem_tra_receiver_minh",
+      "source": "scripts/test/kiem_tra_receiver_minh.vi",
+      "expected": "scripts/test/expected/kiem_tra_receiver_minh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_receiver_minh_de_quy",
+      "source": "scripts/test/kiem_tra_receiver_minh_de_quy.vi",
+      "expected": "scripts/test/expected/kiem_tra_receiver_minh_de_quy.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_receiver_minh_dieu_khien",
+      "source": "scripts/test/kiem_tra_receiver_minh_dieu_khien.vi",
+      "expected": "scripts/test/expected/kiem_tra_receiver_minh_dieu_khien.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_receiver_minh_nhieu_instance",
+      "source": "scripts/test/kiem_tra_receiver_minh_nhieu_instance.vi",
+      "expected": "scripts/test/expected/kiem_tra_receiver_minh_nhieu_instance.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_rest_json_jwt",
+      "source": "scripts/test/kiem_tra_rest_json_jwt.vi",
+      "expected": "scripts/test/expected/kiem_tra_rest_json_jwt.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_rong_va_map",
+      "source": "scripts/test/kiem_tra_rong_va_map.vi",
+      "expected": "scripts/test/expected/kiem_tra_rong_va_map.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_selfhost_i32_artifact",
+      "source": "scripts/test/kiem_tra_selfhost_i32_artifact.vi",
+      "expected": "scripts/test/expected/kiem_tra_selfhost_i32_artifact.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_semantics_gia_tri",
+      "source": "scripts/test/kiem_tra_semantics_gia_tri.vi",
+      "expected": "scripts/test/expected/kiem_tra_semantics_gia_tri.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_chan_1-20",
+      "source": "scripts/test/kiem_tra_so_chan_1-20.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_chan_1-20.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_chia_het_cho_3_va_4",
+      "source": "scripts/test/kiem_tra_so_chia_het_cho_3_va_4.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_chia_het_cho_3_va_4.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_ham_module_tu_chu",
+      "source": "scripts/test/kiem_tra_so_ham_module_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_ham_module_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_le_chia_het_cho_5",
+      "source": "scripts/test/kiem_tra_so_le_chia_het_cho_5.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_le_chia_het_cho_5.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_nguyen",
+      "source": "scripts/test/kiem_tra_so_nguyen.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_nguyen.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_thuc",
+      "source": "scripts/test/kiem_tra_so_thuc.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_thuc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_socket_hosts",
+      "source": "scripts/test/kiem_tra_socket_hosts.vi",
+      "expected": "scripts/test/expected/kiem_tra_socket_hosts.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_socket_ip",
+      "source": "scripts/test/kiem_tra_socket_ip.vi",
+      "expected": "scripts/test/expected/kiem_tra_socket_ip.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_sort_early_exit",
+      "source": "scripts/test/kiem_tra_sort_early_exit.vi",
+      "expected": "scripts/test/expected/kiem_tra_sort_early_exit.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_sort_merge",
+      "source": "scripts/test/kiem_tra_sort_merge.vi",
+      "expected": "scripts/test/expected/kiem_tra_sort_merge.expected",
+      "suite": "full",
+      "smoke": true
+    },
+    {
+      "id": "kiem_tra_stack_trace",
+      "source": "scripts/test/kiem_tra_stack_trace.vi",
+      "expected": "scripts/test/expected/kiem_tra_stack_trace.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stack_trace_module",
+      "source": "scripts/test/kiem_tra_stack_trace_module.vi",
+      "expected": "scripts/test/expected/kiem_tra_stack_trace_module.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdio_vpp",
+      "source": "scripts/test/kiem_tra_stdio_vpp.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdio_vpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib",
+      "source": "scripts/test/kiem_tra_stdlib.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_crypto",
+      "source": "scripts/test/kiem_tra_stdlib_crypto.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_crypto.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_http",
+      "source": "scripts/test/kiem_tra_stdlib_http.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_http.expected",
+      "suite": "full",
+      "http": true
+    },
+    {
+      "id": "kiem_tra_stdlib_http_manual",
+      "source": "scripts/test/kiem_tra_stdlib_http_manual.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_http_manual.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_http_post_put",
+      "source": "scripts/test/kiem_tra_stdlib_http_post_put.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_http_post_put.expected",
+      "suite": "full",
+      "http": true
+    },
+    {
+      "id": "kiem_tra_stdlib_io_config_time",
+      "source": "scripts/test/kiem_tra_stdlib_io_config_time.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_io_config_time.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_mo_rong",
+      "source": "scripts/test/kiem_tra_stdlib_mo_rong.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_mo_rong.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_nen_tang",
+      "source": "scripts/test/kiem_tra_stdlib_nen_tang.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_nen_tang.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_starter",
+      "source": "scripts/test/kiem_tra_stdlib_starter.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_starter.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_stdlib_tinh_toan",
+      "source": "scripts/test/kiem_tra_stdlib_tinh_toan.vi",
+      "expected": "scripts/test/expected/kiem_tra_stdlib_tinh_toan.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_su_kien",
+      "source": "scripts/test/kiem_tra_su_kien.vi",
+      "expected": "scripts/test/expected/kiem_tra_su_kien.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tai_nguyen_luu_tru_oop",
+      "source": "scripts/test/kiem_tra_tai_nguyen_luu_tru_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_tai_nguyen_luu_tru_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tap_hop_bien_dich_tu_chu",
+      "source": "scripts/test/kiem_tra_tap_hop_bien_dich_tu_chu.vi",
+      "expected": "scripts/test/expected/kiem_tra_tap_hop_bien_dich_tu_chu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ten_kieu_nhieu_tu",
+      "source": "scripts/test/kiem_tra_ten_kieu_nhieu_tu.vi",
+      "expected": "scripts/test/expected/kiem_tra_ten_kieu_nhieu_tu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_thoat_vong_lap",
+      "source": "scripts/test/kiem_tra_thoat_vong_lap.vi",
+      "expected": "scripts/test/expected/kiem_tra_thoat_vong_lap.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_thoi_gian_lich",
+      "source": "scripts/test/kiem_tra_thoi_gian_lich.vi",
+      "expected": "scripts/test/expected/kiem_tra_thoi_gian_lich.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tien_ich_oop",
+      "source": "scripts/test/kiem_tra_tien_ich_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_tien_ich_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tien_trinh_oop",
+      "source": "scripts/test/kiem_tra_tien_trinh_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_tien_trinh_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_toan_tu_bit",
+      "source": "scripts/test/kiem_tra_toan_tu_bit.vi",
+      "expected": "scripts/test/expected/kiem_tra_toan_tu_bit.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_toan_tu_moi",
+      "source": "scripts/test/kiem_tra_toan_tu_moi.vi",
+      "expected": "scripts/test/expected/kiem_tra_toan_tu_moi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tong_hop_khong_xung_dot",
+      "source": "scripts/test/kiem_tra_tong_hop_khong_xung_dot.vi",
+      "expected": "scripts/test/expected/kiem_tra_tong_hop_khong_xung_dot.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tra_ve",
+      "source": "scripts/test/kiem_tra_tra_ve.vi",
+      "expected": "scripts/test/expected/kiem_tra_tra_ve.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_trang_thai_oop",
+      "source": "scripts/test/kiem_tra_trang_thai_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_trang_thai_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tu_vung_oop",
+      "source": "scripts/test/kiem_tra_tu_vung_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_tu_vung_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tuong_thich_oop_toan_thu_vien",
+      "source": "scripts/test/kiem_tra_tuong_thich_oop_toan_thu_vien.vi",
+      "expected": "scripts/test/expected/kiem_tra_tuong_thich_oop_toan_thu_vien.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_tuy_chon_thong_ke",
+      "source": "scripts/test/kiem_tra_tuy_chon_thong_ke.vi",
+      "expected": "scripts/test/expected/kiem_tra_tuy_chon_thong_ke.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_ung_dung_oop",
+      "source": "scripts/test/kiem_tra_ung_dung_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_ung_dung_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_uu_tien_diem_vao",
+      "source": "scripts/test/kiem_tra_uu_tien_diem_vao.vi",
+      "expected": "scripts/test/expected/kiem_tra_uu_tien_diem_vao.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_van_ban_oop",
+      "source": "scripts/test/kiem_tra_van_ban_oop.vi",
+      "expected": "scripts/test/expected/kiem_tra_van_ban_oop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_visibility_instance",
+      "source": "scripts/test/kiem_tra_visibility_instance.vi",
+      "expected": "scripts/test/expected/kiem_tra_visibility_instance.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_vm_ieee754",
+      "source": "scripts/test/kiem_tra_vm_ieee754.vi",
+      "expected": "scripts/test/expected/kiem_tra_vm_ieee754.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiemtrabootstrapvpp",
+      "source": "scripts/test/kiemtrabootstrapvpp.vi",
+      "expected": "scripts/test/expected/kiemtrabootstrapvpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiemtracompilervpp",
+      "source": "scripts/test/kiemtracompilervpp.vi",
+      "expected": "scripts/test/expected/kiemtracompilervpp.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiemtramacdinh",
+      "source": "scripts/test/kiemtramacdinh.vi",
+      "expected": "scripts/test/expected/kiemtramacdinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiemtranativetuchu",
+      "source": "scripts/test/kiemtranativetuchu.vi",
+      "expected": "scripts/test/expected/kiemtranativetuchu.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiemtrathamsotrung",
+      "source": "scripts/test/kiemtrathamsotrung.vi",
+      "expected": "scripts/test/expected/kiemtrathamsotrung.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiểm tra tên tiếng Việt cách từ",
+      "source": "scripts/test/kiểm tra tên tiếng Việt cách từ.vi",
+      "expected": "scripts/test/expected/kiểm tra tên tiếng Việt cách từ.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_aot_index",
+      "source": "scripts/test/fixtures/native_aot_index.vi",
+      "expected": "scripts/test/expected/native_aot_index.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_aot_indirect_slot",
+      "source": "scripts/test/fixtures/native_aot_indirect_slot.vi",
+      "expected": "scripts/test/expected/native_aot_indirect_slot.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_aot_indirect_slot_error",
+      "source": "scripts/test/fixtures/native_aot_indirect_slot_error.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_aot_indirect_slot_error.expected",
+      "exit": 1,
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "native_aot_private_method",
+      "source": "scripts/test/fixtures/native_aot_private_method.vi",
+      "expected": "scripts/test/expected/native_aot_private_method.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_aot_slots",
+      "source": "scripts/test/fixtures/native_aot_slots.vi",
+      "expected": "scripts/test/expected/native_aot_slots.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_asm_join_gc",
+      "source": "scripts/test/fixtures/native_asm_join_gc.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_asm_join_gc.expected"
+    },
+    {
+      "id": "native_dynamic_vpp",
+      "source": "scripts/test/fixtures/native_dynamic_vpp.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_dynamic_vpp.expected"
+    },
+    {
+      "id": "native_exit_scalar",
+      "source": "scripts/test/fixtures/native_exit_scalar.vi",
+      "expected": "scripts/test/expected/native_exit_scalar.expected",
+      "suite": "full",
+      "exit": 42
+    },
+    {
+      "id": "native_file_seek",
+      "source": "scripts/test/fixtures/native_file_seek.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_file_seek.expected",
+      "args": [
+        "seek-ệ.bin"
+      ],
+      "absent": [
+        "seek-ệ.bin"
+      ]
+    },
+    {
+      "id": "native_frame_pool_gc",
+      "source": "scripts/test/fixtures/native_frame_pool_gc.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_frame_pool_gc.expected"
+    },
+    {
+      "id": "native_i32_backend_calls",
+      "source": "scripts/test/fixtures/native_i32_backend_calls.vi",
+      "expected": "scripts/test/expected/native_i32_backend_calls.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_i32_call_chain",
+      "source": "scripts/test/fixtures/native_i32_call_chain.vi",
+      "expected": "scripts/test/expected/native_i32_call_chain.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_i32_direct_calls",
+      "source": "scripts/test/fixtures/native_i32_direct_calls.vi",
+      "expected": "scripts/test/expected/native_i32_direct_calls.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_i32_expression",
+      "source": "scripts/test/fixtures/native_i32_expression.vi",
+      "expected": "scripts/test/expected/native_i32_expression.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_i32_expression_calls",
+      "source": "scripts/test/fixtures/native_i32_expression_calls.vi",
+      "expected": "scripts/test/expected/native_i32_expression_calls.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_i32_expression_error",
+      "source": "scripts/test/fixtures/native_i32_expression_error.vi",
+      "suite": "full",
+      "expected": "scripts/test/expected/native_i32_expression_error.expected",
+      "exit": 1
+    },
+    {
+      "id": "native_i32_nested_calls",
+      "source": "scripts/test/fixtures/native_i32_nested_calls.vi",
+      "expected": "scripts/test/expected/native_i32_nested_calls.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_linux_heap_capacity",
+      "source": "scripts/test/fixtures/native_linux_heap_capacity.vi",
+      "expected": "scripts/test/expected/native_linux_heap_capacity.expected",
+      "suite": "full",
+      "platforms": [
+        "Linux"
+      ]
+    },
+    {
+      "id": "native_loop_stack_gc",
+      "source": "scripts/test/fixtures/native_loop_stack_gc.vi",
+      "expected": "scripts/test/expected/native_loop_stack_gc.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_path_kind",
+      "source": "scripts/test/fixtures/native_path_kind.vi",
+      "expected": "scripts/test/expected/native_path_kind.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_protected_loop",
+      "source": "scripts/test/fixtures/native_protected_loop.vi",
+      "expected": "scripts/test/expected/native_protected_loop.expected",
+      "suite": "full"
+    },
+    {
+      "id": "native_return_semantics",
+      "source": "scripts/test/fixtures/native_return_semantics.vi",
+      "expected": "scripts/test/expected/native_return_semantics.expected",
+      "suite": "full",
+      "exit": 42
+    },
+    {
+      "id": "program",
+      "source": "scripts/test/program.vi",
+      "expected": "scripts/test/expected/program.expected",
+      "suite": "full"
+    },
+    {
+      "id": "rc-malformed",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-class",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-class.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-expression",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-expression.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-function",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-function.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-import",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-import.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-interface",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-interface.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-list",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-list.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-map",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-map.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-string",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-string.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "rc-malformed-try",
+      "source": "scripts/test/fixtures/rc_malformed/rc-malformed-try.vi",
+      "suite": "full",
+      "compile_reject": true
+    },
+    {
+      "id": "vm_asm",
+      "source": "scripts/test/fixtures/vm_asm.vi",
+      "expected": "scripts/test/expected/vm_asm.expected",
+      "suite": "full"
+    },
+    {
+      "id": "vm_tls_crypto",
+      "source": "scripts/test/fixtures/vm_tls_crypto.vi",
+      "expected": "scripts/test/expected/vm_tls_crypto.expected",
+      "suite": "full"
+    },
+    {
+      "id": "i32-bulk",
+      "source": "scripts/test/nativeaotbulk.vi",
+      "suite": "i32",
+      "cmake": "checknativebulk.cmake"
+    },
+    {
+      "id": "i32-bytefile",
+      "source": "scripts/test/nativeaotbytefile.vi",
+      "suite": "i32",
+      "cmake": "checknativebytefile.cmake"
+    },
+    {
+      "id": "i32-bytesops",
+      "source": "scripts/test/nativeaotbytesops.vi",
+      "suite": "i32",
+      "cmake": "checknativebytesops.cmake"
+    },
+    {
+      "id": "i32-codegen",
+      "source": "scripts/test/nativecodegenharness.vi",
+      "suite": "i32",
+      "cmake": "checknativecodegen.cmake",
+      "platforms": [
+        "Darwin"
+      ]
+    },
+    {
+      "id": "i32-lexer",
+      "source": "scripts/test/nativelexerharness.vi",
+      "suite": "i32",
+      "cmake": "checknativelexer.cmake"
+    },
+    {
+      "id": "i32-parser",
+      "source": "scripts/test/nativeparserharness.vi",
+      "suite": "i32",
+      "cmake": "checknativeparser.cmake"
+    },
+    {
+      "id": "i32-print",
+      "source": "scripts/test/nativeaotprint.vi",
+      "suite": "i32",
+      "cmake": "checknativeprint.cmake"
+    },
+    {
+      "id": "i32-program",
+      "source": "scripts/test/nativeaotprogram.vi",
+      "suite": "i32",
+      "exit": 42,
+      "stdout": ""
+    },
+    {
+      "id": "i32-read",
+      "source": "scripts/test/nativeaotread.vi",
+      "suite": "i32",
+      "cmake": "checknativeread.cmake"
+    },
+    {
+      "id": "rc-dump-ast",
+      "source": "scripts/test/kiem_tra_rc_hardening.vi",
+      "suite": "full",
+      "dump": "dump-ast"
+    },
+    {
+      "id": "rc-dump-ir",
+      "source": "scripts/test/kiem_tra_rc_hardening.vi",
+      "suite": "full",
+      "dump": "dump-ir"
+    },
+    {
+      "id": "rc-disassemble",
+      "source": "scripts/test/kiem_tra_rc_hardening.vi",
+      "suite": "full",
+      "dump": "disassemble"
+    },
+    {
+      "id": "native-aot-index-0",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "âm"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-1",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "cuối"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-2",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "kiểu"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-3",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "danh sách"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-4",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "phép toán"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-5",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "truy cập"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-6",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "tham số"
+      },
+      "exit": 1,
+      "stdout": ""
+    },
+    {
+      "id": "native-aot-index-7",
+      "source": "scripts/test/fixtures/native_aot_index_error.vi",
+      "suite": "full",
+      "env": {
+        "VPP_AOT_TEST_ERROR": "utf8"
+      },
+      "exit": 0,
+      "stdout": "đã bỏ qua lỗi\n",
+      "run_forbidden_regex": "error=3"
+    },
+    {
+      "id": "native-aot-private-shadow",
+      "source": "scripts/test/fixtures/native_aot_private_shadow.vi",
+      "suite": "full",
+      "exit": 1,
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
+    },
+    {
+      "id": "standalone-vm-core",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm.vi",
+      "vm_phase": "core",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/vm_asm_host.vi",
+        "scripts/test/fixtures/native_heap_allocator.vi"
+      ]
+    },
+    {
+      "id": "standalone-vm-system",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm_system.vi",
+      "vm_phase": "system",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/native_system_boundary.vi"
+      ]
+    },
+    {
+      "id": "standalone-vm-directory",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm_directory.vi",
+      "vm_phase": "directory",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/native_directory_decode.vi"
+      ]
+    },
+    {
+      "id": "standalone-vm-process",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm_process.vi",
+      "sources": [
+        "scripts/test/fixtures/vm_asm_process_windows.vi"
+      ],
+      "vm_phase": "process",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "standalone-vm-resolver",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm_resolver.vi",
+      "vm_phase": "resolver",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/vm_asm_resolver_dns.vi",
+        "scripts/test/fixtures/native_dns_mock.vi"
+      ]
+    },
+    {
+      "id": "standalone-vm-socket",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm_socket.vi",
+      "vm_phase": "socket",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "standalone-vm-socket-negative",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_asm.vi",
+      "vm_phase": "socket_negative",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "standalone-vm-tls",
+      "suite": "full",
+      "source": "scripts/test/fixtures/vm_tls_crypto.vi",
+      "vm_phase": "tls",
+      "platforms": [
+        "Darwin",
+        "Linux",
+        "Windows"
+      ],
+      "weight_ms": 600000
+    },
+    {
+      "id": "linker-reader",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_macho_reader.vi",
+      "linker_phase": "reader",
+      "platforms": [
+        "Darwin"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "linker-layout",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_macho_layout.vi",
+      "linker_phase": "layout",
+      "platforms": [
+        "Darwin"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "linker-patch",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_macho_patch.vi",
+      "linker_phase": "patch",
+      "platforms": [
+        "Darwin"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "linker-executable",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_macho_executable.vi",
+      "linker_phase": "executable",
+      "platforms": [
+        "Darwin"
+      ],
+      "weight_ms": 180000
+    },
+    {
+      "id": "linker-direct-object",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_macho_dynamic_object.vi",
+      "linker_phase": "direct-object",
+      "platforms": [
+        "Darwin"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/native_macho_paged_relocations.vi",
+        "scripts/test/fixtures/native_arm64_chunked_object.vi"
+      ]
+    },
+    {
+      "id": "linker-elf-partial",
+      "suite": "i32",
+      "source": "scripts/test/fixtures/native_elf_partial_linker_archive.vi",
+      "linker_phase": "elf-partial",
+      "platforms": [
+        "Linux"
+      ],
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/native_elf_linker_archive.vi"
+      ]
+    },
+    {
+      "id": "i32-runtime",
+      "suite": "i32",
+      "source": "scripts/test/fixtures/native_runtime.vi",
+      "cmake": "check_native_runtime.cmake",
+      "platforms": [
+        "Darwin",
+        "Linux"
+      ]
+    },
+    {
+      "id": "native-source-paths",
+      "suite": "full",
+      "source": "scripts/test/fixtures/native_source_paths.vi",
+      "stdout": "SOURCE PATH ROOTS OK\n"
+    },
+    {
+      "id": "i32-calls",
+      "source": "scripts/test/kiem_tra_native_calls.vi",
+      "suite": "i32",
+      "stdout": "7\n1\n17\n120\n5040\n12\n0\n34\n22\n2\n55\n55\n5\n"
+    },
+    {
+      "id": "i32-bit",
+      "source": "scripts/test/fixtures/native_bit_i32_driver.vi",
+      "suite": "i32",
+      "expected": "scripts/test/expected/native_bit_i32_driver.expected",
+      "sources": [
+        "scripts/test/fixtures/native_bit_i32.vi"
+      ]
+    },
+    {
+      "id": "i32-logical-side-effects",
+      "source": "scripts/test/fixtures/native_logical_side_effects_driver.vi",
+      "suite": "i32",
+      "expected": "scripts/test/expected/native_logical_side_effects_driver.expected",
+      "sources": [
+        "scripts/test/fixtures/native_logical_side_effects.vi"
+      ],
+      "pending": "Historical assignment expressions inside &&/|| are not supported by the current i32 parser (build exit 14); equivalent callable side effects are covered by i32-logical-call-side-effects."
+    },
+    {
+      "id": "i32-boundaries",
+      "source": "scripts/test/native_i32_boundaries_driver.vi",
+      "suite": "i32",
+      "stdout": "-2147483648\n2147483647\n2147483647\n-2147483648\n",
+      "sources": [
+        "scripts/test/kiem_tra_native_i32_boundaries.vi"
+      ],
+      "pending": "Historical parenthesized -(2147483648) is rejected by the current i32 parser (build exit 14); direct INT32_MIN remains covered by i32-print and i32-runtime."
+    },
+    {
+      "id": "native-leaf-architectures",
+      "source": "scripts/test/kiem_tra_native_leaf_vi.vi",
+      "suite": "full",
+      "stdout": "native_leaf_vi_ok\n"
+    },
+    {
+      "id": "i32-logical-call-side-effects",
+      "source": "scripts/test/fixtures/native_logical_call_side_effects.vi",
+      "suite": "i32",
+      "expected": "scripts/test/expected/native_logical_side_effects_driver.expected"
+    }
+  ],
+  "unregistered_sources": {
+    "scripts/test/bootstrapstage2.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/fixtures/anonymous_modules/counter.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/controller.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/database.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/dto.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/entity.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/giao_dien/controller.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/giao_dien/mapper.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/giao_dien/repository.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/giao_dien/service.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/mapper.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/repository.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/api_project/service.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/body-changed-dep.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/cache-key-probe.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/cache-payload-probe.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/extra-main.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/extra.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/initial-dep.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/initial-main.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/repaired-main.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_incremental/signature-changed-dep.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/inspect-archive.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/inspect-object.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/link-filesystem-policy.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/link-publish.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/link-temporary-path.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/link-validate-paths.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/policy-source.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/probe-runtime-fifo.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/runtime-path.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/wrap-single-object.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_native_vpp_runtime/write-archive-object.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_oop_pipeline/api.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_oop_pipeline/captured_receiver.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_oop_pipeline/inheritance.vi": "Specialized harness needs review/port: check_selective_imports.cmake",
+    "scripts/test/fixtures/check_oop_pipeline/missing_interface.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/check_oop_pipeline/stdlib_collection.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/closure.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/compiler_module.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/embedded_native.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/empty.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/i32.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/checkcompilervpp/lib/math.vi": "Specialized harness needs review/port: check_compiler_workers.cmake, check_windows_coff_selfhosting_docker.sh",
+    "scripts/test/fixtures/checkcompilervpp/main.vi": "Specialized harness needs review/port: checknativedriver.cmake, checknativeprogram.cmake, check_macos_native_macho_linker.sh, check_compiler_workers.cmake",
+    "scripts/test/fixtures/compiler_oracle/app/main.vi": "Specialized harness needs review/port: checknativedriver.cmake, checknativeprogram.cmake, check_macos_native_macho_linker.sh, check_compiler_workers.cmake",
+    "scripts/test/fixtures/compiler_oracle/lib/feature.vi": "Specialized harness needs review/port: check_compiler_workers.cmake",
+    "scripts/test/fixtures/compiler_oracle/lib/math.vi": "Specialized harness needs review/port: check_compiler_workers.cmake, check_windows_coff_selfhosting_docker.sh",
+    "scripts/test/fixtures/compiler_oracle/oop/lib/core.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/compiler_oracle/string_order/app/main.vi": "Specialized harness needs review/port: checknativedriver.cmake, checknativeprogram.cmake, check_macos_native_macho_linker.sh, check_compiler_workers.cmake",
+    "scripts/test/fixtures/compiler_oracle/string_order/lib/math.vi": "Specialized harness needs review/port: check_compiler_workers.cmake, check_windows_coff_selfhosting_docker.sh",
+    "scripts/test/fixtures/kiem_tra_khung_bien_module.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/module_reexport/api.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/module_reexport/toan.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_aot_driver_plan.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_aot_facade/gói/demo/chuyển tiếp.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_aot_facade/gói/demo/chính.vi": "Specialized harness needs review/port: check_selective_imports.cmake, check_vm_asm.cmake, prepare_vm_asm.cmake",
+    "scripts/test/fixtures/native_aot_facade/gói/demo/phép cộng.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_aot_facade/gói/demo/toán.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_aot_hash.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_direct_asm.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/native_elf_linker_runtime.vi": "Covered by existing Linux bootstrap convergence gate (check_native_elf_linker.sh), independent exit 42 and ELF audit.",
+    "scripts/test/fixtures/native_object_symbol_index.vi": "Covered by native CI object symbol index gate; checks ELF and COFF relocation indices with an independent Python oracle.",
+    "scripts/test/fixtures/oop_pipeline/api.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/oop_pipeline/base.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/stack_trace/module_loi.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/fixtures/temporary_frame_probe.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/http_fixture.vi": "HTTP server fixture",
+    "scripts/test/kiem_tra_asm_cache.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_cai_dat_cicd.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_chinh_sach_retry.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_hosts_resolver.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_ket_qua_mot_loai.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_resolver_day_du.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_tcp_fallback.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_tcp_negative.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_dns_transport_mang.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_dns_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_entropy_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_local_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_moi_truong_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_nen_tang_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_ngu_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_process_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_socket_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_socket_phan_giai_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_tep_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_thu_muc_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_tls_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_ffi_opcode_utc_cu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_goi_tuong_minh_tu_chu.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_goi_uri.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_khoi_tao_module_oop.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_kien_truc_vi.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_luong_tu_vpp_local.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_native_leaf.vi": "Specialized harness needs review/port: check_native_object_cli.cmake",
+    "scripts/test/kiem_tra_native_machine_vi.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_native_unary.vi": "Specialized harness needs review/port: check_raw_machine_cli.cmake",
+    "scripts/test/kiem_tra_package_git.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_package_registry.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiem_tra_socket_dns_vi.vi": "Specialized harness needs review/port: check_socket_dns_vi.cmake",
+    "scripts/test/kiem_tra_socket_vi_only.vi": "Specialized harness needs review/port: check_socket_hosts.cmake",
+    "scripts/test/kiem_tra_windows_install.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/kiểm tra object writer.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/modules/lifecycle_leaf.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/modules/lifecycle_mid.vi": "Module/support fixture or specialized entry; no standalone golden registered",
+    "scripts/test/modules/math.vi": "Specialized harness needs review/port: check_compiler_workers.cmake, check_windows_coff_selfhosting_docker.sh",
+    "scripts/test/native_elf_x86_harness.vi": "Standalone candidate without registered oracle; requires porting",
+    "scripts/test/nativeaotsmoke.vi": "Specialized harness needs review/port: checknativeselfhost.cmake",
+    "scripts/test/parent.vi": "Specialized harness needs review/port: checknativedriver.cmake",
+    "scripts/test/shared.vi": "Module/support fixture or specialized entry; no standalone golden registered"
+  }
+}

@@ -328,6 +328,9 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy xóa vùng nhớ") == 1) { trả về 79; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot gọi i32") == 1) { trả về 80; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot gập i32") == 1) { trả về 81; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sao chép vùng nhớ") == 1) { trả về 82; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiền tố ascii") == 1) { trả về 83; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy dịch tệp mở") == 1) { trả về 84; };
     trả về -1;
 };
 
@@ -414,6 +417,9 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 79) { trả về 2; };
     nếu (mã định danh == 80) { trả về 3; };
     nếu (mã định danh == 81) { trả về 2; };
+    nếu (mã định danh == 82) { trả về 3; };
+    nếu (mã định danh == 83) { trả về 2; };
+    nếu (mã định danh == 84) { trả về 3; };
     trả về -1;
 };
 

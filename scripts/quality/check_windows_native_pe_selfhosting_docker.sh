@@ -23,7 +23,8 @@ python3 "$root/scripts/quality/check_native_executable_layout.py" "$out/stage1.e
 python3 "$root/scripts/quality/check_native_runtime_linker_inputs.py" pe \
     "$seed" "$out/windows-runtime.obj" "$out/input-regressions"
 printf 'hàm chính() { trả về 52; };\n' > "$out/gói thử nghiệm 𠮷.vi"
-printf 'hàm chính() { trả về máy đặt quyền tệp mở(-1,448); };\n' > "$out/runtime.vi"
+# Compare signed i32 inside V++; use a portable positive process exit code.
+printf 'hàm chính() { nếu (máy đặt quyền tệp mở(-1,448) == -1) { trả về 73; }; trả về 1; };\n' > "$out/runtime.vi"
 printf 'old output must survive\n' > "$out/preserved.exe"
 cp "$out/preserved.exe" "$out/expected"
 printf 'bad COFF object\n' > "$out/malformed.obj"
@@ -66,7 +67,7 @@ docker run --rm --platform linux/amd64 --memory=3g --pids-limit=128 \
         actual=$?
         set -e
         expected=52
-        test "$name" != runtime || expected=255
+        test "$name" != runtime || expected=73
         test "$actual" -eq "$expected" || {
             echo "PE probe $name exit=$actual expected=$expected" >&2; exit 1;
         }

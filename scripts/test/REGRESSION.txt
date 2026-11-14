@@ -1,0 +1,98 @@
+V++ native regression tests
+==========================
+
+Source fixtures and expected outputs remain in scripts/test. regression.json
+registers the tests and accounts for all other .vi files, including imported
+modules and special-purpose fixtures. The runner rejects new visible source
+files or golden snapshots that are not recorded in the manifest.
+Use --inventory for current counts of active, pending and supporting sources.
+Some cases use multiple sources or run an entire historical harness.
+
+Run from the repository after building the V++ compiler:
+
+  ./run_tests.sh --inventory
+  ./run_tests.sh --list
+  ./run_tests.sh --suite smoke
+  ./run_tests.sh --case native_return_semantics
+  ./run_tests.sh --shard-count 16 --shard-index 0
+  ./run_tests.sh build-pure-vpp/bin/vpp-i32 --suite i32
+
+Build a reusable test artifact once, then run it without compiling again:
+
+  ./run_tests.sh --phase build --artifacts build-pure-vpp/regression-tests/full --jobs 1
+  ./run_tests.sh --phase run --artifacts build-pure-vpp/regression-tests/full
+  ./run_tests.sh --phase run --artifacts build-pure-vpp/regression-tests/full --case native_return_semantics
+
+The build phase saves executables and DNS/HTTP helpers. Compiler rejection,
+compiler dump, linker and standalone VM harness assertions run in the build
+phase and are explicitly reported as "checked during build" on subsequent
+runs. The run phase executes the saved ordinary test binaries in fresh,
+isolated directories and never invokes the compiler or rebuilds missing files.
+It rejects artifacts from a different compiler, source corpus, suite or platform.
+Use a new or empty artifact directory for a new build. The default combined
+mode remains available for local development.
+
+On Windows, use the same manifest and package environment as CI:
+
+  ./scripts/windows/run-tests.ps1 -Inventory
+  ./scripts/windows/run-tests.ps1 -VppExecutable C:/vpp/bin/vpp-native.exe -Suite full -Clang C:/msys64/clang64/bin/clang.exe
+  ./scripts/windows/run-tests.ps1 -VppExecutable C:/vpp/bin/vpp-i32.exe -Suite i32 -Clang C:/msys64/clang64/bin/clang.exe
+
+The PowerShell entrypoint also supports -Suite smoke, -Case, -List, -Timeout,
+-Jobs, -BatchSize, -ModuleSuites, -ShardCount, -ShardIndex, -Phase and -Artifacts. It forwards the selected compiler and
+preserves the regression runner's exit status. It requires Python and the
+packaged Windows runtime, not the retired host CLI or Bash test arrays.
+
+  ctest --test-dir build-pure-vpp -L smoke --output-on-failure
+  ctest --test-dir build-pure-vpp -L regression --output-on-failure
+  ctest --test-dir build-pure-vpp -L i32 --output-on-failure
+
+The default run_tests.sh suite is the complete registered full-native suite,
+not the five-test smoke suite. The full suite compiles each .vi independently,
+runs it in an isolated temporary working directory, compares stdout against
+the pre-existing golden (only CRLF is normalized) and checks exit status.
+Negative tests require the expected build rejection or exact runtime error
+code, exit status and empty stdout. Legacy text diagnostics are preserved in
+historical_expected; the pure AOT runtime currently reports numeric codes.
+The structured file-error fixture checks the original full output. The DNS mock checks 23 modes and the HTTP server must become ready
+on localhost; a denied bind is a failure, not a passing skip. Every failed
+build/run has separate stdout, stderr and status logs. Results are stored in
+a fresh run directory under --logs (default build-pure-vpp/regression-logs).
+--timeout specifies a per-process timeout in seconds (default 900).
+Standalone VM phases have a longer harness timeout and preserve nested
+diagnostics under vm-diagnostics. The manifest also registers deterministic
+compiler dumps, native linker oracles, and standalone VM core, system,
+directory, process, resolver, UDP socket, negative socket and TLS tests. The i32 bit
+driver compares 3249 results against the historical arithmetic oracle.
+
+CI builds and publishes the full compiler and prebuilt full/i32 test artifacts
+once per platform. Each of macOS ARM64, Linux x86-64 and Windows x86-64 has one
+regression job, with no shard matrix. The build job checks compiler batch
+parity (and packaged Linux platform objects), completes compiler/linker/VM
+harness checks, and compiles ordinary fixtures with one worker. The regression
+job downloads both artifacts and uses --phase run to execute the saved tests
+sequentially. Re-running a failed regression job reuses the same artifacts;
+it does not rebuild the compiler, runtime, fixtures or helper servers.
+HTTP clients share a server; the nested regression-runner fixture runs before
+that server starts. Mach-O codegen and linker oracles remain Darwin-only;
+ELF partial-linker oracles remain Linux-only. Build logs and run logs are
+uploaded separately for each platform. Initial package probes and
+source/extension/inventory checks remain in place.
+
+Pending and platform-unsupported cases are reported separately from passes.
+Pending cases include retired JIT execution modes and two historical i32 syntax forms (assignment inside
+short-circuit expressions and parenthesized INT32_MIN). The supported i32
+callable short-circuit fixture still checks observable side effects. Raw
+C host ABI cross-link parity is retired. The compatibility process entrypoint
+now runs the maintained V++/ASM process phase on the host architecture;
+the CI platform matrix covers the other architectures. The socket phase
+runs guest UDP ownership/send checks and fail-closed argument/TLS checks;
+it does not claim the retired C harness's TCP/EINTR/FD-count coverage.
+The unregistered_sources inventory identifies supporting
+modules and remaining specialized tests which still need independent oracles
+or ported harnesses. Do not generate expected output from the compiler being
+tested or remove tests from the manifest to make CI green.
+
+When adding a test, add a .vi file, an independent golden or other
+historical/explicit oracle, and register it in regression.json. If a .vi file
+is a helper, record its role in unregistered_sources instead.

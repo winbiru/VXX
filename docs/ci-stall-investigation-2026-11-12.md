@@ -175,9 +175,9 @@ Bootstrap compiler trước/sau vào hai thư mục riêng bằng
 
 ```sh
 "$compiler" --batch-run-tests "$results" \
-  "$root/src/tests/kiem_tra_package_modules.vi" \
-  "$root/src/tests/kiem_tra_package_modules.vi" \
-  "$root/src/tests/kiem_tra_stdlib_tinh_toan.vi"
+  "$root/scripts/test/kiem_tra_package_modules.vi" \
+  "$root/scripts/test/kiem_tra_package_modules.vi" \
+  "$root/scripts/test/kiem_tra_stdlib_tinh_toan.vi"
 ```
 
 Bằng chứng cục bộ nằm trong `build-ci-stall/measured-baseline/`,

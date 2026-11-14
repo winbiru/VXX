@@ -1,0 +1,64 @@
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.đường dẫn.*;
+
+hàm run_tool(tool, args) {
+    k = chạy tiến trình(tool, args, {}, 30000);
+    khẳng định đúng(k["khởi chạy"] && k["mã thoát"] == 0, tool + ": " + k["đầu ra"] + k["lỗi"]);
+};
+hàm cmake_run(args) { run_tool(đọc biến môi trường("VPP_TEST_CMAKE", "cmake"), args); };
+hàm build_graph(build, target) {
+    args = ["--build", build, "--parallel", "8"];
+    nếu (target != "") { máy ảo thêm cuối danh sách(args, "--target"); máy ảo thêm cuối danh sách(args, target); };
+    cmake_run(args);
+};
+hàm graph_log(build, expected) { khẳng định bằng(đọc tệp(build + "/invocations.log"), expected, "build graph invocations"); };
+hàm graph_fixture(root, work, target) {
+    source = work + "/source"; build = work + "/build";
+    tạo thư mục(source);
+    sao chép tệp(root + "/CMakeLists.txt", source + "/CMakeLists.txt");
+    parts = ["bootstrap/macos-arm64/vpp-native", "bootstrap/macos-arm64/vpp-i32", "bootstrap/macos-arm64/SHA256SUMS", "scripts/build-vpp-aot-runtime.sh", "scripts/build-vpp-progress.sh", "scripts/macos/vpp-native-launcher.sh.in", "gói/máy ảo/chính.vi", "scripts/ASM/fixture.inc", "vpp-language.json", "vpp-libraries.json"];
+    lặp(i = 0; i < độ dài(parts); i++) {
+        path = source + "/" + parts[i];
+        tạo thư mục(đường dẫn cha(path)); ghi tệp(path, "");
+    };
+    // Fake toolchain only publishes the outputs CMake declares. The test exercises the real dependency graph.
+    bootstrap = "#!/bin/bash\nset -eu\nroot=$1\nmkdir -p \"$root\"\nprintf 'bootstrap\\n' >> \"$root/invocations.log\"\nprintf '%s' \"${@: -1}\" > \"$root/bootstrap-mode.log\"\nmkdir \"$root/bootstrap-active\"\ntrap 'rmdir \"$root/bootstrap-active\"' EXIT\nsleep 0.3\nmkdir -p \"$root/bin\" \"$root/native-vpp-runtime\"\nprintf 'compiler\\n' > \"$root/bin/vpp-native\"\nprintf 'compiler\\n' > \"$root/bin/vpp\"\ncp \"$(dirname \"$0\")/fake-vm.sh\" \"$root/bin/vpp-i32\"\nchmod +x \"$root/bin/vpp-i32\"\nfor part in runtime.o platform.o dynamic-bridge.o; do printf 'object\\n' > \"$root/native-vpp-runtime/$part\"; done\n";
+    vm = "#!/bin/bash\nset -eu\noutput=${@: -1}\nroot=$(dirname \"$(dirname \"$output\")\")\ntest -f \"$root/bin/vpp-native\"\ntest -f \"$root/native-vpp-runtime/runtime.o\"\nprintf 'vm\\n' >> \"$root/invocations.log\"\nprintf 'shared VM\\n' > \"$output\"\nchmod +x \"$output\"\n";
+    ghi tệp(source + "/scripts/macos/build-vpp-cli.sh", bootstrap);
+    ghi tệp(source + "/scripts/macos/fake-vm.sh", vm);
+    cmake_run(["-G", "Unix Makefiles", "-S", source, "-B", build, "-DBUILD_TESTING=OFF"]);
+    build_graph(build, target); graph_log(build, "bootstrap\nvm\n");
+    build_graph(build, target); graph_log(build, "bootstrap\nvm\n");
+    run_tool("/bin/sleep", ["1.05"]); run_tool("/usr/bin/touch", [build + "/bin/vpp-i32"]);
+    build_graph(build, target); graph_log(build, "bootstrap\nvm\nvm\n");
+    run_tool("/bin/sleep", ["1.05"]); ghi tệp(source + "/gói/máy ảo/chính.vi", "updated VM source\n");
+    expected = "bootstrap\nvm\nvm\nbootstrap\nvm\n";
+    build_graph(build, target); graph_log(build, expected);
+    build_graph(build, target); graph_log(build, expected);
+    cmake_run(["--install", build, "--prefix", work + "/installed"]);
+    khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-vm"), "shared VM\n");
+    khẳng định bằng(đọc tệp(build + "/bootstrap-mode.log"), "OFF");
+    prepared = work + "/prepared"; tạo thư mục(prepared);
+    parts = ["vpp-i32", "runtime.o", "platform.o", "dynamic-bridge.o"];
+    lặp(i = 0; i < độ dài(parts); i++) { ghi tệp(prepared + "/" + parts[i], ""); };
+    modes = ["ON", "OFF"];
+    lặp(i = 0; i < 2; i++) {
+        mode = modes[i]; run_tool("/bin/sleep", ["1.05"]);
+        cmake_run(["-S", source, "-B", build, "-DVPP_PREBUILT_I32_RUNTIME=" + prepared, "-DVPP_CI_PINNED_FULL_STAGE1=" + mode]);
+        expected = expected + "bootstrap\nvm\n";
+        build_graph(build, target); graph_log(build, expected);
+        khẳng định bằng(đọc tệp(build + "/bootstrap-mode.log"), mode);
+        build_graph(build, target); graph_log(build, expected);
+    };
+};
+hàm chính() {
+    root = đọc biến môi trường("VPP_TEST_ROOT", ""); work = đọc biến môi trường("VPP_TEST_WORK", "");
+    khẳng định đúng(root != "" && work != "", "missing test paths");
+    graph_fixture(root, work + "/all targets", "");
+    graph_fixture(root, work + "/vm target", "vpp-vm");
+    in "VPP BUILD GRAPH OK";
+};

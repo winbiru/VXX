@@ -97,7 +97,8 @@ hàm vm_resolver_dns(state, host) {
         nếu (path == 0 || vm_get(path, 1) == 0) {
             biến executable = vm_get(4198464, 10); biến slash = -1;
             lặp(i = 0; i < vm_get(executable, 1); i++) {
-                nếu (máy đọc byte(vm_get(executable, 2) + i) == 47) { slash = i; };
+                biến c = máy đọc byte(vm_get(executable, 2) + i);
+                nếu (c == 47 || (vm_get(4198464, 8) == 2 && c == 92)) { slash = i; };
             };
             path = vm_concat(vm_slice(executable, 0, slash + 1), vm_literal("dns-provider.vmb"));
         };

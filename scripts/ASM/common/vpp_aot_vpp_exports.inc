@@ -15,9 +15,12 @@ AOT_VPP store_integer, 3
 AOT_VPP parameter, 4
 AOT_VPP increment, 2
 AOT_VPP increment_slot, 3
+AOT_VPP increment_slot_discard, 3
 AOT_VPP update_integer_slot, 5
 AOT_VPP update_numeric_slots, 5
 AOT_VPP compare_integer_slot, 4
+AOT_VPP compare_type_slot, 4
+AOT_VPP compare_type_forward_slot, 4
 AOT_VPP compare_integer_range, 4
 AOT_VPP compare_integer_outside_range, 4
 AOT_VPP compare_integer_or_range, 5
@@ -26,6 +29,8 @@ AOT_VPP compare_integer_or_and, 7
 AOT_VPP compare_numeric_slots, 4
 AOT_VPP compare_numeric_slots_and, 5
 AOT_VPP not_slot_and, 3
+AOT_VPP byte_scan_loop, 6
+AOT_VPP decimal_scan_loop, 8
 AOT_VPP counted_scalar_loop, 6
 AOT_VPP counted_scalar_loop_tail, 6
 AOT_VPP simple_scalar_loop, 6
@@ -46,6 +51,7 @@ AOT_VPP index_compare_integer, 6
 AOT_VPP index_compare_integer_outside_range, 6
 AOT_VPP index_compare_integer_pair, 6
 AOT_VPP index_store_slot, 5
+AOT_VPP index_offset, 7
 AOT_VPP index_store_integer_op, 6
 AOT_VPP index_mod_equal, 6
 AOT_VPP index_mod_add_if_equal, 6

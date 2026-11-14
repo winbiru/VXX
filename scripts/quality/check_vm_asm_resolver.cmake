@@ -1,5 +1,5 @@
 # Standalone VM numeric IP resolver requires no network or bind permission.
-set(resolver_fixture "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver.vi")
+set(resolver_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver.vi")
 set(resolver_image "${VPP_OUTPUT_DIR}/resolver.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${resolver_fixture}"
     -o "${resolver_image}"
@@ -65,7 +65,7 @@ if(NOT status STREQUAL "0")
 endif()
 set(dns_image "${VPP_OUTPUT_DIR}/resolver-dns.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "DNS resolver guest compile: ${status}\n${output}\n${errors}")
@@ -79,8 +79,10 @@ foreach(mode IN ITEMS explicit sibling)
     if(mode STREQUAL "sibling")
         set(configured_provider "")
         # Preserve the bare argv[0] case, independently of the working directory.
-        set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
-            vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        if(NOT WIN32)
+            set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
+                vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        endif()
     endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
         "VPP_VM_DNS_PROVIDER=${configured_provider}"
@@ -104,7 +106,7 @@ foreach(mode IN ITEMS explicit sibling)
         message(FATAL_ERROR "V++ DNS hosts returned unexpected addresses: ${output}")
     endif()
 endforeach()
-message(STATUS "V++ DNS hosts, nested provider/main GC, sibling provider and bare argv0 PASS")
+message(STATUS "V++ DNS hosts, nested provider/main GC and sibling provider from foreign cwd PASS")
 if(DEFINED VPP_STAGE1)
     include("${CMAKE_CURRENT_LIST_DIR}/check_vm_dns_vpp_mock.cmake")
 endif()

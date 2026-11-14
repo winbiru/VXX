@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bin=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+if [[ -d "$bin/../share/vpp/gói" ]]; then
+  root="$bin/../share/vpp"
+  runtime="$root/native-vpp-runtime"
+else
+  root=@VPP_SOURCE_ROOT@
+  runtime="$bin/../native-vpp-runtime"
+fi
+export VPP_HOME="${VPP_HOME:-$root}"
+export VPP_AOT_VPP_OBJECT="${VPP_AOT_VPP_OBJECT:-$runtime/runtime.o}"
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64)
+    export VPP_AOT_PLATFORM_OBJECT="${VPP_AOT_PLATFORM_OBJECT:-$runtime/platform.o}"
+    export VPP_AOT_DYNAMIC_BRIDGE_OBJECT="${VPP_AOT_DYNAMIC_BRIDGE_OBJECT:-$runtime/dynamic-bridge.o}"
+    export VPP_AOT_NATIVE_MACHO_LINK=1 VPP_AOT_NATIVE_ARM64_OBJECT=1
+    export VPP_AOT_ASSEMBLER="$bin/assembler-must-not-run"
+    ;;
+  Linux-x86_64)
+    export VPP_AOT_NATIVE_MACHO_LINK=0 VPP_AOT_NATIVE_ARM64_OBJECT=0
+    export VPP_AOT_ASSEMBLER="${VPP_AOT_ASSEMBLER:-$(command -v clang || true)}"
+    if [[ ! -x "$VPP_AOT_ASSEMBLER" ]]; then
+      echo 'V++: full Linux compiler currently requires clang as assembler/linker.' >&2
+      exit 2
+    fi
+    ;;
+  *)
+    echo 'V++: unsupported full compiler platform.' >&2
+    exit 2
+    ;;
+esac
+compiler="$bin/vpp-native"
+if [[ $# == 0 ]]; then exec "$compiler" --help; fi
+case "$1" in
+  phiên) if [[ ${2:-} == bản ]]; then shift 2; exec "$compiler" --version "$@"; fi ;;
+  run) shift ;;
+  chạy) shift ;;
+  *.vi) ;;
+  *) exec "$compiler" "$@" ;;
+esac
+if [[ $# == 0 || $1 == -* || ! -f $1 ]]; then
+  echo 'Usage: vpp run <source.vi> [-- program arguments]' >&2; exit 2
+fi
+source_file=$1
+shift
+if [[ $# != 0 && $1 == -- ]]; then shift; fi
+work=$(mktemp -d "${TMPDIR:-/tmp}/vpp-run.XXXXXXXX")
+trap 'rm -rf "$work"' EXIT
+"$compiler" build "$source_file" -o "$work/program"
+"$work/program" "$@"

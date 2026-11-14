@@ -1,0 +1,45 @@
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh asm;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy kiểm tra CFG;
+nhập gói.văn bản.chuỗi.chứa chính xác;
+
+hàm yêu cầu backend(điều kiện) { nếu (!điều kiện) { ném "backend i32"; }; };
+hàm máy so sánh(phép, nhãn giữa = sai) {
+    lệnh = [biên dịch mã máy lệnh("LoadSlot", 0, 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh(phép, 0, 0, 2),
+        biên dịch mã máy lệnh("BranchZero", 0, 6, 1),
+        biên dịch mã máy lệnh("PushConstant", 11, 0, 0),
+        biên dịch mã máy lệnh("Return", 0, 0, 1),
+        biên dịch mã máy lệnh("PushConstant", 22, 0, 0),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    nếu (nhãn giữa) {
+        // Một cạnh khác vào BranchZero phải giữ boolean đã materialize.
+        máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("PushConstant", 0, 0, 0));
+        máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Jump", 0, 3, 1));
+    };
+    trả về {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": lệnh};
+};
+hàm chính() {
+    phép = ["Equal", "NotEqual", "Less", "LessEqual", "Greater", "GreaterEqual"];
+    arm = ["ne", "eq", "ge", "gt", "le", "lt"];
+    x86 = ["ne", "e", "ge", "g", "le", "l"];
+    lặp(i = 0; i < độ dài(phép); i++) {
+        máy = máy so sánh(phép[i]);
+        biên dịch mã máy kiểm tra CFG(máy);
+        a = biên dịch i32 sinh asm(máy, "probe", "aarch64", "macos");
+        b = biên dịch i32 sinh asm(máy, "probe", "x86_64", "linux");
+        c = biên dịch i32 sinh asm(máy, "probe", "x86_64", "windows");
+        yêu cầu backend(chứa chính xác(a, "b." + arm[i] + " Lprobe_6"));
+        yêu cầu backend(!chứa chính xác(a, "cset "));
+        yêu cầu backend(chứa chính xác(b, "j" + x86[i] + " .Lprobe_6"));
+        yêu cầu backend(!chứa chính xác(b, "set"));
+        yêu cầu backend(chứa chính xác(c, "j" + x86[i] + " .Lprobe_6"));
+        máy = máy so sánh(phép[i], đúng);
+        biên dịch mã máy kiểm tra CFG(máy);
+        a = biên dịch i32 sinh asm(máy, "probe", "aarch64", "macos");
+        yêu cầu backend(chứa chính xác(a, "cset "));
+        yêu cầu backend(chứa chính xác(a, "Lprobe_3:"));
+    };
+    in "Backend i32 CFG/ASM: PASS";
+};

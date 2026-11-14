@@ -46,11 +46,11 @@ foreach(name IN LISTS fixtures)
             "VPP_FFI_ENV_TEST=vpp-env-ffi-ok"
             "VPP_FFI_ENV_EMPTY_TEST="
             "TZ=EST5EDT,M3.2.0/2,M11.1.0/2"
-            "${VPP_CLI}" "${VPP_ROOT}/src/tests/${name}.vi"
+            "${VPP_CLI}" "${VPP_ROOT}/scripts/test/${name}.vi"
         WORKING_DIRECTORY "${VPP_ROOT}"
         RESULT_VARIABLE status OUTPUT_VARIABLE actual ERROR_VARIABLE diagnostics
         TIMEOUT 60)
-    file(READ "${VPP_ROOT}/src/tests/expected/${name}.expected" expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/${name}.expected" expected)
     if (NOT status STREQUAL "0" OR NOT actual STREQUAL expected)
         message(FATAL_ERROR "Machine/no-libffi fixture ${name} failed (${status}):\n${diagnostics}\nActual:\n${actual}\nExpected:\n${expected}")
     endif()
@@ -72,7 +72,7 @@ foreach(name IN ITEMS kiem_tra_ffi_dns kiem_tra_ffi_process_spawn kiem_tra_ffi_t
     file(REMOVE "${executable}")
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-            "${VPP_CLI}" --emit-native "${VPP_ROOT}/src/tests/${name}.vi" "${executable}"
+            "${VPP_CLI}" --emit-native "${VPP_ROOT}/scripts/test/${name}.vi" "${executable}"
         WORKING_DIRECTORY "${VPP_AOT_OUTPUT_DIR}"
         RESULT_VARIABLE compile_status OUTPUT_VARIABLE compile_output
         ERROR_VARIABLE compile_errors TIMEOUT 180)
@@ -100,7 +100,7 @@ foreach(name IN ITEMS kiem_tra_ffi_dns kiem_tra_ffi_process_spawn kiem_tra_ffi_t
         WORKING_DIRECTORY "${VPP_AOT_OUTPUT_DIR}"
         RESULT_VARIABLE run_status OUTPUT_VARIABLE actual
         ERROR_VARIABLE run_errors TIMEOUT 60)
-    file(READ "${VPP_ROOT}/src/tests/expected/${name}.expected" expected)
+    file(READ "${VPP_ROOT}/scripts/test/expected/${name}.expected" expected)
     if (NOT run_status STREQUAL "0" OR NOT actual STREQUAL expected)
         message(FATAL_ERROR "Machine/no-libffi AOT ${name} failed (${run_status}):\n${run_errors}\nExpected:\n${expected}\nActual:\n${actual}")
     endif()

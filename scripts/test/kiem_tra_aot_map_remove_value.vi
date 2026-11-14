@@ -1,0 +1,22 @@
+nhập gói.bộ sưu tập.chính.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+hàm chính() {
+    bảng = {"c": 3, "a": "Việt", "b": rỗng, "d": [7, 8]};
+    nếu (xóa khóa(bảng, "thiếu") != rỗng) { ném "missing"; };
+    nếu (xóa khóa(bảng, "a") != "Việt") { ném "first"; };
+    nếu (xóa khóa(bảng, "b") != rỗng || có khóa(bảng, "b")) { ném "null"; };
+    ds = xóa khóa(bảng, "d");
+    nếu (ds[0] != 7 || ds[1] != 8) { ném "last reference"; };
+    nếu (json tạo(bảng) != "{\"c\":3}") { ném "remaining"; };
+    nếu (xóa khóa(bảng, "c") != 3 || json tạo(bảng) != "{}") { ném "empty"; };
+    lặp(i = 0; i < 512; i++) { bảng["k" + thành chuỗi(i)] = i; };
+    lặp(i = 0; i < 512; i += 2) {
+        nếu (xóa khóa(bảng, "k" + thành chuỗi(i)) != i) { ném "bulk remove"; };
+    };
+    lặp(i = 1; i < 512; i += 2) {
+        nếu (bảng["k" + thành chuỗi(i)] != i) { ném "bulk preserve"; };
+    };
+    nếu (độ dài(khóa từ điển(bảng)) != 256) { ném "size"; };
+    in "CP35 map remove PASS";
+};

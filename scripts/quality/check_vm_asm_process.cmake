@@ -1,5 +1,53 @@
 # This is included after the standalone VM and native compiler are built.
-set(process_fixture "${VPP_ROOT}/src/tests/fixtures/vm_asm_process.vi")
+if(WIN32)
+    # Exercise Win32 pipes, environment, missing executables and JobObject timeout
+    # through the standalone VM, against the same goldens as native AOT.
+    foreach(stem IN ITEMS kiem_tra_ffi_process_spawn_windows kiem_tra_ffi_process_timeout_windows)
+        set(image "${VPP_OUTPUT_DIR}/${stem}.vmb")
+        execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+            "${VPP_ROOT}/scripts/test/${stem}.vi" -o "${image}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+        if(NOT status STREQUAL "0")
+            message(FATAL_ERROR "Windows process VM compile: ${status}\n${output}\n${errors}")
+        endif()
+        file(READ "${VPP_ROOT}/scripts/test/expected/${stem}.expected" expected)
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=$ENV{SystemRoot}/System32" "${VPP_VM}" "${image}"
+            WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+        if(NOT status STREQUAL "0" OR NOT output STREQUAL expected)
+            message(FATAL_ERROR "Windows process VM ${stem}: ${status}\n${output}\n${errors}")
+        endif()
+    endforeach()
+    # An independent Python child checks exact UTF-16 argv and environment,
+    # fills both pipes, closes pipes before exit, and verifies a descendant
+    # really terminates after the V++ JobObject deadline.
+    set(probe_source "${VPP_ROOT}/scripts/test/fixtures/vm_asm_process_windows.vi")
+    set(probe_script "${VPP_ROOT}/scripts/quality/windows_process_probe.py")
+    set(probe_image "${VPP_OUTPUT_DIR}/process-windows.vmb")
+    set(probe_native "${VPP_OUTPUT_DIR}/process-windows.exe")
+    foreach(mode IN ITEMS vm-build build)
+        if(mode STREQUAL "vm-build")
+            set(output_path "${probe_image}")
+            set(run_command "${VPP_VM}" "${probe_image}")
+        else()
+            set(output_path "${probe_native}")
+            set(run_command "${probe_native}")
+        endif()
+        execute_process(COMMAND "${VPP_NATIVE_COMPILER}" "${mode}" "${probe_source}" -o "${output_path}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
+        if(NOT status STREQUAL "0")
+            message(FATAL_ERROR "Windows process oracle ${mode} compile: ${status}\n${output}\n${errors}")
+        endif()
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=$ENV{SystemRoot}/System32"
+            "VPP_PROCESS_TEST_PYTHON=${VPP_PYTHON}" "VPP_PROCESS_TEST_PROBE=${probe_script}" ${run_command}
+            WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+        if(NOT status STREQUAL "0" OR NOT output STREQUAL "WINDOWS PROCESS OK\n")
+            message(FATAL_ERROR "Windows process oracle ${mode}: ${status}\n${output}\n${errors}")
+        endif()
+    endforeach()
+else()
+set(process_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_process.vi")
 set(process_image "${VPP_OUTPUT_DIR}/process.vmb")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${process_fixture}" -o "${process_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
@@ -11,6 +59,7 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${process
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0" OR NOT output STREQUAL "VM ASM PROCESS OK\n")
     message(FATAL_ERROR "Process VM/ASM spawn, pipe and wait regression (${status}):\n${output}\n${errors}")
+endif()
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/process-stale.vi" [=[hàm chính() {
     p = máy tiến trình tạo("/bin/echo");
@@ -56,20 +105,25 @@ foreach(expression IN LISTS process_invalid_cases)
         message(FATAL_ERROR "Process invalid-${process_invalid_index} accepted: ${code}\n${output}\n${errors}")
     endif()
 endforeach()
+set(raw_process "${VPP_OUTPUT_DIR}/process-asm-invalid")
+set(raw_exit "234")
+if(WIN32)
+    string(APPEND raw_process ".exe")
+    set(raw_exit "4294967274")
+endif()
 file(WRITE "${VPP_OUTPUT_DIR}/process-asm-invalid.vi" 
     "hàm chính() { trả về máy tiến trình thô(4, -1); };\n")
-execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_OUTPUT_DIR}/process-asm-invalid.vi"
-    -o "${VPP_OUTPUT_DIR}/process-asm-invalid"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
-if (NOT status STREQUAL "0")
-    message(FATAL_ERROR "Process ASM invalid-offset fixture compilation failed: ${status}\n${output}\n${errors}")
-endif()
+vpp_raw_build("${VPP_OUTPUT_DIR}/process-asm-invalid.vi" "${raw_process}")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
-    "${VPP_OUTPUT_DIR}/process-asm-invalid"
+    "${raw_process}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
-if (NOT status STREQUAL "234")
+if (NOT status STREQUAL raw_exit AND NOT (WIN32 AND status STREQUAL "-22"))
     message(FATAL_ERROR "Process ASM accepted negative arena offset: ${status}\n${output}\n${errors}")
 endif()
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_process_x86.cmake")
-message(STATUS "V++/ASM process: spawn, argv Unicode, pipes, exit and close PASS")
+
+if(WIN32)
+    message(STATUS "V++/ASM Windows process: spawn, pipes, environment, timeout and close PASS")
+else()
+    message(STATUS "V++/ASM process: spawn, argv Unicode, pipes, exit and close PASS")
+endif()

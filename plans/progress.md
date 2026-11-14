@@ -69,7 +69,7 @@ hai revision độc lập, GC allocation/RSS/p95 evidence, runner/comparator và
 - [x] Pipeline đã có Expression AST, scope tree, name resolution, recursive IR và
   direct IR backend cohort đầu.
 - [x] Có regression cho lỗi parser/compiler/semantic, không chỉ expected-output fixture.
-- [x] Test discovery đã phân biệt `test/` cho C++ unit và `src/tests/` cho regression
+- [x] Test discovery đã phân biệt `test/` cho C++ unit và `scripts/test/` cho regression
   V++; HTTP fixture được khởi động riêng trong integration runner.
 - [x] Parity gate hiện đối chiếu 117 chương trình `.vi`; direct IR backend bao phủ
   117/117 chương trình.
@@ -305,7 +305,7 @@ Long-term: 20/41
     Git source đã chạy end-to-end qua transport tách khỏi solver: manifest giữ symbolic `ref`,
     lock pin exact commit `revision`, restore cache-miss checkout đúng commit, offline restore
     dùng cache khi repository đã mất, graph hỗn hợp path -> Git chạy thật và `.git/` không bị
-    vendored. Regression `src/tests/kiem_tra_package_git.vi` chạy package Git thật sau
+    vendored. Regression `scripts/test/kiem_tra_package_git.vi` chạy package Git thật sau
     install/update/restore/offline. `vpp khóa` chặn trường hợp ref đã di chuyển nhưng installed
     bytes còn cũ để không tạo revision/fingerprint bất nhất. File `.vi` trong project có lock
     chỉ chạy khi installed package khớp fingerprint đã khóa. Filesystem registry v1 đã có
@@ -358,7 +358,7 @@ Long-term: 20/41
     permission model tương ứng được chốt.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
-19. [x] **Compiler hardening:** `src/tests/kiem_tra_rc_hardening.vi` và `rc-malformed.vi` chạy qua public CLI và đã PASS
+19. [x] **Compiler hardening:** `scripts/test/kiem_tra_rc_hardening.vi` và `rc-malformed.vi` chạy qua public CLI và đã PASS
     local với 528 malformed/fuzz input seed `0x56505031`, deterministic AST/IR/disassembly qua
     3 lượt, source 800 hàm và project 24 module × 24 hàm biên dịch lặp 5 lần; peak RSS local
     17.0 MiB dưới budget 1 GiB. `vpp-rc-internal-hardening` bổ sung trực tiếp các invariant không

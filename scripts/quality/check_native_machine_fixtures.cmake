@@ -30,9 +30,9 @@ set(fixtures
 
 set(count 0)
 foreach(name IN LISTS fixtures)
-    set(source "${VPP_ROOT}/src/tests/${name}.vi")
+    set(source "${VPP_ROOT}/scripts/test/${name}.vi")
     set(executable "${VPP_OUTPUT_DIR}/${name}")
-    set(expected_file "${VPP_ROOT}/src/tests/expected/${name}.expected")
+    set(expected_file "${VPP_ROOT}/scripts/test/expected/${name}.expected")
     if (NOT EXISTS "${source}" OR NOT EXISTS "${expected_file}")
         message(FATAL_ERROR "Native Machine fixture missing: ${name}")
     endif()

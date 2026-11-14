@@ -1,0 +1,9 @@
+nhập kiem_tra_native_i32_boundaries.*;
+
+hàm chính() {
+    in min_i32();
+    in max_i32_const();
+    in add_limit();
+    in neg_limit();
+    trả về 0;
+};

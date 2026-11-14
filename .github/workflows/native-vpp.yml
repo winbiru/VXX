@@ -1,0 +1,560 @@
+name: V++ native CI
+on:
+  push:
+    branches: [main, developer, 'developer-stage-*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      regression_batch_size:
+        description: 'Full regression builds per compiler process (1 disables AST reuse)'
+        type: choice
+        options: ['1', '2', '4']
+        default: '2'
+      regression_module_suites:
+        description: 'Compile reviewed regression fixtures into shared module executables'
+        type: boolean
+        default: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
+  VPP_REGRESSION_MODULE_SUITES: ${{ github.event_name != 'workflow_dispatch' || inputs.regression_module_suites }}
+jobs:
+  macos-i32:
+    name: macOS ARM64 - i32 source bootstrap
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned seeds and build i32 compiler and bootstrap runtime
+        run: |
+          (cd bootstrap/macos-arm64 && shasum -a 256 -c SHA256SUMS)
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_MACHO_REL_LINK=0
+          bash scripts/build-vpp-aot-runtime.sh "$RUNNER_TEMP/macos-i32" "$GITHUB_WORKSPACE/bootstrap/macos-arm64/vpp-i32"
+          codesign --verify "$RUNNER_TEMP/macos-i32/vpp-i32"
+      - name: Check i32 relative module paths
+        run: |
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
+          "$RUNNER_TEMP/macos-i32/vpp-i32" check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
+          "$RUNNER_TEMP/macos-i32/vpp-i32" check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+      - name: Check ELF and COFF symbol index regression
+        run: |
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
+          out="$RUNNER_TEMP/symbol-index"
+          mkdir -p "$out"
+          "$RUNNER_TEMP/macos-i32/vpp-i32" build "$GITHUB_WORKSPACE/scripts/test/fixtures/native_object_symbol_index.vi" -o "$out/probe"
+          "$out/probe" "$out/probe.elf.o" "$out/probe.coff.obj"
+          python3 scripts/quality/check_native_object_symbol_index.py "$out/probe.elf.o" "$out/probe.coff.obj"
+      - name: Package the rebuilt i32 compiler and runtime
+        run: |
+          COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/macos-i32" -czf "$RUNNER_TEMP/vpp-macos-arm64-i32.tar.gz" vpp-i32 runtime.o platform.o dynamic-bridge.o
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-i32-selfhost
+          path: ${{ runner.temp }}/vpp-macos-arm64-i32.tar.gz
+          if-no-files-found: error
+  macos-full:
+    name: macOS ARM64 - full dynamic compiler
+    needs: macos-i32
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-i32-selfhost
+          path: ${{ runner.temp }}/macos-i32-artifact
+      - name: Prepare runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
+          tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
+          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=ON
+      - name: Bootstrap full compiler (Stage 1)
+        run: |
+          cmake --build build-pure-vpp --parallel
+          bash scripts/quality/check_macos_full_bootstrap.sh --phase stage1 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Self-host Stage 2
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase stage2 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Self-host Stage 3
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase stage3 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Verify binary convergence
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase convergence "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Run tests
+        run: |
+          bash scripts/quality/check_macos_full_bootstrap.sh --phase test "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+          install -m 755 "$RUNNER_TEMP/macos-full/vpp-native-stage3" build-pure-vpp/bin/vpp-native
+          ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
+      - name: Package and test installed compiler
+        run: |
+          cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
+          "$RUNNER_TEMP/vpp-install/bin/vpp" --version
+          COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/vpp-install" -czf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz" .
+          mkdir -p "$RUNNER_TEMP/vpp-extracted"
+          tar -C "$RUNNER_TEMP/vpp-extracted" -xzf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz"
+          printf 'hàm chính() { in 42; }\n' > "$RUNNER_TEMP/probe.vi"
+          result=$("$RUNNER_TEMP/vpp-extracted/bin/vpp" run "$RUNNER_TEMP/probe.vi")
+          test "$result" = 42
+      - name: Check Linux cross emitter
+        run: |
+          probe="$RUNNER_TEMP/probe.vi"
+          build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu "$probe" -o "$RUNNER_TEMP/linux-probe.S"
+          clang -target x86_64-unknown-linux-gnu -DVPP_AOT_VPP_RUNTIME=1 \
+            -I scripts/ASM -I scripts/ASM/common -c "$RUNNER_TEMP/linux-probe.S" -o "$RUNNER_TEMP/linux-probe.o"
+          before=$(shasum -a 256 "$probe")
+          if build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu "$probe" -o "$probe"; then
+            echo 'Cross emitter overwrote its input'; exit 1
+          fi
+          test "$before" = "$(shasum -a 256 "$probe")"
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/vpp-macos-arm64.tar.gz
+          if-no-files-found: error
+      - name: Build regression test artifact once
+        run: |
+          package="$RUNNER_TEMP/vpp-install"
+          module_options=()
+          if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
+          if [[ "$VPP_REGRESSION_BATCH_SIZE" != '1' ]]; then
+            python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity
+          fi
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$package/bin/vpp" --jobs 1 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-build-logs/full --phase build --artifacts "$RUNNER_TEMP/regression-tests/full" "${module_options[@]}"
+          export VPP_HOME="$package/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$package/bin/vpp-i32" --jobs 1 --logs regression-build-logs/i32 --phase build --artifacts "$RUNNER_TEMP/regression-tests/i32"
+          COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/regression-tests" -czf "$RUNNER_TEMP/vpp-macos-arm64-regression.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-regression-tests
+          path: ${{ runner.temp }}/vpp-macos-arm64-regression.tar.gz
+          if-no-files-found: error
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-test-logs
+          path: |
+            regression-build-logs/
+            build-pure-vpp/Testing/Temporary/
+            build-pure-vpp/full-compiler-profile.log
+            ${{ runner.temp }}/macos-full/**/*.log
+            ${{ runner.temp }}/macos-full/convergence.sha256
+          if-no-files-found: ignore
+  linux-i32:
+    name: Linux x86-64 - i32 source bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify seed
+        run: |
+          (cd bootstrap/linux-x86_64 && sha256sum -c SHA256SUMS)
+          bash scripts/quality/audit_linux_static_elf.sh bootstrap/linux-x86_64/vpp-i32
+      - name: Build assembler, host and compiler from source
+        run: bash scripts/quality/check_linux_source_bootstrap.sh "$GITHUB_WORKSPACE/bootstrap/linux-x86_64/vpp-i32" "$RUNNER_TEMP/linux-bootstrap"
+      - name: Package and test the Linux i32 distribution
+        run: |
+          package="$RUNNER_TEMP/linux-package"
+          mkdir -p "$package/bin" "$package/scripts/ASM/linux"
+          cp -R "$RUNNER_TEMP/linux-bootstrap/source/gói" "$package/"
+          install -m 755 "$RUNNER_TEMP/linux-bootstrap/selfhost/vpp-native-stage2" "$package/bin/vpp-i32"
+          install -m 644 "$RUNNER_TEMP/linux-bootstrap/host-stage2.o" "$package/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o"
+          tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-i32.tar.gz" .
+          extracted="$RUNNER_TEMP/linux-extracted"
+          mkdir -p "$extracted"
+          tar -C "$extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-i32.tar.gz"
+          export VPP_HOME="$extracted" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          printf 'hàm chính() { trả về 42; };\n' > "$RUNNER_TEMP/probe.vi"
+          "$extracted/bin/vpp-i32" build "$RUNNER_TEMP/probe.vi" -o "$RUNNER_TEMP/linux-probe"
+          status=0
+          "$RUNNER_TEMP/linux-probe" || status=$?
+          test "$status" -eq 42
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-i32-selfhost
+          path: ${{ runner.temp }}/vpp-linux-x86_64-i32.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-bootstrap-logs
+          path: ${{ runner.temp }}/linux-bootstrap/**/*.log
+          if-no-files-found: ignore
+  linux-full:
+    name: Linux x86-64 - full dynamic compiler
+    runs-on: ubuntu-24.04
+    needs: linux-i32
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-i32-selfhost
+          path: ${{ runner.temp }}/linux-i32
+      - name: Prepare runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/linux-i32-prefix"
+          tar -C "$RUNNER_TEMP/linux-i32-prefix" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
+          bash scripts/quality/check_linux_full_bootstrap.sh --phase prepare "$RUNNER_TEMP/linux-full" "$RUNNER_TEMP/linux-i32-prefix"
+      - name: Bootstrap full compiler (Stage 1)
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage1 "$RUNNER_TEMP/linux-full"
+      - name: Self-host Stage 2
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage2 "$RUNNER_TEMP/linux-full"
+      - name: Self-host Stage 3
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage3 "$RUNNER_TEMP/linux-full"
+      - name: Verify binary convergence
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase convergence "$RUNNER_TEMP/linux-full"
+      - name: Run tests
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase test "$RUNNER_TEMP/linux-full"
+      - name: Package and test installed compiler
+        run: |
+          echo '[Biên dịch V++ Linux đầy đủ  90%] Đóng gói và chạy thử bộ biên dịch'
+          out="$RUNNER_TEMP/linux-full"
+          package="$out/package"
+          mkdir -p "$package/bin" "$package/share/vpp/native-vpp-runtime" "$package/share/vpp/scripts/quality"
+          install -m 755 "$out/vpp-native-stage3" "$package/bin/vpp-native"
+          install -m 755 "$out/i32/bin/vpp-i32" "$package/bin/vpp-i32"
+          install -m 644 "$out/runtime.o" "$package/share/vpp/native-vpp-runtime/runtime.o"
+          platform_objects="$package/share/vpp/native-vpp-runtime/linux-objects"
+          mkdir -p "$platform_objects"
+          for part in start syscalls runtime_core directory sha256 process socket aot_runtime_bridge f64; do
+            clang -target x86_64-unknown-linux-gnu -I scripts/ASM -I scripts/ASM/common \
+              -c "scripts/ASM/linux/vpp_linux_${part}_x86_64.S" -o "$platform_objects/$part.o"
+          done
+          cp -R "$out/i32/gói" "$package/share/vpp/"
+          cp -R scripts/ASM "$package/share/vpp/scripts/"
+          install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
+          install -m 644 scripts/quality/audit_linux_static_elf.sh "$package/share/vpp/scripts/quality/"
+          install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
+          sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/macos/vpp-native-launcher.sh.in > "$package/bin/vpp"
+          chmod 755 "$package/bin/vpp"
+          VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 \
+            "$package/bin/vpp-i32" build "$package/share/vpp/gói/máy ảo/chính.vi" -o "$package/bin/vpp-vm"
+          tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
+          mkdir -p "$out/extracted"
+          tar -C "$out/extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz"
+          printf 'hàm chính() { in 42; };\n' > "$out/package-probe.vi"
+          unset VPP_HOME VPP_AOT_VPP_OBJECT VPP_AOT_ASSEMBLER
+          test "$("$out/extracted/bin/vpp" run "$out/package-probe.vi")" = 42
+          bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-native"
+          bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-vm"
+          "$out/extracted/bin/vpp" vm-build "$out/package-probe.vi" -o "$out/package-probe.vmb"
+          test "$(PATH= "$out/extracted/bin/vpp-vm" "$out/package-probe.vmb")" = 42
+          echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-full
+          path: ${{ runner.temp }}/vpp-linux-x86_64-full.tar.gz
+          if-no-files-found: error
+      - name: Build regression test artifact once
+        run: |
+          package="$RUNNER_TEMP/linux-full/extracted"
+          export VPP_AOT_LINUX_OBJECT_DIR="$package/share/vpp/native-vpp-runtime/linux-objects"
+          module_options=()
+          if [[ "$VPP_REGRESSION_MODULE_SUITES" == 'true' ]]; then module_options+=(--module-suites); fi
+          probe_options=()
+          if [[ "$VPP_REGRESSION_BATCH_SIZE" == '1' ]]; then probe_options+=(--linux-objects-only); fi
+          python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity "${probe_options[@]}"
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$package/bin/vpp" --jobs 1 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-build-logs/full --phase build --artifacts "$RUNNER_TEMP/regression-tests/full" "${module_options[@]}"
+          export VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$package/bin/vpp-i32" --jobs 1 --logs regression-build-logs/i32 --phase build --artifacts "$RUNNER_TEMP/regression-tests/i32"
+          tar -C "$RUNNER_TEMP/regression-tests" -czf "$RUNNER_TEMP/vpp-linux-x86_64-regression.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-regression-tests
+          path: ${{ runner.temp }}/vpp-linux-x86_64-regression.tar.gz
+          if-no-files-found: error
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-full-test-logs
+          path: |
+            regression-build-logs/
+            ${{ runner.temp }}/linux-full/**/*.log
+            ${{ runner.temp }}/linux-full/convergence.sha256
+          if-no-files-found: ignore
+  windows-i32:
+    name: Windows x86-64 - native i32 selfhost
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify native seed and assemble Windows boundary
+        shell: pwsh
+        run: |
+          $seed = "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe"
+          $pins = @(Get-Content "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/SHA256SUMS" | Where-Object { $_ -cmatch '^[0-9a-f]{64}  vpp-i32\.exe$' })
+          if ($pins.Count -ne 1) { throw 'Missing or duplicate Windows i32 seed pin' }
+          $expected = $pins[0].Split(' ')[0]
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $seed).Hash -ne $expected) { throw 'Windows seed checksum mismatch' }
+          python scripts/quality/check_native_executable_layout.py $seed
+          if ($LASTEXITCODE -ne 0) { throw 'Windows seed PE audit failed' }
+          $out = "$env:RUNNER_TEMP/windows-seed"
+          New-Item -ItemType Directory -Path $out | Out-Null
+          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows boundary assembly failed' }
+      - name: Rebuild and execute native Windows compiler
+        shell: pwsh
+        run: |
+          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
+      - name: Package and test the Windows i32 distribution
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP 'windows-package'
+          New-Item -ItemType Directory -Path "$package/bin" | Out-Null
+          Copy-Item -Recurse -LiteralPath "$env:GITHUB_WORKSPACE/gói" -Destination $package
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/windows-selfhost/stage3.exe" -Destination "$package/bin/vpp-i32.exe"
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/windows-selfhost/windows-runtime.obj" -Destination "$package/windows-runtime.obj"
+          $archive = "$env:RUNNER_TEMP/vpp-windows-x86_64-i32.zip"
+          # Python sets the UTF-8 ZIP filename flag for Vietnamese module names.
+          python -c "import pathlib,sys,zipfile; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2], 'w', zipfile.ZIP_DEFLATED); [z.write(p, p.relative_to(root).as_posix()) for p in sorted(root.rglob('*')) if p.is_file()]; z.close()" $package $archive
+          if ($LASTEXITCODE -ne 0) { throw 'UTF-8 archive creation failed' }
+          $extracted = Join-Path $env:RUNNER_TEMP 'windows-extracted'
+          Expand-Archive -LiteralPath $archive -DestinationPath $extracted
+          $env:VPP_HOME = $extracted.Replace([char]92, [char]47)
+          $env:VPP_NATIVE_TARGET = 'windows-x86_64'
+          $env:VPP_NATIVE_NO_CACHE = '1'
+          $env:VPP_WINDOWS_RUNTIME_OBJECT = "$extracted/windows-runtime.obj"
+          $probe = "$env:RUNNER_TEMP/package-probe.vi"
+          [IO.File]::WriteAllText($probe, 'hàm chính() { trả về 42; };' + "`n", [Text.UTF8Encoding]::new($false))
+          $PSNativeCommandUseErrorActionPreference = $false
+          & "$extracted/bin/vpp-i32.exe" build $probe -o "$env:RUNNER_TEMP/package-probe.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Packaged compiler build failed: $LASTEXITCODE" }
+          & "$env:RUNNER_TEMP/package-probe.exe"
+          if ($LASTEXITCODE -ne 42) { throw "Packaged program returned $LASTEXITCODE" }
+          # The probe intentionally exits 42; the packaging step succeeded.
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-i32-selfhost
+          path: ${{ runner.temp }}/vpp-windows-x86_64-i32.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-selfhost-logs
+          path: |
+            ${{ runner.temp }}/windows-selfhost/*.log
+            ${{ runner.temp }}/windows-selfhost/sha256.txt
+          if-no-files-found: ignore
+
+  windows-full:
+    name: Windows x86-64 - full dynamic compiler
+    runs-on: windows-2025
+    needs: windows-i32
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-i32-selfhost
+          path: ${{ runner.temp }}/windows-i32
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANG64
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
+      - name: Prepare runtime
+        shell: pwsh
+        run: |
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $toolchain | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "VPP_CI_CLANG=$toolchain/clang.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $prefix = "$env:RUNNER_TEMP/windows-i32-prefix"
+          python -m zipfile -e "$env:RUNNER_TEMP/windows-i32/vpp-windows-x86_64-i32.zip" $prefix
+          if ($LASTEXITCODE -ne 0) { throw 'Windows i32 extraction failed' }
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix $prefix --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase prepare
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Bootstrap full compiler (Stage 1)
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage1
+      - name: Self-host Stage 2
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage2
+      - name: Self-host Stage 3
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage3
+      - name: Verify binary convergence
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase convergence
+      - name: Run tests
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase test
+      - name: Package and test installed compiler
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase package
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-full
+          path: ${{ runner.temp }}/vpp-windows-x86_64-full.zip
+          if-no-files-found: error
+      - name: Build regression test artifact once
+        shell: pwsh
+        run: |
+          $package = "$env:RUNNER_TEMP/windows-full/extracted"
+          if ($env:VPP_REGRESSION_BATCH_SIZE -ne '1') {
+            python scripts/quality/check_full_batch.py --compiler "$package/bin/vpp-native.exe" --clang "$env:VPP_CI_CLANG" --logs regression-build-logs/batch-parity
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $moduleOptions = @{ ModuleSuites = ($env:VPP_REGRESSION_MODULE_SUITES -eq 'true') }
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$env:VPP_CI_CLANG" -Suite full -Jobs 1 -BatchSize ([int]$env:VPP_REGRESSION_BATCH_SIZE) -LogDirectory regression-build-logs/full -Phase build -Artifacts "$env:RUNNER_TEMP/regression-tests/full" @moduleOptions
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-i32.exe" -Clang "$env:VPP_CI_CLANG" -Suite i32 -Jobs 1 -LogDirectory regression-build-logs/i32 -Phase build -Artifacts "$env:RUNNER_TEMP/regression-tests/i32"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          tar -C "$env:RUNNER_TEMP/regression-tests" -czf "$env:RUNNER_TEMP/vpp-windows-x86_64-regression.tar.gz" .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-regression-tests
+          path: ${{ runner.temp }}/vpp-windows-x86_64-regression.tar.gz
+          if-no-files-found: error
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-full-test-logs
+          path: |
+            regression-build-logs/
+            ${{ runner.temp }}/windows-full/**/*.log
+            ${{ runner.temp }}/windows-full/convergence.sha256
+          if-no-files-found: ignore
+
+  macos-regression:
+    name: macOS ARM64 - regression
+    needs: macos-full
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/regression-package
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-regression-tests
+          path: ${{ runner.temp }}/regression-package
+      - name: Extract compiler and prebuilt tests
+        id: compiler
+        run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
+          mkdir -p "$RUNNER_TEMP/regression-tests"
+          tar -C "$RUNNER_TEMP/regression-tests" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64-regression.tar.gz"
+      - name: Run prebuilt full V++ regression
+        run: |
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --phase run --artifacts "$RUNNER_TEMP/regression-tests/full" --logs regression-logs/full
+      - name: Run prebuilt i32 regression
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        run: |
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --phase run --artifacts "$RUNNER_TEMP/regression-tests/i32" --logs regression-logs/i32
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-regression-logs
+          path: regression-logs/
+
+  linux-regression:
+    name: Linux x86-64 - regression
+    needs: linux-full
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64-full
+          path: ${{ runner.temp }}/regression-package
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64-regression-tests
+          path: ${{ runner.temp }}/regression-package
+      - name: Extract compiler and prebuilt tests
+        id: compiler
+        run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
+          mkdir -p "$RUNNER_TEMP/regression-tests"
+          tar -C "$RUNNER_TEMP/regression-tests" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-regression.tar.gz"
+      - name: Run prebuilt full V++ regression
+        run: |
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --phase run --artifacts "$RUNNER_TEMP/regression-tests/full" --logs regression-logs/full
+      - name: Run prebuilt i32 regression
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        run: |
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --phase run --artifacts "$RUNNER_TEMP/regression-tests/i32" --logs regression-logs/i32
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-regression-logs
+          path: regression-logs/
+
+  windows-regression:
+    name: Windows x86-64 - regression
+    needs: windows-full
+    runs-on: windows-2025
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check regression runner configuration
+        shell: pwsh
+        run: |
+          python scripts/quality/test_script_configuration.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./scripts/windows/test-runner-support.ps1
+          & ./scripts/windows/run-tests.ps1 -Inventory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x86_64-full
+          path: ${{ runner.temp }}/regression-package
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x86_64-regression-tests
+          path: ${{ runner.temp }}/regression-package
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANG64
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
+      - name: Extract compiler and prebuilt tests
+        id: compiler
+        shell: pwsh
+        run: |
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
+          if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
+          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/regression-tests" | Out-Null
+          tar -C "$env:RUNNER_TEMP/regression-tests" -xzf "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-regression.tar.gz"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows test artifact extraction failed' }
+      - name: Run prebuilt full V++ regression
+        shell: pwsh
+        run: |
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$toolchain/clang.exe" -Suite full -Phase run -Artifacts "$env:RUNNER_TEMP/regression-tests/full" -LogDirectory regression-logs/full
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run prebuilt i32 regression
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-i32.exe" -Clang "$toolchain/clang.exe" -Suite i32 -Phase run -Artifacts "$env:RUNNER_TEMP/regression-tests/i32" -LogDirectory regression-logs/i32
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-regression-logs
+          path: regression-logs/

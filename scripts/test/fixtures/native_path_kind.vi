@@ -1,0 +1,22 @@
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+
+hàm chính() {
+    gốc = "native-path-kind-check";
+    tệp = đường dẫn nối(gốc, "bé.txt");
+    thiếu = đường dẫn nối(gốc, "missing");
+    nếu (đường dẫn tồn tại(gốc)) { ném "path fixture already exists"; };
+    tạo thư mục(gốc);
+    ghi tệp(tệp, "42");
+    loại thư mục = 4;
+    loại tệp = 8;
+    nếu (tên nền tảng() == "windows") { loại thư mục = 2; loại tệp = 1; };
+    nếu (máy đường loại(gốc, 1) != loại thư mục || máy đường loại(gốc, 0) != loại thư mục) { ném "directory kind"; };
+    nếu (máy đường loại(tệp, 1) != loại tệp || máy đường loại(tệp, 0) != loại tệp) { ném "file kind"; };
+    nếu (máy đường loại(thiếu, 1) != -1 || máy đường loại(thiếu, 0) != -1) { ném "missing kind"; };
+    nếu (!là thư mục(gốc) || là tệp(gốc) || !là tệp(tệp) || là thư mục(tệp) || đường dẫn tồn tại(thiếu)) { ném "public path predicates"; };
+    nếu (xóa đường dẫn(gốc) != 2 || đường dẫn tồn tại(gốc)) { ném "recursive directory cleanup"; };
+    in "NATIVE PATH KIND OK";
+};

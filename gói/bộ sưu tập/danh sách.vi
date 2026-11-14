@@ -3,6 +3,52 @@
 // Các thuật toán collection còn lại được triển khai trực tiếp bằng V++.
 
 nhập gói.lõi.trình tự.*;
+nhập gói.lõi.chuyển kiểu.loại của;
+
+// Chỉ dùng merge sort khi mọi phép so sánh đều có thứ tự toàn phần.
+// Các kiểu hỗn hợp / số thực giữ thuật toán cũ và thứ tự phát sinh lỗi.
+hàm riêng tư danh sách có thứ tự toàn phần(ds, n) {
+    nếu (loại của(ds) != "danh sách") { trả về sai; };
+    kiểu = loại của(ds[0]);
+    nếu (kiểu != "số nguyên" && kiểu != "chuỗi") { trả về sai; };
+    lặp(k = 1; k < n; k++) {
+        nếu (loại của(ds[k]) != kiểu) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+// Merge ổn định: chọn bên trái khi bằng nhau; luôn sửa chính list ban đầu.
+hàm riêng tư danh sách trộn ổn định(ds, n) {
+    đệm = [];
+    lặp(k = 0; k < n; k++) { máy ảo thêm cuối danh sách(đệm, rỗng); };
+    nguồn = ds; đích = đệm; rộng = 1; ở đệm = sai;
+    khi (rộng < n) {
+        đầu = 0;
+        khi (đầu < n) {
+            giữa = n;
+            nếu (rộng < n - đầu) { giữa = đầu + rộng; };
+            cuối = n;
+            nếu (rộng < n - giữa) { cuối = giữa + rộng; };
+            trái = đầu; phải = giữa; k = đầu;
+            khi (trái < giữa && phải < cuối) {
+                a = nguồn[trái]; b = nguồn[phải];
+                nếu (a > b) { đích[k] = b; phải = phải + 1; }
+                hoặc { đích[k] = a; trái = trái + 1; };
+                k = k + 1;
+            };
+            khi (trái < giữa) { đích[k] = nguồn[trái]; trái = trái + 1; k = k + 1; };
+            khi (phải < cuối) { đích[k] = nguồn[phải]; phải = phải + 1; k = k + 1; };
+            đầu = cuối;
+        };
+        tạm = nguồn; nguồn = đích; đích = tạm; ở đệm = !ở đệm;
+        nếu (rộng >= n - rộng) { rộng = n; }
+        hoặc { rộng = rộng + rộng; };
+    };
+    nếu (ở đệm) {
+        lặp(k = 0; k < n; k++) { ds[k] = nguồn[k]; };
+    };
+    trả về rỗng;
+};
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Tiện Ích Danh Sách {
@@ -50,11 +96,21 @@ lớp công khai Tiện Ích Danh Sách {
     hàm công khai sắp xếp(danh sách đầu vào) {
         n = máy ảo lấy độ dài(danh sách đầu vào);
         lặp(i = 0; i < n; i++) {
+            // Nếu một lượt không đổi chỗ, mọi lượt sau cũng không đổi.
+            // Danh sách đã sắp xếp chỉ cần một lượt duyệt.
+            đổi chỗ = sai;
             lặp(j = 0; j + 1 < n - i; j++) {
                 nếu (danh sách đầu vào[j] > danh sách đầu vào[j + 1]) {
                     tạm = danh sách đầu vào[j];
                     danh sách đầu vào[j] = danh sách đầu vào[j + 1];
                     danh sách đầu vào[j + 1] = tạm;
+                    đổi chỗ = đúng;
+                };
+            };
+            nếu (!đổi chỗ) { thoát; };
+            nếu (i == 1 && n >= 32) {
+                nếu (danh sách có thứ tự toàn phần(danh sách đầu vào, n)) {
+                    trả về danh sách trộn ổn định(danh sách đầu vào, n);
                 };
             };
         };

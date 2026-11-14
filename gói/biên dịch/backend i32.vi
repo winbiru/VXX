@@ -1,0 +1,19 @@
+// Backend MachineFunction dùng chung cho AST native và compiler AOT.
+// Đầu vào đã được lowerer kiểm kiểu/kiểm tra CFG; không parse lại nguồn,
+// không tạo bytecode VM hoặc chuyển mnemonic qua danh sách byte.
+nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
+nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+
+hàm công khai biên dịch i32 sinh asm(máy, tên, kiến trúc, hệ điều hành) {
+    nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
+        ném "Backend i32: kiến trúc chưa hỗ trợ";
+    };
+    trả về biên dịch lắp ráp đầu(hệ điều hành, tên) +
+        biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, sai);
+};
+
+// Raw/object giữ encoder và validator độc lập để đối chiếu với mnemonic.
+hàm công khai biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành) {
+    trả về biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+};

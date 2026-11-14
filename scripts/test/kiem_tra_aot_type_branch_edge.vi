@@ -1,0 +1,38 @@
+nhập gói.chuẩn.chính.*;
+hàm tạo kiểm(v) {
+    trả về hàm(mới) {
+        t = máy ảo lấy loại(v);
+        nếu (máy ảo lấy loại(v) == "chuỗi") {
+            nếu (t != "chuỗi") { ném "capture string"; };
+        } hoặc {
+            nếu (t == "chuỗi") { ném "capture not string"; };
+        };
+        v = mới;
+        nếu (máy ảo lấy loại(v) == "tuple") { trả về 1; };
+        nếu (máy ảo lấy loại(v) == "số nguyên") { trả về 2; };
+        trả về 3;
+    };
+};
+hàm chính() {
+    kiểm = tạo kiểm("Việt🌿");
+    nếu (kiểm(42) != 2) { ném "capture int"; };
+    nếu (kiểm(máy ảo xem byte chuỗi("𠮷")) != 1) { ném "capture view"; };
+    lặp(i = 0; i < 30000; i++) {
+        rác = "số:" + thành chuỗi(i);
+        nếu (máy ảo lấy loại(rác) != "chuỗi") { ném "gc string"; };
+        nếu (máy ảo lấy loại(i) != "số nguyên") { ném "gc int"; };
+    };
+    nếu (kiểm("x") != 3) { ném "capture after GC"; };
+    biến chưa;
+    t = máy ảo lấy loại(chưa);
+    nếu (máy ảo lấy loại(chưa) == "số nguyên") {
+        nếu (t != "số nguyên") { ném "uninitialized mismatch"; };
+    } hoặc { nếu (t == "số nguyên") { ném "uninitialized mismatch"; }; };
+    bắt được = sai;
+    thử {
+        v = "x";
+        nếu (máy ảo lấy loại(v) == "chuỗi") { ném "expected"; };
+    } bắt lỗi (lỗi) { bắt được = đúng; };
+    nếu (!bắt được) { ném "catch"; };
+    in "type branch edges: PASS";
+};

@@ -13,7 +13,7 @@ nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 
-// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+// Lớp giữ API hướng đối tượng; các hàm mô-đun có thể gọi trực tiếp primitive khi không cần trạng thái.
 lớp công khai Xử Lý Chuỗi {
     hàm công khai khởi tạo() {};
 
@@ -191,7 +191,8 @@ lớp công khai Xử Lý Chuỗi {
     // `mục_tiêu` là chuỗi 144 code point; `phân_rã` là danh sách song song.
     hàm riêng tư chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã) {
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(mục tiêu) && vị trí < 0; i++) {
+        n = máy ảo lấy độ dài(mục tiêu);
+        lặp(i = 0; i < n && vị trí < 0; i++) {
             nếu (mục tiêu[i] == c) {
                 vị trí = i;
             };
@@ -230,7 +231,8 @@ lớp công khai Xử Lý Chuỗi {
         };
 
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(phân rã) && vị trí < 0; i++) {
+        n bảng = máy ảo lấy độ dài(phân rã);
+        lặp(i = 0; i < n bảng && vị trí < 0; i++) {
             nếu (phân rã[i] == khóa) {
                 vị trí = i;
             };
@@ -269,28 +271,42 @@ lớp công khai Xử Lý Chuỗi {
             "Ư", "Ừ", "Ứ", "Ử", "Ữ", "Ự", "Y", "Ỳ", "Ý", "Ỷ", "Ỹ", "Ỵ"
         ];
 
+        // Chỉ phân rã và ghép khi ký tự cơ sở có dấu theo sau.
+        // Các ký tự đã dựng sẵn và các dấu đứng đầu giữ nguyên byte.
         kết quả = "";
-        đoạn = [];
-        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+        đầu đoạn = 0;
+        n = máy ảo lấy độ dài(văn bản);
+        i = 0;
+        khi (i + 1 < n) {
             c = văn bản[i];
-            hạng dấu = mình.chuỗi nfc hạng dấu(c);
-            nếu (hạng dấu != 0) {
-                nếu (máy ảo lấy độ dài(đoạn) == 0) {
-                    // Giữ đúng hành vi cũ: combining mark đứng độc lập được phát ra ngay.
-                    kết quả = kết quả + c;
-                } hoặc {
-                    máy ảo thêm cuối danh sách(đoạn, c);
-                };
+            nếu (mình.chuỗi nfc hạng dấu(văn bản[i + 1]) == 0 ||
+                mình.chuỗi nfc hạng dấu(c) != 0) {
+                i = i + 1;
             } hoặc {
-                kết quả = kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+                nếu (i > đầu đoạn) {
+                    kết quả = kết quả + máy ảo cắt chuỗi(văn bản, đầu đoạn, i - đầu đoạn);
+                };
                 đoạn = [];
                 phân rã c = mình.chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã);
                 lặp(j = 0; j < máy ảo lấy độ dài(phân rã c); j++) {
                     máy ảo thêm cuối danh sách(đoạn, phân rã c[j]);
                 };
+                i = i + 1;
+                khi (i < n) {
+                    dấu tiếp = văn bản[i];
+                    nếu (mình.chuỗi nfc hạng dấu(dấu tiếp) == 0) { thoát; };
+                    máy ảo thêm cuối danh sách(đoạn, dấu tiếp);
+                    i = i + 1;
+                };
+                kết quả = kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+                đầu đoạn = i;
             };
         };
-        trả về kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+        nếu (đầu đoạn == 0) { trả về văn bản; };
+        nếu (đầu đoạn < n) {
+            kết quả = kết quả + máy ảo cắt chuỗi(văn bản, đầu đoạn, n - đầu đoạn);
+        };
+        trả về kết quả;
     };
 
     // Phân loại theo Unicode White_Space. Việc xác định code point dùng opcode chuỗi
@@ -891,27 +907,27 @@ lớp công khai Xử Lý Chuỗi {
 
 
 hàm công khai độ dài(giá trị) {
-    trả về Xử Lý Chuỗi().độ dài(giá trị);
+    trả về máy ảo lấy độ dài(giá trị);
 };
 
 hàm công khai nối chuỗi(a, b) {
-    trả về Xử Lý Chuỗi().nối chuỗi(a, b);
+    trả về a + b;
 };
 
 hàm công khai nối ba(a, b, c) {
-    trả về Xử Lý Chuỗi().nối ba(a, b, c);
+    trả về a + b + c;
 };
 
 hàm công khai bằng nhau chuỗi(a, b) {
-    trả về Xử Lý Chuỗi().bằng nhau chuỗi(a, b);
+    trả về a == b;
 };
 
 hàm công khai khác nhau chuỗi(a, b) {
-    trả về Xử Lý Chuỗi().khác nhau chuỗi(a, b);
+    trả về a != b;
 };
 
 hàm công khai là chuỗi rỗng(s) {
-    trả về Xử Lý Chuỗi().là chuỗi rỗng(s);
+    trả về s == "";
 };
 
 hàm công khai đếm ký tự(s, ký tự) {
@@ -943,7 +959,10 @@ hàm công khai chuẩn hóa unicode(s) {
 };
 
 hàm công khai chuỗi mã điểm unicode(c) {
-    trả về Xử Lý Chuỗi().chuỗi mã điểm unicode(c);
+    nếu (loại của(c) != "chuỗi" || máy ảo lấy độ dài(c) != 1) {
+        ném "STRING_TYPE";
+    };
+    trả về mã điểm unicode(c);
 };
 
 hàm công khai là khoảng trắng unicode(c) {
@@ -979,7 +998,10 @@ hàm công khai mã hóa caesar(s, khóa) {
 };
 
 hàm công khai chuỗi yêu cầu(văn bản) {
-    trả về Xử Lý Chuỗi().chuỗi yêu cầu(văn bản);
+    nếu (loại của(văn bản) != "chuỗi") {
+        ném "STRING_TYPE";
+    };
+    trả về văn bản;
 };
 
 hàm công khai ký tự tại(văn bản, chỉ số) {
@@ -1007,7 +1029,7 @@ hàm công khai chuỗi thành các byte(văn bản, bảng mã = "UTF-8") {
 };
 
 hàm công khai chuỗi từ các byte(các byte, bảng mã = "UTF-8", chế độ lỗi = "BÁO_LỖI") {
-    trả về Xử Lý Chuỗi().chuỗi từ các byte(các byte, bảng mã, chế độ lỗi);
+    trả về giải mã bảng mã(các byte, bảng mã, chế độ lỗi);
 };
 
 hàm công khai tìm chuỗi chính xác(văn bản, mẫu, từ = 0) {
@@ -1027,7 +1049,11 @@ hàm công khai chứa chính xác(văn bản, mẫu) {
 };
 
 hàm công khai thay chính xác(văn bản, cũ, mới) {
-    trả về Xử Lý Chuỗi().thay chính xác(văn bản, cũ, mới);
+    // Giữ thứ tự và thông báo kiểm tra của API, bỏ receiver tạm thời.
+    nếu (máy ảo lấy loại(văn bản) != "chuỗi") { ném "STRING_TYPE"; };
+    nếu (máy ảo lấy loại(cũ) != "chuỗi") { ném "STRING_TYPE"; };
+    nếu (máy ảo lấy loại(mới) != "chuỗi") { ném "STRING_TYPE"; };
+    trả về máy ảo thay chuỗi chính xác(văn bản, cũ, mới);
 };
 
 hàm công khai tách hằng văn bản(văn bản, phân cách) {
@@ -1039,7 +1065,13 @@ hàm công khai bộ dựng chuỗi(mức trần = 1048576, mức trần byte = 
 };
 
 hàm công khai bộ dựng yêu cầu(bộ dựng) {
-    trả về Xử Lý Chuỗi().bộ dựng yêu cầu(bộ dựng);
+    nếu (loại của(bộ dựng) != "từ điển") {
+        ném "STRING_BUILDER_INVALID";
+    };
+    nếu (lấy từ điển(bộ dựng, "loại", "") != "BộDựngChuỗi") {
+        ném "STRING_BUILDER_INVALID";
+    };
+    trả về bộ dựng;
 };
 
 hàm công khai bộ dựng thêm(bộ dựng, giá trị) {
@@ -1075,7 +1107,13 @@ hàm công khai mẫu chuỗi(mảnh, giá trị) {
 };
 
 hàm công khai mẫu chuỗi yêu cầu(template) {
-    trả về Xử Lý Chuỗi().mẫu chuỗi yêu cầu(template);
+    nếu (loại của(template) != "từ điển") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    nếu (lấy từ điển(template, "loại", "") != "MẫuChuỗi") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    trả về template;
 };
 
 hàm công khai nội suy mẫu(template) {

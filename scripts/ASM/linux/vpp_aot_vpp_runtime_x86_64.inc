@@ -1,39 +1,13 @@
-// Đổi ABI AOT SysV sang đối số i32 trên ngăn xếp V++. Chuyển cú pháp Intel của chương trình AOT sang
-// AT&T trước khi sinh bộ chuyển đổi và hàm điều phối siêu dữ liệu.
+// AOT động và bộ thực thi i32 Linux cùng dùng ABI SysV AMD64.
+// Chuyển cú pháp Intel sang AT&T trước khi xuất hàm và điều phối siêu dữ liệu.
 .att_syntax prefix
 .text
 .p2align 4
 .macro AOT_VPP ten, so_doi_so
     .globl vpp_native_dynamic_\ten
 vpp_native_dynamic_\ten:
-    subq $40, %rsp
-    movl %edi, (%rsp)
-    .if \so_doi_so > 1
-    movl %esi, 4(%rsp)
-    .endif
-    .if \so_doi_so > 2
-    movl %edx, 8(%rsp)
-    .endif
-    .if \so_doi_so > 3
-    movl %ecx, 12(%rsp)
-    .endif
-    .if \so_doi_so > 4
-    movl %r8d, 16(%rsp)
-    .endif
-    .if \so_doi_so > 5
-    movl %r9d, 20(%rsp)
-    .endif
-    .if \so_doi_so > 6
-    movl 48(%rsp), %eax
-    movl %eax, 24(%rsp)
-    .endif
-    .if \so_doi_so > 7
-    movl 56(%rsp), %eax
-    movl %eax, 28(%rsp)
-    .endif
-    call vpp_fn_aot_\ten
-    addq $40, %rsp
-    ret
+    // Giữ nguyên sáu thanh ghi, các đối số thứ bảy trở đi và địa chỉ trả về.
+    jmp vpp_fn_aot_\ten
 .endm
 .macro AOT_VPP_GAP_I32 ten, so_doi_so
     AOT_VPP \ten, \so_doi_so

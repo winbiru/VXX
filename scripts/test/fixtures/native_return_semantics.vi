@@ -1,0 +1,11 @@
+hàm kết thúc(n = 3) {
+    lặp(i = 0; i < n; i++) { };
+    nếu (n < 0) { trả về 8; };
+};
+hàm chính() {
+    in kết thúc();
+    in kết thúc(0);
+    in kết thúc(-1);
+    biến a = [42];
+    trả về a[0];
+};

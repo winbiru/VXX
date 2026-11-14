@@ -89,18 +89,34 @@ hàm thực thi các byte thêm cuối(mã tài nguyên, giá trị đang xét) 
     trả về máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, chiều dài + 1);
 };
 
-hàm thực thi các byte nối(đích nhận, nguồn đầu vào) {
+// Sao chép một đoạn đã kiểm tra biên bằng ABI i32 của mọi seed.
+// Seed ELF cũ không nhận intrinsic máy sao chép vùng nhớ (82).
+hàm thực thi các byte nối đoạn(đích nhận, nguồn đầu vào, điểm bắt đầu, số phần tử) {
     biến nguồn văn bản = thực thi các byte ô nhớ(nguồn đầu vào);
     nếu (nguồn văn bản < 0) { trả về -1; };
-    biến số phần tử = máy đọc số nguyên ba mươi hai bit(32 + nguồn văn bản * 32);
+    biến dài nguồn = máy đọc số nguyên ba mươi hai bit(32 + nguồn văn bản * 32);
+    nếu (điểm bắt đầu < 0 || số phần tử < 0 || điểm bắt đầu > dài nguồn) { trả về -1; };
+    nếu (số phần tử > dài nguồn - điểm bắt đầu) { trả về -1; };
     nếu (thực thi các byte dự trữ(đích nhận, số phần tử) != 0) { trả về -1; };
     biến đích sao chép = thực thi các byte ô nhớ(đích nhận);
     biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + đích sao chép * 32);
-    lặp (i = 0; i < số phần tử; i++) {
-        máy ghi byte(thực thi nội dung đệm(đích sao chép) + chiều dài + i, máy đọc byte(thực thi nội dung đệm(nguồn văn bản) + i));
+    biến địa chỉ nguồn = thực thi nội dung đệm(nguồn văn bản) + điểm bắt đầu;
+    biến địa chỉ đích = thực thi nội dung đệm(đích sao chép) + chiều dài;
+    biến i = 0;
+    khi (i <= số phần tử - 4) {
+        máy ghi số nguyên ba mươi hai bit(địa chỉ đích + i, máy đọc số nguyên ba mươi hai bit(địa chỉ nguồn + i));
+        i = i + 4;
     };
-    máy ghi byte(thực thi nội dung đệm(đích sao chép) + chiều dài + số phần tử, 0);
+    khi (i < số phần tử) {
+        máy ghi byte(địa chỉ đích + i, máy đọc byte(địa chỉ nguồn + i));
+        i = i + 1;
+    };
+    máy ghi byte(địa chỉ đích + số phần tử, 0);
     trả về máy ghi số nguyên ba mươi hai bit(32 + đích sao chép * 32, chiều dài + số phần tử);
+};
+
+hàm thực thi các byte nối(đích nhận, nguồn đầu vào) {
+    trả về thực thi các byte nối đoạn(đích nhận, nguồn đầu vào, 0, thực thi các byte chiều dài(nguồn đầu vào));
 };
 
 hàm thực thi các byte bằng nhau(vế trái, vế phải) {
@@ -126,13 +142,10 @@ hàm thực thi các byte cắt(mã tài nguyên, điểm bắt đầu, số ph�
     nếu (số phần tử > chiều dài - điểm bắt đầu) { trả về -1; };
     biến kết quả trả về = thực thi các byte mới();
     nếu (kết quả trả về <= 0) { trả về -1; };
-    biến đích sao chép = thực thi các byte ô nhớ(kết quả trả về);
-    nếu (thực thi các byte dự trữ(kết quả trả về, số phần tử) != 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
-    lặp (i = 0; i < số phần tử; i++) {
-        máy ghi byte(thực thi nội dung đệm(đích sao chép) + i, máy đọc byte(thực thi nội dung đệm(ô nhớ) + điểm bắt đầu + i));
+    nếu (thực thi các byte nối đoạn(kết quả trả về, mã tài nguyên, điểm bắt đầu, số phần tử) != 0) {
+        thực thi các byte giải phóng(kết quả trả về);
+        trả về -1;
     };
-    máy ghi byte(thực thi nội dung đệm(đích sao chép) + số phần tử, 0);
-    máy ghi số nguyên ba mươi hai bit(32 + đích sao chép * 32, số phần tử);
     trả về kết quả trả về;
 };
 
@@ -1614,15 +1627,19 @@ hàm thực thi bộ nhớ đệm init() {
     trả về 0;
 };
 
-hàm thực thi bộ nhớ đệm đường tệp(khóa tra cứu) {
+// Không tạo khóa, băm hay tuần tự hóa IR trong các lần build không cache.
+hàm thực thi bộ nhớ đệm đã tắt() {
     biến đã tắt = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_NO_CACHE");
-    nếu (đã tắt > 0) {
-        biến một = "1";
-        biến là độ dời = thực thi các byte bằng nhau(đã tắt, một);
-        thực thi các byte giải phóng(một);
-        thực thi các byte giải phóng(đã tắt);
-        nếu (là độ dời == 1) { trả về -1; };
-    };
+    nếu (đã tắt <= 0) { trả về 0; };
+    biến một = "1";
+    biến kết quả = thực thi các byte bằng nhau(đã tắt, một);
+    thực thi các byte giải phóng(một);
+    thực thi các byte giải phóng(đã tắt);
+    trả về kết quả;
+};
+
+hàm thực thi bộ nhớ đệm đường tệp(khóa tra cứu) {
+    nếu (thực thi bộ nhớ đệm đã tắt() == 1) { trả về -1; };
     nếu (thực thi bộ nhớ đệm init() != 0) { trả về -1; };
     biến thư mục = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_CACHE_DIR");
     nếu (thư mục <= 0) { thư mục = ".vpp-native-cache"; };
@@ -1875,5 +1892,46 @@ hàm thực thi bộ nhớ đệm báo cáo() {
     thực thi các byte thêm cuối(kết xuất, 10);
     thực thi ghi tất cả(2, thực thi nội dung đệm(thực thi các byte ô nhớ(kết xuất)), thực thi các byte chiều dài(kết xuất));
     thực thi các byte giải phóng(kết xuất);
+    trả về 0;
+};
+
+// Nhật ký tiến độ chỉ ghi stderr, dùng chung cho Mach-O, ELF và PE.
+// CI gắn dấu thời gian cho từng dòng; không phụ thuộc đồng hồ của hệ điều hành.
+hàm thực thi tiến độ bật() {
+    biến cờ hiệu = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_BUILD_PROGRESS");
+    nếu (cờ hiệu <= 0) { trả về 0; };
+    biến một = "1";
+    biến kết quả = thực thi các byte bằng nhau(cờ hiệu, một);
+    byte hủy(cờ hiệu);
+    byte hủy(một);
+    trả về kết quả;
+};
+
+hàm thực thi tiến độ ghi(văn bản, đã xong, tổng số) {
+    biến kết xuất = "[V++ i32] ";
+    nếu (kết xuất <= 0) { byte hủy(văn bản); trả về 0; };
+    byte nối(kết xuất, văn bản);
+    byte hủy(văn bản);
+    nếu (tổng số > 0) {
+        thực thi liên kết thêm cuối văn bản(kết xuất, " ");
+        thực thi bộ nhớ đệm thêm cuối số(kết xuất, đã xong);
+        thực thi liên kết thêm cuối văn bản(kết xuất, "/");
+        thực thi bộ nhớ đệm thêm cuối số(kết xuất, tổng số);
+        thực thi liên kết thêm cuối văn bản(kết xuất, " (");
+        thực thi bộ nhớ đệm thêm cuối số(kết xuất, máy chia số nguyên ba mươi hai bit(đã xong * 100, tổng số));
+        thực thi liên kết thêm cuối văn bản(kết xuất, "%)");
+    };
+    thực thi các byte thêm cuối(kết xuất, 10);
+    thực thi liên kết báo lỗi(kết xuất);
+    trả về 0;
+};
+
+hàm thực thi tiến độ nguồn(đường tệp) {
+    nếu (thực thi tiến độ bật() != 1) { trả về 0; };
+    biến kết xuất = "[V++ i32] Nạp mô-đun: ";
+    nếu (kết xuất <= 0) { trả về 0; };
+    byte nối(kết xuất, đường tệp);
+    thực thi các byte thêm cuối(kết xuất, 10);
+    thực thi liên kết báo lỗi(kết xuất);
     trả về 0;
 };
