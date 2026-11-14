@@ -10,28 +10,61 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  macos-full:
-    name: macOS ARM64 - full compiler
+  macos-i32:
+    name: macOS ARM64 - i32 source bootstrap
     runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - run: cmake -S . -B build-pure-vpp
-      - run: cmake --build build-pure-vpp --parallel
-      - run: ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
+      - name: Verify pinned seeds and build i32 compiler and bootstrap runtime
+        run: |
+          (cd bootstrap/macos-arm64 && shasum -a 256 -c SHA256SUMS)
+          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_MACHO_REL_LINK=0
+          bash scripts/build-vpp-aot-runtime.sh "$RUNNER_TEMP/macos-i32" "$GITHUB_WORKSPACE/bootstrap/macos-arm64/vpp-i32"
+          codesign --verify "$RUNNER_TEMP/macos-i32/vpp-i32"
       - name: Check i32 relative module paths
         run: |
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
-          build-pure-vpp/bin/vpp-i32 check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
-          build-pure-vpp/bin/vpp-i32 check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+          "$RUNNER_TEMP/macos-i32/vpp-i32" check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
+          "$RUNNER_TEMP/macos-i32/vpp-i32" check './gói/biên dịch/bản địa/bộ biên dịch.vi'
       - name: Check ELF and COFF symbol index regression
         run: |
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
           out="$RUNNER_TEMP/symbol-index"
           mkdir -p "$out"
-          build-pure-vpp/bin/vpp-i32 build "$GITHUB_WORKSPACE/src/tests/fixtures/native_object_symbol_index.vi" -o "$out/probe"
+          "$RUNNER_TEMP/macos-i32/vpp-i32" build "$GITHUB_WORKSPACE/src/tests/fixtures/native_object_symbol_index.vi" -o "$out/probe"
           "$out/probe" "$out/probe.elf.o" "$out/probe.coff.obj"
           python3 scripts/quality/check_native_object_symbol_index.py "$out/probe.elf.o" "$out/probe.coff.obj"
+      - name: Package the rebuilt i32 compiler and runtime
+        run: |
+          COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/macos-i32" -czf "$RUNNER_TEMP/vpp-macos-arm64-i32.tar.gz" vpp-i32 runtime.o platform.o dynamic-bridge.o
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-i32-selfhost
+          path: ${{ runner.temp }}/vpp-macos-arm64-i32.tar.gz
+          if-no-files-found: error
+  macos-full:
+    name: macOS ARM64 - full dynamic compiler
+    needs: macos-i32
+    runs-on: macos-15
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-i32-selfhost
+          path: ${{ runner.temp }}/macos-i32-artifact
+      - name: Build full compiler using the rebuilt i32 runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
+          tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
+          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix"
+          cmake --build build-pure-vpp --parallel
+      - name: Verify full dynamic compiler self-host convergence
+        run: |
+          bash scripts/quality/check_macos_full_bootstrap.sh "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+          install -m 755 "$RUNNER_TEMP/macos-full/vpp-native-stage3" build-pure-vpp/bin/vpp-native
+      - run: ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
       - run: cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
       - run: '"$RUNNER_TEMP/vpp-install/bin/vpp" --version'
       - name: Package and execute an installed native program
@@ -65,6 +98,8 @@ jobs:
           path: |
             build-pure-vpp/Testing/Temporary/
             build-pure-vpp/full-compiler-profile.log
+            ${{ runner.temp }}/macos-full/**/*.log
+            ${{ runner.temp }}/macos-full/convergence.sha256
           if-no-files-found: ignore
   linux-i32:
     name: Linux x86-64 - i32 source bootstrap

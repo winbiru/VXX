@@ -1998,6 +1998,12 @@
       "suite": "full"
     },
     {
+      "id": "native_path_kind",
+      "source": "src/tests/fixtures/native_path_kind.vi",
+      "expected": "src/tests/expected/native_path_kind.expected",
+      "suite": "full"
+    },
+    {
       "id": "native_protected_loop",
       "source": "src/tests/fixtures/native_protected_loop.vi",
       "expected": "src/tests/expected/native_protected_loop.expected",

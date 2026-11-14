@@ -6,6 +6,16 @@ The two seed executables are generated V++/ASM Mach-O binaries, not the old C++ 
 
 The bootstrap runtime is kept separate from the published runtime: Apple `ld -r` adds symbol flags that the direct Mach-O linker rejects. The build regenerates the final runtime object with `VPP_NATIVE_MACHO_REL_LINK=1` using the freshly built i32 compiler.
 
+macOS native CI now has three jobs: `macos-i32` rebuilds i32 and the bootstrap runtime from source and uploads them as a tar archive; `macos-full` consumes that archive via `VPP_PREBUILT_I32_RUNTIME`, builds the current full compiler, and uses the direct V++ ARM64/Mach-O path to regenerate stages 2 and 3. Both stages must execute dynamic AOT fixtures, pass code signature and dependency checks, and match byte-for-byte (including their SHA-256 hashes). Stage 3 is the compiler published in the full package. `macos-regression` then runs both suites from that package. The system assembler/linker is permitted only for the initial bootstrap; subsequent full self-builds use the direct V++ route and the prebuilt runtime objects.
+
+To reproduce the full convergence gate after a normal CMake build:
+
+```sh
+bash scripts/quality/check_macos_full_bootstrap.sh build-pure-vpp /tmp/vpp-macos-full-bootstrap
+```
+
+Use a fresh output directory. The initial CMake compiler is stage 1 for this gate; the pinned seed is an input to that build.
+
 To use independently verified replacement seeds, set `VPP_BOOTSTRAP_FULL` and `VPP_BOOTSTRAP_I32` at CMake configure time. The build checks the target, signature and linked libraries of both seeds; the checksum manifest pins the bundled seeds only.
 
 ## Linux x86-64 i32 seed

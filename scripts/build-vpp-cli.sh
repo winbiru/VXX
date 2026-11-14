@@ -5,6 +5,7 @@ source "$root/scripts/build-vpp-progress.sh"
 out=${1:-"$root/build-pure-vpp"}
 full=${2:-"$root/bootstrap/macos-arm64/vpp-native"}
 i32=${3:-"$root/bootstrap/macos-arm64/vpp-i32"}
+prepared=${4:-}
 if [[ $(uname -s)-$(uname -m) != Darwin-arm64 ]]; then
   echo 'V++: quá trình tự biên dịch hoàn chỉnh hiện yêu cầu macOS ARM64.' >&2
   exit 2
@@ -37,7 +38,17 @@ runtime="$out/native-vpp-runtime"
 bootstrap_runtime="$out/bootstrap-runtime"
 mkdir -p "$runtime"
 # Compile the i32 compiler and runtime from current V++ sources.
-VPP_NATIVE_MACHO_REL_LINK=0 bash "$root/scripts/build-vpp-aot-runtime.sh" "$bootstrap_runtime" "$i32" cli
+if [[ -n "$prepared" ]]; then
+  # The preceding native CI job prepared these files from the same checkout.
+  mkdir -p "$bootstrap_runtime"
+  for part in vpp-i32 runtime.o platform.o dynamic-bridge.o; do
+    test -s "$prepared/$part"
+    cp -p "$prepared/$part" "$bootstrap_runtime/$part"
+  done
+  progress 50 'Sử dụng bộ biên dịch i32 và runtime từ giai đoạn trước'
+else
+  VPP_NATIVE_MACHO_REL_LINK=0 bash "$root/scripts/build-vpp-aot-runtime.sh" "$bootstrap_runtime" "$i32" cli
+fi
 audit "$bootstrap_runtime/vpp-i32"
 export VPP_AOT_VPP_OBJECT="$bootstrap_runtime/runtime.o" VPP_AOT_PLATFORM_OBJECT="$bootstrap_runtime/platform.o" VPP_AOT_DYNAMIC_BRIDGE_OBJECT="$bootstrap_runtime/dynamic-bridge.o"
 # A previous-generation seed can emit ASM rather than direct Mach-O.

@@ -3,6 +3,13 @@ project(VPP VERSION 1.0.0 LANGUAGES NONE)
 
 set(VPP_BOOTSTRAP_FULL "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-native" CACHE FILEPATH "Autonomous V++ compiler seed")
 set(VPP_BOOTSTRAP_I32 "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-i32" CACHE FILEPATH "V++ i32 compiler seed")
+set(VPP_PREBUILT_I32_RUNTIME "" CACHE PATH "Prepared macOS i32 compiler and bootstrap runtime directory")
+set(VPP_PREBUILT_I32_INPUTS)
+if(VPP_PREBUILT_I32_RUNTIME)
+  foreach(part vpp-i32 runtime.o platform.o dynamic-bridge.o)
+    list(APPEND VPP_PREBUILT_I32_INPUTS "${VPP_PREBUILT_I32_RUNTIME}/${part}")
+  endforeach()
+endif()
 if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" OR NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   message(FATAL_ERROR "Quá trình tự biên dịch V++/ASM hoàn chỉnh hiện yêu cầu macOS ARM64")
 endif()
@@ -11,8 +18,8 @@ set(VPP_BIN "${CMAKE_BINARY_DIR}/bin")
 set(VPP_RUNTIME "${CMAKE_BINARY_DIR}/native-vpp-runtime")
 add_custom_command(OUTPUT "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"
   "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o"
-  COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/build-vpp-cli.sh" "${CMAKE_BINARY_DIR}" "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}"
-  DEPENDS ${VPP_SOURCES} "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}"
+  COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/build-vpp-cli.sh" "${CMAKE_BINARY_DIR}" "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" "${VPP_PREBUILT_I32_RUNTIME}"
+  DEPENDS ${VPP_SOURCES} "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" ${VPP_PREBUILT_I32_INPUTS}
     scripts/build-vpp-cli.sh scripts/build-vpp-aot-runtime.sh scripts/build-vpp-progress.sh scripts/vpp-native-launcher.sh.in bootstrap/macos-arm64/SHA256SUMS
   COMMENT "Khởi tạo bộ biên dịch V++ (xem các mốc tiến độ bên dưới)"
   VERBATIM USES_TERMINAL)
