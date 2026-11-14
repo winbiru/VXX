@@ -4,12 +4,27 @@
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 source "$root/scripts/build-vpp-progress.sh"
-if [[ $# != 2 || $(uname -s)-$(uname -m) != Darwin-arm64 || -e "$2" || -L "$2" ]]; then
-  echo 'Usage on macOS ARM64: check_macos_full_bootstrap.sh <cmake-build-dir> <fresh-output-dir>' >&2
+phase=all
+if [[ ${1:-} == --phase ]]; then
+  phase=${2:-}
+  shift 2
+fi
+case "$phase" in
+  all|stage1|stage2|stage3|convergence|test) ;;
+  *) echo "Unknown macOS bootstrap phase: $phase" >&2; exit 2 ;;
+esac
+if [[ $# != 2 || $(uname -s)-$(uname -m) != Darwin-arm64 ]]; then
+  echo 'Usage on macOS ARM64: check_macos_full_bootstrap.sh [--phase PHASE] <cmake-build-dir> <output-dir>' >&2
   exit 2
 fi
 build=$(cd "$1" && pwd)
-mkdir -p "$2"
+if [[ "$phase" == all || "$phase" == stage1 ]]; then
+  if [[ -e "$2" || -L "$2" ]]; then
+    echo 'A fresh macOS bootstrap output directory is required' >&2
+    exit 2
+  fi
+  mkdir -p "$2"
+fi
 out=$(cd "$2" && pwd)
 for name in ${!VPP_@}; do unset "$name"; done
 export VPP_HOME="$root" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_BUILD_PROGRESS=1
@@ -42,17 +57,25 @@ check_stage() {
     diff -u "$root/src/tests/expected/$fixture.expected" "$out/stage$stage-$fixture.stdout.log"
   done
 }
-check_stage 1 "$compiler"
+if [[ "$phase" == all || "$phase" == stage1 ]]; then
+  check_stage 1 "$compiler"
+fi
 for stage in 2 3; do
+  if [[ "$phase" != all && "$phase" != "stage$stage" ]]; then continue; fi
+  if [[ "$stage" == 3 ]]; then compiler="$out/vpp-native-stage2"; fi
   echo "[Biên dịch V++ macOS đầy đủ] Tự biên dịch giai đoạn $stage"
   next="$out/vpp-native-stage$stage"
   vpp_profile_command "$out/stage$stage-profile.log" "$compiler" build "$source_file" -o "$next" 2>&1 | tee "$out/stage$stage-build.log"
-  check_stage "$stage" "$next"
-  compiler="$next"
+  if [[ "$stage" == 2 ]]; then check_stage "$stage" "$next"; fi
 done
-# Both stages use the direct linker and deterministic signing. Require exact
-# equality of the actual binaries, including their Mach-O metadata.
-(cd "$out" && shasum -a 256 vpp-native-stage2 vpp-native-stage3 > convergence.sha256)
-cat "$out/convergence.sha256"
-cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
-echo 'MACOS_FULL_BOOTSTRAP_CONVERGENCE=PASS'
+if [[ "$phase" == all || "$phase" == convergence ]]; then
+  # Both stages use the direct linker and deterministic signing. Require exact
+  # equality of the actual binaries, including their Mach-O metadata.
+  (cd "$out" && shasum -a 256 vpp-native-stage2 vpp-native-stage3 > convergence.sha256)
+  cat "$out/convergence.sha256"
+  cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
+  echo 'MACOS_FULL_BOOTSTRAP_CONVERGENCE=PASS'
+fi
+if [[ "$phase" == all || "$phase" == test ]]; then
+  check_stage 3 "$out/vpp-native-stage3"
+fi

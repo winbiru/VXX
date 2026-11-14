@@ -54,32 +54,36 @@ jobs:
         with:
           name: macos-i32-selfhost
           path: ${{ runner.temp }}/macos-i32-artifact
-      - name: Build full compiler using the rebuilt i32 runtime
+      - name: Prepare runtime
         run: |
           mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
           tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
           cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix"
+      - name: Bootstrap full compiler (Stage 1)
+        run: |
           cmake --build build-pure-vpp --parallel
-      - name: Verify full dynamic compiler self-host convergence
+          bash scripts/quality/check_macos_full_bootstrap.sh --phase stage1 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Self-host Stage 2
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase stage2 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Self-host Stage 3
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase stage3 "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Verify binary convergence
+        run: bash scripts/quality/check_macos_full_bootstrap.sh --phase convergence "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+      - name: Run tests
         run: |
-          bash scripts/quality/check_macos_full_bootstrap.sh "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
+          bash scripts/quality/check_macos_full_bootstrap.sh --phase test "$GITHUB_WORKSPACE/build-pure-vpp" "$RUNNER_TEMP/macos-full"
           install -m 755 "$RUNNER_TEMP/macos-full/vpp-native-stage3" build-pure-vpp/bin/vpp-native
-      - run: ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
-      - run: cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
-      - run: '"$RUNNER_TEMP/vpp-install/bin/vpp" --version'
-      - name: Package and execute an installed native program
+          ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
+      - name: Package and test installed compiler
         run: |
+          cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
+          "$RUNNER_TEMP/vpp-install/bin/vpp" --version
           COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/vpp-install" -czf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz" .
           mkdir -p "$RUNNER_TEMP/vpp-extracted"
           tar -C "$RUNNER_TEMP/vpp-extracted" -xzf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz"
           printf 'hàm chính() { in 42; }\n' > "$RUNNER_TEMP/probe.vi"
           result=$("$RUNNER_TEMP/vpp-extracted/bin/vpp" run "$RUNNER_TEMP/probe.vi")
           test "$result" = 42
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-arm64-full
-          path: ${{ runner.temp }}/vpp-macos-arm64.tar.gz
-          if-no-files-found: error
       - name: Check Linux cross emitter
         run: |
           probe="$RUNNER_TEMP/probe.vi"
@@ -91,7 +95,14 @@ jobs:
             echo 'Cross emitter overwrote its input'; exit 1
           fi
           test "$before" = "$(shasum -a 256 "$probe")"
-      - uses: actions/upload-artifact@v4
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-full
+          path: ${{ runner.temp }}/vpp-macos-arm64.tar.gz
+          if-no-files-found: error
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: macos-test-logs
@@ -152,12 +163,22 @@ jobs:
         with:
           name: linux-i32-selfhost
           path: ${{ runner.temp }}/linux-i32
-      - name: Bootstrap full compiler from pinned Linux seed and verify convergence
+      - name: Prepare runtime
         run: |
           mkdir -p "$RUNNER_TEMP/linux-i32-prefix"
           tar -C "$RUNNER_TEMP/linux-i32-prefix" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
-          bash scripts/quality/check_linux_full_bootstrap.sh "$RUNNER_TEMP/linux-full" "$RUNNER_TEMP/linux-i32-prefix"
-      - name: Package and test full Linux compiler
+          bash scripts/quality/check_linux_full_bootstrap.sh --phase prepare "$RUNNER_TEMP/linux-full" "$RUNNER_TEMP/linux-i32-prefix"
+      - name: Bootstrap full compiler (Stage 1)
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage1 "$RUNNER_TEMP/linux-full"
+      - name: Self-host Stage 2
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage2 "$RUNNER_TEMP/linux-full"
+      - name: Self-host Stage 3
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase stage3 "$RUNNER_TEMP/linux-full"
+      - name: Verify binary convergence
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase convergence "$RUNNER_TEMP/linux-full"
+      - name: Run tests
+        run: bash scripts/quality/check_linux_full_bootstrap.sh --phase test "$RUNNER_TEMP/linux-full"
+      - name: Package and test installed compiler
         run: |
           echo '[Biên dịch V++ Linux đầy đủ  90%] Đóng gói và chạy thử bộ biên dịch'
           out="$RUNNER_TEMP/linux-full"
@@ -192,12 +213,14 @@ jobs:
           "$out/extracted/bin/vpp" vm-build "$out/package-probe.vi" -o "$out/package-probe.vmb"
           test "$(PATH= "$out/extracted/bin/vpp-vm" "$out/package-probe.vmb")" = 42
           echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
-      - uses: actions/upload-artifact@v4
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64-full
           path: ${{ runner.temp }}/vpp-linux-x86_64-full.tar.gz
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: linux-full-test-logs
@@ -286,22 +309,44 @@ jobs:
         with:
           msystem: CLANG64
           install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
-      - name: Bootstrap and execute the full Windows compiler
+      - name: Prepare runtime
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
+          $toolchain | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "VPP_CI_CLANG=$toolchain/clang.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $prefix = "$env:RUNNER_TEMP/windows-i32-prefix"
           python -m zipfile -e "$env:RUNNER_TEMP/windows-i32/vpp-windows-x86_64-i32.zip" $prefix
           if ($LASTEXITCODE -ne 0) { throw 'Windows i32 extraction failed' }
-          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix $prefix --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip"
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix $prefix --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase prepare
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+      - name: Bootstrap full compiler (Stage 1)
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage1
+      - name: Self-host Stage 2
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage2
+      - name: Self-host Stage 3
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage3
+      - name: Verify binary convergence
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase convergence
+      - name: Run tests
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase test
+      - name: Package and test installed compiler
+        shell: pwsh
+        run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase package
+      - name: Upload full compiler
+        uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64-full
           path: ${{ runner.temp }}/vpp-windows-x86_64-full.zip
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - name: Upload build and test logs
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-full-test-logs

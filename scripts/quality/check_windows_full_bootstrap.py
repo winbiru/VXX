@@ -146,119 +146,131 @@ def package_env(package, clang):
     return full_env(home, home / 'native-vpp-runtime', home / 'windows-runtime.obj', clang)
 
 
-def bootstrap(out, prefix, archive, clang):
-    verify_seeds()
-    out.mkdir(parents=True, exist_ok=False)
+def bootstrap(out, prefix, archive, clang, phase='all'):
+    # Each invocation reconstructs the same environment from the prepared
+    # output and i32 prefix; the default still runs the complete bootstrap.
+    if phase in ('all', 'prepare'):
+        verify_seeds()
+        out.mkdir(parents=True, exist_ok=False)
+    elif not out.is_dir():
+        raise RuntimeError(f'Missing prepared bootstrap output: {out}')
     env = clean_env()
     if prefix is None:
-        boundary = out / 'i32-boundary.obj'
-        assemble(clang, ASM / 'windows/vpp_aot_primitives_windows_x86_64.S', boundary,
-                 env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1')
-        command(['pwsh', '-NoProfile', '-File', ROOT / 'scripts/quality/check_windows_native_pe_selfhosting.ps1',
-                 '-SeedCompiler', SEEDS / 'vpp-i32.exe', '-RuntimeObject', boundary,
-                 '-OutputDirectory', out / 'i32-bootstrap'], env, out / 'i32-bootstrap.log')
         i32 = out / 'i32-bootstrap/stage3.exe'
         boundary = out / 'i32-bootstrap/windows-runtime.obj'
     else:
         i32, boundary = prefix / 'bin/vpp-i32.exe', prefix / 'windows-runtime.obj'
-    if not i32.is_file() or not boundary.is_file():
-        raise RuntimeError('Missing Windows i32 compiler or boundary')
-    command([sys.executable, ROOT / 'scripts/quality/check_native_executable_layout.py', i32], env, out / 'i32-audit.log')
+    if phase in ('all', 'prepare'):
+        if prefix is None:
+            seed_boundary = out / 'i32-boundary.obj'
+            assemble(clang, ASM / 'windows/vpp_aot_primitives_windows_x86_64.S', seed_boundary,
+                     env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1')
+            command(['pwsh', '-NoProfile', '-File', ROOT / 'scripts/quality/check_windows_native_pe_selfhosting.ps1',
+                     '-SeedCompiler', SEEDS / 'vpp-i32.exe', '-RuntimeObject', seed_boundary,
+                     '-OutputDirectory', out / 'i32-bootstrap'], env, out / 'i32-bootstrap.log')
+        if not i32.is_file() or not boundary.is_file():
+            raise RuntimeError('Missing Windows i32 compiler or boundary')
+        command([sys.executable, ROOT / 'scripts/quality/check_native_executable_layout.py', i32], env, out / 'i32-audit.log')
+        env = full_env(ROOT, out, boundary, clang)
+        runtime_source = ROOT / 'gói/máy ảo/runtime syscall.vi'
+        command([i32, 'runtime-object', runtime_source, '-o', out / 'runtime.o'], env, out / 'runtime.log')
+        # Windows i32 exports implicit and source units separately. The dynamic
+        # AOT core must be regenerated from the source units, including f64.
+        command([i32, 'object', runtime_source, '-o', out / 'runtime-core.o'], env, out / 'runtime-core.log')
+        assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'platform.o', env, out / 'platform.log')
+        assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'raw-platform.o', env,
+                 out / 'raw-platform.log', '-DVPP_WINDOWS_RAW_BOUNDARY=1')
     env = full_env(ROOT, out, boundary, clang)
-    runtime_source = ROOT / 'gói/máy ảo/runtime syscall.vi'
-    command([i32, 'runtime-object', runtime_source, '-o', out / 'runtime.o'], env, out / 'runtime.log')
-    # Windows i32 exports implicit and source units separately. The dynamic
-    # AOT core must be regenerated from the source units, including f64.
-    command([i32, 'object', runtime_source, '-o', out / 'runtime-core.o'], env, out / 'runtime-core.log')
-    assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'platform.o', env, out / 'platform.log')
-    assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'raw-platform.o', env,
-             out / 'raw-platform.log', '-DVPP_WINDOWS_RAW_BOUNDARY=1')
-    with gzip.open(SEEDS / 'vpp-full.S.gz', 'rb') as source, (out / 'seed.S').open('wb') as dest:
-        shutil.copyfileobj(source, dest)
-    assemble(clang, out / 'seed.S', out / 'seed.o', env, out / 'seed.log', '-DVPP_AOT_VPP_RUNTIME=1')
     objects = [out / name for name in ('runtime.o', 'runtime-core.o', 'platform.o')]
-    stage1 = out / 'vpp-native-stage1.exe'
-    link(clang, [out / 'seed.o', *objects], stage1, env, out / 'stage1-link.log')
-    check_fixtures(stage1, out / 'stage1-fixtures', env)
-    previous = stage1
-    for stage in (2, 3):
-        current = out / f'vpp-native-stage{stage}.exe'
+    stage1, stage2, stage3 = (out / f'vpp-native-stage{s}.exe' for s in (1, 2, 3))
+    if phase in ('all', 'stage1'):
+        with gzip.open(SEEDS / 'vpp-full.S.gz', 'rb') as source, (out / 'seed.S').open('wb') as dest:
+            shutil.copyfileobj(source, dest)
+        assemble(clang, out / 'seed.S', out / 'seed.o', env, out / 'seed.log', '-DVPP_AOT_VPP_RUNTIME=1')
+        link(clang, [out / 'seed.o', *objects], stage1, env, out / 'stage1-link.log')
+        check_fixtures(stage1, out / 'stage1-fixtures', env)
+    for stage, previous, current in ((2, stage1, stage2), (3, stage2, stage3)):
+        if phase not in ('all', f'stage{stage}'):
+            continue
         command([previous, 'build', SOURCE, '-o', current], env, out / f'stage{stage}-build.log')
         audit_pe(current)
-        check_fixtures(current, out / f'stage{stage}-fixtures', env)
-        previous = current
-    stage2, stage3 = (out / f'vpp-native-stage{s}.exe' for s in (2, 3))
-    if stage2.read_bytes() != stage3.read_bytes():
-        raise RuntimeError('Windows full compiler stages 2 and 3 diverged')
-    (out / 'convergence.sha256').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in (stage2, stage3)), encoding='ascii')
-    print('WINDOWS_FULL_BOOTSTRAP_CONVERGENCE=PASS', flush=True)
-    package = out / 'package'
-    home = package / 'share/vpp'
-    (package / 'bin').mkdir(parents=True)
-    (home / 'native-vpp-runtime').mkdir(parents=True)
-    shutil.copy2(stage3, package / 'bin/vpp-native.exe')
-    shutil.copy2(i32, package / 'bin/vpp-i32.exe')
-    shutil.copy2(boundary, home / 'windows-runtime.obj')
-    for obj in [*objects, out / 'raw-platform.o']:
-        shutil.copy2(obj, home / 'native-vpp-runtime' / obj.name)
-    shutil.copytree(ROOT / 'gói', home / 'gói')
-    shutil.copytree(ASM, home / 'scripts/ASM')
-    for metadata in ('vpp-language.json', 'vpp-libraries.json'):
-        shutil.copy2(ROOT / metadata, home / metadata)
-    # The standalone VM has its own V++ main and needs the full OS boundary,
-    # not the i32 compiler's narrower PE import table or AOT metadata.
-    command([i32, 'object', ROOT / 'gói/máy ảo/chính.vi', '-o', out / 'vm.o'], env, out / 'vm-build.log')
-    link(clang, [out / 'vm.o', out / 'runtime.o', out / 'platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
-    command([stage3, 'vm-build', ROOT / 'gói/máy ảo/nhà cung cấp DNS.vi',
-             '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
-    shutil.copy2(ROOT / 'scripts/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
-    with zipfile.ZipFile(archive, 'x', zipfile.ZIP_DEFLATED) as z:
-        for path in sorted(package.rglob('*')):
-            if path.is_file():
-                z.write(path, path.relative_to(package).as_posix())
-    extracted = out / 'extracted'
-    with zipfile.ZipFile(archive) as z:
-        z.extractall(extracted)
-    env = package_env(extracted, clang)
-    compiler = extracted / 'bin/vpp-native.exe'
-    smoke = out / 'package smoke'
-    smoke.mkdir()
-    probe = smoke / 'package-probe.vi'
-    probe.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
-    binary, bytecode = smoke / 'package-probe.exe', smoke / 'package-probe.vmb'
-    command([compiler, 'build', probe, '-o', binary], env, out / 'package-build.log', cwd=smoke)
-    audit_pe(binary)
-    run_env = clean_env()
-    run_env['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
-    command([binary], run_env, out / 'package-run.log', expected=b'42\n', cwd=smoke)
-    command([compiler, 'vm-build', probe, '-o', bytecode], env, out / 'package-bytecode.log', cwd=smoke)
-    command([extracted / 'bin/vpp-vm.exe', bytecode], run_env, out / 'package-vm.log',
-            expected=b'42\n', cwd=smoke)
-    # Resolve from a deterministic hosts file, loading the packaged sibling
-    # provider from a different working directory without external DNS.
-    dns_image = smoke / 'dns.vmb'
-    hosts = smoke / 'hosts.txt'
-    hosts.write_text('203.0.113.47 vpp.example\n2001:db8::1 vpp.example\n', encoding='ascii')
-    command([compiler, 'vm-build', FIXTURES / 'vm_asm_resolver_dns.vi', '-o', dns_image],
-            env, out / 'package-dns-build.log', cwd=smoke)
-    dns_env = dict(run_env, VPP_DNS_VI_HOSTS_FILE=hosts.as_posix(), VPP_DNS_VI_SERVER='',
-                   VPP_DNS_VI_SERVERS='', VPP_DNS_VI_RESOLV_CONF='')
-    dns_log = out / 'package-dns-run.log'
-    command([extracted / 'bin/vpp-vm.exe', dns_image], dns_env, dns_log, cwd=smoke)
-    lines = dns_log.read_text(encoding='utf-8').splitlines()
-    if (len(lines) != 3 or lines[2] != 'DNS VM VI OK' or '203.0.113.47' not in lines[:2]
-            or not any(ip in lines[:2] for ip in ('2001:db8::1', '2001:db8:0:0:0:0:0:1'))):
-        raise RuntimeError(f'{dns_log}: packaged DNS provider output mismatch')
-    # Exercise the actual installed launcher with no repository VPP_HOME.
-    launcher_env = clean_env()
-    launcher_env['VPP_AOT_ASSEMBLER'] = clang.as_posix()
-    launcher_env['PATH'] = str(extracted / 'bin') + os.pathsep + launcher_env['PATH']
-    launched = smoke / 'launcher.exe'
-    command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'build', probe, '-o', launched],
-            launcher_env, out / 'package-launcher.log', cwd=smoke)
-    audit_pe(launched)
-    command([launched], run_env, out / 'package-launcher-run.log', expected=b'42\n', cwd=smoke)
-    print('WINDOWS_FULL_PACKAGE=PASS', flush=True)
+        if stage == 2:
+            check_fixtures(current, out / f'stage{stage}-fixtures', env)
+    if phase in ('all', 'convergence'):
+        if stage2.read_bytes() != stage3.read_bytes():
+            raise RuntimeError('Windows full compiler stages 2 and 3 diverged')
+        (out / 'convergence.sha256').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in (stage2, stage3)), encoding='ascii')
+        print('WINDOWS_FULL_BOOTSTRAP_CONVERGENCE=PASS', flush=True)
+    if phase in ('all', 'test'):
+        check_fixtures(stage3, out / 'stage3-fixtures', env)
+    if phase in ('all', 'package'):
+        package = out / 'package'
+        home = package / 'share/vpp'
+        (package / 'bin').mkdir(parents=True)
+        (home / 'native-vpp-runtime').mkdir(parents=True)
+        shutil.copy2(stage3, package / 'bin/vpp-native.exe')
+        shutil.copy2(i32, package / 'bin/vpp-i32.exe')
+        shutil.copy2(boundary, home / 'windows-runtime.obj')
+        for obj in [*objects, out / 'raw-platform.o']:
+            shutil.copy2(obj, home / 'native-vpp-runtime' / obj.name)
+        shutil.copytree(ROOT / 'gói', home / 'gói')
+        shutil.copytree(ASM, home / 'scripts/ASM')
+        for metadata in ('vpp-language.json', 'vpp-libraries.json'):
+            shutil.copy2(ROOT / metadata, home / metadata)
+        # The standalone VM has its own V++ main and needs the full OS boundary,
+        # not the i32 compiler's narrower PE import table or AOT metadata.
+        command([i32, 'object', ROOT / 'gói/máy ảo/chính.vi', '-o', out / 'vm.o'], env, out / 'vm-build.log')
+        link(clang, [out / 'vm.o', out / 'runtime.o', out / 'platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
+        command([stage3, 'vm-build', ROOT / 'gói/máy ảo/nhà cung cấp DNS.vi',
+                 '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
+        shutil.copy2(ROOT / 'scripts/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
+        with zipfile.ZipFile(archive, 'x', zipfile.ZIP_DEFLATED) as z:
+            for path in sorted(package.rglob('*')):
+                if path.is_file():
+                    z.write(path, path.relative_to(package).as_posix())
+        extracted = out / 'extracted'
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(extracted)
+        env = package_env(extracted, clang)
+        compiler = extracted / 'bin/vpp-native.exe'
+        smoke = out / 'package smoke'
+        smoke.mkdir()
+        probe = smoke / 'package-probe.vi'
+        probe.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
+        binary, bytecode = smoke / 'package-probe.exe', smoke / 'package-probe.vmb'
+        command([compiler, 'build', probe, '-o', binary], env, out / 'package-build.log', cwd=smoke)
+        audit_pe(binary)
+        run_env = clean_env()
+        run_env['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
+        command([binary], run_env, out / 'package-run.log', expected=b'42\n', cwd=smoke)
+        command([compiler, 'vm-build', probe, '-o', bytecode], env, out / 'package-bytecode.log', cwd=smoke)
+        command([extracted / 'bin/vpp-vm.exe', bytecode], run_env, out / 'package-vm.log',
+                expected=b'42\n', cwd=smoke)
+        # Resolve from a deterministic hosts file, loading the packaged sibling
+        # provider from a different working directory without external DNS.
+        dns_image = smoke / 'dns.vmb'
+        hosts = smoke / 'hosts.txt'
+        hosts.write_text('203.0.113.47 vpp.example\n2001:db8::1 vpp.example\n', encoding='ascii')
+        command([compiler, 'vm-build', FIXTURES / 'vm_asm_resolver_dns.vi', '-o', dns_image],
+                env, out / 'package-dns-build.log', cwd=smoke)
+        dns_env = dict(run_env, VPP_DNS_VI_HOSTS_FILE=hosts.as_posix(), VPP_DNS_VI_SERVER='',
+                       VPP_DNS_VI_SERVERS='', VPP_DNS_VI_RESOLV_CONF='')
+        dns_log = out / 'package-dns-run.log'
+        command([extracted / 'bin/vpp-vm.exe', dns_image], dns_env, dns_log, cwd=smoke)
+        lines = dns_log.read_text(encoding='utf-8').splitlines()
+        if (len(lines) != 3 or lines[2] != 'DNS VM VI OK' or '203.0.113.47' not in lines[:2]
+                or not any(ip in lines[:2] for ip in ('2001:db8::1', '2001:db8:0:0:0:0:0:1'))):
+            raise RuntimeError(f'{dns_log}: packaged DNS provider output mismatch')
+        # Exercise the actual installed launcher with no repository VPP_HOME.
+        launcher_env = clean_env()
+        launcher_env['VPP_AOT_ASSEMBLER'] = clang.as_posix()
+        launcher_env['PATH'] = str(extracted / 'bin') + os.pathsep + launcher_env['PATH']
+        launched = smoke / 'launcher.exe'
+        command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'build', probe, '-o', launched],
+                launcher_env, out / 'package-launcher.log', cwd=smoke)
+        audit_pe(launched)
+        command([launched], run_env, out / 'package-launcher-run.log', expected=b'42\n', cwd=smoke)
+        print('WINDOWS_FULL_PACKAGE=PASS', flush=True)
 
 
 def raw_build(i32, source, output, env, logs, vm_core=False, timeout=600):
@@ -280,6 +292,8 @@ def main():
     build.add_argument('output', type=Path)
     build.add_argument('--i32-prefix', type=Path)
     build.add_argument('--archive', required=True, type=Path)
+    build.add_argument('--phase', choices=('all', 'prepare', 'stage1', 'stage2', 'stage3',
+                                          'convergence', 'test', 'package'), default='all')
     regress = modes.add_parser('regression')
     regress.add_argument('package', type=Path)
     regress.add_argument('--suite', choices=('full', 'i32'), default='full')
@@ -301,7 +315,7 @@ def main():
         return 0
     if args.mode == 'bootstrap':
         bootstrap(args.output.resolve(), args.i32_prefix.resolve(strict=True) if args.i32_prefix else None,
-                  args.archive.resolve(), clang)
+                  args.archive.resolve(), clang, args.phase)
     else:
         package = args.package.resolve(strict=True)
         if args.suite == 'i32':
