@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Link full V++ program assembly emitted by the macOS full compiler, with the
-# runtime object produced by the self-hosted Linux i32 compiler. No C/C++.
+# Link x86-64 Linux V++ program assembly with the runtime object produced
+# by the self-hosted Linux i32 compiler. No C/C++.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ $# -ne 3 || "$(uname -s)-$(uname -m)" != Linux-x86_64 ]]; then

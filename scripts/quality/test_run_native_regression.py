@@ -54,6 +54,24 @@ class SharedVMTests(unittest.TestCase):
         self.assertEqual(len(runs), 7)
         self.assertEqual({r.kwargs["vm"] for r in runs}, {compiler.with_name("vpp-vm")})
 
+    def test_windows_vm_uses_native_executable_names(self):
+        with tempfile.TemporaryDirectory() as work, mock.patch.object(regression.platform, "system", return_value="Windows"):
+            root = Path(work)
+            compiler = root / "vpp-native.exe"
+            logs = root / "logs"
+            def build_vm(compiler, source, binary, cwd, env, logs, timeout):
+                binary.touch()
+                return 0
+            with mock.patch.object(regression, "build", side_effect=build_vm) as build:
+                vm = regression.prepare_vm(compiler, logs, {}, 900)
+                self.assertEqual(vm.name, "vpp-vm.exe")
+                self.assertEqual(build.call_args.args[0], root / "vpp-i32.exe")
+            packaged = root / "vpp-vm.exe"
+            packaged.touch()
+            with mock.patch.object(regression, "build") as build:
+                self.assertEqual(regression.prepare_vm(compiler, logs, {}, 900), packaged)
+                build.assert_not_called()
+
     def test_failed_vm_setup_is_reported_without_seven_build_attempts(self):
         _, status, builds, runs, results = self.run_phases(build_status=1)
         self.assertEqual(status, 1)

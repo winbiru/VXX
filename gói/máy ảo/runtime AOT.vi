@@ -2353,7 +2353,7 @@ hàm aot_region(kind, index) {
 hàm chính() {
     vm_init();
     biến platform = máy thư mục thô(6, 0, 0);
-    nếu (platform < 0 || platform > 1) { trả về 1; };
+    nếu (platform < 0 || platform > 2) { trả về 1; };
     vm_set(4198464, 8, platform);
     // Ô thứ 17 giữ kho khung AOT, để GC thấy tất cả khung rảnh.
     biến state = vm_alloc(80, 1); nếu (state == 0) { trả về 1; };

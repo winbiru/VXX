@@ -126,7 +126,7 @@ hàm vm_dir_find(state, token) {
 // info receives [name address, byte length]; no OS pointer escapes into V++.
 hàm vm_dir_record(raw, available, linux, info) {
     biến start = 21;
-    nếu (linux == 1) { start = 19; };
+    nếu (linux != 0) { start = 19; };
     nếu (available <= start) { trả về 0; };
     biến size = máy đọc byte(raw + 16) + máy đọc byte(raw + 17) * 256;
     nếu (size <= start || size > available) { trả về 0; };

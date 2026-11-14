@@ -125,3 +125,6 @@ node_modules/
 
 # Document provenance of the native bootstrap seed.
 !/bootstrap/README.md
+
+# Pinned Windows V++/ASM bootstrap executable.
+!/bootstrap/windows-x86_64/vpp-i32.exe

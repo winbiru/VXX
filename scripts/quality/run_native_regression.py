@@ -24,6 +24,10 @@ def normalize(data):
     return data.replace(b"\r\n", b"\n")
 
 
+def executable_name(name):
+    return name + ".exe" if platform.system() == "Windows" else name
+
+
 def partition(cases, count):
     # Historical timings are scheduling hints only; the new backend can differ.
     weights = {}
@@ -101,18 +105,18 @@ def build(compiler, source, binary, cwd, env, logs, timeout):
 
 def prepare_vm(compiler, logs, env, timeout):
     # CI packages one VM for every regression shard. Local runs build it once.
-    packaged = compiler.with_name("vpp-vm")
+    packaged = compiler.with_name(executable_name("vpp-vm"))
     if packaged.is_file():
         print(f"SETUP shared VM: {packaged}", flush=True)
         return packaged
     directory = logs / "shared-vm"
     directory.mkdir(parents=True, exist_ok=True)
-    vm = directory / "vpp-vm"
+    vm = directory / executable_name("vpp-vm")
     vm_env = dict(env)
     if platform.system() == "Linux":
         vm_env["VPP_NATIVE_ELF_LINK"] = "1"
     print("SETUP building shared VM", flush=True)
-    status = build(compiler.with_name("vpp-i32"), ROOT / "gói/máy ảo/chính.vi",
+    status = build(compiler.with_name(executable_name("vpp-i32")), ROOT / "gói/máy ảo/chính.vi",
                    vm, ROOT, vm_env, directory, timeout)
     if status or not vm.is_file():
         raise RuntimeError(f"Shared VM build failed (exit {status}); logs: {directory}")
@@ -136,7 +140,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None):
     with tempfile.TemporaryDirectory(prefix="vpp-regression-") as work:
         cwd = Path(work)
         env["VPP_PREFERENCES_HOME"] = str(cwd / "preferences")
-        binary = cwd / ("program.exe" if os.name == "nt" else "program")
+        binary = cwd / executable_name("program")
         source = ROOT / case["source"]
         if "dump" in case:
             for name in ("first", "second"):
@@ -154,13 +158,13 @@ def run_case(case, compiler, logs, env, timeout, vm=None):
                 raise RuntimeError(f"Linker {case['linker_phase']} harness exit {status}")
             return
         if "vm_phase" in case:
-            cmd = ["cmake", f"-DVPP_STAGE1={compiler.with_name('vpp-i32')}",
+            cmd = ["cmake", f"-DVPP_STAGE1={compiler.with_name(executable_name('vpp-i32'))}",
                    f"-DVPP_NATIVE_COMPILER={compiler}", f"-DVPP_ROOT={ROOT}",
                    f"-DVPP_OUTPUT_DIR={cwd}", f"-DVPP_VM_PHASE={case['vm_phase']}"]
             if vm is not None:
                 # DNS provider discovery uses the VM's directory. Keep each
                 # phase's generated providers beside its own copy of the VM.
-                local_vm = cwd / "vpp-vm"
+                local_vm = cwd / executable_name("vpp-vm")
                 shutil.copy2(vm, local_vm)
                 cmd.append(f"-DVPP_VM={local_vm}")
             cmd += ["-P", ROOT / "scripts/quality/check_vm_asm.cmake"]
@@ -231,13 +235,55 @@ def run_case(case, compiler, logs, env, timeout, vm=None):
             raise RuntimeError("stdout differs from golden")
 
 
+def run_dns_mode(server, client, cwd, env, logs, mode, queries):
+    # Keep the actual V++ server and client on every OS; Python only manages
+    # their lifetime and checks the protocol between the test processes.
+    config = logs / "config"
+    config.write_bytes(f"{mode}\n{queries}\n".encode("ascii"))
+    hosts = logs / "empty-hosts"
+    hosts.touch()
+    server_out = logs / "server.out"
+    deadline = time.monotonic() + 30
+    with config.open("rb") as inp, server_out.open("wb") as out, (logs / "server.err").open("wb") as err:
+        worker = subprocess.Popen([str(server)], cwd=cwd, env={**env, "PATH": ""},
+                                  stdin=inp, stdout=out, stderr=err)
+        try:
+            while True:
+                data = server_out.read_bytes()
+                if b"\n" in data:
+                    port = data.splitlines()[0].strip()
+                    if not port.isdigit() or not 0 < int(port) <= 65535:
+                        raise RuntimeError("DNS server returned invalid port")
+                    break
+                if worker.poll() is not None:
+                    raise RuntimeError(f"DNS server exited before readiness: {worker.returncode}")
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("DNS server readiness timed out")
+                time.sleep(0.02)
+            client_env = dict(env, VPP_DNS_MOCK_MODE=str(mode), VPP_DNS_VI_PORT=port.decode("ascii"),
+                              VPP_DNS_VI_SERVER="127.0.0.1", VPP_DNS_VI_SERVERS="127.0.0.2,127.0.0.1" if mode == 4 else "",
+                              VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
+            status = execute([client], cwd, client_env, logs, "client", max(0.1, deadline - time.monotonic()))
+            if status:
+                raise RuntimeError(f"DNS client exit {status}")
+            if worker.wait(timeout=max(0.1, deadline - time.monotonic())):
+                raise RuntimeError(f"DNS server exit {worker.returncode}")
+            if server_out.read_bytes().splitlines()[-1].strip() != str(queries).encode("ascii"):
+                raise RuntimeError("DNS server query count mismatch")
+            if normalize((logs / "client.stdout").read_bytes()) != b"VPP DNS MOCK OK\n":
+                raise RuntimeError("DNS client output mismatch")
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+            worker.wait()
+
+
 def run_dns_mock(compiler, client, cwd, env, logs, timeout):
-    # The legacy harness already checks the DNS server's query count and client output.
-    i32 = compiler.with_name("vpp-i32")
+    i32 = compiler.with_name(executable_name("vpp-i32"))
     i32_env = dict(env)
     if platform.system() == "Linux":
         i32_env["VPP_NATIVE_ELF_LINK"] = "1"
-    server = cwd / "dns-server"
+    server = cwd / executable_name("dns-server")
     server_logs = logs / "server-build"
     server_logs.mkdir(exist_ok=True)
     if build(i32, TESTS / "fixtures/native_dns_mock.vi", server, ROOT, i32_env, server_logs, timeout):
@@ -248,21 +294,16 @@ def run_dns_mock(compiler, client, cwd, env, logs, timeout):
         mode_logs = logs / f"mode-{mode}"
         mode_logs.mkdir(exist_ok=True)
         try:
-            status = execute(["sh", ROOT / "scripts/quality/run_dns_vpp_mock.sh",
-                              server, client, TESTS / "kiem_tra_dns_vpp_mock.vi", mode,
-                              queries, mode_logs, "exe"], cwd, env, mode_logs, "dns", 30)
-        except subprocess.TimeoutExpired:
-            failures.append(f"mode {mode}: timed out")
-            continue
-        if status != 0 or normalize((mode_logs / "dns.stdout").read_bytes()) != b"VPP DNS MOCK OK\n":
-            failures.append(f"mode {mode}: exit {status} or incorrect output")
+            run_dns_mode(server, client, cwd, env, mode_logs, mode, queries)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            failures.append(f"mode {mode}: {exc}")
     if failures:
         raise RuntimeError("DNS mock: " + "; ".join(failures))
 
 
 def start_http(compiler, directory, env, timeout):
     directory.mkdir(parents=True, exist_ok=True)
-    binary = directory / "server"
+    binary = directory / executable_name("server")
     if build(compiler, TESTS / "http_fixture.vi", binary, ROOT, env, directory, timeout):
         raise RuntimeError("HTTP fixture failed to compile")
     with (directory / "server.log").open("wb") as log:

@@ -25,6 +25,10 @@ add_custom_command(OUTPUT "${VPP_BIN}/vpp-vm"
   COMMENT "Biên dịch máy ảo V++ dùng chung cho các nhóm kiểm thử"
   VERBATIM)
 add_custom_target(vpp-vm ALL DEPENDS "${VPP_BIN}/vpp-vm")
+# The bootstrap has multiple outputs shared by both targets. Make needs a
+# target-level ordering edge as well as the compiler file dependency above,
+# otherwise it can execute the same bootstrap rule in parallel target recipes.
+add_dependencies(vpp-vm vpp-cli)
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME vpp-source-boundary COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh")
@@ -38,7 +42,10 @@ if(BUILD_TESTING)
   add_test(NAME vpp-regression-inventory COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}" --inventory)
   add_test(NAME vpp-regression-runner COMMAND "${Python3_EXECUTABLE}" -m unittest discover
     -s "${CMAKE_SOURCE_DIR}/scripts/quality" -p test_run_native_regression.py)
-  set_tests_properties(vpp-source-boundary vpp-regression-inventory vpp-regression-runner PROPERTIES LABELS smoke)
+  add_test(NAME vpp-build-graph COMMAND "${Python3_EXECUTABLE}" -m unittest discover
+    -s "${CMAKE_SOURCE_DIR}/scripts/quality" -p test_cmake_build_graph.py)
+  set_tests_properties(vpp-source-boundary vpp-regression-inventory vpp-regression-runner vpp-build-graph PROPERTIES LABELS smoke)
+  set_tests_properties(vpp-build-graph PROPERTIES TIMEOUT 60)
   if(VPP_NODE)
     set_tests_properties(vpp-extension PROPERTIES LABELS smoke)
   endif()

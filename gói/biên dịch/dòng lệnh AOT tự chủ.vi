@@ -155,12 +155,35 @@ hàm riêng tư AOT tự chủ liên kết linux(tạm, kế hoạch, gốc) {
     đổi tên tệp(executable, kế hoạch[2]);
 };
 
+hàm riêng tư AOT tự chủ liên kết windows(tạm, kế hoạch, gốc) {
+    runtime = đọc biến môi trường("VPP_AOT_VPP_OBJECT", đường dẫn nối(gốc, "native-vpp-runtime/runtime.o"));
+    lõi = đọc biến môi trường("VPP_AOT_CORE_OBJECT", đường dẫn nối(đường dẫn cha(runtime), "runtime-core.o"));
+    nền = đọc biến môi trường("VPP_AOT_PLATFORM_OBJECT", đường dẫn nối(đường dẫn cha(runtime), "platform.o"));
+    công cụ = đọc biến môi trường("VPP_AOT_ASSEMBLER", "gcc.exe");
+    nếu (!là tệp(runtime) || !là tệp(lõi) || !là tệp(nền)) {
+        ném "Native AOT: incomplete Windows V++ runtime objects";
+    };
+    nguồn = đường dẫn nối(tạm, "program.S");
+    đối tượng = đường dẫn nối(tạm, "program.o");
+    executable = đường dẫn nối(tạm, "program.exe");
+    asm gốc = đường dẫn nối(gốc, "scripts/ASM");
+    biên dịch AOT chạy lệnh([công cụ, "-x", "assembler-with-cpp", "-c", nguồn,
+        "-DVPP_AOT_VPP_RUNTIME=1", "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"),
+        "-o", đối tượng], "Windows V++ program assembly");
+    biên dịch AOT chạy lệnh([công cụ, đối tượng, runtime, lõi, nền,
+        "-lshell32", "-lbcrypt", "-lws2_32", "-lntdll", "-Wl,--no-insert-timestamp",
+        "-o", executable], "Windows V++ executable link");
+    biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+    đổi tên tệp(executable, kế hoạch[2]);
+};
+
 hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
     tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(kế hoạch[2]));
     tệp = rỗng;
     obj = rỗng;
     linux = bộ ba == "x86_64-unknown-linux-gnu";
-    mã trực tiếp = !linux && đọc biến môi trường("VPP_AOT_NATIVE_ARM64_OBJECT", "0") == "1";
+    windows = bộ ba == "x86_64-pc-windows-msvc";
+    mã trực tiếp = !linux && !windows && đọc biến môi trường("VPP_AOT_NATIVE_ARM64_OBJECT", "0") == "1";
     thử {
         nguồn = đường dẫn nối(tạm, "program.S");
         nếu (mã trực tiếp) {
@@ -184,6 +207,7 @@ hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
             tệp = rỗng;
         };
         nếu (linux) { bỏ kết quả = AOT tự chủ liên kết linux(tạm, kế hoạch, gốc); }
+        hoặc nếu (windows) { bỏ kết quả = AOT tự chủ liên kết windows(tạm, kế hoạch, gốc); }
         hoặc { bỏ kết quả = AOT tự chủ liên kết(tạm, kế hoạch, gốc, mã trực tiếp); };
     } bắt lỗi(e) {
         nếu (obj != rỗng) { thử { bỏ kết quả = obj.đóng(); } bắt lỗi(lỗi obj) {}; };
@@ -209,7 +233,8 @@ hàm chính() {
         hệ = tên nền tảng();
         bộ ba = "aarch64-apple-darwin";
         nếu (hệ == "linux") { bộ ba = "x86_64-unknown-linux-gnu"; }
-        hoặc nếu (hệ != "macos") { ném "Native AOT: autonomous CLI requires macOS ARM64 or Linux x86-64"; };
+        hoặc nếu (hệ == "windows") { bộ ba = "x86_64-pc-windows-msvc"; }
+        hoặc nếu (hệ != "macos") { ném "Native AOT: unsupported native host"; };
         bỏ kết quả = biên dịch AOT kiểm tra runtime(hệ);
         kế hoạch = biên dịch phân tích dòng lệnh máy(args);
         lệnh = kế hoạch[0];

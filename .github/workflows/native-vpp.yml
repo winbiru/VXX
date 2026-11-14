@@ -47,7 +47,7 @@ jobs:
           name: macos-arm64-full
           path: ${{ runner.temp }}/vpp-macos-arm64.tar.gz
           if-no-files-found: error
-      - name: Emit full Linux compiler assembly from V++
+      - name: Check Linux cross emitter
         run: |
           probe="$RUNNER_TEMP/probe.vi"
           build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu "$probe" -o "$RUNNER_TEMP/linux-probe.S"
@@ -58,15 +58,6 @@ jobs:
             echo 'Cross emitter overwrote its input'; exit 1
           fi
           test "$before" = "$(shasum -a 256 "$probe")"
-          source scripts/build-vpp-progress.sh
-          vpp_profile_command build-pure-vpp/linux-cross-profile.log \
-            build-pure-vpp/bin/vpp emit-program-asm --target x86_64-unknown-linux-gnu \
-            "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$RUNNER_TEMP/linux-full-compiler.S"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-full-compiler-assembly
-          path: ${{ runner.temp }}/linux-full-compiler.S
-          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -74,7 +65,6 @@ jobs:
           path: |
             build-pure-vpp/Testing/Temporary/
             build-pure-vpp/full-compiler-profile.log
-            build-pure-vpp/linux-cross-profile.log
           if-no-files-found: ignore
   linux-i32:
     name: Linux x86-64 - i32 source bootstrap
@@ -119,49 +109,19 @@ jobs:
   linux-full:
     name: Linux x86-64 - full dynamic compiler
     runs-on: ubuntu-24.04
-    needs: [macos-full, linux-i32]
+    needs: linux-i32
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: linux-full-compiler-assembly
-          path: ${{ runner.temp }}/linux-full
-      - uses: actions/download-artifact@v4
-        with:
           name: linux-i32-selfhost
           path: ${{ runner.temp }}/linux-i32
-      - name: Build full V++ runtime from source
+      - name: Bootstrap full compiler from pinned Linux seed and verify convergence
         run: |
-          echo '[Biên dịch V++ Linux đầy đủ   0%] Chuẩn bị bộ biên dịch i32 và mã nguồn bộ thực thi'
-          mkdir -p "$RUNNER_TEMP/linux-full/i32"
-          tar -C "$RUNNER_TEMP/linux-full/i32" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
-          export VPP_HOME="$RUNNER_TEMP/linux-full/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_BUILD_PROGRESS=1
-          source scripts/build-vpp-progress.sh
-          echo '[Biên dịch V++ Linux đầy đủ  10%] Biên dịch tệp đối tượng bộ thực thi V++'
-          vpp_timed_command "$RUNNER_TEMP/linux-full/i32/bin/vpp-i32" runtime-object \
-            "$VPP_HOME/gói/máy ảo/runtime syscall.vi" -o "$RUNNER_TEMP/linux-full/runtime.o"
-      - name: Link and verify the full Linux compiler
-        run: |
-          out="$RUNNER_TEMP/linux-full"
-          echo '[Biên dịch V++ Linux đầy đủ  25%] Hợp dịch và liên kết bộ biên dịch V++ đầy đủ'
-          bash scripts/build-linux-full-seed.sh "$out/linux-full-compiler.S" "$out/runtime.o" "$out/vpp-native"
-          echo '[Biên dịch V++ Linux đầy đủ  35%] Kiểm tra bộ biên dịch vừa tạo'
-          bash scripts/quality/check_linux_dynamic_vpp.sh "$out/fixtures" "$out/vpp-native" "$out/runtime.o"
-      - name: Rebuild full compiler using V++ on Linux
-        run: |
-          out="$RUNNER_TEMP/linux-full"
-          export VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)" VPP_NATIVE_NO_CACHE=1
-          echo '[Biên dịch V++ Linux đầy đủ  45%] Tự biên dịch bộ biên dịch giai đoạn 2'
-          source scripts/build-vpp-progress.sh
-          vpp_profile_command "$out/stage2-profile.log" "$out/vpp-native" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage2"
-          bash scripts/quality/check_linux_dynamic_vpp.sh "$out/stage2-fixtures" "$out/vpp-native-stage2" "$out/runtime.o"
-          echo '[Biên dịch V++ Linux đầy đủ  65%] Tự biên dịch bộ biên dịch giai đoạn 3'
-          vpp_profile_command "$out/stage3-profile.log" "$out/vpp-native-stage2" build "$GITHUB_WORKSPACE/gói/biên dịch/dòng lệnh AOT tự chủ.vi" -o "$out/vpp-native-stage3"
-          echo '[Biên dịch V++ Linux đầy đủ  80%] Kiểm tra tính đồng nhất của hai thế hệ bộ biên dịch'
-          bash scripts/quality/audit_linux_static_elf.sh "$out/vpp-native-stage3"
-          cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
-          sha256sum "$out/vpp-native-stage2" "$out/vpp-native-stage3" > "$out/convergence.sha256"
+          mkdir -p "$RUNNER_TEMP/linux-i32-prefix"
+          tar -C "$RUNNER_TEMP/linux-i32-prefix" -xzf "$RUNNER_TEMP/linux-i32/vpp-linux-x86_64-i32.tar.gz"
+          bash scripts/quality/check_linux_full_bootstrap.sh "$RUNNER_TEMP/linux-full" "$RUNNER_TEMP/linux-i32-prefix"
       - name: Package and test full Linux compiler
         run: |
           echo '[Biên dịch V++ Linux đầy đủ  90%] Đóng gói và chạy thử bộ biên dịch'
@@ -186,6 +146,10 @@ jobs:
           printf 'hàm chính() { in 42; };\n' > "$out/package-probe.vi"
           unset VPP_HOME VPP_AOT_VPP_OBJECT VPP_AOT_ASSEMBLER
           test "$("$out/extracted/bin/vpp" run "$out/package-probe.vi")" = 42
+          bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-native"
+          bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-vm"
+          "$out/extracted/bin/vpp" vm-build "$out/package-probe.vi" -o "$out/package-probe.vmb"
+          test "$(PATH= "$out/extracted/bin/vpp-vm" "$out/package-probe.vmb")" = 42
           echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
       - uses: actions/upload-artifact@v4
         with:
@@ -200,50 +164,28 @@ jobs:
             ${{ runner.temp }}/linux-full/**/*.log
             ${{ runner.temp }}/linux-full/convergence.sha256
           if-no-files-found: ignore
-  windows-seed:
-    name: Windows x86-64 - create PE seed
-    runs-on: macos-15
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cross-build V++ i32 and Windows boundary
-        run: |
-          echo '[Biên dịch V++ Windows khởi tạo   0%] Kiểm tra bộ biên dịch khởi tạo'
-          (cd bootstrap/macos-arm64 && shasum -a 256 -c SHA256SUMS)
-          out="$RUNNER_TEMP/windows-seed"
-          mkdir -p "$out"
-          export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_MACHO_REL_LINK=0
-          echo '[Biên dịch V++ Windows khởi tạo  25%] Biên dịch bộ biên dịch V++ i32'
-          bootstrap/macos-arm64/vpp-i32 build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/vpp-i32"
-          echo '[Biên dịch V++ Windows khởi tạo  50%] Hợp dịch lớp giao tiếp Windows'
-          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
-          export VPP_NATIVE_TARGET=windows-x86_64 VPP_WINDOWS_RUNTIME_OBJECT="$out/windows-runtime.obj"
-          echo '[Biên dịch V++ Windows khởi tạo  75%] Biên dịch và kiểm tra tệp PE khởi tạo'
-          VPP_NATIVE_BUILD_PROGRESS=1 "$out/vpp-i32" build "$GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi" -o "$out/stage1.exe"
-          python3 scripts/quality/check_native_executable_layout.py "$out/stage1.exe"
-          echo '[Biên dịch V++ Windows khởi tạo 100%] Tạo bộ biên dịch khởi tạo Windows hoàn tất'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-i32-seed
-          path: |
-            ${{ runner.temp }}/windows-seed/stage1.exe
-            ${{ runner.temp }}/windows-seed/windows-runtime.obj
-          if-no-files-found: error
   windows-i32:
     name: Windows x86-64 - native i32 selfhost
     runs-on: windows-2025
-    needs: windows-seed
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-i32-seed
-          path: ${{ runner.temp }}/windows-seed
+      - name: Verify native seed and assemble Windows boundary
+        shell: pwsh
+        run: |
+          $seed = "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe"
+          $expected = (Get-Content "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/SHA256SUMS").Split(' ')[0]
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $seed).Hash -ne $expected) { throw 'Windows seed checksum mismatch' }
+          python scripts/quality/check_native_executable_layout.py $seed
+          if ($LASTEXITCODE -ne 0) { throw 'Windows seed PE audit failed' }
+          $out = "$env:RUNNER_TEMP/windows-seed"
+          New-Item -ItemType Directory -Path $out | Out-Null
+          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows boundary assembly failed' }
       - name: Rebuild and execute native Windows compiler
         shell: pwsh
         run: |
-          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:RUNNER_TEMP/windows-seed/stage1.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
+          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
       - name: Package and test the Windows i32 distribution
         shell: pwsh
         run: |
@@ -327,7 +269,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
-          python3 scripts/quality/run_native_regression.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

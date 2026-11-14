@@ -116,8 +116,9 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
         };
         đích = biên dịch phân tích đích(bộ ba);
         nếu (!(đích["hệ điều hành"] == "linux" && đích["kiến trúc"] == "x86_64") &&
+            !(đích["hệ điều hành"] == "windows" && đích["kiến trúc"] == "x86_64") &&
             !(đích["hệ điều hành"] == "macos" && đích["kiến trúc"] == "aarch64")) {
-            ném "Native CLI: full program assembly supports Linux x86-64 and macOS ARM64";
+            ném "Native CLI: full program assembly requires macOS ARM64 or Linux/Windows x86-64";
         };
         trả về [lệnh, vị trí[0], đầu ra, sai, sai, "", bộ ba, ""];
     };

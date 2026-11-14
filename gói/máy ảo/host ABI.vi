@@ -592,6 +592,19 @@ hàm vm_path_absolute(path) {
     // libc++ absolute("") on Darwin appends the empty component to cwd;
     // the Linux libstdc++ reference returns EINVAL for an empty path.
     nếu (n == 0 && vm_get(4198464, 8) == 1) { trả về vm_path_os_error(22); };
+    nếu (vm_get(4198464, 8) == 2) {
+        nếu (n > 4095) { trả về vm_path_os_error(36); };
+        biến đầu = vm_alloc(4096, 0); biến cuối = vm_alloc(4096, 0);
+        nếu (đầu == 0 || cuối == 0) { trả về 0; };
+        nếu (máy sao chép vùng nhớ(đầu, raw, n) != 0) { trả về vm_error(4); };
+        máy ghi byte(đầu + n, 0);
+        biến got = máy thư mục thô(8, đầu, cuối);
+        nếu (got < 0) { trả về vm_path_os_error(0 - got); };
+        biến full = vm_string(got);
+        nếu (full == 0) { trả về 0; };
+        nếu (máy sao chép vùng nhớ(vm_get(full, 2), cuối, got) != 0) { trả về vm_error(4); };
+        trả về vm_path_os_ok(full);
+    };
     nếu (n > 0 && máy đọc byte(raw) == 47) { trả về vm_path_os_ok(path); };
     biến result = vm_path_current();
     nếu (result == 0) { trả về 0; };
@@ -832,6 +845,7 @@ hàm vm_host(state, op, args) {
         lặp(i = 0; i < 8; i++) { vm_append(danh_sách_bit, vm_int(máy đọc byte(số_thực_nguồn + 8 + i))); }; trả về danh_sách_bit;
     };
     nếu (op == 135) {
+        nếu (vm_get(4198464, 8) == 2) { trả về vm_literal("windows"); };
         nếu (vm_get(4198464, 8) == 1) { trả về vm_literal("linux"); }; trả về vm_literal("macos");
     };
     nếu (op == 159) {
