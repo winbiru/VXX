@@ -189,7 +189,18 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
         trả về ra + mình.lưu(ghi, từ);
     };
 
-    hàm công khai xuất() {
+    // Keep a bounded list of fragments for large compiler functions. The
+    // string-returning API remains unchanged for callers without a writer.
+    hàm riêng tư phát(phần, văn bản, đích ghi) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(phần, văn bản);
+        nếu (đích ghi != rỗng && độ dài(phần) >= 128) {
+            bỏ kết quả = đích ghi.ghi(biên dịch lắp ráp nối các phần(phần));
+            trả về [];
+        };
+        trả về phần;
+    };
+
+    hàm công khai xuất(đích ghi = rỗng) {
         phần = [];
         mở = ".intel_syntax noprefix\npush rbp\nmov rbp, rsp\n";
         nếu (mình.arm) { mở = "stp x29, x30, [sp, #-16]!\nmov x29, sp\n"; };
@@ -209,7 +220,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
         };
         // Thân động nhận frame ID; thân chuyên biệt nhận parameterCount i32.
         mở += mình.nhận tham số();
-        bỏ kết quả = máy ảo thêm cuối danh sách(phần, mở);
+        phần = mình.phát(phần, mở, đích ghi);
         phép arm = {"Add": "add", "Sub": "sub", "Mul": "mul", "BitAnd": "and",
             "BitOr": "orr", "BitXor": "eor", "ShiftLeft": "lsl", "ShiftRight": "asr"};
         phép x86 = {"Add": "add", "Sub": "sub", "Mul": "imul", "BitAnd": "and",
@@ -275,7 +286,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                         !máy ảo có khóa từ điển(nhãn, j)) {
                         lỗi = ""; bước = 1;
                         nếu (máy ảo có khóa từ điển(gộp lỗi, j)) { lỗi = gộp lỗi[j]; bước = 3; };
-                        bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra + mình.gọi(mục, đối số, lỗi));
+                        phần = mình.phát(phần, ra + mình.gọi(mục, đối số, lỗi), đích ghi);
                         i = j + bước; bỏ qua;
                     };
                 };
@@ -294,7 +305,7 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                     hoặc { ra += mình.tải(a, sâu - 2) + mình.tải(b, sâu - 1); };
                     nếu (mình.arm) { ra += "cmp " + a + ", " + b + "\nb." + ngược arm[mã] + " " + mình.nhãn + sau["operand"] + "\n"; }
                     hoặc { ra += "cmp eax, ecx\nj" + ngược x86[mã] + " " + mình.nhãn + sau["operand"] + "\n"; };
-                    bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra); i += 2; bỏ qua;
+                    phần = mình.phát(phần, ra, đích ghi); i += 2; bỏ qua;
                 };
             };
             bước = 1;
@@ -382,20 +393,24 @@ lớp riêng tư Bộ In ASM Trực Tiếp {
                     ra += mình.lưu(a, sâu - 2);
                 }
             };
-            bỏ kết quả = máy ảo thêm cuối danh sách(phần, ra);
+            phần = mình.phát(phần, ra, đích ghi);
             i += bước;
         };
-        nếu (!mình.arm) { bỏ kết quả = máy ảo thêm cuối danh sách(phần, ".att_syntax prefix\n"); };
+        nếu (!mình.arm) { phần = mình.phát(phần, ".att_syntax prefix\n", đích ghi); };
+        nếu (đích ghi != rỗng) {
+            bỏ kết quả = đích ghi.ghi(biên dịch lắp ráp nối các phần(phần));
+            trả về "";
+        };
         trả về biên dịch lắp ráp nối các phần(phần);
     };
 };
 
-hàm công khai biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, động = đúng) {
+hàm công khai biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, động = đúng, đích ghi = rỗng) {
     nếu ((kiến trúc != "aarch64" && kiến trúc != "x86_64") ||
         (hệ điều hành != "linux" && hệ điều hành != "macos" && hệ điều hành != "windows") ||
         (kiến trúc == "aarch64" && hệ điều hành == "windows")) {
         ném "ASM trực tiếp: target chưa hỗ trợ: " + kiến trúc + "/" + hệ điều hành;
     };
     bộ in = Bộ In ASM Trực Tiếp(máy, tên, kiến trúc, hệ điều hành, động);
-    trả về bộ in.xuất();
+    trả về bộ in.xuất(đích ghi);
 };

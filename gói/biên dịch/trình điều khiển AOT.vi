@@ -213,7 +213,16 @@ hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
             "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
             "-Wl,-z,noexecstack", đối tượng];
         thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+        đối tượng nền tảng = đọc biến môi trường("VPP_AOT_LINUX_OBJECT_DIR", "");
         lặp(i = 0; i < độ dài(thành phần); i++) {
+            nếu (đối tượng nền tảng != "") {
+                phần = đường dẫn nối(đối tượng nền tảng, thành phần[i] + ".o");
+                nếu (!đường dẫn là tuyệt đối(phần) || !là tệp(phần)) {
+                    ném "Native AOT: packaged Linux platform object missing: " + phần;
+                };
+                máy ảo thêm cuối danh sách(liên kết, phần);
+                bỏ qua;
+            };
             phần = đường dẫn nối(tạm, thành phần[i] + ".o");
             lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
                 đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S")];

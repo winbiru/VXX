@@ -131,6 +131,12 @@ jobs:
           install -m 755 "$out/vpp-native-stage3" "$package/bin/vpp-native"
           install -m 755 "$out/i32/bin/vpp-i32" "$package/bin/vpp-i32"
           install -m 644 "$out/runtime.o" "$package/share/vpp/native-vpp-runtime/runtime.o"
+          platform_objects="$package/share/vpp/native-vpp-runtime/linux-objects"
+          mkdir -p "$platform_objects"
+          for part in start syscalls runtime_core directory sha256 process socket aot_runtime_bridge f64; do
+            clang -target x86_64-unknown-linux-gnu -I scripts/ASM -I scripts/ASM/common \
+              -c "scripts/ASM/linux/vpp_linux_${part}_x86_64.S" -o "$platform_objects/$part.o"
+          done
           cp -R "$out/i32/gói" "$package/share/vpp/"
           cp -R scripts/ASM "$package/share/vpp/scripts/"
           install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
@@ -174,7 +180,9 @@ jobs:
         shell: pwsh
         run: |
           $seed = "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe"
-          $expected = (Get-Content "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/SHA256SUMS").Split(' ')[0]
+          $pins = @(Get-Content "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/SHA256SUMS" | Where-Object { $_ -cmatch '^[0-9a-f]{64}  vpp-i32\.exe$' })
+          if ($pins.Count -ne 1) { throw 'Missing or duplicate Windows i32 seed pin' }
+          $expected = $pins[0].Split(' ')[0]
           if ((Get-FileHash -Algorithm SHA256 -LiteralPath $seed).Hash -ne $expected) { throw 'Windows seed checksum mismatch' }
           python scripts/quality/check_native_executable_layout.py $seed
           if ($LASTEXITCODE -ne 0) { throw 'Windows seed PE audit failed' }
@@ -227,6 +235,46 @@ jobs:
             ${{ runner.temp }}/windows-selfhost/sha256.txt
           if-no-files-found: ignore
 
+  windows-full:
+    name: Windows x86-64 - full dynamic compiler
+    runs-on: windows-2025
+    needs: windows-i32
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-i32-selfhost
+          path: ${{ runner.temp }}/windows-i32
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANG64
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
+      - name: Bootstrap and execute the full Windows compiler
+        shell: pwsh
+        run: |
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $prefix = "$env:RUNNER_TEMP/windows-i32-prefix"
+          python -m zipfile -e "$env:RUNNER_TEMP/windows-i32/vpp-windows-x86_64-i32.zip" $prefix
+          if ($LASTEXITCODE -ne 0) { throw 'Windows i32 extraction failed' }
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix $prefix --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-full
+          path: ${{ runner.temp }}/vpp-windows-x86_64-full.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-full-test-logs
+          path: |
+            ${{ runner.temp }}/windows-full/**/*.log
+            ${{ runner.temp }}/windows-full/convergence.sha256
+          if-no-files-found: ignore
+
   macos-regression:
     name: macOS ARM64 - full regression
     needs: macos-full
@@ -250,9 +298,40 @@ jobs:
           path: regression-logs/
 
   linux-regression:
-    name: linux-regression - full shard ${{ matrix.shard }}
+    name: Linux x86-64 - full and i32 regression
     needs: linux-full
     runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x86_64-full
+          path: ${{ runner.temp }}/regression-package
+      - name: Extract self-hosted Linux compiler once
+        id: compiler
+        run: |
+          mkdir -p "$RUNNER_TEMP/regression-compiler"
+          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
+      - name: Build and run all full V++ regression cases
+        run: |
+          export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --logs regression-logs/full
+      - name: Build and run all i32 regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        run: |
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-regression-logs
+          path: regression-logs/
+
+  windows-regression:
+    name: windows-regression - full shard ${{ matrix.shard }}
+    needs: windows-full
+    runs-on: windows-2025
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -263,17 +342,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: linux-x86_64-full
+          name: windows-x86_64-full
           path: ${{ runner.temp }}/regression-package
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANG64
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
       - name: Run full V++ regression shard
+        shell: pwsh
         run: |
-          mkdir -p "$RUNNER_TEMP/regression-compiler"
-          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --shard-count 16 --shard-index ${{ matrix.shard }} --logs regression-logs
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
+          if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --shard-index ${{ matrix.shard }} --logs regression-logs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-regression-${{ matrix.shard }}-logs
+          name: windows-regression-${{ matrix.shard }}-logs
           path: regression-logs/
 
   macos-i32-regression:
@@ -296,28 +385,6 @@ jobs:
         if: always()
         with:
           name: macos-i32-regression-logs
-          path: regression-logs/
-
-  linux-i32-regression:
-    name: Linux x86-64 - i32 regression
-    needs: linux-i32
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-i32-selfhost
-          path: ${{ runner.temp }}/regression-package
-      - run: |
-          mkdir -p "$RUNNER_TEMP/regression-compiler"
-          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-i32.tar.gz"
-          export VPP_HOME="$RUNNER_TEMP/regression-compiler" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1
-          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$VPP_HOME/bin/vpp-i32" --logs regression-logs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: linux-i32-regression-logs
           path: regression-logs/
 
   windows-i32-regression:

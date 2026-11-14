@@ -59,12 +59,10 @@ foreach(expression IN LISTS invalid_cases)
 endforeach()
 
 set(boundary "${VPP_OUTPUT_DIR}/native-system-boundary")
-execute_process(COMMAND "${VPP_STAGE1}" build
-    "${VPP_ROOT}/src/tests/fixtures/native_system_boundary.vi" -o "${boundary}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
-if (NOT status STREQUAL "0")
-    message(FATAL_ERROR "Raw system boundary build failed: ${status}\n${output}\n${errors}")
+if(WIN32)
+    string(APPEND boundary ".exe")
 endif()
+vpp_raw_build("${VPP_ROOT}/src/tests/fixtures/native_system_boundary.vi" "${boundary}")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${boundary}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 10)
 if (NOT status STREQUAL "0")

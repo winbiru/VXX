@@ -14,8 +14,11 @@
     jmp "\target"
 .endm
 #include "../linux/vpp_linux_aot_runtime_exports.inc"
+// Raw i32 boundary probes do not include the dynamic VM number parser.
+#ifndef VPP_WINDOWS_RAW_BOUNDARY
 RT_EXPORT vpp_native_f64_parse, vpp_fn_vm_f64_parse, 2
 RT_EXPORT vpp_native_f64_text, vpp_fn_vm_f64_text, 2
+#endif
 #define VPP_VM_F64_FREESTANDING 1
 #include "../common/posix/vpp_vm_f64_primitives.inc"
 #include "aot_x86_64/he_thong.inc"

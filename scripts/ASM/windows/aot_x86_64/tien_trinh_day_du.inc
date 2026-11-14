@@ -40,6 +40,20 @@ vpp_native_os_process:
     movq %rax, 112(%r15)
     // Layout: command[65536], argument[8192], overrides[128*8192],
     // followed by a bounded Unicode environment block.
+    // The public Windows command line is already quoted by V++.
+    movl 60(%r15), %eax
+    testl %eax, %eax
+    jz .Lwin_tien_trinh_dung_argv
+    cmpl $(VPP_ARENA_SIZE-4096), %eax
+    ja .Lwin_tien_trinh_tao_loi
+    leaq (%rbx,%rax), %rcx
+    movq %rsi, %rdx
+    call Lduong_utf8_sang_utf16
+    testl %eax, %eax
+    jz .Lwin_tien_trinh_tao_loi
+    leaq (%rsi,%rax,2), %rdi
+    jmp .Lwin_tien_trinh_moi_truong
+.Lwin_tien_trinh_dung_argv:
     xorl %r14d, %r14d
     movq %rsi, %rdi
 .Lwin_tien_trinh_doi_so:
@@ -178,6 +192,22 @@ vpp_native_os_process:
     call SetHandleInformation
     testl %eax, %eax
     jz .Lwin_tien_trinh_tao_loi
+    // A suspended child cannot create descendants before joining the job.
+    // KILL_ON_JOB_CLOSE guarantees cleanup of the entire tree on timeout.
+    xorl %ecx, %ecx
+    xorl %edx, %edx
+    call CreateJobObjectW
+    testq %rax, %rax
+    jz .Lwin_tien_trinh_tao_loi
+    movq %rax, 304(%r15)
+    movq %rax, %rcx
+    movl $9, %edx
+    leaq 320(%r15), %r8
+    movl $0x2000, 336(%r15)
+    movl $144, %r9d
+    call SetInformationJobObject
+    testl %eax, %eax
+    jz .Lwin_tien_trinh_tao_loi
     movl $104, 160(%r15)
     movl $0x100, 220(%r15)
     movl $-10, %ecx
@@ -192,7 +222,7 @@ vpp_native_os_process:
     xorl %r8d, %r8d
     xorl %r9d, %r9d
     movq $1, 32(%rsp)
-    movq $0x400, 40(%rsp)
+    movq $0x404, 40(%rsp)
     movq 128(%r15), %rax
     movq %rax, 48(%rsp)
     movq $0, 56(%rsp)
@@ -203,6 +233,15 @@ vpp_native_os_process:
     call CreateProcessW
     testl %eax, %eax
     jz .Lwin_tien_trinh_tao_loi
+    movq 304(%r15), %rcx
+    movq 272(%r15), %rdx
+    call AssignProcessToJobObject
+    testl %eax, %eax
+    jz .Lwin_tien_trinh_tao_loi
+    movq 280(%r15), %rcx
+    call ResumeThread
+    cmpl $-1, %eax
+    je .Lwin_tien_trinh_tao_loi
     movq 280(%r15), %rcx
     call CloseHandle
     movq $0, 280(%r15)
@@ -250,6 +289,25 @@ vpp_native_os_process:
     movq $0, 112(%r15)
     movq $0, 120(%r15)
     call .Lwin_tien_trinh_dong_ong
+    // If CreateProcess succeeded but assignment/resume failed, the child
+    // is still suspended. Explicitly terminate it even if not in the job.
+    movq 272(%r15), %rcx
+    testq %rcx, %rcx
+    jz 2f
+    movl $1, %edx
+    call TerminateProcess
+    movq 272(%r15), %rcx
+    movl $-1, %edx
+    call WaitForSingleObject
+    movq 272(%r15), %rcx
+    call CloseHandle
+    movq $0, 272(%r15)
+2:  movq 280(%r15), %rcx
+    testq %rcx, %rcx
+    jz 3f
+    call CloseHandle
+    movq $0, 280(%r15)
+3:  call .Lwin_tien_trinh_dong_job
     xorl %eax, %eax
     WIN_RA
 .Lwin_tien_trinh_tham_do:
@@ -273,6 +331,15 @@ vpp_native_os_process:
     jge 2f
     cmpl $0, 8(%r15)
     jge 2f
+    // EOF on both pipes does not imply that the process has exited.
+    // Keep polling until the process signals or the caller's deadline expires.
+    movq 272(%r15), %rcx
+    xorl %edx, %edx
+    call WaitForSingleObject
+    cmpl $258, %eax
+    je 2f
+    testl %eax, %eax
+    jnz .Lwin_khong_hop_le
     movl $4, %r12d
     jmp 3f
 2:  call GetTickCount64
@@ -361,9 +428,11 @@ vpp_native_os_process:
     call CloseHandle
     movq $0, 272(%r15)
     movl $0, (%r15)
+    call .Lwin_tien_trinh_dong_job
     movl -72(%rbp), %eax
     WIN_RA
 .Lwin_tien_trinh_dong:
+    call .Lwin_tien_trinh_dong_job
     call .Lwin_tien_trinh_dong_ong
     movq 272(%r15), %rcx
     testq %rcx, %rcx
@@ -394,4 +463,14 @@ vpp_native_os_process:
     cmpq $96, -80(%rbp)
     jb 1b
     addq $40, %rsp
+    ret
+
+.Lwin_tien_trinh_dong_job:
+    subq $40, %rsp
+    movq 304(%r15), %rcx
+    testq %rcx, %rcx
+    jz 1f
+    movq $0, 304(%r15)
+    call CloseHandle
+1:  addq $40, %rsp
     ret

@@ -445,19 +445,22 @@
       "id": "kiem_tra_ffi_process_spawn",
       "source": "src/tests/kiem_tra_ffi_process_spawn.vi",
       "expected": "src/tests/expected/kiem_tra_ffi_process_spawn.expected",
-      "suite": "full"
+      "suite": "full",
+      "platforms": ["Darwin", "Linux"]
     },
     {
       "id": "kiem_tra_ffi_process_spawn_windows",
       "source": "src/tests/kiem_tra_ffi_process_spawn_windows.vi",
       "expected": "src/tests/expected/kiem_tra_ffi_process_spawn_windows.expected",
-      "suite": "full"
+      "suite": "full",
+      "platforms": ["Windows"]
     },
     {
       "id": "kiem_tra_ffi_process_timeout_windows",
       "source": "src/tests/kiem_tra_ffi_process_timeout_windows.vi",
       "expected": "src/tests/expected/kiem_tra_ffi_process_timeout_windows.expected",
-      "suite": "full"
+      "suite": "full",
+      "platforms": ["Windows"]
     },
     {
       "id": "kiem_tra_ffi_socket",
@@ -2257,7 +2260,8 @@
       "vm_phase": "core",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000,
       "sources": [
@@ -2271,7 +2275,8 @@
       "vm_phase": "system",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000,
       "sources": [
@@ -2285,7 +2290,8 @@
       "vm_phase": "directory",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000,
       "sources": [
@@ -2296,10 +2302,12 @@
       "id": "standalone-vm-process",
       "suite": "full",
       "source": "src/tests/fixtures/vm_asm_process.vi",
+      "sources": ["src/tests/fixtures/vm_asm_process_windows.vi"],
       "vm_phase": "process",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000
     },
@@ -2310,7 +2318,8 @@
       "vm_phase": "resolver",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000,
       "sources": [
@@ -2325,7 +2334,8 @@
       "vm_phase": "socket_negative",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 180000
     },
@@ -2336,7 +2346,8 @@
       "vm_phase": "tls",
       "platforms": [
         "Darwin",
-        "Linux"
+        "Linux",
+        "Windows"
       ],
       "weight_ms": 600000
     },

@@ -2,15 +2,20 @@
 // descriptors escape the V++ resource table; the OS boundary is ASM.
 // Opcode parity: 185..192. Resolver (203..205) and verified TLS (206..208)
 // are deliberately separate providers.
-hàm vm_socket_find(state, value) {
-    nếu (vm_tag(value) != 1 || vm_number(value) < 1073741825) { vm_error(2); trả về 0; };
+hàm vm_socket_lookup(state, value) {
+    nếu (vm_tag(value) != 1 || vm_number(value) < 1073741825) { trả về 0; };
     biến table = vm_get(state, 13);
-    nếu (table == 0) { vm_error(2); trả về 0; };
+    nếu (table == 0) { trả về 0; };
     lặp(i = 0; i < vm_get(table, 1); i++) {
         biến r = vm_at(table, i);
         nếu (r != 0 && vm_get(r, 0) == vm_number(value) && vm_get(r, 3) == 1) { trả về r; };
     };
-    vm_error(2); trả về 0;
+    trả về 0;
+};
+hàm vm_socket_find(state, value) {
+    biến resource = vm_socket_lookup(state, value);
+    nếu (resource == 0) { vm_error(2); };
+    trả về resource;
 };
 hàm vm_socket_register(state, fd, kind, ctl) {
     biến table = vm_get(state, 13);

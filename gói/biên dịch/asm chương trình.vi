@@ -2290,7 +2290,7 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng, đối tượng = rỗng) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng, đối tượng = rỗng, đích ghi = rỗng) {
     bắt đầu bước = 0;
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
     hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
@@ -2298,6 +2298,20 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
     trực tiếp = lấy từ điển(bảng i32, "ASM trực tiếp", sai);
     nếu (đối tượng != rỗng) {
         bỏ kết quả = đối tượng.ghi hàm(tên, biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đúng));
+        trả về "";
+    };
+    nếu (trực tiếp && bộ đệm == rỗng && đích ghi != rỗng) {
+        nếu (thống kê != rỗng) {
+            thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
+        };
+        bỏ kết quả = đích ghi.ghi(biên dịch lắp ráp đầu(đích["hệ điều hành"], tên));
+        bỏ kết quả = biên dịch asm động trực tiếp(máy, tên, đích["kiến trúc"], đích["hệ điều hành"], đúng, đích ghi);
+        bỏ kết quả = đích ghi.đẩy đệm();
+        nếu (thống kê != rỗng) {
+            thống kê["assemble_ms"] = thống kê["assemble_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
+            thống kê["count"] = thống kê["count"] + 1;
+        };
         trả về "";
     };
     khóa = "";
@@ -2559,7 +2573,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             máy trước = thống kê["machine_ms"];
             lắp ráp trước = thống kê["assemble_ms"];
         };
-        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng));
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
         nếu (thống kê != rỗng) {
             tên = "<anonymous>";
             nếu (các hàm[i][1] >= 0) { tên = chuỗi[các hàm[i][1]]; };
@@ -2570,9 +2584,9 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
         };
     };
     lặp(i = 0; i < độ dài(khởi tạo); i = i + 1) {
-        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng));
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
     };
-    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng));
+    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
     nếu (thống kê != rỗng) {
         bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
         bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);

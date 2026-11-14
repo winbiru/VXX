@@ -79,8 +79,10 @@ foreach(mode IN ITEMS explicit sibling)
     if(mode STREQUAL "sibling")
         set(configured_provider "")
         # Preserve the bare argv[0] case, independently of the working directory.
-        set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
-            vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        if(NOT WIN32)
+            set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
+                vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        endif()
     endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
         "VPP_VM_DNS_PROVIDER=${configured_provider}"
@@ -104,7 +106,7 @@ foreach(mode IN ITEMS explicit sibling)
         message(FATAL_ERROR "V++ DNS hosts returned unexpected addresses: ${output}")
     endif()
 endforeach()
-message(STATUS "V++ DNS hosts, nested provider/main GC, sibling provider and bare argv0 PASS")
+message(STATUS "V++ DNS hosts, nested provider/main GC and sibling provider from foreign cwd PASS")
 if(DEFINED VPP_STAGE1)
     include("${CMAKE_CURRENT_LIST_DIR}/check_vm_dns_vpp_mock.cmake")
 endif()

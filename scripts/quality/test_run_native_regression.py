@@ -3,6 +3,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -59,16 +60,16 @@ class SharedVMTests(unittest.TestCase):
             root = Path(work)
             compiler = root / "vpp-native.exe"
             logs = root / "logs"
-            def build_vm(compiler, source, binary, cwd, env, logs, timeout):
+            def build_vm(compiler, source, binary, env, logs, **kwargs):
                 binary.touch()
-                return 0
-            with mock.patch.object(regression, "build", side_effect=build_vm) as build:
+            with mock.patch("check_windows_full_bootstrap.raw_build", side_effect=build_vm) as build:
                 vm = regression.prepare_vm(compiler, logs, {}, 900)
                 self.assertEqual(vm.name, "vpp-vm.exe")
                 self.assertEqual(build.call_args.args[0], root / "vpp-i32.exe")
+                self.assertEqual(build.call_args.kwargs, {"vm_core": True, "timeout": 900})
             packaged = root / "vpp-vm.exe"
             packaged.touch()
-            with mock.patch.object(regression, "build") as build:
+            with mock.patch("check_windows_full_bootstrap.raw_build") as build:
                 self.assertEqual(regression.prepare_vm(compiler, logs, {}, 900), packaged)
                 build.assert_not_called()
 
@@ -100,6 +101,82 @@ class SharedVMTests(unittest.TestCase):
             with mock.patch.object(regression, "execute", side_effect=harness) as run:
                 regression.run_case(case, root / "vpp", logs, {}, 900, vm=shared_vm)
             self.assertEqual(run.call_count, 1)
+
+
+class StagedRegressionTests(unittest.TestCase):
+    def test_build_barrier_and_failure_isolation(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            cases = [{"id": name, "suite": "i32", "source": name + ".vi", "stdout": "ok\n"}
+                     for name in ("first", "second", "reject", "broken")]
+            cases[2]["compile_reject"] = True
+            built = []
+            ran = []
+            records = {}
+            lock = threading.Lock()
+
+            def build(compiler, source, binary, cwd, env, logs, timeout):
+                with lock:
+                    built.append(source.stem)
+                if source.stem in ("reject", "broken"):
+                    return 1
+                binary.write_text(source.stem)
+                return 0
+
+            def execute(command, cwd, env, logs, name, timeout):
+                with lock:
+                    self.assertCountEqual(built, [c["id"] for c in cases])
+                    self.assertEqual(name, "run")
+                    ran.append(Path(command[0]).read_text())
+                (logs / "run.stdout").write_bytes(b"ok\n")
+                return 0
+
+            def record(case, status, detail, seconds):
+                records[case["id"]] = status
+
+            with mock.patch.object(regression, "build", side_effect=build), \
+                    mock.patch.object(regression, "execute", side_effect=execute), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                regression.staged_regression(cases, root / "vpp", root / "logs", {}, 10, 2, record)
+            self.assertCountEqual(built, [c["id"] for c in cases])
+            self.assertCountEqual(ran, ["first", "second"])
+            self.assertEqual(records, {"first": "PASS", "second": "PASS", "reject": "PASS", "broken": "FAIL"})
+
+    def test_shared_setup_once_and_http_clients_serialized(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            cases = [{"id": "vm", "vm_phase": "core"},
+                     {"id": "http1", "http": True}, {"id": "http2", "http": True}]
+            built = set()
+            lock = threading.Lock()
+            http_active = threading.Lock()
+            server = object()
+
+            def run_case(case, compiler, logs, env, timeout, *, vm, phase, work):
+                self.assertEqual(vm, root / "vm")
+                if phase == "build":
+                    with lock:
+                        built.add(case["id"])
+                    return True
+                self.assertEqual(built, {c["id"] for c in cases})
+                if case.get("http"):
+                    self.assertTrue(http_active.acquire(blocking=False))
+                    http_active.release()
+
+            with mock.patch.object(regression, "prepare_vm", return_value=root / "vm") as vm, \
+                    mock.patch.object(regression, "prepare_http", return_value=root / "http") as http, \
+                    mock.patch.object(regression, "start_prepared_http", return_value=server) as start, \
+                    mock.patch.object(regression, "stop_http") as stop, \
+                    mock.patch.object(regression, "run_case", side_effect=run_case), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                record = mock.Mock()
+                regression.staged_regression(cases, root / "vpp", root / "logs", {}, 10, 2, record)
+            vm.assert_called_once()
+            http.assert_called_once()
+            start.assert_called_once()
+            stop.assert_called_once_with(server)
+            self.assertEqual(record.call_count, 3)
+            self.assertTrue(all(call.args[1] == "PASS" for call in record.call_args_list))
 
 
 if __name__ == "__main__":

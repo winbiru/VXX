@@ -14,13 +14,21 @@ nhập runtime.*;
 hàm aot_state() { trả về vm_get(4198464, 2); };
 hàm aot_status() { trả về vm_get(4198464, 1) != 0; };
 // Lỗi vận chuyển socket của OS phải đi qua thử/bắt lỗi để thư viện
-// mạng đóng socket, retry hoặc chuyển máy chủ. Giữ nguyên lỗi ABI,
-// token không hợp lệ và provider không được hỗ trợ.
+// mạng đóng socket, retry hoặc chuyển máy chủ. Token nguyên đã hết hạn
+// hoặc chưa cấp cũng là lỗi có thể bắt ở API AOT. VM độc lập vẫn giữ
+// error=2 cho token không hợp lệ; lỗi kiểu/arity/provider không đổi.
 hàm aot_host_call(state, op, args) {
     biến result = vm_host(state, op, args);
-    nếu (op >= 186 && op <= 192 && vm_get(4198464, 1) == 20) {
+    biến transport_error = op >= 186 && op <= 192 && vm_get(4198464, 1) == 20;
+    biến invalid_token = 0;
+    nếu (op >= 185 && op <= 190 && vm_get(4198464, 1) == 2) {
+        biến token = vm_at(args, 0);
+        invalid_token = vm_tag(token) == 1 && vm_socket_lookup(state, token) == 0;
+    };
+    nếu (transport_error || invalid_token) {
         vm_set(4198464, 1, 0);
         biến reason = vm_literal("socket: OS transport failed");
+        nếu (invalid_token) { reason = vm_literal("socket: invalid or closed token"); };
         nếu (aot_status() == 0) {
             vm_set(4198464, 3, reason); vm_error(16);
         };

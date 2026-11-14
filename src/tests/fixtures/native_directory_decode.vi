@@ -2,6 +2,7 @@
 
 hàm chính() {
     vm_init();
+    vm_set(4198464, 8, máy thư mục thô(6, 0, 0));
     biến raw = vm_alloc(8192, 0);
     biến info = vm_alloc(8, 0);
     máy ghi byte(raw + 16, 24);

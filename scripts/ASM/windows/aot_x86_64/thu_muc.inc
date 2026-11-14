@@ -10,7 +10,9 @@ vpp_native_os_directory:
     jne 1f
     movl $2, %eax
     WIN_RA
-1:  cmpl $(VPP_ARENA_SIZE-8192), %r13d
+1:  testl %r13d, %r13d
+    jz .Lwin_khong_hop_le
+    cmpl $(VPP_ARENA_SIZE-8192), %r13d
     ja .Lwin_khong_hop_le
     cmpl $(VPP_ARENA_SIZE-8192), %r14d
     ja .Lwin_khong_hop_le
@@ -164,7 +166,7 @@ vpp_native_os_directory:
 .Lwin_thu_muc_dong:
     movq 8(%rsi), %r15
     testq %r15, %r15
-    jz .Lwin_khong_hop_le
+    jz .Lwin_thu_muc_da_dong
     movq $0, 8(%rsi)
     movq (%rsi), %rcx
     movq $-1, (%rsi)
@@ -175,4 +177,8 @@ vpp_native_os_directory:
     testl %r12d, %r12d
     jz .Lwin_khong_hop_le
     xorl %eax, %eax
+    WIN_RA
+
+.Lwin_thu_muc_da_dong:
+    movl $-9, %eax
     WIN_RA

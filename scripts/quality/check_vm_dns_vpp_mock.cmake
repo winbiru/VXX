@@ -1,11 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 set(server "${VPP_OUTPUT_DIR}/vm-dns-mock")
-execute_process(COMMAND "${VPP_STAGE1}" build
-    "${VPP_ROOT}/src/tests/fixtures/native_dns_mock.vi" -o "${server}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
-if(NOT status STREQUAL "0")
-    message(FATAL_ERROR "VM DNS V++ mock build: ${status}\n${output}\n${errors}")
+if(WIN32)
+    string(APPEND server ".exe")
 endif()
+vpp_raw_build("${VPP_ROOT}/src/tests/fixtures/native_dns_mock.vi" "${server}")
 foreach(mode IN ITEMS 0 1 2 3 4 10 11 12)
     set(queries 1)
     if(mode LESS 4)
@@ -16,16 +14,30 @@ foreach(mode IN ITEMS 0 1 2 3 4 10 11 12)
         set(queries 2)
     endif()
     set(work "${VPP_OUTPUT_DIR}/vm-dns-mode-${mode}")
-    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
-        "VPP_VM_DNS_PROVIDER=${provider}"
-        sh "${VPP_ROOT}/scripts/quality/run_dns_vpp_mock.sh"
-        "${server}" "${VPP_VM}" "${dns_image}" "${mode}" "${queries}" "${work}" asm
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+    if(WIN32)
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+            "VPP_VM_DNS_PROVIDER=${provider}"
+            "${VPP_PYTHON}" "${VPP_ROOT}/scripts/quality/run_vm_dns_mock.py"
+            "${server}" "${VPP_VM}" "${dns_image}" "${mode}" "${queries}" "${work}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 40)
+    else()
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+            "VPP_VM_DNS_PROVIDER=${provider}"
+            sh "${VPP_ROOT}/scripts/quality/run_dns_vpp_mock.sh"
+            "${server}" "${VPP_VM}" "${dns_image}" "${mode}" "${queries}" "${work}" asm
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+    endif()
     if(status STREQUAL "77")
         message(FATAL_ERROR "VM DNS mock: loopback bind denied (exit 77)")
     endif()
     if(NOT status STREQUAL "0")
-        file(READ "${work}/client.err" client_error)
+        set(client_error "")
+        foreach(log IN ITEMS client.err client.stderr server.err)
+            if(EXISTS "${work}/${log}")
+                file(READ "${work}/${log}" diagnostic)
+                string(APPEND client_error "\n${diagnostic}")
+            endif()
+        endforeach()
         message(FATAL_ERROR "VM DNS mock mode=${mode}: ${status}\n${output}\n${errors}\n${client_error}")
     endif()
     if(mode GREATER_EQUAL 10)

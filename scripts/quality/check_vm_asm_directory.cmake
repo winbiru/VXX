@@ -5,6 +5,26 @@ foreach(required IN ITEMS VPP_VM VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUT
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 
+set(providers asm)
+if(WIN32)
+    set(stem kiem_tra_ffi_thu_muc_windows)
+    set(image "${VPP_OUTPUT_DIR}/directory.vmb")
+    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+        "${VPP_ROOT}/src/tests/${stem}.vi" -o "${image}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "Windows directory VM compile: ${status}\n${output}\n${errors}")
+    endif()
+    file(READ "${VPP_ROOT}/src/tests/expected/${stem}.expected" expected)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${image}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 90)
+    if(NOT status STREQUAL "0" OR NOT output STREQUAL expected OR EXISTS "${VPP_OUTPUT_DIR}/.tmp_ffi_win_thu_muc")
+        message(FATAL_ERROR "Windows directory VM: ${status}\n${output}\n${errors}")
+    endif()
+    file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/vm-dir-external")
+    file(WRITE "${VPP_OUTPUT_DIR}/vm-dir-external/sentinel" "preserved")
+else()
 find_program(VPP_DIR_SHELL NAMES sh REQUIRED)
 set(source "${VPP_OUTPUT_DIR}/directory.vi")
 configure_file("${VPP_ROOT}/src/tests/fixtures/vm_asm_directory.vi" "${source}" COPYONLY)
@@ -77,6 +97,8 @@ if (NOT status STREQUAL "0")
     message(FATAL_ERROR "UID/GID differs from OS: ${status}\n${errors}")
 endif()
 
+endif()
+
 set(invalid_cases
     "máy thư mục tạo(12)" "máy thư mục mở(\"\")"
     "máy thư mục mở(chuỗi từ byte máy ảo([255]))"
@@ -108,25 +130,27 @@ foreach(expression IN LISTS invalid_cases)
 endforeach()
 
 set(native "${VPP_OUTPUT_DIR}/native-directory-decode")
+if(WIN32)
+    string(APPEND native ".exe")
+endif()
 set(native_source "${VPP_OUTPUT_DIR}/native-directory-decode.vi")
 file(WRITE "${native_source}" "")
 foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục máy" "tiến trình máy" "ổ cắm máy"
-        "phân giải máy" "host ABI" "nạp chương trình" "runtime" "thực thi")
+        "phân giải máy" "host ABI" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
     file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
     file(APPEND "${native_source}" "${contents}\n")
 endforeach()
 file(READ "${VPP_ROOT}/src/tests/fixtures/native_directory_decode.vi" contents)
 file(APPEND "${native_source}" "${contents}\n")
-execute_process(COMMAND "${VPP_STAGE1}" build
-    "${native_source}" -o "${native}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
-if (NOT status STREQUAL "0")
-    message(FATAL_ERROR "Directory decoder build failed: ${status}\n${output}\n${errors}")
-endif()
+vpp_raw_build("${native_source}" "${native}" --vm-core)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${native}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Directory decoder/ownership/cleanup failed: ${status}\n${output}\n${errors}")
 endif()
-message(STATUS "V++/ASM directories, PID/PPID, UTF-8, tokens, cleanup PASS")
+if(WIN32)
+    message(STATUS "V++/ASM Windows directories, UTF-8, tokens, cleanup PASS")
+else()
+    message(STATUS "V++/ASM directories, PID/PPID, UTF-8, tokens, cleanup PASS")
+endif()
