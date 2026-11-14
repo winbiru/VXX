@@ -107,7 +107,7 @@ def build(compiler, source, binary, cwd, env, logs, timeout):
 
 
 def prepare_vm(compiler, logs, env, timeout):
-    # CI packages one VM for every regression shard. Local runs build it once.
+    # CI packages one VM per platform. Local runs build it once.
     packaged = compiler.with_name(executable_name("vpp-vm"))
     if packaged.is_file():
         print(f"SETUP shared VM: {packaged}", flush=True)

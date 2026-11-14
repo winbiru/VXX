@@ -932,8 +932,15 @@ hàm vm_host(state, op, args) {
         nếu (vm_number(b) == 1) { trạng_thái_thông_tin = máy thông tin tệp(offset, 3376); } hoặc { trạng_thái_thông_tin = máy thông tin liên kết(offset, 3376); };
         byte hủy(đường_thư_mục); nếu (trạng_thái_thông_tin < 0) { trả về vm_int(-1); };
         biến chế_độ_tệp_tin = máy đọc byte(3380) + máy đọc byte(3381) * 256;
-        // All POSIX stat adapters normalize mode to offset 4.
-        trả về vm_int(máy chia số nguyên ba mươi hai bit(chế_độ_tệp_tin, 4096));
+        // The stat adapters normalize mode to offset 4, including Win64.
+        biến loại_tệp = máy chia số nguyên ba mươi hai bit(chế_độ_tệp_tin, 4096);
+        nếu (vm_get(4198464, 8) == 2) {
+            // Windows machine path ABI: file=1, directory=2, other=0.
+            nếu (loại_tệp == 8) { trả về vm_int(1); };
+            nếu (loại_tệp == 4) { trả về vm_int(2); };
+            trả về vm_int(0);
+        };
+        trả về vm_int(loại_tệp);
     };
     nếu (op == 222) { trả về vm_path_absolute(a); };
     nếu (op == 223) { trả về vm_path_canonical(a); };

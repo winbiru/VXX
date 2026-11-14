@@ -117,6 +117,7 @@ def fixture_cases(directory):
     hello = directory / 'hello.vi'
     hello.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
     yield 'hello', hello, b'42\n', 0
+    yield 'path-kind', FIXTURES / 'native_path_kind.vi', b'NATIVE PATH KIND OK\n', 0
     yield 'vm', FIXTURES / 'vm_asm.vi', ('-2147483648\n-2147483648\n-1\n3.75\n3.0\ni\n[1, 9, 3]\n16\n41\n42\n9\n25\nswitch\nngoại lệ VM\nASM VM OK\n').encode(), 0
     yield 'dynamic', FIXTURES / 'native_dynamic_vpp.vi', ('42\n43\n2147483647\n3.75\n2\n🐱\n[1, 9, 3]\n9\n41\n43\n9\n0\n1\n2\nđúng\n[ngoại lệ, 42]\n44\n10\n[1, 9, 3]\nVPP DYNAMIC AOT OK\n').encode(), 0
     for name, stem, status in [('private-method', 'native_aot_private_method', 0),
@@ -136,7 +137,8 @@ def check_fixtures(compiler, directory, env):
         binary = directory / (name + '.exe')
         command([compiler, 'build', source, '-o', binary], env, directory / (name + '.build.log'), timeout=600)
         audit_pe(binary)
-        command([binary], env, directory / (name + '.run.log'), timeout=120, status=status, expected=expected)
+        command([binary], env, directory / (name + '.run.log'), timeout=120, status=status, expected=expected,
+                cwd=directory if name == 'path-kind' else ROOT)
 
 
 def package_env(package, clang):
@@ -280,7 +282,8 @@ def main():
     build.add_argument('--archive', required=True, type=Path)
     regress = modes.add_parser('regression')
     regress.add_argument('package', type=Path)
-    regress.add_argument('--shard-index', required=True, type=int)
+    regress.add_argument('--suite', choices=('full', 'i32'), default='full')
+    regress.add_argument('--jobs', type=int, default=2)
     regress.add_argument('--logs', required=True, type=Path)
     raw = modes.add_parser('raw-build')
     raw.add_argument('i32', type=Path)
@@ -301,10 +304,18 @@ def main():
                   args.archive.resolve(), clang)
     else:
         package = args.package.resolve(strict=True)
-        env = package_env(package, clang)
+        if args.suite == 'i32':
+            home = package / 'share/vpp'
+            env = clean_env()
+            env.update(VPP_HOME=home.as_posix(),
+                       VPP_WINDOWS_RUNTIME_OBJECT=(home / 'windows-runtime.obj').as_posix())
+            compiler = package / 'bin/vpp-i32.exe'
+        else:
+            env = package_env(package, clang)
+            compiler = package / 'bin/vpp-native.exe'
         return subprocess.call([sys.executable, str(ROOT / 'scripts/quality/run_native_regression.py'),
-                                '--suite', 'full', '--compiler', str(package / 'bin/vpp-native.exe'),
-                                '--shard-count', '16', '--shard-index', str(args.shard_index),
+                                '--suite', args.suite, '--compiler', str(compiler),
+                                '--jobs', str(args.jobs),
                                 '--logs', str(args.logs.resolve())], cwd=ROOT, env=env)
     return 0
 

@@ -70,8 +70,17 @@ hàm vm_dir_mutate(path, remove) {
         status = máy xóa(raw);
         nếu (status < 0) { error = máy lỗi(); };
     };
-    // unlink removes a symlink itself; only an actual directory needs rmdir.
-    nếu (remove == 1 && (error == 1 || error == 21)) {
+    // Windows _wunlink reports EACCES for directories. Inspect without
+    // following reparse points before trying RemoveDirectoryW on that entry.
+    biến xóa_thư_mục = remove == 1 && (error == 1 || error == 21);
+    nếu (remove == 1 && error == 13 && vm_get(4198464, 8) == 2) {
+        nếu (máy thông tin liên kết(raw, 3376) == 0) {
+            biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
+            biến kind = máy chia số nguyên ba mươi hai bit(mode, 4096);
+            xóa_thư_mục = kind == 4 || kind == 10;
+        };
+    };
+    nếu (xóa_thư_mục) {
         status = máy thư mục thô(3, raw, 0);
         error = 0; nếu (status < 0) { error = 0 - status; };
     };

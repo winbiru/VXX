@@ -276,21 +276,29 @@ jobs:
           if-no-files-found: ignore
 
   macos-regression:
-    name: macOS ARM64 - full regression
+    name: macOS ARM64 - full and i32 regression
     needs: macos-full
     runs-on: macos-15
-    timeout-minutes: 240
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: macos-arm64-full
           path: ${{ runner.temp }}/regression-package
-      - name: Run full V++ regression
+      - name: Extract self-hosted macOS compiler once
+        id: compiler
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs
+      - name: Build and run all full V++ regression cases
+        run: |
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --logs regression-logs/full
+      - name: Build and run all i32 regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        run: |
+          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -329,15 +337,10 @@ jobs:
           path: regression-logs/
 
   windows-regression:
-    name: windows-regression - full shard ${{ matrix.shard }}
+    name: Windows x86-64 - full and i32 regression
     needs: windows-full
     runs-on: windows-2025
-    timeout-minutes: 240
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -349,67 +352,32 @@ jobs:
         with:
           msystem: CLANG64
           install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
-      - name: Run full V++ regression shard
+      - name: Extract self-hosted Windows compiler once
+        id: compiler
+        shell: pwsh
+        run: |
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
+          if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
+      - name: Build and run all full V++ regression cases
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
-          if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
-          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --shard-index ${{ matrix.shard }} --logs regression-logs
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite full --jobs 2 --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: windows-regression-${{ matrix.shard }}-logs
-          path: regression-logs/
-
-  macos-i32-regression:
-    name: macOS ARM64 - i32 regression
-    needs: macos-full
-    runs-on: macos-15
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: macos-arm64-full
-          path: ${{ runner.temp }}/regression-package
-      - run: |
-          mkdir -p "$RUNNER_TEMP/regression-compiler"
-          tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
-          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --logs regression-logs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: macos-i32-regression-logs
-          path: regression-logs/
-
-  windows-i32-regression:
-    name: Windows x86-64 - i32 regression
-    needs: windows-i32
-    runs-on: windows-2025
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-i32-selfhost
-          path: ${{ runner.temp }}/regression-package
-      - shell: pwsh
+      - name: Build and run all i32 regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
+        shell: pwsh
         run: |
-          $extracted = Join-Path $env:RUNNER_TEMP 'regression-compiler'
-          Expand-Archive -LiteralPath "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-i32.zip" -DestinationPath $extracted
-          $env:VPP_HOME = $extracted.Replace([char]92, [char]47)
-          $env:VPP_NATIVE_TARGET = 'windows-x86_64'
-          $env:VPP_NATIVE_NO_CACHE = '1'
-          $env:VPP_WINDOWS_RUNTIME_OBJECT = "$extracted/windows-runtime.obj"
-          python scripts/quality/run_native_regression.py --suite i32 --compiler "$extracted/bin/vpp-i32.exe" --logs regression-logs
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          $package = "$env:RUNNER_TEMP/regression-compiler"
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite i32 --jobs 2 --logs regression-logs/i32
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-i32-regression-logs
+          name: windows-regression-logs
           path: regression-logs/
