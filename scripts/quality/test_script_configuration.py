@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression checks for build-cache invalidation and test-runner configuration."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -190,6 +191,54 @@ class RegressionShardTests(unittest.TestCase):
         self.assertEqual(record.call_count, 2)
         self.assertTrue(all(c.args[1] == 'PASS' for c in record.call_args_list))
 
+    def test_prebuilt_helpers_and_nested_http_lifecycle_never_compile(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        cases = [{'id': 'http-client', 'suite': 'full', 'http': True},
+                 {'id': 'dns-client', 'suite': 'full', 'dns_mock': True},
+                 {'id': 'kiem_tra_regression_runner', 'suite': 'full', 'tooling_test': True}]
+        events = []
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            artifacts, logs = root / 'artifact', root / 'logs'
+            logs.mkdir()
+            ready = []
+            for index, case in enumerate(cases):
+                directory = artifacts / str(index)
+                directory.mkdir(parents=True)
+                binary = directory / runner.executable_name('program')
+                binary.write_text('prebuilt')
+                if case.get('dns_mock'):
+                    (directory / runner.executable_name('dns-server')).write_text('DNS helper')
+                ready.append(dict(id=case['id'], directory=str(index),
+                                  binary=binary.relative_to(artifacts).as_posix(), selector=None))
+            server = artifacts / runner.executable_name('server')
+            server.write_text('HTTP helper')
+            plan = dict(ready=ready, checks=[], http=server.name)
+
+            def run_case(case, *args, phase, work, prepared_binary, **kwargs):
+                self.assertEqual(phase, 'run')
+                self.assertEqual(prepared_binary.read_text(), 'prebuilt')
+                if case.get('dns_mock'):
+                    self.assertEqual((work / runner.executable_name('dns-server')).read_text(), 'DNS helper')
+                events.append(case['id'])
+
+            def start_http(binary, *args):
+                self.assertEqual(binary.read_text(), 'HTTP helper')
+                events.append('start-http')
+                return object()
+
+            with mock.patch.object(runner, 'build', side_effect=AssertionError('unexpected compilation')), \
+                 mock.patch.object(runner, 'run_case', side_effect=run_case), \
+                 mock.patch.object(runner, 'start_prepared_http', side_effect=start_http), \
+                 mock.patch.object(runner, 'stop_http') as stop:
+                record = mock.Mock()
+                runner.run_prepared_regression(cases, root / 'vpp', artifacts, plan, logs, {}, 1, record)
+            self.assertEqual(events, ['kiem_tra_regression_runner', 'start-http', 'http-client', 'dns-client'])
+            self.assertTrue(all(c.args[1] == 'PASS' for c in record.call_args_list))
+            stop.assert_called_once()
+
 
 class WindowsRunnerTests(unittest.TestCase):
     def test_packaged_runner_preserves_selection_paths_and_exit_code(self):
@@ -205,7 +254,8 @@ class WindowsRunnerTests(unittest.TestCase):
             argv = ['runner', '--clang', str(clang), 'regression', str(package),
                     '--suite', 'smoke', '--compiler', str(compiler),
                     '--case', 'kiem_tra_aot_i32_run', '--timeout', '37', '--shard-count', '4',
-                    '--shard-index', '2', '--logs', str(package / 'logs')]
+                    '--shard-index', '2', '--phase', 'run', '--artifacts', str(package / 'tests'),
+                    '--logs', str(package / 'logs')]
             with mock.patch.object(sys, 'argv', argv), \
                  mock.patch.object(module.platform, 'system', return_value='Windows'), \
                  mock.patch.object(module.platform, 'machine', return_value='AMD64'), \
@@ -214,11 +264,132 @@ class WindowsRunnerTests(unittest.TestCase):
             command = run.call_args.args[0]
             for option, value in (('--compiler', str(compiler.resolve())), ('--suite', 'smoke'),
                                   ('--case', 'kiem_tra_aot_i32_run'), ('--timeout', '37'),
-                                  ('--shard-count', '4'), ('--shard-index', '2')):
+                                  ('--shard-count', '4'), ('--shard-index', '2'),
+                                  ('--phase', 'run'), ('--artifacts', str((package / 'tests').resolve()))):
                 self.assertEqual(command[command.index(option) + 1], value)
             env = run.call_args.kwargs['env']
             self.assertEqual(env['VPP_HOME'], (package.resolve() / 'share/vpp').as_posix())
             self.assertEqual(env['VPP_AOT_ASSEMBLER'], clang.resolve().as_posix())
+
+
+@unittest.skipUnless(os.name == 'posix', 'Fake executables use a Python shebang')
+class PreparedRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='vpp prepared tests ')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        for name in ('scripts/quality', 'scripts/test/fixtures', 'gói', 'bin'):
+            (self.root / name).mkdir(parents=True)
+        for name in ('run_native_regression.py', 'native_golden_costs.tsv'):
+            shutil.copyfile(QUALITY / name, self.root / 'scripts/quality' / name)
+        cases = []
+        names = ['kiem_tra_bo_qua', 'kiem_tra_boolean', 'kiem_tra_so_thuc',
+                 *[f'regular{i}' for i in range(16)], 'reject', 'dump']
+        for name in names:
+            source = f'scripts/test/{name}.vi'
+            (self.root / source).write_text('hàm chính() { in "ok"; };\n', encoding='utf-8')
+            case = dict(id=name, source=source, suite='full')
+            if name == 'reject':
+                case['compile_reject'] = True
+            elif name == 'dump':
+                case['dump'] = 'dump-ir'
+            else:
+                case['expected'] = f'scripts/test/{name}.expected'
+                (self.root / case['expected']).write_text('ok\n')
+            cases.append(case)
+        (self.root / 'scripts/test/regression.json').write_text(
+            json.dumps(dict(cases=cases, unregistered_sources={})), encoding='utf-8')
+        self.compiler = self.root / 'bin/vpp'
+        self.calls = self.root / 'compiler-calls'
+        self.compiler.write_text(f'#!{sys.executable}\n' + '''import json, os, pathlib, sys
+with open(os.environ['VPP_PREPARED_TEST_CALLS'], 'a') as log:
+    log.write(json.dumps(sys.argv[1:]) + '\\n')
+program = "#!" + sys.executable + "\\n" + """from pathlib import Path
+import os
+assert not Path('run-once').exists(), 'dirty test workspace'
+Path('run-once').touch()
+print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
+"""
+def publish(source, output):
+    if pathlib.Path(source).stem == 'reject':
+        sys.exit(1)
+    path = pathlib.Path(output)
+    path.write_text(program)
+    path.chmod(0o755)
+if sys.argv[1] == 'build':
+    publish(sys.argv[2], sys.argv[4])
+elif sys.argv[1] == 'batch-build':
+    for index in range(2, len(sys.argv), 2):
+        publish(sys.argv[index], sys.argv[index+1])
+        print('VPP_BATCH_BUILD', index-1, 1)
+else:
+    print('stable compiler dump')
+''')
+        self.compiler.chmod(0o755)
+        self.artifacts = self.root / 'build-artifact'
+
+    def invoke(self, phase, *options, status=0, fail=False):
+        result = subprocess.run([
+            sys.executable, str(self.root / 'scripts/quality/run_native_regression.py'),
+            '--compiler', str(self.compiler), '--phase', phase, '--artifacts', str(self.artifacts),
+            '--logs', str(self.root / 'logs'), *options],
+            env=dict(os.environ, VPP_PREPARED_TEST_CALLS=str(self.calls),
+                     VPP_PREPARED_TEST_FAIL='1' if fail else ''),
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, status, result.stdout + result.stderr)
+        return result
+
+    def test_relocated_artifact_runs_twice_without_compiler_or_dirty_workspace(self):
+        options = ('--case', 'regular0', '--case', 'reject', '--case', 'dump')
+        self.invoke('build', *options)
+        self.assertNotIn('run-once', [p.name for p in self.artifacts.rglob('*')])
+        calls = self.calls.read_text()
+        relocated = self.root / 'extracted artifact'
+        self.artifacts.rename(relocated)
+        self.artifacts = relocated
+        self.compiler.chmod(0o644)  # A run job cannot execute this compiler.
+        for _ in range(2):
+            result = self.invoke('run', *options)
+            self.assertIn('3 passed, 0 failed', result.stdout)
+            self.assertIn('checked during build', result.stdout)
+        self.assertEqual(self.calls.read_text(), calls)
+        self.assertFalse(any(p.name == 'run-once' for p in self.artifacts.rglob('*')))
+
+    def test_batches_and_shared_modules_are_reused_and_runtime_failures_still_fail(self):
+        options = tuple(arg for name in ('kiem_tra_bo_qua', 'kiem_tra_boolean', 'kiem_tra_so_thuc',
+                                          'regular0', 'regular1') for arg in ('--case', name))
+        self.invoke('build', *options, '--jobs', '1', '--batch-size', '2', '--module-suites')
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertEqual([c[0] for c in calls].count('batch-build'), 1)
+        self.assertEqual([c[0] for c in calls].count('build'), 1)
+        self.compiler.chmod(0o644)
+        self.invoke('run', *options, status=1, fail=True)
+        result = self.invoke('run', *options)
+        self.assertIn('5 passed, 0 failed', result.stdout)
+        self.assertEqual(len(self.calls.read_text().splitlines()), 2)
+
+    def test_missing_binary_fails_without_rebuild(self):
+        options = ('--case', 'regular0')
+        self.invoke('build', *options)
+        calls = self.calls.read_text()
+        plan = json.loads((self.artifacts / 'build.json').read_text())
+        (self.artifacts / plan['ready'][0]['binary']).unlink()
+        result = self.invoke('run', *options, status=2)
+        self.assertIn('missing artifact file', result.stderr)
+        self.assertEqual(self.calls.read_text(), calls)
+
+    def test_changed_compiler_or_source_rejects_stale_artifact(self):
+        options = ('--case', 'regular0')
+        self.invoke('build', *options)
+        source = self.root / 'scripts/test/regular0.vi'
+        original = source.read_bytes()
+        source.write_bytes(original + b'// changed\n')
+        self.invoke('run', *options, status=2)
+        source.write_bytes(original)
+        with self.compiler.open('a') as stream:
+            stream.write('# changed compiler\n')
+        self.invoke('run', *options, status=2)
+        self.assertEqual(len(self.calls.read_text().splitlines()), 1)
 
 
 if __name__ == '__main__':

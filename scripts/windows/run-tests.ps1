@@ -16,6 +16,9 @@ param(
     [ValidateRange(1, 2147483647)]
     [int]$Timeout = 900,
     [string]$Clang = $env:VPP_AOT_ASSEMBLER,
+    [ValidateSet('all', 'build', 'run')]
+    [string]$Phase = 'all',
+    [string]$Artifacts,
     [switch]$ModuleSuites,
     [switch]$List,
     [switch]$Inventory
@@ -69,6 +72,12 @@ $options += @('--compiler', $compiler, '--jobs', "$Jobs", '--batch-size', "$Batc
     '--timeout', "$Timeout", '--logs', $LogDirectory,
     '--shard-count', "$ShardCount", '--shard-index', "$ShardIndex")
 if ($ModuleSuites) { $options += '--module-suites' }
+if ($Phase -ne 'all') {
+    if ([string]::IsNullOrWhiteSpace($Artifacts)) { throw 'Phase build/run requires Artifacts' }
+    $options += @('--phase', $Phase, '--artifacts', $Artifacts)
+} elseif (-not [string]::IsNullOrWhiteSpace($Artifacts)) {
+    throw 'Artifacts requires Phase build/run'
+}
 # The package helper establishes the Windows runtime/linker environment and
 # invokes run_native_regression.py. Native argument arrays preserve UTF-8
 # paths and spaces without Start-Process command-line quoting.

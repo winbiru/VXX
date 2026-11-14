@@ -22,4 +22,15 @@ hàm chính() {
         } bắt lỗi(e) { lỗi += 1; };
     };
     in lỗi == 8;
+    // Hai chữ số ở gốc, trong object và trước từng delimiter hợp lệ.
+    in json phân tích("10") == 10 && json phân tích("99") == 99;
+    in json tạo(json phân tích("{\"a\":12,\"b\":99 }")) == "{\"a\":12,\"b\":99}";
+    in json phân tích("12\t\r\n ") == 12;
+    in json phân tích("12.5") == 12.5 && json phân tích("12e2") == 1200.0;
+    lỗi = 0;
+    danh sách lỗi = ["00","09","12x","12.","12e","12e+","12 3","[12,]","{\"x\":12x}"];
+    lặp(i = 0; i < máy ảo lấy độ dài(danh sách lỗi); i++) {
+        thử { json phân tích(danh sách lỗi[i]); } bắt lỗi(e) { lỗi += 1; };
+    };
+    in lỗi == 9;
 };

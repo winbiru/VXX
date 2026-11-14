@@ -177,4 +177,14 @@ hàm chính() {
     in thay chính xác(mẫu dài, mẫu dài, "X") == "X";
     in thay chính xác("é", chuỗi từ byte máy ảo([195]), "X") == "é";
     in thay chính xác(chuỗi từ byte máy ảo([195, 88, 169]), "X", "") == "é";
+    // NFC: mọi nguyên âm trong bảng, các đoạn đã chuẩn hóa và dấu độc lập.
+    dựng sẵn = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊOÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
+    phân rã = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊOÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
+    in chuẩn hóa unicode(dựng sẵn) == dựng sẵn;
+    in chuẩn hóa unicode(phân rã) == dựng sẵn;
+    in chuẩn hóa unicode("̣́á🚀𠮷ḅ́") == "̣́á🚀𠮷ḅ́";
+    in chuẩn hóa unicode("ậ Á̆ á́") == "ậ Á̆ á́";
+    in chuẩn hóa unicode("中 Ω") == "中 Ω" && chuẩn hóa unicode("") == "";
+    lỗi unicode = chuỗi từ byte máy ảo([195, 255, 128]);
+    in chuẩn hóa unicode(lỗi unicode + "á" + lỗi unicode) == lỗi unicode + "á" + lỗi unicode;
 };

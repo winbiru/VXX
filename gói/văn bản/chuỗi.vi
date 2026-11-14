@@ -191,7 +191,8 @@ lớp công khai Xử Lý Chuỗi {
     // `mục_tiêu` là chuỗi 144 code point; `phân_rã` là danh sách song song.
     hàm riêng tư chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã) {
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(mục tiêu) && vị trí < 0; i++) {
+        n = máy ảo lấy độ dài(mục tiêu);
+        lặp(i = 0; i < n && vị trí < 0; i++) {
             nếu (mục tiêu[i] == c) {
                 vị trí = i;
             };
@@ -230,7 +231,8 @@ lớp công khai Xử Lý Chuỗi {
         };
 
         vị trí = -1;
-        lặp(i = 0; i < máy ảo lấy độ dài(phân rã) && vị trí < 0; i++) {
+        n bảng = máy ảo lấy độ dài(phân rã);
+        lặp(i = 0; i < n bảng && vị trí < 0; i++) {
             nếu (phân rã[i] == khóa) {
                 vị trí = i;
             };
@@ -269,28 +271,42 @@ lớp công khai Xử Lý Chuỗi {
             "Ư", "Ừ", "Ứ", "Ử", "Ữ", "Ự", "Y", "Ỳ", "Ý", "Ỷ", "Ỹ", "Ỵ"
         ];
 
+        // Chỉ phân rã và ghép khi ký tự cơ sở có dấu theo sau.
+        // Các ký tự đã dựng sẵn và các dấu đứng đầu giữ nguyên byte.
         kết quả = "";
-        đoạn = [];
-        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+        đầu đoạn = 0;
+        n = máy ảo lấy độ dài(văn bản);
+        i = 0;
+        khi (i + 1 < n) {
             c = văn bản[i];
-            hạng dấu = mình.chuỗi nfc hạng dấu(c);
-            nếu (hạng dấu != 0) {
-                nếu (máy ảo lấy độ dài(đoạn) == 0) {
-                    // Giữ đúng hành vi cũ: combining mark đứng độc lập được phát ra ngay.
-                    kết quả = kết quả + c;
-                } hoặc {
-                    máy ảo thêm cuối danh sách(đoạn, c);
-                };
+            nếu (mình.chuỗi nfc hạng dấu(văn bản[i + 1]) == 0 ||
+                mình.chuỗi nfc hạng dấu(c) != 0) {
+                i = i + 1;
             } hoặc {
-                kết quả = kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+                nếu (i > đầu đoạn) {
+                    kết quả = kết quả + máy ảo cắt chuỗi(văn bản, đầu đoạn, i - đầu đoạn);
+                };
                 đoạn = [];
                 phân rã c = mình.chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã);
                 lặp(j = 0; j < máy ảo lấy độ dài(phân rã c); j++) {
                     máy ảo thêm cuối danh sách(đoạn, phân rã c[j]);
                 };
+                i = i + 1;
+                khi (i < n) {
+                    dấu tiếp = văn bản[i];
+                    nếu (mình.chuỗi nfc hạng dấu(dấu tiếp) == 0) { thoát; };
+                    máy ảo thêm cuối danh sách(đoạn, dấu tiếp);
+                    i = i + 1;
+                };
+                kết quả = kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+                đầu đoạn = i;
             };
         };
-        trả về kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
+        nếu (đầu đoạn == 0) { trả về văn bản; };
+        nếu (đầu đoạn < n) {
+            kết quả = kết quả + máy ảo cắt chuỗi(văn bản, đầu đoạn, n - đầu đoạn);
+        };
+        trả về kết quả;
     };
 
     // Phân loại theo Unicode White_Space. Việc xác định code point dùng opcode chuỗi

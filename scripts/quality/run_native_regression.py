@@ -4,6 +4,7 @@ import argparse
 import collections
 import concurrent.futures
 import contextlib
+import hashlib
 import threading
 import json
 import math
@@ -584,7 +585,7 @@ def stop_http(process):
 
 
 def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_size=1,
-                      module_suites=False):
+                      module_suites=False, artifacts=None):
     """Build each fixture once, then execute prepared binaries in parallel.
 
     Compiler/linker/VM harnesses intentionally compile their own inputs as
@@ -594,7 +595,7 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
     vm = None
     http_binary = None
     setup_errors = {}
-    http_dir = logs / "http-fixture"
+    http_dir = (artifacts if artifacts is not None else logs) / "http-fixture"
     if any("vm_phase" in c for c in cases):
         try:
             vm = prepare_vm(compiler, logs, env, timeout)
@@ -607,9 +608,12 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
             setup_errors["http"] = str(exc)
     elapsed = {}
     http_lock = threading.Lock()
-    # Keep executables off the diagnostics artifact and isolate every test.
-    with tempfile.TemporaryDirectory(prefix="vpp-regression-build-") as work:
+    # A persistent build artifact can be extracted elsewhere and run repeatedly.
+    # Normal combined runs keep executables off the diagnostics artifact.
+    with (tempfile.TemporaryDirectory(prefix="vpp-regression-build-") if artifacts is None
+          else contextlib.nullcontext(artifacts / "work")) as work:
         work = Path(work)
+        work.mkdir(parents=True, exist_ok=True)
         directories = {c["id"]: work / str(i) for i, c in enumerate(cases)}
         for directory in directories.values():
             directory.mkdir()
@@ -623,7 +627,7 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
         def stage(case, phase):
             name = case["id"]
             start = time.monotonic()
-            label = "DEFER HARNESS" if phase == "build" and any(k in case for k in HARNESS_KEYS) else phase.upper()
+            label = ("CHECK" if artifacts is not None else "DEFER HARNESS") if phase == "build" and any(k in case for k in HARNESS_KEYS) else phase.upper()
             print(f"{label} {name}", flush=True)
             try:
                 for key, detail in setup_errors.items():
@@ -636,8 +640,14 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
                     options = {}
                     if name in prepared:
                         options["prepared_binary"], options["selector"] = prepared[name]
+                    # Compiler/linker/VM checks exercise builds as assertions.
+                    # Finish these checks in the build job, never the run job.
+                    check = artifacts is not None and phase == "build" and any(k in case for k in HARNESS_KEYS)
                     ready = run_case(case, compiler, logs / name, env, timeout,
-                                     vm=vm, phase=phase, work=directories[name], **options)
+                                     vm=vm, phase="both" if check else phase,
+                                     work=directories[name], **options)
+                    if check:
+                        ready = False
                 return case, bool(ready), "", time.monotonic() - start
             except errors as exc:
                 return case, False, str(exc), time.monotonic() - start
@@ -714,6 +724,19 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
                     else:
                         ready.append(case)
         print(f"BUILD PHASE COMPLETE: {len(ready)} cases ready for execution", flush=True)
+        if artifacts is not None:
+            publications = []
+            for case in ready:
+                name = case["id"]
+                binary, selector = prepared.get(name, (directories[name] / executable_name("program"), None))
+                publications.append({"id": name,
+                                     "directory": directories[name].relative_to(artifacts).as_posix(),
+                                     "binary": binary.relative_to(artifacts).as_posix(),
+                                     "selector": selector})
+            return {
+                "ready": publications,
+                "http": http_binary.relative_to(artifacts).as_posix() if http_binary is not None else None,
+            }
         server = None
         try:
             # This tooling fixture starts its own runner/server on port 18080.
@@ -741,6 +764,99 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
             stop_http(server)
 
 
+def artifact_inputs(compiler):
+    """Reject artifacts from a different compiler, test corpus or tool version."""
+    digest = hashlib.sha256()
+    paths = [MANIFEST, Path(__file__).resolve()]
+    paths += [p for root in (ROOT / "gói", TESTS) for p in root.rglob("*")
+              if p.is_file() and p.suffix in (".vi", ".expected")
+              and not any(part.startswith(".") for part in p.relative_to(ROOT).parts)]
+    for path in sorted(paths):
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8") + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    backend = compiler.with_name(executable_name("vpp-native"))
+    return {"version": 1, "system": platform.system(), "machine": platform.machine().lower(),
+            "compiler": hashlib.sha256(compiler.read_bytes()).hexdigest(),
+            "backend": hashlib.sha256(backend.read_bytes()).hexdigest() if backend.is_file() else None,
+            "sources": digest.hexdigest()}
+
+
+def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout, record):
+    """Execute only saved binaries, in fresh workspaces on every invocation."""
+    ready = {c["id"]: c for c in plan["ready"]}
+    checked = {c["id"]: c for c in plan["checks"]}
+    missing = {c["id"] for c in cases} - (ready.keys() | checked.keys())
+    if missing:
+        raise RuntimeError(f"cases missing from build artifact: {sorted(missing)}")
+
+    def artifact_file(relative):
+        path = (artifacts / relative).resolve()
+        if not path.is_relative_to(artifacts) or not path.is_file():
+            raise RuntimeError(f"missing artifact file: {relative}; rebuild the test artifact")
+        return path
+
+    # Fail before running anything if an executable/helper is absent. Never
+    # fall back to compilation, even when the compiler is available.
+    for case in cases:
+        if case["id"] in ready:
+            item = ready[case["id"]]
+            artifact_file(item["binary"])
+            if case.get("dns_mock"):
+                artifact_file(item["directory"] + "/" + executable_name("dns-server"))
+    http_binary = artifact_file(plan["http"]) if any(c.get("http") and c["id"] in ready for c in cases) else None
+    errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
+    server = None
+    http_error = None
+    # The nested runner starts its own HTTP server on the shared port.
+    cases = sorted(cases, key=lambda c: c["id"] != "kiem_tra_regression_runner")
+    with tempfile.TemporaryDirectory(prefix="vpp-regression-run-") as temporary:
+        work = Path(temporary)
+        try:
+            for index, case in enumerate(cases):
+                name = case["id"]
+                if name in checked:
+                    result = checked[name]
+                    record(case, result["status"], "checked during build: " + result["detail"], 0)
+                    continue
+                start = time.monotonic()
+                print(f"RUN {name} (prebuilt)", flush=True)
+                case_work = work / str(index)
+                try:
+                    if case.get("http") and server is None:
+                        if http_error:
+                            raise RuntimeError(http_error)
+                        directory = work / "http-fixture"
+                        directory.mkdir(exist_ok=True)
+                        binary = directory / executable_name("server")
+                        shutil.copy2(http_binary, binary)
+                        try:
+                            server = start_prepared_http(binary, directory, env)
+                        except errors as exc:
+                            http_error = str(exc)
+                            raise
+                    item = ready[name]
+                    directory = case_work
+                    shutil.copytree(artifacts / item["directory"], directory)
+                    binary = directory / executable_name("program")
+                    # Shared module executables live above the case workspace.
+                    shutil.copy2(artifact_file(item["binary"]), binary)
+                    run_case(case, compiler, logs / name, env, timeout, phase="run",
+                             work=directory, prepared_binary=binary, selector=item["selector"])
+                    status, detail = "PASS", ""
+                except errors as exc:
+                    status, detail = "FAIL", str(exc)
+                finally:
+                    shutil.rmtree(case_work, ignore_errors=True)
+                record(case, status, detail, time.monotonic() - start)
+        finally:
+            stop_http(server)
+            http_log = work / "http-fixture/server.log"
+            if http_log.is_file():
+                destination = logs / "http-fixture"
+                destination.mkdir(exist_ok=True)
+                shutil.copy2(http_log, destination / "server.log")
+
+
 def print_failure_logs(directory):
     for name in ("build.stderr", "run.stderr", "run.stdout", "harness.stderr", "harness.stdout"):
         path = directory / name
@@ -766,6 +882,10 @@ def main():
                         help="experimental full compiler AST reuse, up to four builds per process")
     parser.add_argument("--module-suites", action="store_true",
                         help="compile reviewed full regression cases into shared executables")
+    parser.add_argument("--phase", choices=("all", "build", "run"), default="all",
+                        help="build a reusable test artifact, or run it without compiling")
+    parser.add_argument("--artifacts", type=Path,
+                        help="test artifact directory for --phase build or --phase run")
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--logs", type=Path, default=ROOT / "build-pure-vpp/regression-logs")
     args = parser.parse_args()
@@ -797,13 +917,18 @@ def main():
         parser.error("--batch-size requires the full suite and --jobs")
     if args.module_suites and (args.suite != "full" or args.jobs is None):
         parser.error("--module-suites requires the full suite and --jobs")
+    if (args.phase != "all") != (args.artifacts is not None):
+        parser.error("--phase build/run requires --artifacts; --phase all does not accept it")
     if args.compiler is None:
         parser.error("--compiler required")
     compiler = args.compiler.resolve()
     if not compiler.is_file():
         parser.error(f"missing compiler: {compiler}")
-    cases = partition(cases, args.shard_count, args.module_suites)[args.shard_index]
-    print(f"SHARD {args.shard_index + 1}/{args.shard_count}: {len(cases)} registered cases", flush=True)
+    if args.shard_count > 1:
+        cases = partition(cases, args.shard_count, args.module_suites)[args.shard_index]
+        print(f"SHARD {args.shard_index + 1}/{args.shard_count}: {len(cases)} registered cases", flush=True)
+    else:
+        print(f"SUITE {args.suite}: {len(cases)} registered cases", flush=True)
     host = platform.system()
     quiet_platform_skips = host in ("Linux", "Windows")
     pending = [c for c in cases if "pending" in c]
@@ -814,6 +939,19 @@ def main():
     if not cases:
         parser.error("no cases in selection")
     cases = [c for c in cases if c not in pending and c not in unsupported]
+    artifacts = args.artifacts.resolve() if args.artifacts is not None else None
+    plan = None
+    if args.phase == "build":
+        if artifacts.exists() and any(artifacts.iterdir()):
+            parser.error(f"test artifact directory must be empty: {artifacts}")
+        artifacts.mkdir(parents=True, exist_ok=True)
+    elif args.phase == "run":
+        try:
+            plan = json.loads((artifacts / "build.json").read_text(encoding="utf-8"))
+            if plan["inputs"] != artifact_inputs(compiler) or plan["suite"] != args.suite:
+                parser.error("test artifact does not match this compiler, sources, suite or platform; rebuild it")
+        except (OSError, ValueError, KeyError) as exc:
+            parser.error(f"invalid test artifact: {exc}")
     env = dict(os.environ)
     installed = compiler.parent.parent / "share/vpp"
     env.setdefault("VPP_HOME", str(installed if (installed / "gói").is_dir() else ROOT))
@@ -846,7 +984,23 @@ def main():
         if status == "FAIL":
             print_failure_logs(directory)
 
-    if args.jobs is not None:
+    if args.phase == "run":
+        try:
+            run_prepared_regression(cases, compiler, artifacts, plan, logs, env, args.timeout, record)
+        except (OSError, RuntimeError, KeyError, TypeError) as exc:
+            parser.error(f"cannot run test artifact: {exc}")
+    elif args.phase == "build":
+        plan = staged_regression(cases, compiler, logs, env, args.timeout, args.jobs or 1, record,
+                                 batch_size=args.batch_size, module_suites=args.module_suites,
+                                 artifacts=artifacts)
+        plan.update(inputs=artifact_inputs(compiler), suite=args.suite,
+                    checks=[r for r in results if r["status"] in ("PASS", "FAIL")])
+        (artifacts / "build.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        ready_ids = {c["id"] for c in plan["ready"]}
+        for case in cases:
+            if case["id"] in ready_ids:
+                record(case, "BUILT", "saved for --phase run", 0)
+    elif args.jobs is not None:
         staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
                           batch_size=args.batch_size, module_suites=args.module_suites)
     else:
@@ -887,6 +1041,8 @@ def main():
     failed = sum(c["status"] == "FAIL" for c in results)
     passed = sum(c["status"] == "PASS" for c in results)
     summary = f"{passed} passed, {failed} failed, {len(pending)} pending"
+    if args.phase == "build":
+        summary = f"{len(plan['ready'])} built, {passed} build checks passed, {failed} failed, {len(pending)} pending"
     if not quiet_platform_skips:
         summary += f", {len(unsupported)} unsupported on this platform"
     print(f"{summary}; logs: {logs}")

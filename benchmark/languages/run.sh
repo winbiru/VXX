@@ -15,4 +15,4 @@ Path(out,'manifest.json').write_text(json.dumps({'root':root,'runtimes':[]},inde
 PY
 python3 "$root/scripts/quality/compare_languages_aot.py" --manifest "$output/manifest.json" \
   --aot "$output/vpp-workloads" --runtimes vpp-aot-vpp --output "$output/report.json" \
-  --runs "${VPP_BENCH_RUNS:-9}" --target-ms "${VPP_BENCH_TARGET_MS:-60}"
+  --extended --runs "${VPP_BENCH_RUNS:-9}" --target-ms "${VPP_BENCH_TARGET_MS:-60}"

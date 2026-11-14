@@ -352,6 +352,10 @@ Các batch đo dài 21,37–41,28 ms. Kiểm thử bootstrap compiler chạy
 chưa phải phép đo trên máy hoàn toàn nhàn rỗi. Chưa đo riêng RAM, I/O,
 đa luồng hay thời gian biên dịch.
 
+Bộ đo native mở rộng hiện có 21 workload, bao gồm số thực, UCLN, số nguyên tố,
+ma trận, đệ quy, tìm kiếm, sắp xếp, từ điển, cấp phát đối tượng, Unicode,
+JSON và ngoại lệ. Chạy `make benchmark`; xem [hướng dẫn và phạm vi đo](benchmark/languages/README.md).
+
 [Mã nguồn workload](benchmark/languages/)
 · [Bộ đo, oracle và thống kê](scripts/quality/compare_languages_aot.py).
 Báo cáo gốc: `benchmark/reports/languages-2026-11-14-refresh.json`;

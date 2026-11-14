@@ -257,7 +257,7 @@ hàm riêng tư json đọc chuỗi(trạng thái) {
     ký tự = các byte[vị trí];
     nếu (ký tự == 34) {
         trạng thái[1] = vị trí + 1;
-        trả về json đoạn nguồn(nội dung, bắt đầu, vị trí - bắt đầu);
+        trả về máy ảo cắt chuỗi theo byte(nội dung, bắt đầu, vị trí - bắt đầu);
     };
     nếu (ký tự < 32) {
         trạng thái[1] = vị trí + 1;
@@ -271,7 +271,7 @@ hàm riêng tư json đọc chuỗi(trạng thái) {
         c = các byte[vị trí];
         nếu (c == 34) {
             nếu (vị trí > đầu đoạn) {
-                kết quả = kết quả + json đoạn nguồn(nội dung, đầu đoạn, vị trí - đầu đoạn);
+                kết quả = kết quả + máy ảo cắt chuỗi theo byte(nội dung, đầu đoạn, vị trí - đầu đoạn);
             };
             vị trí = vị trí + 1;
             trạng thái[1] = vị trí;
@@ -279,7 +279,7 @@ hàm riêng tư json đọc chuỗi(trạng thái) {
         } hoặc {
             nếu (c == 92) {
                 nếu (vị trí > đầu đoạn) {
-                    kết quả = kết quả + json đoạn nguồn(nội dung, đầu đoạn, vị trí - đầu đoạn);
+                    kết quả = kết quả + máy ảo cắt chuỗi theo byte(nội dung, đầu đoạn, vị trí - đầu đoạn);
                 };
                 vị trí = vị trí + 1;
                 trạng thái[1] = vị trí;
@@ -290,7 +290,7 @@ hàm riêng tư json đọc chuỗi(trạng thái) {
                 vị trí = vị trí + 1;
                 trạng thái[1] = vị trí;
                 nếu (ký tự thoát == 34 || ký tự thoát == 92 || ký tự thoát == 47) {
-                    kết quả = kết quả + json đoạn nguồn(nội dung, vị trí - 1, 1);
+                    kết quả = kết quả + máy ảo cắt chuỗi theo byte(nội dung, vị trí - 1, 1);
                 } hoặc {
                     nếu (ký tự thoát == 98) {
                         // Lexer V++ chưa hỗ trợ escape \b và \f trong literal.
@@ -488,7 +488,7 @@ hàm riêng tư json đọc số(trạng thái) {
         nếu (âm) { trả về số nguyên âm; };
         trả về 0 - số nguyên âm;
     };
-    văn bản = json đoạn nguồn(nội dung, bắt đầu, vị trí - bắt đầu);
+    văn bản = máy ảo cắt chuỗi theo byte(nội dung, bắt đầu, vị trí - bắt đầu);
     nếu (số thực) {
         trả về thành số thực(văn bản);
     };
@@ -777,7 +777,7 @@ hàm riêng tư json đọc đối tượng(trạng thái) {
         khóa trực tiếp = sai;
         nếu (cuối khóa < n) { khóa trực tiếp = các byte[cuối khóa] == 34; };
         nếu (khóa trực tiếp) {
-            khóa = json đoạn nguồn(nội dung, đầu khóa, cuối khóa - đầu khóa);
+            khóa = máy ảo cắt chuỗi theo byte(nội dung, đầu khóa, cuối khóa - đầu khóa);
             trạng thái[1] = cuối khóa + 1;
         } hoặc {
             khóa = json đọc chuỗi(trạng thái);
@@ -889,6 +889,19 @@ hàm riêng tư json đọc giá trị(trạng thái) {
             nếu ((c sau >= 48 && c sau <= 57) || c sau == 46 ||
                 c sau == 101 || c sau == 69) {
                 cần đọc tiếp = đúng;
+                nếu (c >= 49 && c sau >= 48 && c sau <= 57) {
+                    cuối = vị trí sau + 1;
+                    nếu (cuối == n) {
+                        trạng thái[1] = cuối;
+                        trả về (c - 48) * 10 + c sau - 48;
+                    };
+                    c cuối = các byte[cuối];
+                    nếu (c cuối == 44 || c cuối == 93 || c cuối == 125 ||
+                        c cuối == 32 || c cuối == 9 || c cuối == 10 || c cuối == 13) {
+                        trạng thái[1] = cuối;
+                        trả về (c - 48) * 10 + c sau - 48;
+                    };
+                };
             };
         };
         nếu (!cần đọc tiếp) {
@@ -908,10 +921,6 @@ hàm riêng tư json kiểm tra utf8(văn bản) {
         ném "json phân tích: UTF-8 không hợp lệ";
     };
     trả về máy ảo xem byte chuỗi(văn bản);
-};
-
-hàm riêng tư json đoạn nguồn(ký tự, vị trí, n) {
-    trả về máy ảo cắt chuỗi theo byte(ký tự, vị trí, n);
 };
 
 hàm công khai json phân tích(nội dung) {

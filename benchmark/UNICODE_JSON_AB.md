@@ -1681,3 +1681,58 @@ The restricted self-host compiler retains single-use evaluation results in W9/W0
 | merge/reverse_large | 25,902,500.005 | 17,345,499.990 | -33.04% |
 | merge/random_large | 27,953,999.995 | 18,679,500.015 | -33.18% |
 | merge/unicode_large | 28,058,999.985 | 18,819,000.005 | -32.93% |
+
+## 2026-11-14 — Vietnamese NFC and JSON parsing (same runtime)
+
+Baseline library sources: `f8f9ac1`. Both native ARM64 AOT binaries use
+the same self-hosted compiler, runtime/platform/bridge objects and the same
+extended `benchmark/languages/workloads.vi` driver. Seven randomized paired
+rounds, seed 17, identical iterations per case, three warmup batches, and
+independent expected-value/checksum verification; no concurrent compilation.
+
+| Workload | Before (ns/op) | After (ns/op) | Time reduction |
+| --- | ---: | ---: | ---: |
+| `unicode_normalize` | 5,204,000.004 | 513,812.497 | 90.13% |
+| `json_parse` | 107,399.457 | 94,077.446 | 12.40% |
+| `json_nested` | 450,187.500 | 442,721.591 | 1.66% |
+| `json_encode` | 117,575.582 | 119,549.419 | -1.68% |
+| `unicode_replace` | 9,172.264 | 9,201.493 | -0.32% |
+| `list_128` | 132.620 | 132.857 | -0.18% |
+
+NFC is 10.13× faster on this decomposed Vietnamese sentence by processing
+only clusters with supported combining marks, copying unchanged spans and
+returning the original string for unchanged input. The existing 144-entry
+Vietnamese normalization contract remains in place. JSON parsing removes a
+redundant slice wrapper and accepts two-digit positive integers directly
+when followed by a valid separator or EOF. Other numbers retain the original
+parser. Both changes use V++ library code. The attempted four-lane candidate
+scan in `vm_thay_tìm` was discarded: the isolated runtime experiment measured
+an 11.57% slowdown in `unicode_replace` with concurrent builds, and gave no
+reason to replace the original runtime. Small changes in the control cases
+above are not claimed as improvements.
+
+Reproduce the paired measurement using two already-built binaries of the
+identical driver:
+
+```bash
+d="$PWD/build-benchmark-unicode-json-2026-11-14-opt"
+python3 scripts/quality/compare_languages_aot_pair.py \
+  --before "$d/before" --after "$d/after-final" \
+  --output "$d/paired-before-after-final.json"
+```
+
+The local raw report contains all 84 measured samples, iteration counts,
+checksums, SHA-256 binary hashes and median absolute deviations. The driver
+SHA-256 is `3bb0e85c61e97b1a44bf0719ab1b873e0239736160ef36d88bb07734c07ebd9d`.
+The final string regression matches all 94 golden output lines, including
+all precomposed/decomposed Vietnamese vowels and malformed byte inputs. The
+final broad native regression run passed all 12 cases (zero failures,
+pending or unsupported), including JSON parsing, integer overflow, UTF-8,
+escaping, byte views and GC, key scanning, mixed integers, safety, control
+characters, standard library and single-pass replacement. Together with
+the separate string regression, 13 distinct targeted native fixtures passed.
+An additional Python algorithm-level differential comparison matched the
+original and optimized NFC algorithms on 96,580 inputs; this is modeled
+coverage, not native execution. The original NFC candidate had an out-of-range read for trailing
+combining marks because V++ `&&` is eager; the final version checks the index
+before reading it. Measurements are macOS ARM64 only.

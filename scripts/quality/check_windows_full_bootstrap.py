@@ -305,6 +305,8 @@ def main():
     regress.add_argument('--shard-index', type=int, default=0)
     regress.add_argument('--batch-size', type=int, choices=range(1, 5), default=1)
     regress.add_argument('--module-suites', action='store_true')
+    regress.add_argument('--phase', choices=('all', 'build', 'run'), default='all')
+    regress.add_argument('--artifacts', type=Path)
     regress.add_argument('--logs', required=True, type=Path)
     raw = modes.add_parser('raw-build')
     raw.add_argument('i32', type=Path)
@@ -342,6 +344,8 @@ def main():
                                 '--shard-count', str(args.shard_count), '--shard-index', str(args.shard_index),
                                 '--timeout', str(args.timeout), '--logs', str(args.logs.resolve()),
                                 *[arg for case in args.case for arg in ('--case', case)],
+                                '--phase', args.phase,
+                                *(['--artifacts', str(args.artifacts.resolve())] if args.artifacts is not None else []),
                                 *(['--module-suites'] if args.module_suites else [])], cwd=ROOT, env=env)
     return 0
 

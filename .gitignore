@@ -104,6 +104,7 @@ node_modules/
 !benchmark/NATIVE.md
 !benchmark/UNICODE_JSON_AB.md
 !benchmark/languages/BULK_BENCHMARK.md
+!benchmark/languages/README.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
 !docs/vm-asm.md
