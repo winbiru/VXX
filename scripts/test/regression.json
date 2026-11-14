@@ -2025,6 +2025,15 @@
       "suite": "full"
     },
     {
+      "id": "native_linux_heap_capacity",
+      "source": "scripts/test/fixtures/native_linux_heap_capacity.vi",
+      "expected": "scripts/test/expected/native_linux_heap_capacity.expected",
+      "suite": "full",
+      "platforms": [
+        "Linux"
+      ]
+    },
+    {
       "id": "native_loop_stack_gc",
       "source": "scripts/test/fixtures/native_loop_stack_gc.vi",
       "expected": "scripts/test/expected/native_loop_stack_gc.expected",
@@ -2304,7 +2313,8 @@
       ],
       "weight_ms": 180000,
       "sources": [
-        "scripts/test/fixtures/vm_asm_host.vi"
+        "scripts/test/fixtures/vm_asm_host.vi",
+        "scripts/test/fixtures/native_heap_allocator.vi"
       ]
     },
     {
