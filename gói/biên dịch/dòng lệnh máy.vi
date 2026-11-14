@@ -254,7 +254,7 @@ hàm công khai biên dịch xuất lắp ráp máy(đường, đầu ra, bộ b
 // Việc đọc nguồn/artifact, chọn pipeline, kiểm tra wire và phát ASM ở V++.
 // assemble/execute được nối với trình điều khiển AOT.vi; host không chọn
 // assembler, runtime hay linker cho các yêu cầu của compiler tự chủ.
-hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm = rỗng, số worker = rỗng, runtime thuần = sai, đích ghi = rỗng, đối tượng = rỗng) {
+hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư viện, bộ ba, bộ đệm = rỗng, số worker = rỗng, runtime thuần = sai, đích ghi = rỗng, đối tượng = rỗng, cache ASM = đúng) {
     lệnh = kế hoạch[0];
     đường = kế hoạch[1];
     đầu ra = kế hoạch[2];
@@ -322,7 +322,9 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
         };
     };
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm,
+    bộ đệm ASM = rỗng;
+    nếu (cache ASM) { bộ đệm ASM = bộ đệm; };
+    asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm ASM,
         đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0", đích ghi, đối tượng);
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.total", bắt đầu);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };

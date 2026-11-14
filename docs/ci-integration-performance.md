@@ -558,3 +558,78 @@ với fixture chỉ chạy một lần, thời gian frontend và assembler/linke
 Điều tra tiếp ngày 2026-11-12 đo riêng CPU, ghi assembly, cache key và thời
 gian chạy executable, kèm đối chiếu Actions:
 [ci-stall-investigation-2026-11-12.md](ci-stall-investigation-2026-11-12.md).
+
+### Full regression: dùng chung phiên phân tích nguồn (2026-11-14)
+
+VM và HTTP server đã được chuẩn bị một lần cho mỗi lượt regression. Năm
+fixture HTTP/socket vẫn là năm chương trình khác nhau: mỗi chương trình
+phải được biên dịch, liên kết, chạy và so sánh golden riêng. Pha chạy không
+biên dịch lại executable đã chuẩn bị; các harness compiler/linker/VM vẫn
+tự biên dịch những đầu vào cần thiết cho phép kiểm tra của chúng.
+
+Compiler full tự chủ bổ sung lệnh nội bộ `batch-build` cho tối đa bốn cặp
+nguồn/đích. Mỗi lần dựng lại đồ thị import, đọc toàn bộ nguồn và chỉ tái
+dùng snapshot AST khi nội dung trùng khớp; snapshot được sao chép sâu trước
+khi sử dụng. IR, codegen, liên kết và xuất bản executable vẫn độc lập. Không
+dùng executable cache hoặc cache thân ASM trong đường này. Phiên dừng ở
+lỗi đầu tiên; runner xác nhận marker xuất bản, không tự động thử lại các
+case chưa hoàn tất. Cache AST giữ tối đa 128 module, 1 MiB nguồn và 192 KiB
+mỗi module.
+
+Thử trên compiler full mới đã tự biên dịch:
+
+```sh
+python3 scripts/quality/run_native_regression.py --suite full \
+  --compiler build-pure-vpp/bin/vpp --jobs 2 --batch-size 2 \
+  --logs build-pure-vpp/regression-batch-logs
+```
+
+Workflow `V++ native CI` có input `regression_batch_size` (1, 2, 4), mặc định
+2 trên cả macOS ARM64, Linux x86-64 và Windows x86-64, kể cả push/PR.
+Chọn 1 khi cần chẩn đoán bằng các tiến trình build độc lập; chọn 4 để thử
+batch lớn hơn. Trong 358
+case full đang hoạt động, 322 case đủ điều kiện gom batch trước khi lọc theo
+host; case có môi trường riêng, harness, lỗi biên dịch, DNS mock hoặc dump
+vẫn dùng đường độc lập. Hai suite i32 và full giữ nguyên inventory, golden,
+barrier build/run và yêu cầu hội tụ Stage 2/3.
+
+Linux full dùng lại chín platform object đã được đóng gói từ cùng source
+và flags thay vì assemble chín lần cho mỗi chương trình. Chỉ sử dụng khi
+`VPP_AOT_LINUX_OBJECT_DIR` được chỉ định; thiếu object là lỗi, còn bootstrap
+cold không đặt biến này. Khi chọn 1, CI Linux vẫn kiểm tra hai executable
+cold và packaged giống từng byte. Với batch 2 hoặc 4, cả ba hệ điều hành
+bắt buộc kiểm tra cold, batch/no-cache, batch/AST, stdout, AST hit và hành vi
+dừng khi có lỗi ở giữa batch trước khi chạy full regression. Nếu parity
+thất bại thì full regression không chạy; i32 vẫn được kiểm tra độc lập.
+
+Baseline cục bộ macOS ARM64 với compiler trước thay đổi, không cache và có
+profile (hai fixture cùng import `gói.chuẩn.chính.*`):
+
+| Fixture | Wall build | `source.graph` | `source.link` | `asm.total` |
+| --- | ---: | ---: | ---: | ---: |
+| `kiem_tra_su_kien` | 355,28 s | 25,16 s | 49,14 s | 206,34 s |
+| `kiem_tra_chuoi_nen_tang` | 359,24 s | 27,35 s | 50,08 s | 208,85 s |
+
+Cả hai executable baseline đã chạy và khớp golden từng byte. Đây là một
+lượt đo mỗi case, trong lúc tiến trình tự biên dịch compiler khác cũng chạy;
+không phải A/B có kiểm soát. Profile cho thấy codegen và liên kết đồ thị là
+chi phí lớn hơn parse. Chưa thể suy ra mức giảm wall time của batch từ số
+liệu này. Cần đo cùng compiler mới, cùng fixture, cùng cấu hình profile
+và chạy độc lập để đánh giá chính xác.
+
+Probe cục bộ macOS ARM64 trên compiler full mới tự biên dịch (853,60 s):
+hai chương trình nhỏ cùng import `shared.vi` có executable trùng từng byte
+giữa cả ba chế độ, stdout đúng và batch lỗi giữa chừng giữ đúng ranh giới
+xuất bản. Build thứ hai báo một AST hit. Wall time lần đo duy nhất:
+cold 31,32 s, batch không cache 31,42 s, batch AST 31,43 s. Probe xác nhận
+tính đúng đắn, chưa cho thấy cải thiện tốc độ trên chương trình nhỏ.
+
+Đo A/B runner full với cùng compiler mới, `--jobs 1`, cùng cấu hình profile,
+hai fixture `kiem_tra_aot_byte_scan` và `kiem_tra_aot_byte_scan_heap` cùng
+import `gói.lõi.chuyển kiểu.*`: cả hai chế độ đều PASS 2/2, khớp golden.
+Wall time toàn runner: batch size 1 = 40,12 s; batch size 2 = 39,62 s.
+Build thứ hai trong batch báo một AST hit. Chênh lệch 0,50 s (~1,25%) trên
+một lượt đo chưa đủ chứng minh tăng tốc ổn định. Chưa đo năm fixture HTTP
+hay kiểm tra native Linux/Windows. Theo yêu cầu triển khai trên cả ba hệ
+điều hành, CI dùng batch mặc định 2 với parity bắt buộc; không coi kết quả
+macOS là bằng chứng cho tốc độ hay tính đúng đắn trên Linux/Windows.

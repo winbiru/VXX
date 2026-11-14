@@ -4,6 +4,12 @@ on:
     branches: [main, developer, 'developer-stage-*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      regression_batch_size:
+        description: 'Full regression builds per compiler process (1 disables AST reuse)'
+        type: choice
+        options: ['1', '2', '4']
+        default: '2'
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -360,6 +366,8 @@ jobs:
     needs: macos-full
     runs-on: macos-15
     timeout-minutes: 360
+    env:
+      VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -371,9 +379,15 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-      - name: Build and run all full V++ regression cases
+      - name: Verify full compiler batch parity
+        id: batch_parity
+        if: ${{ env.VPP_REGRESSION_BATCH_SIZE != '1' }}
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --logs regression-logs/full
+          python3 scripts/quality/check_full_batch.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs/batch-parity
+      - name: Build and run all full V++ regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
+        run: |
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
         run: |
@@ -390,6 +404,8 @@ jobs:
     needs: linux-full
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -401,10 +417,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
-      - name: Build and run all full V++ regression cases
+      - name: Verify full compiler batch and packaged platform object parity
+        id: batch_parity
         run: |
           export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --logs regression-logs/full
+          probe_options=()
+          if [[ "$VPP_REGRESSION_BATCH_SIZE" == '1' ]]; then probe_options+=(--linux-objects-only); fi
+          python3 scripts/quality/check_full_batch.py --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --logs regression-logs/batch-parity "${probe_options[@]}"
+      - name: Build and run all full V++ regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && steps.batch_parity.outcome == 'success' }}
+        run: |
+          export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
+          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jobs 2 --batch-size "$VPP_REGRESSION_BATCH_SIZE" --logs regression-logs/full
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
         run: |
@@ -421,6 +445,8 @@ jobs:
     needs: windows-full
     runs-on: windows-2025
     timeout-minutes: 360
+    env:
+      VPP_REGRESSION_BATCH_SIZE: ${{ inputs.regression_batch_size || '2' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -439,13 +465,23 @@ jobs:
           $package = "$env:RUNNER_TEMP/regression-compiler"
           python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
           if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
+      - name: Verify full compiler batch parity
+        id: batch_parity
+        if: ${{ env.VPP_REGRESSION_BATCH_SIZE != '1' }}
+        shell: pwsh
+        run: |
+          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
+          $env:PATH = "$toolchain;$env:PATH"
+          python scripts/quality/check_full_batch.py --compiler "$env:RUNNER_TEMP/regression-compiler/bin/vpp-native.exe" --clang "$toolchain/clang.exe" --logs regression-logs/batch-parity
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and run all full V++ regression cases
+        if: ${{ !cancelled() && steps.compiler.outcome == 'success' && (steps.batch_parity.outcome == 'success' || (env.VPP_REGRESSION_BATCH_SIZE == '1' && steps.batch_parity.outcome == 'skipped')) }}
         shell: pwsh
         run: |
           $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
           $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite full --jobs 2 --logs regression-logs/full
+          python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" regression $package --suite full --jobs 2 --batch-size $env:VPP_REGRESSION_BATCH_SIZE --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and run all i32 regression cases
         if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}

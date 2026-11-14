@@ -179,5 +179,106 @@ class StagedRegressionTests(unittest.TestCase):
             self.assertTrue(all(call.args[1] == "PASS" for call in record.call_args_list))
 
 
+class BatchRegressionTests(unittest.TestCase):
+    def exercise_batch(self, markers, status=0, published=(0, 1), timeout=False):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            cases = [{"id": name, "suite": "full", "source": name + ".vi"}
+                     for name in ("first", "second")]
+            directories = {c["id"]: root / c["id"] for c in cases}
+            for directory in directories.values():
+                directory.mkdir()
+
+            def execute(command, cwd, env, logs, name, limit):
+                self.assertEqual(command[1], "batch-build")
+                self.assertEqual(env["VPP_NATIVE_NO_CACHE"], "0")
+                self.assertNotIn("VPP_COMPILER_PROFILE_FILE", env)
+                self.assertEqual(limit, 20)
+                for index in published:
+                    Path(command[3 + index * 2]).touch()
+                (logs / "batch.stdout").write_text(markers)
+                (logs / "batch.stderr").write_text("compiler diagnostic")
+                if timeout:
+                    raise regression.subprocess.TimeoutExpired(command, limit)
+                return status
+
+            with mock.patch.object(regression, "execute", side_effect=execute):
+                completed, failure = regression.build_batch(
+                    cases, root / "vpp", directories, root / "logs", {}, 10, 0)
+            remaining = [name for name, directory in directories.items()
+                         if (directory / regression.executable_name("program")).exists()]
+            return completed, failure, remaining
+
+    def test_two_independent_publications(self):
+        completed, failure, remaining = self.exercise_batch(
+            "VPP_BATCH_BUILD 1 12.5\nVPP_BATCH_BUILD 3 2e3\n")
+        self.assertEqual(completed, {"first": 0.0125, "second": 2.0})
+        self.assertEqual(failure, "")
+        self.assertEqual(remaining, ["first", "second"])
+
+    def test_failure_never_accepts_unreported_executable(self):
+        for status, timeout in ((1, False), (0, True), (0, False)):
+            with self.subTest(status=status, timeout=timeout):
+                completed, failure, remaining = self.exercise_batch(
+                    "VPP_BATCH_BUILD 1 12\n", status, timeout=timeout)
+                self.assertEqual(set(completed), {"first"})
+                self.assertTrue(failure)
+                self.assertEqual(remaining, ["first"])
+
+    def test_nonzero_exit_after_all_markers_is_failure(self):
+        completed, failure, remaining = self.exercise_batch(
+            "VPP_BATCH_BUILD 1 12\nVPP_BATCH_BUILD 3 12\n", 1)
+        self.assertEqual(set(completed), {"first"})
+        self.assertTrue(failure)
+        self.assertEqual(remaining, ["first"])
+
+    def test_invalid_marker_or_missing_output(self):
+        for marker, published in (("VPP_BATCH_BUILD 3 10", (0, 1)),
+                                  ("VPP_BATCH_BUILD 1 NaN", (0, 1)),
+                                  ("VPP_BATCH_BUILD 1 10", (1,))):
+            with self.subTest(marker=marker, published=published):
+                completed, failure, remaining = self.exercise_batch(marker, published=published)
+                self.assertEqual(completed, {})
+                self.assertTrue(failure)
+                self.assertEqual(remaining, [])
+
+    def test_batch_groups_keep_barrier_and_exclude_special_cases(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            cases = [{"id": name, "suite": "full", "source": name + ".vi"}
+                     for name in ("first", "second", "reject", "third", "fourth")]
+            cases[2]["compile_reject"] = True
+            built, ran, records = set(), [], {}
+            lock = threading.Lock()
+
+            def batch(members, compiler, directories, logs, env, timeout, group):
+                with lock:
+                    names = {c["id"] for c in members}
+                    self.assertNotIn("reject", names)
+                    built.update(names)
+                return {c["id"]: 0.1 for c in members}, ""
+
+            def run_case(case, compiler, logs, env, timeout, *, vm, phase, work):
+                with lock:
+                    if phase == "build":
+                        self.assertEqual(case["id"], "reject")
+                        built.add(case["id"])
+                        return False
+                    self.assertEqual(built, {c["id"] for c in cases})
+                    ran.append(case["id"])
+
+            def record(case, status, detail, seconds):
+                records[case["id"]] = status
+
+            with mock.patch.object(regression, "build_batch", side_effect=batch) as batch_mock, \
+                    mock.patch.object(regression, "run_case", side_effect=run_case), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                regression.staged_regression(cases, root / "vpp", root / "logs",
+                                             {}, 10, 2, record, batch_size=2)
+            self.assertEqual(batch_mock.call_count, 2)
+            self.assertCountEqual(ran, ["first", "second", "third", "fourth"])
+            self.assertEqual(records, {c["id"]: "PASS" for c in cases})
+
+
 if __name__ == "__main__":
     unittest.main()

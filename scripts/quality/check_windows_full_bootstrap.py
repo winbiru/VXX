@@ -298,6 +298,7 @@ def main():
     regress.add_argument('package', type=Path)
     regress.add_argument('--suite', choices=('full', 'i32'), default='full')
     regress.add_argument('--jobs', type=int, default=2)
+    regress.add_argument('--batch-size', type=int, choices=range(1, 5), default=1)
     regress.add_argument('--logs', required=True, type=Path)
     raw = modes.add_parser('raw-build')
     raw.add_argument('i32', type=Path)
@@ -329,7 +330,7 @@ def main():
             compiler = package / 'bin/vpp-native.exe'
         return subprocess.call([sys.executable, str(ROOT / 'scripts/quality/run_native_regression.py'),
                                 '--suite', args.suite, '--compiler', str(compiler),
-                                '--jobs', str(args.jobs),
+                                '--jobs', str(args.jobs), '--batch-size', str(args.batch_size),
                                 '--logs', str(args.logs.resolve())], cwd=ROOT, env=env)
     return 0
 

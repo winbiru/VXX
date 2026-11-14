@@ -19,6 +19,7 @@ nhập gói.hệ thống.nền tảng.tên nền tảng;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.biên dịch.xuất macho.macho xuất từ tệp;
 nhập gói.biên dịch.đối tượng macho động.Bộ Ghi MachO Động;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 hàm riêng tư AOT tự chủ xuất(kênh, văn bản) {
     // Serial native CLI: borrow the runtime's 208-byte stat scratch region
@@ -139,7 +140,16 @@ hàm riêng tư AOT tự chủ liên kết linux(tạm, kế hoạch, gốc) {
         "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
         "-Wl,-z,noexecstack", đối tượng];
     thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+    nền = đọc biến môi trường("VPP_AOT_LINUX_OBJECT_DIR", "");
     lặp(i = 0; i < độ dài(thành phần); i++) {
+        nếu (nền != "") {
+            phần = đường dẫn nối(nền, thành phần[i] + ".o");
+            nếu (!đường dẫn là tuyệt đối(phần) || !là tệp(phần)) {
+                ném "Native AOT: packaged Linux platform object missing: " + phần;
+            };
+            máy ảo thêm cuối danh sách(liên kết, phần);
+            bỏ qua;
+        };
         phần = đường dẫn nối(tạm, thành phần[i] + ".o");
         biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
             đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S"),
@@ -177,7 +187,7 @@ hàm riêng tư AOT tự chủ liên kết windows(tạm, kế hoạch, gốc) {
     đổi tên tệp(executable, kế hoạch[2]);
 };
 
-hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
+hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba, bộ đệm = rỗng) {
     tạm = biên dịch AOT tạo thư mục tạm(đường dẫn cha(kế hoạch[2]));
     tệp = rỗng;
     obj = rỗng;
@@ -191,17 +201,17 @@ hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
                 ném "Native AOT: direct ARM64 object requires VPP_AOT_NATIVE_MACHO_LINK=1";
             };
             obj = Bộ Ghi MachO Động(đường dẫn nối(tạm, "program.o"));
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, rỗng, obj);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, rỗng, obj, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected object"; };
             bỏ kết quả = obj.hoàn tất();
             obj = rỗng;
         } hoặc nếu (đọc biến môi trường("VPP_AOT_ASM_STREAM", "1") == "0") {
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, rỗng, rỗng, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
             bỏ kết quả = ghi tệp(nguồn, kết quả[1]);
         } hoặc {
             tệp = Bộ Đệm Tệp(nguồn, "ghi", 4096, "ghi ASM");
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, tệp);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, tệp, rỗng, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
             bỏ kết quả = tệp.đóng();
             tệp = rỗng;
@@ -216,6 +226,27 @@ hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba) {
         ném e;
     };
     bỏ kết quả = biên dịch AOT dọn thư mục tạm(tạm);
+    trả về 0;
+};
+
+// Bounded session: reuse only parsed module snapshots, never executables.
+// Stop at the first failure; the caller can build the remaining cases in
+// fresh processes. Every successful entry has its own link and publication.
+hàm riêng tư AOT tự chủ batch xây dựng(args, gốc, bộ ba) {
+    n = độ dài(args);
+    nếu (n < 3 || n > 9 || (n - 1) % 2 != 0) {
+        ném "Native AOT: batch-build requires 1 to 4 source/output pairs";
+    };
+    bộ đệm = rỗng;
+    nếu (đọc biến môi trường("VPP_NATIVE_NO_CACHE", "") != "1") { bộ đệm = {}; };
+    lặp(i = 1; i < n; i += 2) {
+        bắt đầu = thời gian đơn điệu mili giây();
+        kế hoạch = biên dịch phân tích dòng lệnh máy(["build", args[i], "-o", args[i + 1]]);
+        kế hoạch = biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
+        bỏ kết quả = AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba, bộ đệm);
+        trôi = thời gian đơn điệu mili giây() - bắt đầu;
+        nếu (!AOT tự chủ xuất(1, "VPP_BATCH_BUILD " + thành chuỗi(i) + " " + thành chuỗi(trôi) + "\n")) { trả về 1; };
+    };
     trả về 0;
 };
 
@@ -236,6 +267,9 @@ hàm chính() {
         hoặc nếu (hệ == "windows") { bộ ba = "x86_64-pc-windows-msvc"; }
         hoặc nếu (hệ != "macos") { ném "Native AOT: unsupported native host"; };
         bỏ kết quả = biên dịch AOT kiểm tra runtime(hệ);
+        nếu (độ dài(args) > 0 && args[0] == "batch-build") {
+            trả về AOT tự chủ batch xây dựng(args, biên dịch AOT gốc gói(""), bộ ba);
+        };
         kế hoạch = biên dịch phân tích dòng lệnh máy(args);
         lệnh = kế hoạch[0];
         nếu (lệnh == "run" || lệnh == "artifact" || lệnh == "embed" || kế hoạch[3] || kế hoạch[4]) {

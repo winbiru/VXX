@@ -6,6 +6,7 @@ import concurrent.futures
 import contextlib
 import threading
 import json
+import math
 import os
 import platform
 import re
@@ -104,6 +105,79 @@ def execute(command, cwd, env, logs, name, timeout):
 
 def build(compiler, source, binary, cwd, env, logs, timeout):
     return execute([compiler, "build", source, "-o", binary], cwd, env, logs, "build", timeout)
+
+
+def batch_eligible(case):
+    # Only ordinary positive builds with identical compiler environments.
+    # Keep compiler rejection, custom environments and harnesses independent.
+    return case["suite"] == "full" and not any(key in case for key in (
+        "dump", "linker_phase", "vm_phase", "cmake", "compile_reject",
+        "diagnostic", "env", "timezone", "dns_mock"))
+
+
+def build_batch(cases, compiler, directories, logs, env, timeout, group):
+    """Return verified publications and a failure reason, if any."""
+    batch_logs = logs / "batches" / str(group)
+    batch_logs.mkdir(parents=True)
+    batch_env = dict(env, VPP_NATIVE_NO_CACHE="0",
+                     VPP_PREFERENCES_HOME=str(batch_logs / "preferences"))
+    if batch_env.get("VPP_COMPILER_PROFILE_FILE"):
+        batch_env["VPP_COMPILER_PROFILE_FILE"] = str(batch_logs / "compiler.profile")
+    command = [compiler, "batch-build"]
+    for case in cases:
+        command.extend((ROOT / case["source"], directories[case["id"]] / executable_name("program")))
+    failure = ""
+    try:
+        status = execute(command, ROOT, batch_env, batch_logs, "batch", timeout * len(cases))
+        if status:
+            failure = f"batch exit {status}"
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        failure = str(exc)
+        (batch_logs / "batch.error").write_text(failure, encoding="utf-8")
+    completed = {}
+    stdout = batch_logs / "batch.stdout"
+    if stdout.is_file():
+        for line in stdout.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.startswith("VPP_BATCH_BUILD "):
+                continue
+            match = re.fullmatch(r"VPP_BATCH_BUILD (\d+) (\S+)", line)
+            try:
+                index, milliseconds = int(match[1]), float(match[2])
+            except (TypeError, ValueError):
+                failure = failure or "invalid batch completion marker"
+                break
+            if (index != 2 * len(completed) + 1 or index >= 2 * len(cases)
+                    or not math.isfinite(milliseconds) or milliseconds < 0):
+                failure = failure or "invalid batch completion order or duration"
+                break
+            name = cases[(index - 1) // 2]["id"]
+            if not (directories[name] / executable_name("program")).is_file():
+                failure = failure or "batch did not publish executable"
+                break
+            completed[name] = milliseconds / 1000
+    if len(completed) != len(cases):
+        failure = failure or "missing batch completion markers"
+    # A nonzero exit after all publications still fails the final case.
+    if failure and len(completed) == len(cases):
+        completed.pop(cases[-1]["id"])
+    for case in cases:
+        name = case["id"]
+        directory = logs / name
+        directory.mkdir(exist_ok=True)
+        (directory / "build.batch").write_text(f"batches/{group}\n")
+        if name in completed:
+            (directory / "build.seconds").write_text(f"{completed[name]:.2f}\n")
+            (directory / "build.status").write_text("0")
+        else:
+            # Do not run or retry an unverified publication: that could mask
+            # a compiler session failure.
+            (directories[name] / executable_name("program")).unlink(missing_ok=True)
+            (directory / "build.status").write_text("1")
+            for suffix in ("stdout", "stderr", "error"):
+                source = batch_logs / f"batch.{suffix}"
+                if source.is_file():
+                    shutil.copyfile(source, directory / f"build.{suffix}")
+    return completed, failure
 
 
 def prepare_vm(compiler, logs, env, timeout):
@@ -376,7 +450,7 @@ def stop_http(process):
             process.wait()
 
 
-def staged_regression(cases, compiler, logs, env, timeout, jobs, record):
+def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_size=1):
     """Build each fixture once, then execute prepared binaries in parallel.
 
     Compiler/linker/VM harnesses intentionally compile their own inputs as
@@ -424,17 +498,44 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record):
             except errors as exc:
                 return case, False, str(exc), time.monotonic() - start
 
+        def build_group(group, members):
+            if len(members) == 1:
+                return [stage(members[0], "build")]
+            for case in members:
+                print(f"BUILD {case['id']} (batch {group})", flush=True)
+            completed, failure = build_batch(members, compiler, directories, logs, env, timeout, group)
+            results = []
+            for case in members:
+                name = case["id"]
+                if name in completed:
+                    results.append((case, True, "", completed[name]))
+                else:
+                    results.append((case, False, f"{failure}; batch {group}", 0))
+            return results
+
+        groups = []
+        eligible = []
+        for case in cases:
+            if batch_size > 1 and batch_eligible(case) and not any(k in case for k in setup_errors):
+                eligible.append(case)
+                if len(eligible) == batch_size:
+                    groups.append(eligible)
+                    eligible = []
+            else:
+                groups.append([case])
+        if eligible:
+            groups.append(eligible)
         ready = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
             for future in concurrent.futures.as_completed(
-                    [pool.submit(stage, c, "build") for c in cases]):
-                case, needs_run, detail, seconds = future.result()
-                elapsed[case["id"]] = seconds
-                if detail or not needs_run:
-                    record(case, "FAIL" if detail else "PASS", detail, seconds)
-                    shutil.rmtree(directories[case["id"]])
-                else:
-                    ready.append(case)
+                    [pool.submit(build_group, i, group) for i, group in enumerate(groups)]):
+                for case, needs_run, detail, seconds in future.result():
+                    elapsed[case["id"]] = seconds
+                    if detail or not needs_run:
+                        record(case, "FAIL" if detail else "PASS", detail, seconds)
+                        shutil.rmtree(directories[case["id"]])
+                    else:
+                        ready.append(case)
         print(f"BUILD PHASE COMPLETE: {len(ready)} cases ready for execution", flush=True)
         server = None
         try:
@@ -475,6 +576,8 @@ def main():
     parser.add_argument("--shard-count", type=int, default=1)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--jobs", type=int, help="staged build and run with this many concurrent workers")
+    parser.add_argument("--batch-size", type=int, choices=range(1, 5), default=1,
+                        help="experimental full compiler AST reuse, up to four builds per process")
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--logs", type=Path, default=ROOT / "build-pure-vpp/regression-logs")
     args = parser.parse_args()
@@ -502,6 +605,8 @@ def main():
         parser.error("invalid shard or timeout")
     if args.jobs is not None and args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.batch_size > 1 and (args.suite != "full" or args.jobs is None):
+        parser.error("--batch-size requires the full suite and --jobs")
     if args.compiler is None:
         parser.error("--compiler required")
     compiler = args.compiler.resolve()
@@ -546,7 +651,8 @@ def main():
             print_failure_logs(directory)
 
     if args.jobs is not None:
-        staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record)
+        staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
+                          batch_size=args.batch_size)
     else:
         try:
             for case in cases:
