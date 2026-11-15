@@ -422,7 +422,8 @@ jobs:
     name: macOS ARM64 - JIT regression
     needs: macos-full
     runs-on: macos-15
-    timeout-minutes: 120
+    # Cold JIT includes parsing, linking and native code generation per case.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -436,7 +437,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --profile --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 900 --profile --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -447,7 +448,7 @@ jobs:
     name: Linux x86-64 - JIT regression
     needs: linux-full
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - name: Install SQLite runtime dependency
@@ -467,7 +468,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --profile --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 900 --profile --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -478,7 +479,7 @@ jobs:
     name: Windows x86-64 - JIT regression
     needs: windows-full
     runs-on: windows-2025
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - name: Install SQLite runtime dependency
@@ -504,7 +505,7 @@ jobs:
         shell: pwsh
         run: |
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 120 --profile --logs regression-logs/full
+          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 900 --profile --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1818,7 +1818,8 @@
       "id": "kiem_tra_stdlib_http_manual",
       "source": "scripts/test/kiem_tra_stdlib_http_manual.vi",
       "expected": "scripts/test/expected/kiem_tra_stdlib_http_manual.expected",
-      "suite": "full"
+      "suite": "full",
+      "manual": "requires public HTTPS endpoint and working external network/TLS"
     },
     {
       "id": "kiem_tra_stdlib_http_post_put",

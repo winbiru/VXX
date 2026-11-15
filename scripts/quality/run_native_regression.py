@@ -55,6 +55,38 @@ JIT_I32_HARNESSES = {
 JIT_VM_PHASES = {"core", "directory", "system", "process", "resolver", "socket", "socket_negative", "tls"}
 JIT_CASE_KEYS = {"id", "suite", "source", "expected", "stdout", "exit", "smoke", "jit"}
 
+# Reviewed, self-contained programs with no imports or filesystem dependencies.
+# Pin the reviewed source contents so edited fixtures fall back to private copies.
+# Normalize line endings for Windows checkouts.
+FIXTURE_FREE_SOURCES = {
+    "scripts/test/fixtures/anonymous_functions/entry.vi": "f974f9a59d7ce32cf77dacd5ea5de93ea527dfcdfa5bfc23541ce4cb71e962aa",
+    "scripts/test/kiem_tra_bo_qua.vi": "218d0c7d1b5157e1beafc51f77d23a0c980392aaa084c1bc08558d32b53d6ab3",
+    "scripts/test/kiem_tra_boolean.vi": "e6d7898243106c450555a6a77e468ba9722b302f4ee9853809b530c2c36eb091",
+    "scripts/test/kiem_tra_chon_ca.vi": "a2d6119bb2e841c66ff3426a9d572efe82b142f4bb1294460256933767acc93e",
+    "scripts/test/kiem_tra_closure_capture.vi": "7cf4a63b7015f9a28c6a9acc0e273d2cf78ffc503c1d5b7f2b8358639a3ec77c",
+    "scripts/test/kiem_tra_constructor_tham_so.vi": "89b60f1fa693505210472b8ba1ab4d9486aae42ebb1b9e92020ee7d2f1313d4e",
+    "scripts/test/kiem_tra_de_quy.vi": "2d3eac2ae4880898859386192c430ba178ab72c1f49ca076e7edad077c30b299",
+    "scripts/test/kiem_tra_dieu_kien_phu_dinh.vi": "d7b144d944a3480e5bad10821ba3b9e308a64597bf1a4f2c8e3ed2302c5b8474",
+    "scripts/test/kiem_tra_ham.vi": "4e2323e821d89420572d9f4801b5986028f4683ed9148a70eeaa3c7b622c26a0",
+    "scripts/test/kiem_tra_khi.vi": "1c932c5bbcf0c12e4398931f085733ecf421743afe484438a464c561e8e72dff",
+    "scripts/test/kiem_tra_noi_chuoi.vi": "021e3eb52e22480a8a2b164510dfcbe3e791aaecef8b537c3c7d6438cc6890c3",
+    "scripts/test/kiem_tra_so_chan_1-20.vi": "fb666c3b8188da3b332ccf1a3a225cdfda3695a0ef30bde02045c89aec3a6fb9",
+    "scripts/test/kiem_tra_so_nguyen.vi": "3ee00268ab56251ee1c936a6c8de67cde7229617f309574399fe0646b8fee5f6",
+    "scripts/test/kiem_tra_so_thuc.vi": "27e9f6a10d806daebae1c1115762b313ca713ae1e77492b3530d677064952614",
+    "scripts/test/kiem_tra_thoat_vong_lap.vi": "6b53b3989a5ea7c11a9aba2ca60344abc3ff5ea8dd76cd04e5f6d4aa5bc496e9",
+    "scripts/test/kiem_tra_toan_tu_bit.vi": "c5910101002f04846fb80eefa56175af1561f1655eee7d75bf43111d7198a407",
+    "scripts/test/kiem_tra_toan_tu_moi.vi": "2b0d1eb5096349f702ca873a6312677e5219853ffee42182c987e138f52c2460",
+    "scripts/test/kiem_tra_tra_ve.vi": "026f5240ba27e10e58dfe326548dfa872908849c905a92b318fc10adf4faf0b5",
+}
+
+
+def fixture_free(case, source):
+    if case.get("suite") != "full" or set(case) - JIT_CASE_KEYS:
+        return False
+    digest = FIXTURE_FREE_SOURCES.get(case["source"])
+    return digest is not None and hashlib.sha256(
+        source.read_bytes().replace(b"\r\n", b"\n")).hexdigest() == digest
+
 
 def toolchain_reason(case, *, jit_mode=False):
     """Cases whose contract requires a specific compiler or executable."""
@@ -752,7 +784,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
                 return True
         if jit is None and not binary.is_file():
             raise RuntimeError("missing prepared executable")
-        if case["suite"] == "full":
+        if case["suite"] == "full" and not (jit is not None and fixture_free(case, source)):
             # Test programs may write relative paths; do not mutate the checkout.
             shutil.copytree(TESTS, cwd / "scripts/test", ignore=shutil.ignore_patterns(".*"))
             shutil.copytree(ROOT / "gói", cwd / "gói")

@@ -121,7 +121,10 @@ hàm riêng tư biên dịch worker hạ IR(các cây, đã kiểm tra ngữ ngh
 };
 
 hàm riêng tư biên dịch worker số luồng() {
-    cấu hình = đọc biến môi trường("VPP_COMPILER_WORKERS", "2");
+    // Runtime V++/ASM hiện chưa có ABI worker. Hạ IR tuần tự mặc định;
+    // cấu hình worker tường minh vẫn đi qua đường song song và báo lỗi
+    // nếu host không hỗ trợ, không giả lập worker bằng lời gọi đồng bộ.
+    cấu hình = đọc biến môi trường("VPP_COMPILER_WORKERS", "0");
     thử {
         số luồng = thành số nguyên(cấu hình);
         nếu (số luồng < 0 || số luồng > 8) {

@@ -1,8 +1,9 @@
 # Worker V++ trên Native AOT
 
-Worker chạy một hàm V++ trên **OS thread riêng**, với `Program`, call frames,
-runtime heap và tài nguyên file riêng. Chức năng này dùng được khi biên dịch
-bằng compiler V++ tự biên dịch (`--compiler=vpp`).
+Hợp đồng worker V++ yêu cầu chạy một hàm trên **OS thread riêng**, với
+`Program`, call frames, runtime heap và tài nguyên file riêng. Runtime Native
+AOT lịch sử có triển khai này. Runtime thuần V++/ASM hiện chưa có ABI worker
+139–143; ví dụ bên dưới mô tả hợp đồng cần giữ khi triển khai lại.
 
 ```vpp
 nhập gói.lõi.đồng thời.*;
@@ -40,15 +41,15 @@ thread. Mã native hoặc lệnh I/O chặn lâu có thể trì hoãn việc h�
 dừng nhanh, nên bố trí các điểm kiểm tra hoặc thời gian chờ hữu hạn. Khi
 `Program` gốc kết thúc, runtime yêu cầu hủy rồi join tất cả worker còn sống.
 
-Chạy regression riêng:
+Chạy regression trên runtime thuần hiện tại để kiểm tra mức hỗ trợ thực tế:
 
 ```sh
-cmake --build build --target vpp-cli --parallel 2
-ctest --test-dir build -R '^vpp-native-aot-workers$' --output-on-failure
+cmake --build build --target vpp-jit --parallel 2
+python3 scripts/quality/run_native_regression.py --backend jit --jit build/bin/vpp-jit --case kiem_tra_native_worker
 ```
 
-CTest sử dụng fixture `native-cli-compiler` để biên dịch và chạy
-`scripts/test/kiem_tra_native_worker.vi` bằng `--compiler=vpp`.
+Bài kiểm thử `scripts/test/kiem_tra_native_worker.vi` tiếp tục yêu cầu worker
+thật và sẽ báo lỗi nếu runtime chưa hỗ trợ.
 
 ## Worker trong bộ biên dịch V++
 
@@ -57,17 +58,15 @@ AST đã chuẩn hóa kiểu thành IR. Mỗi worker sở hữu bản sao dữ l
 sổ ký hiệu, function ID, StringPool và phát bytecode/liên kết vẫn xử lý
 tuần tự để bảo toàn bytecode khi dùng import lồng nhau.
 
-`VPP_COMPILER_WORKERS` mặc định là `2`; nhận số nguyên `0..8`, trong đó
+`VPP_COMPILER_WORKERS` mặc định là `0`; nhận số nguyên `0..8`, trong đó
 `0` và `1` giữ cách hạ IR tuần tự. Mô-đun đơn luôn đi đường tuần tự.
+Runtime thuần V++/ASM hiện chưa triển khai ABI worker (opcode 139–143),
+nên chỉ bật `2..8` trên host đã hỗ trợ worker thực. Compiler không tự
+chuyển yêu cầu song song tường minh thành chạy đồng bộ.
 Khi worker báo lỗi, compiler hủy và chờ những worker còn lại trước khi
 trả lỗi. Đối với đồ thị lớn, cân nhắc RAM vì worker sao chép dữ liệu AST
 và runtime; tăng worker không đảm bảo cải thiện thời gian biên dịch.
 
-```sh
-VPP_COMPILER_WORKERS=2 build/bin/vpp-cli build --compiler=vpp main.vi -o main.vbc
-ctest --test-dir build -R '^vpp-compiler-workers-parity$' --output-on-failure
-```
-
-Bài kiểm thử parity so sánh artifact khi dùng `0`, `1`, `2`, `4`, `8` worker,
+Khi ABI worker thuần được triển khai, kiểm thử parity cần so sánh artifact khi dùng `0`, `1`, `2`, `4`, `8` worker,
 bao gồm cả trường hợp chỉ có một import, sau đó chạy bytecode sinh từ
 compiler nhiều worker. Giá trị cấu hình sai hoặc ngoài `0..8` phải báo lỗi.

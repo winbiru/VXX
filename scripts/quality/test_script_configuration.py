@@ -16,6 +16,16 @@ ROOT = Path(__file__).resolve().parents[2]
 QUALITY = ROOT / 'scripts/quality'
 
 
+class MachoProbeTimeoutTests(unittest.TestCase):
+    def test_cold_jit_probes_have_compilation_budget(self):
+        spec = importlib.util.spec_from_file_location('macho_layout', QUALITY / 'check_native_macho_layout.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.probe_timeout(['vpp-jit', '--dynamic', 'probe.vi'], 30), 900)
+        self.assertEqual(module.probe_timeout(['vpp-jit', '--dynamic', 'probe.vi'], 1800), 1800)
+        self.assertEqual(module.probe_timeout(Path('probe'), 30), 30)
+
+
 @unittest.skipUnless(os.name == 'posix', 'Bash bootstrap runs on POSIX hosts')
 class RuntimeCacheTests(unittest.TestCase):
     def setUp(self):
@@ -186,6 +196,48 @@ class RegressionShardTests(unittest.TestCase):
                     runner.run_case(case, None, root / str(index), env, 1, jit=Path(sys.executable))
             self.assertNotEqual(*observed)
             self.assertEqual(env['VPP_COMPILER_PROFILE_FILE'], str(root / 'shared.profile'))
+
+    def test_reviewed_sources_skip_copies_and_edits_restore_isolation(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        cases = runner.load_manifest()['cases']
+        case = next(c for c in cases if c['id'] == 'anonymous_functions')
+        for reviewed in runner.FIXTURE_FREE_SOURCES:
+            matching = [c for c in cases if c['source'] == reviewed and runner.fixture_free(c, ROOT / reviewed)]
+            self.assertTrue(matching, f'fixture-free review no longer matches: {reviewed}')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / 'checkout'
+            tests = checkout / 'scripts/test'
+            source = checkout / case['source']
+            expected = checkout / case['expected']
+            source.parent.mkdir(parents=True)
+            expected.parent.mkdir(parents=True)
+            (checkout / 'gói').mkdir()
+            shutil.copyfile(ROOT / case['source'], source)
+            shutil.copyfile(ROOT / case['expected'], expected)
+            observed = []
+            def execute(command, cwd, env, logs, name, timeout):
+                self.assertEqual(command[1:3], ['--dynamic', source])
+                self.assertEqual(Path(env['VPP_PREFERENCES_HOME']), cwd / 'preferences')
+                observed.append(cwd)
+                for relative in ('scripts/test', 'gói', 'fixtures', 'expected'):
+                    self.assertEqual((cwd / relative).is_dir(), len(observed) > 1)
+                if len(observed) > 1:
+                    (cwd / 'scripts/test' / source.relative_to(tests)).write_bytes(b'private edit')
+                    self.assertNotEqual(source.read_bytes(), b'private edit')
+                (logs / 'run.stdout').write_bytes(expected.read_bytes())
+                (logs / 'run.stderr').write_bytes(b'')
+                return 0
+            with mock.patch.object(runner, 'ROOT', checkout), \
+                 mock.patch.object(runner, 'TESTS', tests), \
+                 mock.patch.object(runner, 'execute', side_effect=execute):
+                runner.run_case(case, None, root / 'first', os.environ, 1, jit=Path(sys.executable))
+                source.write_bytes(source.read_bytes() + b'\n// changed\n')
+                runner.run_case(case, None, root / 'second', os.environ, 1, jit=Path(sys.executable))
+            self.assertNotEqual(*observed)
+            self.assertFalse(any(cwd.exists() for cwd in observed))
 
     def test_raw_jit_abi_matches_both_assembly_resolvers(self):
         source = (ROOT / 'gói/biên dịch/JIT.vi').read_text(encoding='utf-8')

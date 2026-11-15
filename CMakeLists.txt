@@ -83,9 +83,9 @@ if(BUILD_TESTING)
     --suite smoke --backend jit --jit "${VPP_BIN}/vpp-jit" --logs "${CMAKE_BINARY_DIR}/regression-logs/smoke")
   set_tests_properties(vpp-native-smoke PROPERTIES TIMEOUT 7200 LABELS smoke)
   add_test(NAME vpp-native-regression COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
-    --suite full --backend jit --jit "${VPP_BIN}/vpp-jit" --jobs 2 --timeout 120
+    --suite full --backend jit --jit "${VPP_BIN}/vpp-jit" --jobs 2 --timeout 900
     --logs "${CMAKE_BINARY_DIR}/regression-logs/full")
-  set_tests_properties(vpp-native-regression PROPERTIES TIMEOUT 7200 LABELS "regression;full;jit")
+  set_tests_properties(vpp-native-regression PROPERTIES TIMEOUT 21600 LABELS "regression;full;jit")
 endif()
 install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)

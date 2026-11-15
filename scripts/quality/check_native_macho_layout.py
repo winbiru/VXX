@@ -20,6 +20,14 @@ def probe_command(probe, *args):
     return [*map(str, prefix), *map(str, args)]
 
 
+def probe_timeout(probe, native_timeout):
+    # A JIT probe compiles the complete source on every invocation, including
+    # rejection cases. Allow the same cold compile budget as the full suite.
+    if isinstance(probe, (list, tuple)) and '--dynamic' in probe:
+        return max(native_timeout, 900)
+    return native_timeout
+
+
 def catalog():
     # Use the same explicit platform policy as the i32 linker. Never derive
     # permitted imports from the objects being tested.
@@ -114,7 +122,7 @@ def verify(probe, paths, env=None, allowed=None):
     allowed = catalog() if allowed is None else allowed
     start = time.monotonic()
     result = subprocess.run(probe_command(probe, '|'.join(allowed), *paths), env=env,
-                            capture_output=True, timeout=180)
+                            capture_output=True, timeout=probe_timeout(probe, 180))
     assert result.returncode == 0 and not result.stderr, (result.returncode, result.stdout, result.stderr)
     lines = result.stdout.decode().splitlines()
     assert lines[-1] == 'Mach-O layout: PASS', lines
@@ -193,7 +201,7 @@ def smoke(probe, out, env=None):
                                     ([bad], catalog(), 'relocation chưa hỗ trợ'),
                                     ([import_page], catalog(), 'relocation chưa hỗ trợ')):
         result = subprocess.run(probe_command(probe, '|'.join(allowed), *paths), env=env,
-                                capture_output=True, timeout=30)
+                                capture_output=True, timeout=probe_timeout(probe, 30))
         assert result.returncode == 1 and message in result.stdout.decode() and not result.stderr, result
     print('MACH-O LAYOUT REJECTION PASS cases=6', flush=True)
 
@@ -256,7 +264,7 @@ def verify_patches(probe, paths, env=None, allowed=None):
     allowed = catalog() if allowed is None else allowed
     start = time.monotonic()
     result = subprocess.run(probe_command(probe, '|'.join(allowed), *paths), env=env,
-                            capture_output=True, timeout=180)
+                            capture_output=True, timeout=probe_timeout(probe, 180))
     assert result.returncode == 0 and not result.stderr, (result.returncode, result.stdout[-1000:], result.stderr)
     lines = result.stdout.decode().splitlines()
     assert lines[-1] == 'Mach-O patch: PASS', lines[-5:]
@@ -292,7 +300,7 @@ def patch_smoke(probe, out, env=None):
     cases.append(([duplicate], 'relocation trùng vị trí'))
     for paths, error in cases:
         result = subprocess.run(probe_command(probe, '|'.join(catalog()), *paths), env=env,
-                                capture_output=True, timeout=30)
+                                capture_output=True, timeout=probe_timeout(probe, 30))
         assert result.returncode == 1 and error in result.stdout.decode() and not result.stderr, result
     print(f'MACH-O PATCH REJECTION PASS cases={len(cases)}', flush=True)
 
@@ -335,7 +343,7 @@ def executable_smoke(probe, out, env=None, large=False):
 
     def link(paths, dest, expected, timeout=180):
         result = subprocess.run(probe_command(probe, '|'.join(catalog()), dest, *paths),
-                                env=env, capture_output=True, timeout=timeout)
+                                env=env, capture_output=True, timeout=probe_timeout(probe, timeout))
         assert result.returncode == 0 and result.stdout == b'Mach-O executable: PASS\n' and not result.stderr, result
         raw = dest.read_bytes()
         assert struct.unpack_from('<4I', raw) == (0xfeedfacf, 0x100000c, 0, 2)

@@ -357,6 +357,29 @@ hàm chính() {
     bắt lỗi(e) { có_lỗi = đúng; };
     nếu (!có_lỗi) { ném "AArch64 Machine IR không chặn underflow"; };
 
+    // Every binary opcode has the same stack transfer. Verify both normal
+    // execution and rejection of unreachable underflow in the shared CFG.
+    các toán tử = ["Add", "Sub", "Mul", "Div", "Mod", "Equal", "NotEqual",
+        "Less", "LessEqual", "Greater", "GreaterEqual", "BitAnd", "BitOr",
+        "BitXor", "ShiftLeft", "ShiftRight"];
+    lặp (i = 0; i < độ dài(các toán tử); i++) {
+        toán tử = các toán tử[i];
+        lệnh = [biên dịch mã máy lệnh("PushConstant", 1),
+                biên dịch mã máy lệnh("PushConstant", 2, 0, 1),
+                biên dịch mã máy lệnh(toán tử, 0, 0, 2),
+                biên dịch mã máy lệnh("Return", 0, 0, 1)];
+        bỏ kết quả = biên dịch mã máy kiểm tra CFG({"parameterCount": 0,
+            "slotCount": 0, "maxStackDepth": 2, "instructions": lệnh});
+        lệnh = [biên dịch mã máy lệnh("PushConstant", 1),
+                biên dịch mã máy lệnh("Return", 0, 0, 1),
+                biên dịch mã máy lệnh(toán tử, 0, 0, 1)];
+        có_lỗi = sai;
+        thử { bỏ kết quả = biên dịch mã máy kiểm tra CFG({"parameterCount": 0,
+            "slotCount": 0, "maxStackDepth": 2, "instructions": lệnh}); }
+        bắt lỗi(e) { có_lỗi = e == "machine IR binary stack underflow"; };
+        nếu (!có_lỗi) { ném "Machine IR không chặn binary underflow: " + toán tử; };
+    };
+
     lệnh = [biên dịch mã máy lệnh("Call", 0, 0, 0)];
     có_lỗi = sai;
     thử { biên dịch mã máy hàm("aarch64", {"parameterCount": 0, "slotCount": 0,
