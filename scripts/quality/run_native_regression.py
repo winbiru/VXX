@@ -598,11 +598,19 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
+    if env.get("VPP_COMPILER_PROFILE_FILE"):
+        env["VPP_COMPILER_PROFILE_FILE"] = str(logs / "compiler.profile")
     if "timezone" in case:
         env["TZ"] = case["timezone"]
     with (tempfile.TemporaryDirectory(prefix="vpp-regression-") if work is None
           else contextlib.nullcontext(work)) as work:
         cwd = Path(work)
+        if case.get("hosts_fixture"):
+            hosts = cwd / "socket.hosts"
+            hosts.write_text("203.0.113.21 fixture.test alias.test\n::1 fixture.test\n"
+                             "0:0:0:0:0:0:0:1 fixture.test\n999.1.1.1 fixture.test\n", encoding="ascii")
+            env.update(VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_SOCKET_VI_ONLY="0",
+                       VPP_DNS_VI_SERVER="", VPP_DNS_VI_SERVERS="", VPP_DNS_VI_RESOLV_CONF="")
         env["VPP_PREFERENCES_HOME"] = str(cwd / "preferences")
         binary = prepared_binary if prepared_binary is not None else cwd / executable_name("program")
         if case.get("tooling_test"):
@@ -752,7 +760,8 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
         if case.get("dns_mock"):
             if jit is not None:
                 run_dns_mock([jit, "--dynamic", source], cwd, env, logs,
-                             server=[jit, "--raw-program", TESTS / "fixtures/native_dns_mock.vi"])
+                             server=[jit, "--raw-program", TESTS / "fixtures/native_dns_mock.vi"],
+                             timeout=timeout)
             else:
                 run_dns_mock(binary, cwd, env, logs)
             return
@@ -801,19 +810,25 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             raise RuntimeError("stdout differs from golden")
 
 
-def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, timeout=30):
+def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, timeout=30, batch_client=None):
     # Keep the actual V++ server and client on every OS; Python only manages
     # their lifetime and checks the protocol between the test processes.
+    gated = image is None and isinstance(client, list) and "--dynamic" in client
+    ready_file = logs / "client.ready"
+    ready_file.unlink(missing_ok=True)
     config = logs / "config"
-    config.write_bytes(f"{mode}\n{queries}\n".encode("ascii"))
+    config.write_bytes(f"{mode}\n{-queries if gated else queries}\n".encode("ascii"))
     hosts = logs / "empty-hosts"
     hosts.touch()
     server_out = logs / "server.out"
     deadline = time.monotonic() + timeout
     with config.open("rb") as inp, server_out.open("wb") as out, (logs / "server.err").open("wb") as err:
         worker = subprocess.Popen([str(x) for x in server] if isinstance(server, list) else [str(server)], cwd=cwd, env={**env, "PATH": ""},
-                                  stdin=inp, stdout=out, stderr=err)
+                                  stdin=subprocess.PIPE if gated else inp, stdout=out, stderr=err)
         try:
+            if gated:
+                worker.stdin.write(config.read_bytes())
+                worker.stdin.flush()
             while True:
                 data = server_out.read_bytes()
                 if b"\n" in data:
@@ -831,8 +846,29 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, time
                               VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
             if image is not None:
                 client_env["PATH"] = ""
-            status = execute((client if isinstance(client, list) else [client]) if image is None else [client, image], cwd, client_env,
-                             logs, "client", max(0.1, deadline - time.monotonic()))
+            command = (client if isinstance(client, list) else [client]) if image is None else [client, image]
+            if batch_client is not None:
+                worker.stdin.write(b"1\n")
+                worker.stdin.flush()
+                status = batch_client(mode, int(port), logs, deadline)
+            elif gated:
+                client_env["VPP_DNS_MOCK_READY"] = str(ready_file)
+                # Compilation remains bounded by the original harness deadline.
+                # The fixture's five-second receive timer starts only when the
+                # actual guest is ready. UDP can queue while the gate is released.
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    task = pool.submit(execute, command, cwd, client_env, logs, "client",
+                                       max(0.1, deadline - time.monotonic()))
+                    while not ready_file.exists() and not task.done() and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    if ready_file.exists():
+                        worker.stdin.write(b"1\n")
+                        worker.stdin.flush()
+                    status = task.result()
+                    if not ready_file.exists() and status == 0:
+                        raise RuntimeError("DNS client did not enter guest code")
+            else:
+                status = execute(command, cwd, client_env, logs, "client", max(0.1, deadline - time.monotonic()))
             if image is not None and mode >= 10:
                 if status == 0 or b"error=16" not in (logs / "client.stderr").read_bytes():
                     raise RuntimeError(f"VM accepted malformed DNS or returned wrong diagnostic: {status}")
@@ -848,6 +884,8 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, time
             if worker.poll() is None:
                 worker.kill()
             worker.wait()
+            if worker.stdin is not None:
+                worker.stdin.close()
 
 
 def prepare_dns_mock(compiler, cwd, env, logs, timeout):
@@ -867,11 +905,94 @@ def prepare_dns_mock(compiler, cwd, env, logs, timeout):
         raise RuntimeError("missing DNS server executable")
 
 
+@contextlib.contextmanager
+def dns_batch_client(client, cwd, env, logs, deadline):
+    """Compile the explicit-port DNS cases once, then send one mode at a time."""
+    batch_logs = logs / "client-batch"
+    batch_logs.mkdir(exist_ok=True)
+    hosts = batch_logs / "empty-hosts"
+    hosts.touch()
+    client_env = dict(env, VPP_DNS_MOCK_BATCH="1", VPP_DNS_MOCK_READY="",
+                      VPP_DNS_VI_SERVER="127.0.0.1", VPP_DNS_VI_SERVERS="",
+                      VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
+    command, client_env = fixture_process(client, client_env)
+    stdout = batch_logs / "client.stdout"
+    stderr = batch_logs / "client.stderr"
+    with stdout.open("wb") as out, stderr.open("wb") as err, stdout.open("rb") as response:
+        process = subprocess.Popen(command, cwd=cwd, env=client_env, stdin=subprocess.PIPE,
+                                   stdout=out, stderr=err, start_new_session=(os.name != "nt"))
+
+        def read_line(until):
+            while True:
+                offset = response.tell()
+                line = response.readline()
+                if line.endswith(b"\n"):
+                    return normalize(line)
+                response.seek(offset)
+                if process.poll() is not None:
+                    raise RuntimeError(f"DNS batch guest exited {process.returncode}: {stderr.read_bytes()[-4096:]!r}; stdout={line!r}")
+                if time.monotonic() >= until:
+                    raise RuntimeError("DNS batch guest timed out")
+                time.sleep(0.01)
+
+        def run_mode(mode, port, mode_logs, until):
+            start = time.monotonic()
+            process.stdin.write(f"{mode}\n{port}\n".encode("ascii"))
+            process.stdin.flush()
+            line = read_line(min(until, deadline))
+            (mode_logs / "client.stdout").write_bytes(line)
+            (mode_logs / "client.seconds").write_text(f"{time.monotonic() - start:.2f}")
+            if line != b"VPP DNS MOCK OK\n":
+                raise RuntimeError(f"DNS batch mode {mode}: unexpected output {line!r}")
+            return 0
+
+        try:
+            if read_line(deadline) != b"VPP DNS MOCK READY\n":
+                raise RuntimeError("DNS batch guest failed to enter main")
+            yield run_mode
+            process.stdin.write(b"-1\n")
+            process.stdin.flush()
+            if process.wait(timeout=max(0.1, deadline - time.monotonic())):
+                raise RuntimeError(f"DNS batch guest exit {process.returncode}")
+            if response.read() or stderr.read_bytes():
+                raise RuntimeError("DNS batch guest produced unexpected trailing output")
+        finally:
+            if process.poll() is None:
+                if os.name == "nt":
+                    process.kill()
+                else:
+                    os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+            process.stdin.close()
+
+
 def run_dns_mock(client, cwd, env, logs, server=None, timeout=30):
     if server is None:
         server = cwd / executable_name("dns-server")
+    modes = (0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 30, 31, 32, 33, 34, 35, 36, 37)
+    if isinstance(client, list) and "--dynamic" in client:
+        deadline = time.monotonic() + timeout
+        with dns_batch_client(client, cwd, env, logs, deadline) as run_mode:
+            for mode in modes:
+                if mode == 3:
+                    continue
+                queries = 2 if mode in (0, 1, 20, 21) else 1
+                mode_logs = logs / f"mode-{mode}"
+                mode_logs.mkdir(exist_ok=True)
+                try:
+                    run_dns_mode(server, client, cwd, env, mode_logs, mode, queries,
+                                 timeout=min(30, max(0.1, deadline - time.monotonic())), batch_client=run_mode)
+                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                    raise RuntimeError(f"DNS mock mode {mode}: {exc}") from exc
+        # The environment-based resolver has its own fresh guest, preserving
+        # the original test of VPP_DNS_VI_PORT and the hosts-file override.
+        mode_logs = logs / "mode-3"
+        mode_logs.mkdir(exist_ok=True)
+        run_dns_mode(server, client, cwd, env, mode_logs, 3, 2,
+                     timeout=max(0.1, deadline - time.monotonic()))
+        return
     failures = []
-    for mode in (0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 30, 31, 32, 33, 34, 35, 36, 37):
+    for mode in modes:
         queries = 2 if mode in (0, 1, 3, 20, 21) else 1
         mode_logs = logs / f"mode-{mode}"
         mode_logs.mkdir(exist_ok=True)
@@ -1282,6 +1403,8 @@ def main():
     parser.add_argument("--case", action="append")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--inventory", action="store_true")
+    parser.add_argument("--include-manual", action="store_true", help="include tests requiring public network/services; --case also opts in")
+    parser.add_argument("--profile", action="store_true", help="save a separate compiler.profile for each case")
     parser.add_argument("--shard-count", type=int, default=1)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--jobs", type=int, help="number of concurrent regression workers")
@@ -1324,6 +1447,8 @@ def main():
             label = (" [PENDING: " + c["pending"] + "]" if "pending" in c else "")
             if c.get("platforms"):
                 label += " [" + ", ".join(c["platforms"]) + "]"
+            if c.get("manual"):
+                label += " [MANUAL: " + c["manual"] + "]"
             print(c["id"] + label)
         return 0
     if args.inventory:
@@ -1372,12 +1497,14 @@ def main():
     quiet_platform_skips = host in ("Linux", "Windows")
     pending = [c for c in cases if "pending" in c]
     unsupported = [c for c in cases if "pending" not in c and c.get("platforms") and host not in c["platforms"]]
+    manual = [c for c in cases if c.get("manual") and c not in pending and c not in unsupported
+              and not (args.include_manual or args.case)]
     if not quiet_platform_skips:
         for c in unsupported:
             print(f"UNSUPPORTED {c['id']} on {host}", flush=True)
     if not cases:
         parser.error("no cases in selection")
-    cases = [c for c in cases if c not in pending and c not in unsupported]
+    cases = [c for c in cases if c not in pending and c not in unsupported and c not in manual]
     artifacts = args.artifacts.resolve() if args.artifacts is not None else None
     plan = None
     if args.phase == "build":
@@ -1392,6 +1519,12 @@ def main():
         except (OSError, ValueError, KeyError) as exc:
             parser.error(f"invalid test artifact: {exc}")
     env = dict(os.environ)
+    # SQLite is a runtime dependency of the database driver, not a compiler.
+    # Resolve it before JIT isolation strips PATH; retain the compiler guards.
+    if not env.get("VPP_SQLITE3"):
+        sqlite = shutil.which("sqlite3", path=env.get("PATH"))
+        if sqlite:
+            env["VPP_SQLITE3"] = str(Path(sqlite).resolve())
     installed = (jit if args.backend == "jit" else compiler).parent.parent / "share/vpp"
     env.setdefault("VPP_HOME", str(installed if (installed / "gói").is_dir() else ROOT))
     env.update(VPP_NATIVE_NO_CACHE="1", VPP_FFI_ENV_TEST="vpp-env-ffi-ok", VPP_FFI_ENV_EMPTY_TEST="")
@@ -1401,6 +1534,8 @@ def main():
     logs = args.logs.resolve()
     logs.mkdir(parents=True, exist_ok=True)
     logs = Path(tempfile.mkdtemp(prefix="run-", dir=logs))
+    if args.profile:
+        env["VPP_COMPILER_PROFILE_FILE"] = str(logs / "compiler.profile")
     server = None
     http_error = None
     vm = None
@@ -1409,6 +1544,9 @@ def main():
     # Preserve platform exclusions in the machine-readable report, even when
     # they are omitted from the Linux/Windows console output.
     results += [{"id": c["id"], "status": "UNSUPPORTED", "detail": host, "seconds": 0} for c in unsupported]
+    results += [{"id": c["id"], "status": "MANUAL", "detail": c["manual"], "seconds": 0} for c in manual]
+    for c in manual:
+        print(f"MANUAL {c['id']}: {c['manual']} (--include-manual or --case to run)", flush=True)
     for c in pending:
         print(f"PENDING {c['id']}: {c['pending']}", flush=True)
     results_path = logs / "results.json"
@@ -1491,6 +1629,8 @@ def main():
     failed = sum(c["status"] == "FAIL" for c in results)
     passed = sum(c["status"] == "PASS" for c in results)
     summary = f"{passed} passed, {failed} failed, {len(pending)} pending"
+    if manual:
+        summary += f", {len(manual)} manual (not run)"
     if args.phase == "build":
         summary = f"{len(plan['ready'])} built, {len(plan['jit_cases'])} JIT ready, {passed} build checks passed, {failed} failed, {len(pending)} pending"
     if not quiet_platform_skips:

@@ -5,6 +5,7 @@ nhập gói.biên dịch.dòng lệnh VM.biên dịch dòng lệnh VM;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
 
 hàm riêng tư jit đối số(i) {
@@ -41,7 +42,8 @@ hàm chính() {
             nếu (đầu + 2 > đối số đếm()) { ném "V++ JIT: --dynamic cần tệp nguồn"; };
             gốc = đọc biến môi trường("VPP_HOME", "");
             nếu (gốc == "") { ném "V++ JIT: cần VPP_HOME"; };
-            nguồn = jit đối số(đầu + 1);
+            nguồn = đường dẫn tuyệt đối(jit đối số(đầu + 1));
+            gốc = đường dẫn tuyệt đối(gốc);
             nếu (tệp == "--check-dynamic") {
                 nếu (đầu + 2 != đối số đếm()) { ném "V++ JIT: --check-dynamic cần đúng một tệp nguồn"; };
                 văn bản = đọc tệp(nguồn);

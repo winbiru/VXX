@@ -1755,6 +1755,7 @@
       "id": "kiem_tra_socket_hosts",
       "source": "scripts/test/kiem_tra_socket_hosts.vi",
       "expected": "scripts/test/expected/kiem_tra_socket_hosts.expected",
+      "hosts_fixture": true,
       "suite": "full"
     },
     {

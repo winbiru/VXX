@@ -54,6 +54,11 @@ Ljit_find:
     b.ne Ljit_find
     b Ljit_invalid
 Ljit_found:
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    ldr w9, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    ldr w10, [x22, #28]
+    cmp w9, w10
+    b.ne Ljit_invalid
     cmp w20, #0
     b.le Ljit_invalid
     cmp w19, #3
@@ -261,6 +266,9 @@ Ljit_allocate:
     str w0, [x22, #16]
     str w19, [x22, #20]
     str w23, [x22, #24]
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    ldr w9, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    str w9, [x22, #28]
     b Ljit_done
 1:  mov w26, #0
 Ljit_copy:
@@ -317,6 +325,9 @@ Ljit_image_relocated:
     str w0, [x22, #16]
     str w19, [x22, #20]
     str wzr, [x22, #24]
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    ldr w9, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    str w9, [x22, #28]
     b Ljit_done
 Ljit_rollback:
     mov x0, x24
@@ -451,6 +462,7 @@ Ljit_release:
     str wzr, [x22, #16]
     str wzr, [x22, #20]
     str wzr, [x22, #24]
+    str wzr, [x22, #28]
     b Ljit_done
 Ljit_address:
     mov w0, w21
@@ -948,5 +960,41 @@ Ljit_image_found:
     ldr x0, [x9]
     ldr w1, [x9, #8]
     ret
+// Dynamic guest owns only mappings allocated during its run. Release them
+// before restoring the compiler arena; parent handles are never accessible.
+.globl _vpp_native_jit_guest_begin
+_vpp_native_jit_guest_begin:
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    adrp x10, _vpp_jit_next@PAGE
+    ldr w10, [x10, _vpp_jit_next@PAGEOFF]
+    add w10, w10, #1
+    str w10, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    ret
+.globl _vpp_native_jit_guest_end
+_vpp_native_jit_guest_end:
+    stp x19, x20, [sp, #-32]!
+    str x30, [sp, #16]
+    adrp x19, _vpp_jit_slots@PAGE
+    add x19, x19, _vpp_jit_slots@PAGEOFF
+    mov w20, #64
+Ljit_guest_cleanup:
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    ldr w9, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    ldr w10, [x19, #28]
+    cmp w9, w10
+    b.ne 1f
+    mov w0, #3
+    ldr w1, [x19, #16]
+    mov w2, #0
+    bl _vpp_native_jit_service
+1:  add x19, x19, #32
+    subs w20, w20, #1
+    b.ne Ljit_guest_cleanup
+    adrp x9, _vpp_jit_guest_scope@PAGE
+    str wzr, [x9, _vpp_jit_guest_scope@PAGEOFF]
+    ldr x30, [sp, #16]
+    ldp x19, x20, [sp], #32
+    ret
+.zerofill __DATA,__bss,_vpp_jit_guest_scope,4,2
 .zerofill __DATA,__bss,_vpp_jit_slots,2048,3
 .zerofill __DATA,__bss,_vpp_jit_next,4,2

@@ -325,6 +325,33 @@ lớp công khai Bộ Liên Kết Bytecode {
             biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai)));
     };
 
+    // Phát mã trung gian đầy đủ trước khi bỏ khai báo không dùng trong JIT.
+    // Bộ phát mã còn phân giải lời gọi và kiểm tra đối số; kiểm tra AST
+    // đơn thuần không phát hiện được mọi lỗi trong thân hàm bị loại.
+    hàm riêng tư biên dịch liên kết xác thực JIT(sổ, đồ thị, bộ kiểu) {
+        cạnh theo nguồn = {};
+        các cạnh = đồ thị["cạnh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các cạnh); i++) {
+            nguồn cạnh = các cạnh[i]["nguồn"];
+            nếu (!máy ảo có khóa từ điển(cạnh theo nguồn, nguồn cạnh)) {
+                cạnh theo nguồn[nguồn cạnh] = [];
+            };
+            máy ảo thêm cuối danh sách(cạnh theo nguồn[nguồn cạnh], i);
+        };
+        phiên = {"đa mô đun": đúng, "cạnh dùng": {},
+                 "cạnh theo nguồn": cạnh theo nguồn,
+                 "đã phát": [], "đã phát theo tên": {},
+                 "id tối đa": -1, "ngoại": [], "ngữ nghĩa đã kiểm tra": sai};
+        tên gốc = đồ thị["điểm vào"];
+        cây gốc = bộ kiểu.cây hạ IR(tên gốc, sai);
+        biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng, sai);
+        biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian gốc, sổ,
+            biên dịch sổ tìm mô đun(sổ, tên gốc), đồ thị, phiên);
+        nếu (máy ảo lấy độ dài(phiên["đã phát"]) != máy ảo lấy độ dài(đồ thị["thứ tự khởi tạo"])) {
+            ném "biên dịch liên kết: xác thực JIT thiếu mô đun";
+        };
+    };
+
     // Linker nhiều mô-đun: mỗi initializer có bytecode và slot riêng, còn
     // StringPool và function ID là duy nhất trong toàn phiên. Không nối trực
     // tiếp các initializer vì jump/slot đều là offset cục bộ của emitter.
@@ -349,13 +376,24 @@ lớp công khai Bộ Liên Kết Bytecode {
         };
         biên dịch hồ sơ ghi(đường hồ sơ, "link.types", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-        đã kiểm tra ngữ nghĩa = biên dịch lọc nhập chọn lọc(sổ, đồ thị);
+        xác thực JIT = lấy từ điển(đồ thị, "lọc nhập rộng", sai);
+        nếu (xác thực JIT) {
+            mình.biên dịch liên kết xác thực JIT(sổ, đồ thị, bộ kiểu);
+            // Emitter thay đổi ID closure, tên runtime và StringPool.
+            // Dùng sổ mới để tính closure trên các khai báo ban đầu.
+            sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+            bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
+            bộ kiểu.đăng ký();
+            biên dịch hồ sơ ghi(đường hồ sơ, "link.validate_full", bắt đầu);
+            bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        };
+        đã kiểm tra ngữ nghĩa = biên dịch lọc nhập chọn lọc(sổ, đồ thị, xác thực JIT);
         nếu (đã kiểm tra ngữ nghĩa) {
             // Reassign contiguous IDs only after computing the dependency
             // closure; omitted declarations never reach IR or serialization.
             sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
             bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
-            bộ kiểu.đăng ký();
+            bộ kiểu.đăng ký(lấy từ điển(đồ thị, "lọc nhập rộng", sai));
         };
         // Chế độ đối chiếu để đo A/B và truy vết lỗi semantic sau khi lọc.
         // Mặc định tận dụng lần kiểm tra đầy đủ ở trên trong cùng phiên.

@@ -7,6 +7,7 @@ nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.văn bản.chuỗi.*;
 nhập gói.hệ thống.tiến trình.chạy tiến trình;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
@@ -202,6 +203,7 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
         nếu (bộ máy == "sqlite") {
             chương trình = "sqlite3";
             nếu (tên nền tảng() == "windows") { chương trình = "sqlite3.exe"; };
+            chương trình = đọc biến môi trường("VPP_SQLITE3", chương trình);
             trả về {"ok": đúng, "chương trình": chương trình,
                 "đối số": [lấy từ điển(cấu hình, "path", ""), sql],
                 "môi trường": {}, "dự phòng": "", "lỗi mở": "cannot-open-sqlite-process"};

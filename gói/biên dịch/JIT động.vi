@@ -171,8 +171,17 @@ lớp công khai Bộ Ghi Ảnh JIT {
         khi (mình.dài() % 4 != 0) { bỏ kết quả = mình.ghi byte(0); };
         bỏ kết quả = mình.định nghĩa("_" + tên);
         bắt đầu = mình.dài();
+        từ máy = lấy từ điển(phát, "wordChunks", rỗng);
         khối = lấy từ điển(phát, "chunks", rỗng);
-        nếu (khối == rỗng) { bỏ kết quả = mình.ghi dãy(phát["bytes"]); }
+        nếu (từ máy != rỗng) {
+            ảnh cần(mình.hệ == 1, "wordChunks cần ARM64");
+            lặp(i = 0; i < máy ảo lấy độ dài(từ máy); i++) {
+                trang = từ máy[i];
+                lặp(j = 0; j < máy ảo lấy độ dài(trang); j++) { bỏ kết quả = mình.ghi word(trang[j]); };
+            };
+            ảnh cần(mình.dài() - bắt đầu == phát["size"], "kích thước wordChunks sai");
+        }
+        hoặc nếu (khối == rỗng) { bỏ kết quả = mình.ghi dãy(phát["bytes"]); }
         hoặc {
             lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) {
                 bỏ kết quả = mình.ghi dãy(khối[i]);
@@ -307,9 +316,9 @@ hàm riêng tư jit động từ dây(dây) {
 };
 hàm công khai jit động tệp(đường, thư viện) {
     ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
-    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn tệp tự chủ(đường, thư viện, 0)));
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn tệp tự chủ(đường, thư viện, 0, rỗng, đúng)));
 };
 hàm công khai jit động nguồn(nguồn, gốc, thư viện) {
     ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
-    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn nhúng tự chủ(nguồn, gốc, thư viện, 0)));
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn nhúng tự chủ(nguồn, gốc, thư viện, 0, đúng)));
 };

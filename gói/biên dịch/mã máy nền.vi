@@ -45,15 +45,15 @@ lớp công khai Tiện Ích Mã Máy {
         b2 = (từ máy >> 16) & 255;
         b3 = (từ máy >> 24) & 255;
         nếu (ít trước) {
-            máy ảo thêm cuối danh sách(ra, b0);
-            máy ảo thêm cuối danh sách(ra, b1);
-            máy ảo thêm cuối danh sách(ra, b2);
-            máy ảo thêm cuối danh sách(ra, b3);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
         } hoặc {
-            máy ảo thêm cuối danh sách(ra, b3);
-            máy ảo thêm cuối danh sách(ra, b2);
-            máy ảo thêm cuối danh sách(ra, b1);
-            máy ảo thêm cuối danh sách(ra, b0);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
         };
         trả về ra;
     };
@@ -243,15 +243,15 @@ hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trướ
     b2 = (từ máy >> 16) & 255;
     b3 = (từ máy >> 24) & 255;
     nếu (ít trước) {
-        máy ảo thêm cuối danh sách(ra, b0);
-        máy ảo thêm cuối danh sách(ra, b1);
-        máy ảo thêm cuối danh sách(ra, b2);
-        máy ảo thêm cuối danh sách(ra, b3);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
     } hoặc {
-        máy ảo thêm cuối danh sách(ra, b3);
-        máy ảo thêm cuối danh sách(ra, b2);
-        máy ảo thêm cuối danh sách(ra, b1);
-        máy ảo thêm cuối danh sách(ra, b0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
     };
     trả về ra;
 };

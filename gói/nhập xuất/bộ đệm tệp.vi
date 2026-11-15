@@ -218,6 +218,9 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
 
     hàm công khai dịch(lệch, mốc = 0) {
         bỏ kết quả = mình.yêu cầu mở();
+        nếu (loại của(lệch) != "số nguyên") {
+            ném "luồng tệp: độ lệch phải là số nguyên i32";
+        };
         nếu (loại của(mốc) != "số nguyên" || mốc < 0 || mốc > 2) {
             ném "luồng tệp: gốc phải là 0, 1 hoặc 2";
         };

@@ -427,6 +427,8 @@ Laot_thong_tin_bien_dich:
     ret
 Laot_thong_tin_bang:
     tbnz w1, #31, Laot_thong_tin_sai
+    cmp w0, #40
+    b.hs Laot_thong_tin_ffi
     cmp w0, #11
     b.hi Laot_thong_tin_ham
     cmp w0, #10
@@ -473,6 +475,54 @@ Laot_thong_tin_ham_i32:
     add x10, x10, x1, lsl #4
     add x10, x10, #8
     ldr w0, [x10, x0, lsl #2]
+    ret
+// Foreign descriptor: id/result, four C strings, parameter/extent arrays.
+Laot_thong_tin_ffi:
+    cmp w0, #47
+    b.hi Laot_thong_tin_sai
+    ldr x10, [x9, #64]
+    cmp x1, x10
+    b.hs Laot_thong_tin_sai
+    ldr x10, [x9, #72]
+    mov x11, #72
+    madd x10, x1, x11, x10
+    cmp w0, #44
+    b.hs Laot_thong_tin_ffi_signature
+    sub w0, w0, #40
+    add x10, x10, #8
+    ldr x10, [x10, x0, lsl #3]
+    cmp w2, #127
+    b.hi Laot_thong_tin_sai
+    cbz x10, Laot_thong_tin_sai
+    mov w11, #0
+Laot_thong_tin_ffi_byte:
+    ldrb w0, [x10, x11]
+    cmp w11, w2
+    b.eq Laot_thong_tin_ffi_return
+    cbz w0, Laot_thong_tin_sai
+    add w11, w11, #1
+    b Laot_thong_tin_ffi_byte
+Laot_thong_tin_ffi_signature:
+    cmp w0, #44
+    b.eq Laot_thong_tin_ffi_result
+    cmp w0, #45
+    b.eq Laot_thong_tin_ffi_params
+    cmp w0, #46
+    b.eq Laot_thong_tin_ffi_extents
+    ldr w0, [x10]
+    ret
+Laot_thong_tin_ffi_result:
+    ldr w0, [x10, #4]
+    ret
+Laot_thong_tin_ffi_params:
+    ldr x0, [x10, #40]
+    b Laot_thong_tin_ffi_count
+Laot_thong_tin_ffi_extents:
+    ldr x0, [x10, #56]
+Laot_thong_tin_ffi_count:
+    cmp x0, #0
+    cset w0, ne
+Laot_thong_tin_ffi_return:
     ret
 Laot_thong_tin_sai:
     mov w0, #-1
@@ -761,8 +811,10 @@ Ljit_dynamic_run:
     mov x21, x0
     bl _vpp_native_memory_base
     cbz x0, Ljit_dynamic_run_alloc_bad
+    bl _vpp_native_jit_guest_begin
     bl _main
     mov w22, w0
+    bl _vpp_native_jit_guest_end
     b Ljit_dynamic_run_restore
 Ljit_dynamic_run_alloc_bad:
     mov w22, #-2

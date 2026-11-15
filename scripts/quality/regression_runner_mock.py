@@ -25,7 +25,7 @@ def main():
     def publish(destination, label):
         # Preserve the executable-copy protocol, including CMake failures.
         subprocess.run([os.environ['VPP_TEST_CMAKE'], '-E', 'copy', str(logical_self), destination], check=True)
-        Path(destination + '.label').write_text(label)
+        Path(destination + '.label').write_text(label, encoding='utf-8')
 
     name = logical_self.stem
     if name == 'server':
@@ -80,7 +80,7 @@ def main():
                 (source.name == 'http_fixture.vi' and mode == 'http-fail')):
             return 1
         if source.name == 'suite.vi':
-            assert 'ca2.kiểm thử()' in source.read_text()
+            assert 'ca2.kiểm thử()' in source.read_text(encoding='utf-8')
             assert (source.parent / 'case2.vi').is_file()
             if mode == 'module-fail':
                 print('module diagnostic')
@@ -88,7 +88,7 @@ def main():
         publish(destination, source.name)
         return 0
     else:
-        label = Path(str(logical_self) + '.label').read_text()
+        label = Path(str(logical_self) + '.label').read_text(encoding='utf-8')
         if label == 'tooling.vi':
             own = Path(os.environ['VPP_TEST_SELF'])
             assert own.name == logical_self.name and own.is_file()
@@ -99,7 +99,7 @@ def main():
             assert all((state / ('build-' + name + '.vi')).is_file() for name in names), 'build barrier'
         if label == 'suite.vi':
             selector = args[1]
-            (state / ('run-module-' + selector)).write_text(os.getcwd())
+            (state / ('run-module-' + selector)).write_text(os.getcwd(), encoding='utf-8')
             if selector == '1':
                 print('wrong')
                 return 0

@@ -323,7 +323,7 @@ hàm công khai biên dịch nguồn đồ thị(điểm vào, thư viện, bộ
     trả về bộ nạp.đồ thị(điểm vào);
 };
 
-hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện, số worker = rỗng, bộ đệm = rỗng) {
+hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện, số worker = rỗng, bộ đệm = rỗng, lọc nhập rộng = sai) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     cache = biên dịch nguồn cache(bộ đệm);
@@ -341,6 +341,7 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
         cũ trượt = cache["trượt"];
     };
     đồ thị = biên dịch nguồn đồ thị(điểm vào, thư viện, bộ đệm);
+    đồ thị["lọc nhập rộng"] = lọc nhập rộng;
     nếu (bộ đệm != rỗng) {
         các tệp = [đồ thị["điểm vào"]];
         các mô đun = đồ thị["mô đun"];
@@ -363,8 +364,9 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
 
 // Preserve the importer's directory without creating a .vi file beside it.
 // This also allows scripts to import modules from read-only directories.
-hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện, số worker = rỗng) {
+hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện, số worker = rỗng, lọc nhập rộng = sai) {
     bộ nạp = Bộ Nạp Nguồn(thư viện);
-    trả về biên dịch liên kết đồ thị thuần(
-        bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn), số worker);
+    đồ thị = bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn);
+    đồ thị["lọc nhập rộng"] = lọc nhập rộng;
+    trả về biên dịch liên kết đồ thị thuần(đồ thị, số worker);
 };

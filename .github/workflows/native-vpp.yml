@@ -9,6 +9,11 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
+env:
+  # V++ sources, paths, expected output and diagnostics are UTF-8 on every OS.
+  # Keep Python and its child processes on the same encoding on Windows too.
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: utf-8
 jobs:
   macos-i32:
     name: macOS ARM64 - i32 source bootstrap
@@ -258,6 +263,14 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Check regression runner configuration
+        shell: pwsh
+        run: |
+          python scripts/quality/test_script_configuration.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./scripts/windows/test-runner-support.ps1
+          & ./scripts/windows/run-tests.ps1 -Inventory
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify native seed and assemble Windows boundary
         shell: pwsh
         run: |
@@ -404,7 +417,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --profile --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -418,6 +431,12 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - name: Install SQLite runtime dependency
+        run: |
+          if ! command -v sqlite3 >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y sqlite3
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: linux-x86_64-full
@@ -429,7 +448,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --profile --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -443,14 +462,14 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: Check regression runner configuration
+      - name: Install SQLite runtime dependency
         shell: pwsh
         run: |
-          python scripts/quality/test_script_configuration.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & ./scripts/windows/test-runner-support.ps1
-          & ./scripts/windows/run-tests.ps1 -Inventory
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Get-Command sqlite3.exe -ErrorAction SilentlyContinue)) {
+            choco install sqlite -y --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "$env:ChocolateyInstall/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
       - uses: actions/download-artifact@v4
         with:
           name: windows-x86_64-full
@@ -466,7 +485,7 @@ jobs:
         shell: pwsh
         run: |
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 120 --logs regression-logs/full
+          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 120 --profile --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

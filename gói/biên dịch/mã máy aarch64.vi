@@ -10,7 +10,7 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phát AARCH64 {
-    hàm công khai khởi tạo() { mình.phân khối = sai; mình.số byte = 0; };
+    hàm công khai khởi tạo() { mình.phân khối = sai; mình.từ jit = sai; mình.số byte = 0; };
 
     hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
@@ -37,6 +37,12 @@ lớp công khai Bộ Phát AARCH64 {
     // avoiding 32 KiB allocations on a fragmented nonmoving heap. All
     // offsets remain byte offsets; the legacy encoder returns a flat list.
     hàm riêng tư biên dịch mã máy aarch64 từ máy(ra, từ máy) {
+        nếu (mình.từ jit) {
+            nếu (mình.số byte % 8192 == 0) { bỏ kết quả = máy ảo thêm cuối danh sách(ra, []); };
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra[máy ảo lấy độ dài(ra) - 1], từ máy);
+            mình.số byte = mình.số byte + 4;
+            trả về 0;
+        };
         đích byte = ra;
         nếu (mình.phân khối) {
             nếu (mình.số byte % 2048 == 0) { bỏ kết quả = máy ảo thêm cuối danh sách(ra, []); };
@@ -50,6 +56,10 @@ lớp công khai Bộ Phát AARCH64 {
     };
 
     hàm riêng tư vá từ máy(ra, vị trí, từ máy) {
+        nếu (mình.từ jit) {
+            ra[vị trí / 8192][(vị trí % 8192) / 4] = từ máy;
+            trả về 0;
+        };
         đích byte = ra;
         lệch = vị trí;
         nếu (mình.phân khối) {
@@ -138,8 +148,8 @@ lớp công khai Bộ Phát AARCH64 {
 
     // Nhận IR đã được CFG validator kiểm tra depth tại các điểm nối.
     // Branch target là chỉ số lệnh; kết quả offset và relocation là byte offset.
-    hàm công khai biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai) {
-        mình.phân khối = phân khối; mình.số byte = 0;
+    hàm công khai biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai, từ jit = sai) {
+        mình.phân khối = phân khối; mình.từ jit = từ jit; mình.số byte = 0;
         tham số = danh sách hàm biểu diễn trung gian["parameterCount"];
         ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
         sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
@@ -700,6 +710,7 @@ lớp công khai Bộ Phát AARCH64 {
             nếu (giá trị < 0) { giá trị += mô đun; };
             bỏ kết quả = mình.vá từ máy(ra, f["vị trí"], cơ sở + giá trị * hệ số);
         };
+        nếu (từ jit) { trả về {"wordChunks": ra, "size": mình.số byte, "relocations": tái định vị}; };
         nếu (phân khối) { trả về {"chunks": ra, "size": mình.số byte, "relocations": tái định vị}; };
         trả về {"bytes": ra, "relocations": tái định vị};
     };
@@ -843,7 +854,7 @@ hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao,
     trả về bộ chuyển tiếp.biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ điều hành);
 };
 
-hàm công khai biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai) {
+hàm công khai biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai, từ jit = sai) {
     bộ chuyển tiếp = Bộ Phát AARCH64();
-    trả về bộ chuyển tiếp.biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành, phân khối);
+    trả về bộ chuyển tiếp.biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành, phân khối, từ jit);
 };

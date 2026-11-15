@@ -49,6 +49,29 @@ hàm chính() {
 };''', encoding='utf-8')
         missing = work / 'missing.vi'
         missing.write_text('hàm chính() { trả về hàm_không_tồn_tại(); };', encoding='utf-8')
+        broad = work / 'broad.vi'
+        broad.write_text('''in "initializer";
+hàm công khai dùng(a) { trả về a + 1; };
+hàm công khai không dùng() { trả về 99; };
+lớp công khai Cha { hàm công khai tính() { trả về 41; }; };
+lớp công khai Con kế thừa Cha { hàm công khai lấy() { trả về mình.tính(); }; };
+''', encoding='utf-8')
+        broad_entry = work / 'broad-entry.vi'
+        broad_entry.write_text('''nhập broad.*;
+hàm chính() { f = dùng; in f(41); c = Con(); in c.lấy(); };
+''', encoding='utf-8')
+        umbrella = work / 'umbrella.vi'
+        umbrella.write_text('công khai nhập broad.*;\n', encoding='utf-8')
+        alias_entry = work / 'alias-entry.vi'
+        alias_entry.write_text('nhập umbrella.* như bộ; hàm chính() { in bộ.không dùng(); };\n', encoding='utf-8')
+        selected_entry = work / 'selected-entry.vi'
+        selected_entry.write_text('''nhập broad.dùng như cộng một;
+nhập broad.không dùng như bỏ;
+nhập broad.Con như Kiểu Con;
+hàm chính() { f = cộng một; in f(41); c = Kiểu Con(); in c.lấy(); };
+''', encoding='utf-8')
+        invalid_selected = work / 'invalid-selected.vi'
+        invalid_selected.write_text('nhập broad.không tồn tại; hàm chính() {};', encoding='utf-8')
         before = {p.name: p.read_bytes() for p in work.iterdir()}
 
         def run(source, status, expected=None, profile=False, tier=True, *, mode="--dynamic", guest_args=(), diagnostic=None, timeout=600):
@@ -75,6 +98,33 @@ hàm chính() {
         run(minimal, 0, b'', mode='--check-dynamic')
         run(bad, 1, mode='--check-dynamic', diagnostic='V++ JIT: từ chối cú pháp'.encode())
         run(missing, 1, mode='--check-dynamic', diagnostic='hàm_không_tồn_tại'.encode())
+        # Pruning broad imports must preserve initialization, function values,
+        # inherited methods and namespace/re-export lookup.
+        run(broad_entry, 0, b'initializer\n42\n41\n')
+        run(alias_entry, 0, b'initializer\n99\n')
+        run(selected_entry, 0, b'initializer\n42\n41\n')
+        run(invalid_selected, 1, diagnostic='không tồn tại'.encode())
+        compiler_profile = work / 'compiler.profile'
+        env['VPP_COMPILER_PROFILE_FILE'] = str(compiler_profile)
+        run(broad_entry, 0, b'initializer\n42\n41\n')
+        env.pop('VPP_COMPILER_PROFILE_FILE')
+        profile_text = compiler_profile.read_text(encoding='utf-8')
+        compiler_profile.unlink()
+        if 'name=không dùng\n' in profile_text or '::không dùng\n' in profile_text:
+            raise RuntimeError('JIT generated an unused broad-import function')
+        if 'VPP_COMPILER_PROFILE asm.body.count ' not in profile_text:
+            raise RuntimeError('missing compiler profile for pruning assertion')
+        env['VPP_COMPILER_PROFILE_FILE'] = str(compiler_profile)
+        run(selected_entry, 0, b'initializer\n42\n41\n')
+        env.pop('VPP_COMPILER_PROFILE_FILE')
+        profile_text = compiler_profile.read_text(encoding='utf-8')
+        compiler_profile.unlink()
+        if 'name=không dùng\n' in profile_text or '::không dùng\n' in profile_text:
+            raise RuntimeError('JIT generated an unused selected-import function')
+        broad.write_text(broad.read_text(encoding='utf-8') +
+                         'hàm lỗi chưa dùng() { trả về hàm_không_tồn_tại(); };\n', encoding='utf-8')
+        run(broad_entry, 1, diagnostic='hàm_không_tồn_tại'.encode())
+        broad.write_bytes(before[broad.name])
         run(argv, 0, f'1\n{argv}\n\n\n'.encode())
         run(argv, 0, f'4\n{argv}\nTiếng Việt\n\n--dynamic\n\n\n'.encode(),
             guest_args=('Tiếng Việt', '', '--dynamic'))

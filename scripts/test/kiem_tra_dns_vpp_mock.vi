@@ -4,9 +4,8 @@ nhập gói.lõi.chuyển kiểu.*;
 nhập gói.bộ sưu tập.từ điển.*;
 nhập gói.kiểm thử.khẳng định.*;
 nhập gói.thời gian.đơn điệu.*;
-hàm chính() {
-    mode = thành số nguyên(đọc biến môi trường("VPP_DNS_MOCK_MODE", "0"));
-    port = thành số nguyên(đọc biến môi trường("VPP_DNS_VI_PORT", "53"));
+nhập gói.nhập xuất.tệp.ghi tệp;
+hàm kiểm tra chế độ DNS(mode, port) {
     bộ = Bộ Phân Giải DNS();
     nếu (mode >= 10 && mode != 20 && mode != 21) {
         rejected = sai; start = thời gian đơn điệu mili giây();
@@ -42,4 +41,26 @@ hàm chính() {
         khẳng định bằng(a["ttl"], 25); khẳng định bằng(aaaa["ttl"], 25);
     };
     in "VPP DNS MOCK OK";
+};
+
+hàm chính() {
+    // Reuse one JIT image for the explicit-port cases. Each mode constructs
+    // its own resolver and the harness starts a fresh server for every mode.
+    // Mode 3 still runs separately to exercise environment-based resolution.
+    nếu (đọc biến môi trường("VPP_DNS_MOCK_BATCH", "") == "1") {
+        in "VPP DNS MOCK READY";
+        mode = đọc số();
+        khi (mode >= 0) {
+            port = đọc số();
+            kiểm tra chế độ DNS(mode, port);
+            mode = đọc số();
+        };
+        trả về 0;
+    };
+    // This marker is written by the running guest, not by its compiler.
+    sẵn sàng = đọc biến môi trường("VPP_DNS_MOCK_READY", "");
+    nếu (sẵn sàng != "") { bỏ kết quả = ghi tệp(sẵn sàng, "ready"); };
+    mode = thành số nguyên(đọc biến môi trường("VPP_DNS_MOCK_MODE", "0"));
+    port = thành số nguyên(đọc biến môi trường("VPP_DNS_VI_PORT", "53"));
+    kiểm tra chế độ DNS(mode, port);
 };

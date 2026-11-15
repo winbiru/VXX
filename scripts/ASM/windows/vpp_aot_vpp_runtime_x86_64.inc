@@ -49,6 +49,8 @@ vpp_native_aot_info:
 .Laot_thong_tin_bang_x:
     testl %edx, %edx
     js .Laot_thong_tin_sai_x
+    cmpl $40, %ecx
+    jae .Laot_thong_tin_ffi_x
     cmpl $11, %ecx
     ja .Laot_thong_tin_ham_x
     cmpl $10, %ecx
@@ -90,6 +92,52 @@ vpp_native_aot_info:
     addq 88(%r9), %rdx
     addq $8, %rdx
     movl (%rdx,%rcx,4), %eax
+    ret
+.Laot_thong_tin_ffi_x:
+    cmpl $47, %ecx
+    ja .Laot_thong_tin_sai_x
+    cmpq 64(%r9), %rdx
+    jae .Laot_thong_tin_sai_x
+    imulq $72, %rdx, %r10
+    addq 72(%r9), %r10
+    cmpl $44, %ecx
+    jae .Laot_thong_tin_ffi_signature_x
+    subl $40, %ecx
+    movq 8(%r10,%rcx,8), %r10
+    testq %r10, %r10
+    je .Laot_thong_tin_sai_x
+    cmpl $127, %r8d
+    ja .Laot_thong_tin_sai_x
+    xorl %r11d, %r11d
+.Laot_thong_tin_ffi_byte_x:
+    movzbl (%r10,%r11), %eax
+    cmpl %r8d, %r11d
+    je .Laot_thong_tin_ffi_return_x
+    testl %eax, %eax
+    je .Laot_thong_tin_sai_x
+    incl %r11d
+    jmp .Laot_thong_tin_ffi_byte_x
+.Laot_thong_tin_ffi_signature_x:
+    cmpl $44, %ecx
+    je .Laot_thong_tin_ffi_result_x
+    cmpl $45, %ecx
+    je .Laot_thong_tin_ffi_params_x
+    cmpl $46, %ecx
+    je .Laot_thong_tin_ffi_extents_x
+    movl (%r10), %eax
+    ret
+.Laot_thong_tin_ffi_result_x:
+    movl 4(%r10), %eax
+    ret
+.Laot_thong_tin_ffi_params_x:
+    cmpq $0, 40(%r10)
+    jmp .Laot_thong_tin_ffi_count_x
+.Laot_thong_tin_ffi_extents_x:
+    cmpq $0, 56(%r10)
+.Laot_thong_tin_ffi_count_x:
+    setne %al
+    movzbl %al, %eax
+.Laot_thong_tin_ffi_return_x:
     ret
 .Laot_thong_tin_sai_x:
     movl $-1, %eax

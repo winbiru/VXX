@@ -107,8 +107,10 @@
     movl $-2, %r13d
     testq %rax, %rax
     je .Ljit_x86_restore
+    call vpp_native_jit_guest_begin
     call main
     movl %eax, %r13d
+    call vpp_native_jit_guest_end
 .Ljit_x86_restore:
 #ifdef _WIN32
     movq %r12, %rcx

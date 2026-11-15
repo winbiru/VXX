@@ -2322,7 +2322,7 @@ hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32,
             thống kê["lower_ms"] = thống kê["lower_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
             bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
         };
-        phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đích["kiến trúc"] == "aarch64");
+        phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"], đích["kiến trúc"] == "aarch64", lấy từ điển(bảng i32, "ảnh JIT", sai));
         nếu (thống kê != rỗng) {
             thống kê["machine_ms"] = thống kê["machine_ms"] + biên dịch hồ sơ bắt đầu("asm") - bắt đầu bước;
             bắt đầu bước = biên dịch hồ sơ bắt đầu("asm");
@@ -2470,6 +2470,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     // Tắt specialization phụ thuộc runtime của chương trình nhưng vẫn in
     // Machine IR trực tiếp ra ASM: compiler và chương trình dùng cùng ABI.
     bảng i32["compiler"] = compiler;
+    bảng i32["ảnh JIT"] = ảnh jit;
     bảng i32["ASM trực tiếp"] = trực tiếp;
     nếu (!compiler) {
         tên kiểu = {"rỗng": 0, "số nguyên": 1, "số thực": 2, "chuỗi": 3,
@@ -2713,7 +2714,7 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
 
 // The binary metadata has the same ABI as the textual AOT spec.
 hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi tạo, ngoại, nhanh, bảng, compiler, ảnh jit = sai) {
-    nếu (độ dài(ngoại) != 0) { ném "Mach-O object: foreign descriptors unavailable"; };
+    nếu (!ảnh jit && độ dài(ngoại) != 0) { ném "Mach-O object: foreign descriptors unavailable"; };
     o.bắt đầu dữ liệu();
     lặp(i = 0; i < độ dài(chuỗi); i++) {
         o.nhãn(".Laot_string_" + i);
@@ -2744,7 +2745,29 @@ hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi t�
     };
     o.nhãn(".Laot_initializers");
     lặp(i = 0; i < độ dài(khởi tạo); i++) { o.con trỏ("_vpp_aot_init_" + i); };
+    lặp(i = 0; i < độ dài(ngoại); i++) {
+        d = ngoại[i];
+        o.nhãn(".Laot_foreign_lib_" + i); o.dữ liệu byte(chuỗi thành byte máy ảo(d[1])); o.dữ liệu byte([0]);
+        o.nhãn(".Laot_foreign_sym_" + i); o.dữ liệu byte(chuỗi thành byte máy ảo(d[2])); o.dữ liệu byte([0]);
+        o.nhãn(".Laot_foreign_abi_" + i); o.dữ liệu byte(chuỗi thành byte máy ảo(d[6])); o.dữ liệu byte([0]);
+        o.nhãn(".Laot_foreign_cap_" + i); o.dữ liệu byte(chuỗi thành byte máy ảo(d[7])); o.dữ liệu byte([0]);
+        o.căn dữ liệu(); o.nhãn(".Laot_foreign_params_" + i);
+        lặp(j = 0; j < độ dài(d[3]); j++) { o.dữ liệu word(d[3][j]); };
+        o.căn dữ liệu(); o.nhãn(".Laot_foreign_extents_" + i);
+        lặp(j = 0; j < độ dài(d[4]); j++) {
+            e = d[4][j];
+            o.dữ liệu dài(e[0]); o.dữ liệu word(e[1]); o.dữ liệu word(0); o.dữ liệu dài(e[2]);
+        };
+    };
     o.căn dữ liệu(); o.nhãn(".Laot_foreign");
+    lặp(i = 0; i < độ dài(ngoại); i++) {
+        d = ngoại[i];
+        o.dữ liệu word(d[0]); o.dữ liệu word(d[5]);
+        o.con trỏ(".Laot_foreign_lib_" + i); o.con trỏ(".Laot_foreign_sym_" + i);
+        o.con trỏ(".Laot_foreign_abi_" + i); o.con trỏ(".Laot_foreign_cap_" + i);
+        o.dữ liệu dài(độ dài(d[3])); o.con trỏ(".Laot_foreign_params_" + i);
+        o.dữ liệu dài(độ dài(d[4])); o.con trỏ(".Laot_foreign_extents_" + i);
+    };
     o.nhãn(".Laot_i32_functions");
     lặp(i = 0; i < độ dài(các hàm); i++) {
         dạng = lấy từ điển(nhanh, "" + i, rỗng);
@@ -2762,7 +2785,7 @@ hàm riêng tư biên dịch asm metadata macho(o, chuỗi, các hàm, khởi t�
     o.con trỏ("_vpp_aot_entry");
     cờ = 0; nếu (compiler) { cờ = 1; };
     o.dữ liệu word(cờ); o.dữ liệu word(1);
-    o.dữ liệu dài(0); o.con trỏ(".Laot_foreign");
+    o.dữ liệu dài(độ dài(ngoại)); o.con trỏ(".Laot_foreign");
     o.dữ liệu dài(độ dài(các hàm)); o.con trỏ(".Laot_i32_functions");
     trả về 0;
 };

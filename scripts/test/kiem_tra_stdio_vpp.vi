@@ -55,10 +55,23 @@ hàm chính() {
     khẳng định các byte(đọc các byte tệp(đường), [0, 255, 65, 66, 67, 68, 69, 70, 71]);
     in "nối sau seek: đạt";
 
-    // Kiểm tra i64 mà không ghi tệp khổng lồ trên Windows.
+    // The native file ABI accepts signed i32 offsets. Check the maximum
+    // position without writing a large file, and reject decimal strings
+    // before the primitive can turn a type error into a fatal runtime error.
     ghi = Bộ Đệm Tệp(đường, "ghi", 1);
-    ghi.dịch("4294967296");
-    khẳng định bằng(thành chuỗi(ghi.vị trí()), "4294967296");
+    ghi.dịch(2147483647);
+    khẳng định bằng(ghi.vị trí(), 2147483647);
+    sai_lệch = sai;
+    thử { ghi.dịch("4294967296"); } bắt lỗi(e) {
+        sai_lệch = e == "luồng tệp: độ lệch phải là số nguyên i32";
+    };
+    khẳng định đúng(sai_lệch);
+    khẳng định bằng(ghi.vị trí(), 2147483647);
+    sai_lệch = sai;
+    thử { tệp thô dịch(0, "4294967296", 0); } bắt lỗi(e) {
+        sai_lệch = e == "tệp thô: độ lệch phải là số nguyên i32";
+    };
+    khẳng định đúng(sai_lệch);
     ghi.dịch(0);
     ghi.ghi("V");
     khẳng định bằng(đọc tệp(đường), "V");
@@ -75,5 +88,5 @@ hàm chính() {
     khẳng định đúng(sai_đệm);
     khẳng định bằng(đọc tệp(đường), "V");
     khẳng định bằng(tệp thô xóa(đường), 0);
-    in "i64, validation và đóng: đạt";
+    in "i32, validation và đóng: đạt";
 };

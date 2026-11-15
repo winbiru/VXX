@@ -81,6 +81,9 @@ vpp_native_jit_service:
     jne .Lvpp_jit_find
     jmp .Lvpp_jit_invalid
 .Lvpp_jit_found:
+    movl vpp_jit_guest_scope(%rip), %eax
+    cmpl %eax, 28(%rbx)
+    jne .Lvpp_jit_invalid
     cmpl $3, -64(%rbp)
     je .Lvpp_jit_release
     cmpl $10, 20(%rbx)
@@ -340,6 +343,8 @@ vpp_native_jit_service:
     movl %eax, 16(%rbx)
     movl $10, 20(%rbx)
     movl %r14d, 24(%rbx)
+    movl vpp_jit_guest_scope(%rip), %ecx
+    movl %ecx, 28(%rbx)
     jmp .Lvpp_jit_done
 1:  movl $0, -80(%rbp)
 .Lvpp_jit_copy:
@@ -411,6 +416,8 @@ vpp_native_jit_service:
     movl -64(%rbp), %ecx
     movl %ecx, 20(%rbx)
     movl $0, 24(%rbx)
+    movl vpp_jit_guest_scope(%rip), %ecx
+    movl %ecx, 28(%rbx)
     jmp .Lvpp_jit_done
 .Lvpp_jit_rollback:
 #ifdef _WIN32
@@ -579,6 +586,7 @@ vpp_native_jit_service:
     movl $0, 16(%rbx)
     movl $0, 20(%rbx)
     movl $0, 24(%rbx)
+    movl $0, 28(%rbx)
     xorl %eax, %eax
     jmp .Lvpp_jit_done
 .Lvpp_jit_address:
@@ -1048,7 +1056,41 @@ vpp_native_jit_image:
 3:  xorl %eax, %eax
     xorl %edx, %edx
     ret
+// Scope guest mappings separately from the compiler's published images.
+.globl vpp_native_jit_guest_begin
+vpp_native_jit_guest_begin:
+    movl vpp_jit_next(%rip), %eax
+    incl %eax
+    movl %eax, vpp_jit_guest_scope(%rip)
+    ret
+.globl vpp_native_jit_guest_end
+vpp_native_jit_guest_end:
+    pushq %rbx
+    pushq %r12
+    pushq %r13
+    subq $32, %rsp
+    leaq vpp_jit_slots(%rip), %rbx
+    movl $64, %r12d
+.Lvpp_jit_guest_cleanup:
+    movl vpp_jit_guest_scope(%rip), %eax
+    cmpl %eax, 28(%rbx)
+    jne 1f
+    JIT_ARG1 $3
+    JIT_ARG2 16(%rbx)
+    JIT_ARG3 $0
+    call vpp_native_jit_service
+1:  addq $32, %rbx
+    decl %r12d
+    jne .Lvpp_jit_guest_cleanup
+    movl $0, vpp_jit_guest_scope(%rip)
+    addq $32, %rsp
+    popq %r13
+    popq %r12
+    popq %rbx
+    ret
 .bss
+.p2align 3
+vpp_jit_guest_scope: .zero 4
 .p2align 3
 vpp_jit_slots: .zero 2048
 vpp_jit_next: .zero 4

@@ -50,7 +50,7 @@ lớp công khai Bộ Đăng Ký Kiểu {
         mình.đồ thị = đồ thị;
     };
 
-    hàm riêng tư gom kiểu() {
+    hàm riêng tư gom kiểu(đã kiểm tra nhập) {
         sổ = mình.sổ;
         đồ thị = mình.đồ thị;
         các kiểu = [];
@@ -97,6 +97,9 @@ lớp công khai Bộ Đăng Ký Kiểu {
             mục["kiểu xuất"] = xuất;
         };
         sổ["kiểu"] = các kiểu;
+        // The JIT closure has already validated every selected import using
+        // the complete registry. A pruned export need not survive rebuilding IDs.
+        nếu (đã kiểm tra nhập) { trả về; };
         // A selected name can be either a function or a public type.
         lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
             e = cạnh[i];
@@ -139,8 +142,8 @@ lớp công khai Bộ Đăng Ký Kiểu {
         };
     };
 
-    hàm công khai đăng ký() {
-        mình.gom kiểu();
+    hàm công khai đăng ký(đã kiểm tra nhập = sai) {
+        mình.gom kiểu(đã kiểm tra nhập);
         mình.chuẩn hóa();
     };
 

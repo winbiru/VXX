@@ -76,6 +76,10 @@ hàm response(q, r, n, mode, index) {
 };
 hàm chính() {
     biến mode = đọc số(); biến queries = đọc số();
+    // Negative count opts into the JIT startup barrier. Bind first, then
+    // wait for the client to enter guest code before starting socket I/O.
+    biến gated = queries < 0;
+    nếu (gated) { queries = -queries; };
     nếu (queries < 1 || queries > 16) { trả về 2; };
     biến u = 65536; biến l = 65792; biến c = 66048;
     biến q = 70000; biến r = 74096; biến frame = 78192;
@@ -90,6 +94,11 @@ hàm chính() {
         nếu (máy ổ cắm thô(1, l) < 0) { máy ổ cắm thô(5, u); trả về 5; };
     };
     nếu (ready(port) < 1) { máy ổ cắm thô(5, u); trả về 6; };
+    nếu (gated && đọc số() != 1) {
+        máy ổ cắm thô(5, u);
+        nếu (tcp) { máy ổ cắm thô(5, l); };
+        trả về 16;
+    };
     biến status = 0; biến served = 0;
     lặp(index = 0; index < queries; index++) {
         m32(u + 16, q); m32(u + 20, 4096);

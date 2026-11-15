@@ -2385,7 +2385,12 @@ hàm aot_native_core_call(id, a, b, c) {
     nếu (id == 85) {
         // Dynamic bridge is linked only into full AOT runtimes. On other
         // hosts these reserved info selectors reject the request.
-        nếu (máy aot thông tin(110, 0, 0) == 1) { trả về -1; };
+        nếu (máy aot thông tin(110, 0, 0) == 1) {
+            // Guest staging is scoped by the native boundary. Publishing,
+            // invoking raw entries and querying host addresses stay disabled.
+            nếu (a == 3 || (a >= 10 && a <= 16)) { trả về máy JIT thô(a, b, c); };
+            trả về -1;
+        };
         nếu (a == 8 || a == 9) { trả về máy aot thông tin(100 + a, b, c); };
         trả về máy JIT thô(a, b, c);
     };
@@ -2419,9 +2424,38 @@ hàm aot_native_core(frame, id, count) {
     nếu (aot_status()) { trả về 1; };
     trả về aot_push(frame, vm_int(result));
 };
-// Arbitrary foreign descriptors and compiler-host services have no native
-// V++ provider yet. Reject them explicitly; never load a C++ fallback.
-hàm aot_foreign(frame, descriptor, count) { vm_error(22); trả về 1; };
+// Provider policy is V++; ASM only reads metadata from the active image.
+// Reject every library/symbol/capability/signature outside the explicit ABI.
+hàm aot_foreign_text_matches(descriptor, field, expected) {
+    biến size = vm_get(expected, 1);
+    nếu (size > 127) { trả về 0; };
+    lặp(i = 0; i < size; i++) {
+        nếu (máy aot thông tin(field, descriptor, i) != máy đọc byte(vm_get(expected, 2) + i)) { trả về 0; };
+    };
+    trả về máy aot thông tin(field, descriptor, size) == 0;
+};
+hàm aot_foreign_provider(descriptor) {
+    nếu (descriptor < 0 || descriptor >= máy aot thông tin(3, 0, 0)) { trả về 0; };
+    nếu (máy aot thông tin(47, descriptor, 0) != descriptor ||
+        máy aot thông tin(44, descriptor, 0) != 1 ||
+        máy aot thông tin(45, descriptor, 0) != 0 ||
+        máy aot thông tin(46, descriptor, 0) != 0) { trả về 0; };
+    nếu (!aot_foreign_text_matches(descriptor, 40, vm_literal("system.ffi")) ||
+        !aot_foreign_text_matches(descriptor, 42, vm_literal("c")) ||
+        !aot_foreign_text_matches(descriptor, 43, vm_literal("system.ffi.error"))) { trả về 0; };
+    nếu (aot_foreign_text_matches(descriptor, 41, vm_literal("last_errno"))) { trả về 1; };
+    nếu (aot_foreign_text_matches(descriptor, 41, vm_literal("eintr"))) { trả về 2; };
+    trả về 0;
+};
+hàm aot_foreign(frame, descriptor, count) {
+    vm_set(4198464, 13, 156);
+    nếu (count != 0) { vm_error(22); trả về 1; };
+    biến provider = aot_foreign_provider(descriptor);
+    nếu (provider == 1) { trả về aot_push(frame, vm_int(vm_get(aot_state(), 9))); };
+    // The normalized machine ABI defines EINTR as 4 on supported hosts.
+    nếu (provider == 2) { trả về aot_push(frame, vm_int(4)); };
+    vm_error(22); trả về 1;
+};
 hàm aot_switch_begin(frame) {
     biến switches = vm_get(frame, 8);
     nếu (switches == 0) { switches = vm_vector(4); vm_set(frame, 8, switches); };
@@ -2549,7 +2583,10 @@ hàm chính() {
         vm_set(4198464, 12, 1);
     };
     // Reject unavailable services before running any user initializer.
-    nếu (máy aot thông tin(3, 0, 0) != 0 || máy aot thông tin(4, 0, 0) != 0) { vm_error(22); };
+    nếu (máy aot thông tin(4, 0, 0) != 0) { vm_error(22); };
+    lặp(i = 0; i < máy aot thông tin(3, 0, 0); i++) {
+        nếu (aot_foreign_provider(i) == 0) { vm_error(22); thoát; };
+    };
     lặp(i = 0; i < máy aot thông tin(2, 0, 0); i++) {
         nếu (aot_status()) { thoát; }; aot_region(1, i);
     };

@@ -25,14 +25,14 @@ hàm chính() {
     in độ dài(các byte) == 3 && các byte[0] == 0 && các byte[1] == 195 && các byte[2] == 169;
 
     // Pipe của cả hai hướng vượt dung lượng pipe thông thường; phải drain xen kẽ.
-    lớn = chạy tiến trình("/bin/sh", ["-c", "head -c 73728 /dev/zero; head -c 73728 /dev/zero 1>&2"]);
+    lớn = chạy tiến trình("/bin/sh", ["-c", "/usr/bin/head -c 73728 /dev/zero; /usr/bin/head -c 73728 /dev/zero 1>&2"]);
     in lớn["khởi chạy"];
     in lớn["mã thoát"] == 0;
     in độ dài(lớn["đầu ra"]) == 73728;
     in độ dài(lớn["lỗi"]) == 73728;
 
     // Giới hạn thời gian dùng clock đơn điệu FFI; child bị reap khi hết hạn.
-    giới = chạy tiến trình("/bin/sh", ["-c", "printf partial; exec sleep 3"], {}, 40);
+    giới = chạy tiến trình("/bin/sh", ["-c", "printf partial; exec /bin/sleep 3"], {}, 40);
     in giới["khởi chạy"];
     in giới["mã thoát"] == -1;
     // Shell có thể chưa chạy printf khi 40 ms hết hạn dưới tải lớn.
@@ -42,7 +42,7 @@ hàm chính() {
 
     // Deadline rất ngắn và rất dài: không chuyển số thực có phần lẻ
     // thành số nguyên sai và không hủy child đã hoàn tất.
-    ngắn = chạy tiến trình("/bin/sh", ["-c", "exec sleep 3"], {}, 1);
+    ngắn = chạy tiến trình("/bin/sh", ["-c", "exec /bin/sleep 3"], {}, 1);
     in ngắn["khởi chạy"] && ngắn["mã thoát"] == -1;
     in ngắn["lỗi"] == "chạy tiến trình: quá thời hạn";
     đủ = chạy tiến trình("/bin/sh", ["-c", "printf done"], {}, 10000);
@@ -51,7 +51,7 @@ hàm chính() {
 
     // Shell sinh thêm tiến trình nền cùng nhóm; timeout phải trả kết quả
     // đồng thời runtime gửi SIGKILL cho toàn bộ nhóm trước khi reap shell.
-    nhóm = chạy tiến trình("/bin/sh", ["-c", "printf group; sleep 3 & wait"], {}, 150);
+    nhóm = chạy tiến trình("/bin/sh", ["-c", "printf group; /bin/sleep 3 & wait"], {}, 150);
     in nhóm["khởi chạy"];
     in nhóm["mã thoát"] == -1;
     in nhóm["đầu ra"] == "" || nhóm["đầu ra"] == "group";
