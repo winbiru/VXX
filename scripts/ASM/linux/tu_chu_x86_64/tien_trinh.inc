@@ -441,9 +441,7 @@ vpp_native_os_process:
 .Ltien_trinh_duong_tiep:
     cmpb $0, (%r12)
     jne .Ltien_trinh_duong_ke_tiep
-    movslq -44(%rbp), %rax
-    negq %rax
-    jmp .Ltien_trinh_con_that_bai
+    jmp .Ltien_trinh_exec_ghi_loi
 .Ltien_trinh_duong_ke_tiep:
     incq %r12
     jmp .Ltien_trinh_duong_doan

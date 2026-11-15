@@ -34,8 +34,13 @@ audit() {
   libs=$(/usr/bin/otool -L "$seed" | tail -n +2 | awk '{print $1}')
   test "$libs" = /usr/lib/libSystem.B.dylib
   symbols=$(/usr/bin/nm -g "$seed")
+  # These two symbols are generated from the current V++ runtime, not the
+  # retired host dispatcher. Keep rejecting every other legacy match.
+  symbols=$(sed -E '/[[:space:]]T[[:space:]]+_vpp_fn_vm_step(_body)?$/d' <<< "$symbols")
   if grep -Eq '__cxa_|__Z[0-9NSt]|ffi_|vm_step|linkedBytecodeRun|executeVpp|bytecode_dispatch' <<< "$symbols"; then
-    echo "V++: phát hiện ký hiệu của môi trường chủ cũ trong $seed" >&2; return 1
+    echo "V++: phát hiện ký hiệu của môi trường chủ cũ trong $seed" >&2
+    grep -E '__cxa_|__Z[0-9NSt]|ffi_|vm_step|linkedBytecodeRun|executeVpp|bytecode_dispatch' <<< "$symbols" >&2
+    return 1
   fi
 }
 audit "$full"

@@ -70,7 +70,12 @@ def audit(compiler):
     names = [line.strip().split(b' (', 1)[0] for line in libraries.stdout.splitlines()[1:]]
     assert names == [b'/usr/lib/libSystem.B.dylib'], names
     symbols, _ = run(['/usr/bin/nm', '-g', compiler])
-    assert not re.search(rb'__cxa_|__Z[0-9NSt]|ffi_|vm_step|linkedBytecodeRun|executeVpp|bytecode_dispatch', symbols.stdout)
+    # The pure V++ runtime exports these dispatcher functions itself.
+    host_symbols = [line for line in symbols.stdout.splitlines()
+                    if not re.search(rb'\sT\s+_vpp_fn_vm_step(?:_body)?$', line)]
+    legacy = [line for line in host_symbols if re.search(
+        rb'__cxa_|__Z[0-9NSt]|ffi_|vm_step|linkedBytecodeRun|executeVpp|bytecode_dispatch', line)]
+    assert not legacy, legacy
     assert b'_vpp_fn_vm_collect' in symbols.stdout
     assert b'_vpp_fn_aot_integer' in symbols.stdout
     print(f'AUDIT PASS {compiler.name} sha256={digest(compiler)}', flush=True)

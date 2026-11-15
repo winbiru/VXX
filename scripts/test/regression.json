@@ -2677,6 +2677,7 @@
     }
   ],
   "unregistered_sources": {
+    "scripts/test/fixtures/vm_asm_resolver_config.vi": "Windows installed VM DNS configuration fixture exercised by check_windows_full_bootstrap.py",
     "scripts/test/fixtures/native_jit_pressure.vi": "Dynamic JIT tier pressure fixture exercised by check_jit_dynamic.py",
     "scripts/test/bootstrapstage2.vi": "Standalone candidate without registered oracle; requires porting",
     "scripts/test/fixtures/anonymous_modules/counter.vi": "Module/support fixture or specialized entry; no standalone golden registered",
