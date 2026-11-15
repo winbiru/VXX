@@ -52,6 +52,23 @@ hàm chính() {
     in đọc tệp(đường) == văn bản lớn + văn bản đệm;
     xóa đường dẫn(đường);
 
+    // Copy crosses multiple 64 KiB reads, preserves binary/UTF-8 data,
+    // overwrites an existing file and reports failure without truncating it
+    // when the source cannot be opened.
+    nguồn = đường + ".nguồn";
+    đích = đường + ".đích";
+    nội dung sao = "🌿cà phê" + chuỗi từ byte máy ảo([0, 255]);
+    lặp(i = 0; i < 13; i++) { nội dung sao += nội dung sao; };
+    ghi tệp(nguồn, nội dung sao);
+    ghi tệp(đích, "cũ");
+    in sao chép tệp(nguồn, đích) == 1;
+    in đọc tệp(đích) == nội dung sao;
+    xóa đường dẫn(nguồn);
+    lỗi sao = sai;
+    thử { sao chép tệp(nguồn, đích); } bắt lỗi(e) { lỗi sao = e != "sao chép tệp: errno=0"; };
+    in lỗi sao && đọc tệp(đích) == nội dung sao;
+    xóa đường dẫn(đích);
+
     thử { đọc tệp(".tmp_ffi_file_does_not_exist"); }
     bắt lỗi(e) { in "chặn tệp thiếu"; };
     thử { ghi tệp(".tmp_ffi_file_bad" + chuỗi từ byte máy ảo([0]), "X"); }

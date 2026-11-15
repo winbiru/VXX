@@ -19,6 +19,11 @@ hàm chính() {
     in hỏng["đầu ra"] == "";
     in độ dài(hỏng["lỗi"]) > 0;
 
+    // A real program exiting 127 is distinct from exec failure.
+    thoát_127 = chạy tiến trình("/bin/sh", ["-c", "exit 127"]);
+    in thoát_127["khởi chạy"] && thoát_127["mã thoát"] == 127;
+    in thoát_127["lỗi"] == "";
+
     nhị_phân = chạy tiến trình("/bin/sh", ["-c", "printf '\\000\\303\\251'"]);
     in nhị_phân["khởi chạy"];
     các byte = chuỗi thành byte máy ảo(nhị_phân["đầu ra"]);

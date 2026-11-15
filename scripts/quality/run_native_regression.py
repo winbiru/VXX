@@ -458,7 +458,9 @@ def jit_i32_io(case, jit, source, cwd, env, logs, timeout):
     kind = case["cmake"]
 
     def check(path, label, stdout=None, diagnostic=None, stdin=None):
-        status = execute([jit, path], cwd, env, logs, label, timeout, stdin=stdin)
+        # Standalone i32 literals and byte/file handles need a fresh arena,
+        # rather than the compiler's ordinary function-call arena.
+        status = execute([jit, "--raw-program", path], cwd, env, logs, label, timeout, stdin=stdin)
         out = (logs / (label + ".stdout")).read_bytes()
         err = (logs / (label + ".stderr")).read_bytes()
         if diagnostic is not None:
@@ -528,7 +530,7 @@ def jit_i32_frontend(case, jit, source, cwd, env, logs, timeout):
     parts.append(source)
     combined = cwd / "frontend.vi"
     combined.write_text("\n".join(re.sub(r"(?m)^[ \t]*nhập[^\n]*;[ \t]*$", "", part.read_text(encoding="utf-8")) for part in parts), encoding="utf-8")
-    status = execute([jit, combined], cwd, env, logs, "run", timeout)
+    status = execute([jit, "--raw-program", combined], cwd, env, logs, "run", timeout)
     if status or normalize((logs / "run.stdout").read_bytes()) != b"20261017\n" or (logs / "run.stderr").read_bytes():
         raise RuntimeError(f"native JIT frontend failed: {status}")
     if not parser:
@@ -546,7 +548,7 @@ def jit_i32_frontend(case, jit, source, cwd, env, logs, timeout):
     for label, code, diagnostic in probes:
         path = cwd / (label + ".vi")
         path.write_text(code + "\n", encoding="utf-8")
-        status = execute([jit, path], cwd, env, logs, label, timeout)
+        status = execute([jit, "--raw-program", path], cwd, env, logs, label, timeout)
         if status != 1 or diagnostic.encode() not in (logs / (label + ".stdout")).read_bytes() + (logs / (label + ".stderr")).read_bytes():
             raise RuntimeError(f"{label}: native JIT parser did not reject with {diagnostic}")
 
@@ -564,7 +566,7 @@ def jit_i32_codegen(jit, source, cwd, env, logs, timeout):
     combined = cwd / "codegen.vi"
     combined.write_text("\n".join(re.sub(r"(?m)^[ \t]*nhập[^\n]*;[ \t]*$", "", part.read_text(encoding="utf-8"))
                                   for part in [*parts, source]), encoding="utf-8")
-    status = execute([jit, combined], cwd, env, logs, "run", timeout)
+    status = execute([jit, "--raw-program", combined], cwd, env, logs, "run", timeout)
     if status or normalize((logs / "run.stdout").read_bytes()) != b"20261017\n" or (logs / "run.stderr").read_bytes():
         raise RuntimeError(f"native JIT codegen failed: {status}")
     obj = cwd / "native-codegen-output.o"
@@ -777,6 +779,10 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             combined = cwd / "logical-side-effects.vi"
             combined.write_text((ROOT / module).read_text(encoding="utf-8") + "\n" + text.replace(directive, "", 1), encoding="utf-8")
             command = [jit, combined]
+        elif jit is not None and case["id"] == "i32-logical-call-side-effects":
+            # This oracle checks the i32 frontend's short-circuit lowering.
+            # The dynamic bytecode frontend has eager logical operators.
+            command = [jit, "--raw-program", source, *args]
         else:
             command = [jit, "--dynamic", source, *args] if jit is not None else [binary, *args]
         status = execute(command, cwd, env, logs, "run", timeout)

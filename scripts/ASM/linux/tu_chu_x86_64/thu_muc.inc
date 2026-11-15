@@ -50,6 +50,11 @@ vpp_native_os_directory:
     cmpl $6, %r15d
     ja Lvm_thu_muc_sai_x86
     jne 1f
+    cmpl $1, %r13d
+    jne 2f
+    movl $120000000, %eax
+    jmp Lvm_thu_muc_tra_ve_x86
+2:
     movl $1, %eax
     jmp Lvm_thu_muc_tra_ve_x86
 1:
@@ -57,7 +62,7 @@ vpp_native_os_directory:
     jz Lvm_thu_muc_duong_x86
     cmpl $3, %r15d
     jae Lvm_thu_muc_duong_x86
-    cmpl $68162544, %r13d
+    cmpl $(135271424 - 16), %r13d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r13d
     jnz Lvm_thu_muc_sai_x86
@@ -66,7 +71,7 @@ vpp_native_os_directory:
     jne Lvm_thu_muc_da_dong_x86
     cmpl $2, %r15d
     je Lvm_thu_muc_dong_x86
-    cmpl $68154368, %r14d
+    cmpl $(135271424 - 8192), %r14d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r14
     movq (%r13), %rdi
@@ -95,7 +100,7 @@ Lvm_thu_muc_dong_x86:
     leave
     ret
 Lvm_thu_muc_duong_x86:
-    cmpl $68158464, %r13d
+    cmpl $(135271424 - 4096), %r13d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r13
     movq %r13, %rax
@@ -114,7 +119,7 @@ Lvm_thu_muc_duong_x86:
     je Lvm_thu_muc_tao_thu_muc_x86
     cmpl $3, %r15d
     je Lvm_thu_muc_xoa_x86
-    cmpl $68162544, %r14d
+    cmpl $(135271424 - 16), %r14d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r14d
     jnz Lvm_thu_muc_sai_x86
@@ -140,7 +145,7 @@ Lvm_thu_muc_tra_ve_x86:
     leave
     ret
 Lvm_thu_muc_doc_lien_ket_x86:
-    cmpl $68158464, %r14d
+    cmpl $(135271424 - 4096), %r14d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r14
     movl $-100, %edi

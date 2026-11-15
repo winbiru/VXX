@@ -28,7 +28,7 @@ hàm graph_fixture(root, work, target) {
     source = work + "/source"; build = work + "/build";
     tạo thư mục(source);
     sao chép tệp(root + "/CMakeLists.txt", source + "/CMakeLists.txt");
-    parts = ["bootstrap/macos-arm64/vpp-native", "bootstrap/macos-arm64/vpp-i32", "bootstrap/macos-arm64/SHA256SUMS", "scripts/build-vpp-aot-runtime.sh", "scripts/build-vpp-progress.sh", "scripts/macos/vpp-native-launcher.sh.in", "gói/máy ảo/chính.vi", "gói/biên dịch/dòng lệnh JIT.vi", "scripts/ASM/fixture.inc", "vpp-language.json", "vpp-libraries.json"];
+    parts = ["bootstrap/macos-arm64/vpp-native", "bootstrap/macos-arm64/vpp-i32", "bootstrap/macos-arm64/SHA256SUMS", "bootstrap/macos-arm64/vpp-full.S.gz", "scripts/build-vpp-aot-runtime.sh", "scripts/build-vpp-progress.sh", "scripts/macos/vpp-native-launcher.sh.in", "gói/máy ảo/chính.vi", "gói/biên dịch/dòng lệnh JIT.vi", "scripts/ASM/fixture.inc", "vpp-language.json", "vpp-libraries.json"];
     lặp(i = 0; i < độ dài(parts); i++) {
         path = source + "/" + parts[i];
         tạo thư mục(đường dẫn cha(path)); ghi tệp(path, "");

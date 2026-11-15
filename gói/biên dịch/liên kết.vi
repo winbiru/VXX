@@ -317,8 +317,8 @@ lớp công khai Bộ Liên Kết Bytecode {
                 "slots": các ô nhớ, "chuỗi": chuỗi};
     };
 
-    hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
-        cây = biên dịch phân tích chương trình thuần(mã nguồn);
+    hàm công khai biên dịch chương trình tự chủ(mã nguồn, cây = rỗng) {
+        nếu (cây == rỗng) { cây = biên dịch phân tích chương trình thuần(mã nguồn); };
         mục = biên dịch điểm vào lớp(cây);
         nếu (mục != rỗng) { cây = biên dịch điểm vào thêm(cây, mục); };
         trả về mình.biên dịch liên kết mã trung gian thuần(
@@ -573,9 +573,9 @@ hàm công khai biên dịch liên kết mã trung gian thuần(sản phẩm bi�
     trả về bộ chuyển tiếp.biên dịch liên kết mã trung gian thuần(sản phẩm biên dịch);
 };
 
-hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
+hàm công khai biên dịch chương trình tự chủ(mã nguồn, cây = rỗng) {
     bộ chuyển tiếp = Bộ Liên Kết Bytecode();
-    trả về bộ chuyển tiếp.biên dịch chương trình tự chủ(mã nguồn);
+    trả về bộ chuyển tiếp.biên dịch chương trình tự chủ(mã nguồn, cây);
 };
 
 hàm công khai biên dịch liên kết đồ thị thuần(đồ thị, số worker = rỗng) {

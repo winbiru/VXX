@@ -66,11 +66,22 @@ export VPP_AOT_NATIVE_MACHO_LINK=0 VPP_AOT_NATIVE_ARM64_OBJECT=0
 export VPP_AOT_ASSEMBLER=/usr/bin/clang
 # CI follows the same two current-source self-builds as Linux and Windows.
 # Normal developer builds still compile the current full source here.
+# Relink the bundled compiler code with this checkout's runtime, just as
+# Linux/Windows do. A copied executable embeds an obsolete heap/host ABI.
+if [[ "$full" == "$root/bootstrap/macos-arm64/vpp-native" ]]; then
+  progress 50 'Liên kết seed V++ với runtime hiện tại'
+  gzip -dc "$root/bootstrap/macos-arm64/vpp-full.S.gz" > "$bootstrap_runtime/full-seed.S"
+  /usr/bin/clang -c "$bootstrap_runtime/full-seed.S" -o "$bootstrap_runtime/full-seed.o"
+  /usr/bin/clang "$bootstrap_runtime/full-seed.o" "$bootstrap_runtime/runtime.o" \
+    "$bootstrap_runtime/platform.o" -o "$bootstrap_runtime/full-seed"
+  full="$bootstrap_runtime/full-seed"
+  audit "$full"
+fi
 if [[ "$pinned_stage1" == ON ]]; then
   progress 50 'Sử dụng seed V++ đầy đủ đã kiểm tra cho Stage 1'
   cp "$full" "$out/bin/vpp-native.new"
   chmod 755 "$out/bin/vpp-native.new"
-  printf 'Stage 1: pinned full seed; current-source builds follow in Stages 2/3.\n' > "$out/full-compiler-profile.log"
+  printf 'Stage 1: audited seed; current-source builds follow in Stages 2/3.\n' > "$out/full-compiler-profile.log"
 else
   progress 50 'Biên dịch và kiểm tra bộ biên dịch V++ đầy đủ'
   # Report completed compiler phases without flooding the build log.

@@ -277,7 +277,7 @@ hàm pe rt tạo(coff, runtime, kết quả) {
             lặp (j = 0; j < 3; j++) { byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0); };
             đối tượng i32(kết quả, 0); đối tượng i32(kết quả, data rva + macho rt căn(byte dài(dữ liệu), 4096)); đối tượng i32(kết quả, 512); đối tượng i32(kết quả, 0);
             byte thêm(kết quả, 3); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 1);
-            đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096); đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+            đối tượng u64(kết quả, 67108864); đối tượng u64(kết quả, 4096); đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
             đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 16);
             lặp (j = 0; j < 16; j++) {
                 biến v = 0; biến kích thước thư mục dữ liệu = 0;

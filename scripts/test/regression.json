@@ -2134,7 +2134,8 @@
       "source": "scripts/test/fixtures/native_i32_expression_error.vi",
       "suite": "full",
       "expected": "scripts/test/expected/native_i32_expression_error.expected",
-      "exit": 1
+      "exit": 1,
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native_i32_nested_calls",
@@ -2146,10 +2147,7 @@
       "id": "native_linux_heap_capacity",
       "source": "scripts/test/fixtures/native_linux_heap_capacity.vi",
       "expected": "scripts/test/expected/native_linux_heap_capacity.expected",
-      "suite": "full",
-      "platforms": [
-        "Linux"
-      ]
+      "suite": "full"
     },
     {
       "id": "native_loop_stack_gc",

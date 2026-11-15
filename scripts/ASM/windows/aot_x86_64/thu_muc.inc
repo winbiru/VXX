@@ -9,7 +9,10 @@ vpp_native_os_directory:
     cmpl $6, %r12d
     jne 1f
     movl $2, %eax
-    WIN_RA
+    cmpl $1, %r13d
+    jne 2f
+    movl $120000000, %eax
+2:  WIN_RA
 1:  testl %r13d, %r13d
     jz .Lwin_khong_hop_le
     cmpl $(VPP_ARENA_SIZE-8192), %r13d

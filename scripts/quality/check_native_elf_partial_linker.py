@@ -153,7 +153,9 @@ def execute(executable_harness, obj, directory, label, success=True):
     executable.write_bytes(sentinel)
     result = subprocess.run(probe_command(executable_harness, archive, executable),
                             env=dict(os.environ, VPP_NATIVE_ELF_LINK="1",
-                                     VPP_HOME=str(host_root)),
+                                     VPP_HOME=str(host_root),
+                                     HOME=str(directory / "unrelated-user-home")),
+                            cwd=directory,
                             capture_output=True, timeout=120)
     (directory / (label + ".log")).write_bytes(result.stdout + result.stderr)
     assert result.returncode == (0 if success else 1), (

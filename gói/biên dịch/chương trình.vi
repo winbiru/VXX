@@ -10,8 +10,8 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 
 // API parser thuần V++: không gọi snapshot / compiler C++.
-hàm công khai biên dịch phân tích chương trình thuần(mã nguồn) {
-    bộ = Bộ Phân Tích Cú Pháp(mã nguồn);
+hàm công khai biên dịch phân tích chương trình thuần(mã nguồn, các từ tố = rỗng) {
+    bộ = Bộ Phân Tích Cú Pháp(mã nguồn, các từ tố);
     trả về bộ.phân tích();
 };
 

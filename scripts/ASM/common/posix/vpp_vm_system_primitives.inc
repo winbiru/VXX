@@ -7,11 +7,7 @@
 #define VM_SYS_SYM(x) x
 #define VM_SYS_LIB(x) x@PLT
 #endif
-#ifdef VPP_VM_SYSTEM_FREESTANDING
 #define VM_SYS_X86_ARENA 135271424
-#else
-#define VM_SYS_X86_ARENA 68162560
-#endif
 .text
 #if defined(__aarch64__) || defined(__arm64__)
 .macro VM_VAO_HE_THONG
@@ -35,7 +31,7 @@ VM_SYS_SYM(vpp_native_os_clock):
     b.hi Lvm_he_thong_sai_bat
     tbnz w20, #31, Lvm_he_thong_sai_bat
     mov w10, #0x13f0           // Kích thước vùng nhớ trừ sizeof(timespec)
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w20, w10
     b.hi Lvm_he_thong_sai_bat
     add x1, x21, w20, uxtw
@@ -64,7 +60,7 @@ VM_SYS_SYM(vpp_native_os_thread_cpu_clock):
     VM_VAO_HE_THONG
     tbnz w20, #31, Lvm_he_thong_sai_bat
     mov w10, #0x13f0
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w20, w10
     b.hi Lvm_he_thong_sai_bat
     add x1, x21, w20, uxtw
@@ -124,7 +120,7 @@ VM_SYS_SYM(vpp_native_os_entropy):
     uxtw x10, w19
     add x10, x10, w20, uxtw
     mov w11, #0x1400
-    movk w11, #0x410, lsl #16
+    movk w11, #0x810, lsl #16
     cmp x10, x11
     b.hi Lvm_he_thong_sai_bat
     add x0, x21, w19, uxtw

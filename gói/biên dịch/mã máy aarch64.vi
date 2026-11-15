@@ -6,11 +6,12 @@
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
 nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy chuẩn hóa CFG;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phát AARCH64 {
-    hàm công khai khởi tạo() { mình.phân khối = sai; mình.từ jit = sai; mình.số byte = 0; };
+    hàm công khai khởi tạo() { mình.phân khối = sai; mình.từ jit = sai; mình.số byte = 0; mình.khối hiện tại = []; };
 
     hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
@@ -38,15 +39,21 @@ lớp công khai Bộ Phát AARCH64 {
     // offsets remain byte offsets; the legacy encoder returns a flat list.
     hàm riêng tư biên dịch mã máy aarch64 từ máy(ra, từ máy) {
         nếu (mình.từ jit) {
-            nếu (mình.số byte % 8192 == 0) { bỏ kết quả = máy ảo thêm cuối danh sách(ra, []); };
-            bỏ kết quả = máy ảo thêm cuối danh sách(ra[máy ảo lấy độ dài(ra) - 1], từ máy);
+            nếu (mình.số byte % 8192 == 0) {
+                mình.khối hiện tại = [];
+                bỏ kết quả = máy ảo thêm cuối danh sách(ra, mình.khối hiện tại);
+            };
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.khối hiện tại, từ máy);
             mình.số byte = mình.số byte + 4;
             trả về 0;
         };
         đích byte = ra;
         nếu (mình.phân khối) {
-            nếu (mình.số byte % 2048 == 0) { bỏ kết quả = máy ảo thêm cuối danh sách(ra, []); };
-            đích byte = ra[máy ảo lấy độ dài(ra) - 1];
+            nếu (mình.số byte % 2048 == 0) {
+                mình.khối hiện tại = [];
+                bỏ kết quả = máy ảo thêm cuối danh sách(ra, mình.khối hiện tại);
+            };
+            đích byte = mình.khối hiện tại;
         };
         bỏ kết quả = máy ảo thêm cuối danh sách(đích byte, từ máy & 255);
         bỏ kết quả = máy ảo thêm cuối danh sách(đích byte, (từ máy >> 8) & 255);
@@ -89,12 +96,18 @@ lớp công khai Bộ Phát AARCH64 {
     };
 
     hàm riêng tư biên dịch mã máy aarch64 nạp hằng(ra, đích, giá trị) {
-        nửa = biên dịch mã máy trả về(giá trị);
+        nếu (giá trị < -2147483647 - 1 || giá trị > 2147483647) {
+            ném "mã máy V++: hằng nằm ngoài i32";
+        };
+        // MOVZ/MOVK only need the two unsigned halves; avoid allocating a
+        // temporary dictionary for every constant in the machine emitter.
+        thấp = giá trị & 65535;
+        cao = (giá trị >> 16) & 65535;
         bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra,
-            1384120320 + nửa["lo"] * 32 + đích);
-        nếu (nửa["hi"] != 0) {
+            1384120320 + thấp * 32 + đích);
+        nếu (cao != 0) {
             bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra,
-                1923088384 + nửa["hi"] * 32 + đích);
+                1923088384 + cao * 32 + đích);
         };
     };
 
@@ -143,7 +156,18 @@ lớp công khai Bộ Phát AARCH64 {
             hoặc { bỏ kết quả = mình.biên dịch mã máy aarch64 chuyển(ra, vị trí, thành ghi); };
             trả về;
         };
-        bỏ kết quả = mình.biên dịch mã máy aarch64 truy cập byte(ra, tải, thành ghi, ô nhớ * 4);
+        // Most dynamic frames use encodable stack offsets. Emit that word
+        // directly rather than entering the general large-offset helper for
+        // every load/store. Keep identical checks and the large-frame path.
+        độ lệch = ô nhớ * 4;
+        nếu (độ lệch >= 0 && độ lệch <= 16380) {
+            cơ sở = -1191182336;
+            nếu (tải) { cơ sở = -1186988032; };
+            bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra,
+                cơ sở + độ lệch * 256 + 992 + thành ghi);
+        } hoặc {
+            bỏ kết quả = mình.biên dịch mã máy aarch64 truy cập byte(ra, tải, thành ghi, độ lệch);
+        };
     };
 
     // Nhận IR đã được CFG validator kiểm tra depth tại các điểm nối.
@@ -159,67 +183,16 @@ lớp công khai Bộ Phát AARCH64 {
             sâu nhất < 0 || ô nhớ + sâu nhất > 134217724 || số lệnh == 0) {
             ném "AArch64 machine IR/frame không hợp lệ";
         };
-        // Convert dynamic instruction maps once to parallel scalar arrays.
-        // Opcode IDs match MachineOpcode in raw_codegen.h; hot passes avoid
-        // per-instruction maps, strings, and temporary record allocations.
-        // Page each scalar column at 2048 entries: large compiler functions
-        // must not request a 128 KiB contiguous reference array from a
-        // fragmented nonmoving heap. The output and IR offsets are unchanged.
-        lệnh = [];
-        hằng lệnh = [];
-        toán hạng lệnh = [];
-        độ sâu lệnh = [];
-        ký hiệu lệnh = [];
-        lặp (i = 0; i < số lệnh; i += 1) {
-            nếu ((i & 2047) == 0) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(lệnh, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu lệnh, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh, []);
-            };
-            nguồn = lệnh gốc[i];
-            mã = -1;
-            chọn (nguồn["opcode"]) {
-                ca "PushConstant": { mã = 0; }
-                ca "LoadSlot": { mã = 1; }
-                ca "StoreSlot": { mã = 2; }
-                ca "Drop": { mã = 3; }
-                ca "Add": { mã = 4; }
-                ca "Sub": { mã = 5; }
-                ca "Mul": { mã = 6; }
-                ca "Div": { mã = 7; }
-                ca "Mod": { mã = 8; }
-                ca "Equal": { mã = 9; }
-                ca "NotEqual": { mã = 10; }
-                ca "Less": { mã = 11; }
-                ca "LessEqual": { mã = 12; }
-                ca "Greater": { mã = 13; }
-                ca "GreaterEqual": { mã = 14; }
-                ca "BranchZero": { mã = 15; }
-                ca "Jump": { mã = 16; }
-                ca "Call": { mã = 17; }
-                ca "Return": { mã = 18; }
-                ca "Trap": { mã = 19; }
-                ca "BitAnd": { mã = 20; }
-                ca "BitOr": { mã = 21; }
-                ca "BitXor": { mã = 22; }
-                ca "ShiftLeft": { mã = 23; }
-                ca "ShiftRight": { mã = 24; }
-                mặc định: { ném "AArch64: opcode Machine IR không hợp lệ"; }
-            };
-            bỏ kết quả = máy ảo thêm cuối danh sách(lệnh[i >> 11], mã);
-            bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh[i >> 11], nguồn["immediate"]);
-            bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh[i >> 11], nguồn["operand"]);
-            bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu lệnh[i >> 11], nguồn["depthBefore"]);
-            bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh[i >> 11], nguồn["symbol"]);
-        };
+        // Validate every instruction and reuse its paged scalar columns.
+        chuẩn = biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian);
+        lệnh = chuẩn["opcodes"];
+        hằng lệnh = chuẩn["immediates"];
+        toán hạng lệnh = chuẩn["operands"];
+        độ sâu lệnh = chuẩn["depths"];
+        ký hiệu lệnh = chuẩn["symbols"];
+        có lời gọi = chuẩn["calls"];
         bước tham số = 8;
         nếu (hệ điều hành == "macos") { bước tham số = 4; };
-        có lời gọi = sai;
-        lặp (i = 0; i < số lệnh; i += 1) {
-            nếu (lệnh[(i) >> 11][(i) & 2047] == 17) { có lời gọi = đúng; };
-        };
         giữ thành ghi = có lời gọi && tham số <= 8 && ô nhớ + sâu nhất <= 10;
         dùng thành ghi = giữ thành ghi || (!có lời gọi && tham số <= 8 && ô nhớ + sâu nhất <= 16);
         số thành ghi giữ = 0;
@@ -241,14 +214,18 @@ lớp công khai Bộ Phát AARCH64 {
         };
         lặp (i = 0; i < số lệnh; i += 1) {
             op = lệnh[(i) >> 11][(i) & 2047];
-            nếu ((op == 16 || op == 15) &&
-                toán hạng lệnh[(i) >> 11][(i) & 2047] >= 0 && toán hạng lệnh[(i) >> 11][(i) & 2047] < số lệnh) {
-                đích nhảy[(toán hạng lệnh[(i) >> 11][(i) & 2047]) >> 11][(toán hạng lệnh[(i) >> 11][(i) & 2047]) & 2047] = đúng;
+            nếu (op == 16 || op == 15) {
+                đích = toán hạng lệnh[i >> 11][i & 2047];
+                nếu (đích >= 0 && đích < số lệnh) {
+                    đích nhảy[đích >> 11][đích & 2047] = đúng;
+                };
             };
         };
         lặp (i = 0; i + 1 < số lệnh; i += 1) {
             hiện tại = lệnh[(i) >> 11][(i) & 2047];
+            nếu (hiện tại < 9 || hiện tại > 14) { bỏ qua; };
             sau = lệnh[(i + 1) >> 11][(i + 1) & 2047];
+            nếu (sau != 15) { bỏ qua; };
             mã ghép = -1;
             chọn (hiện tại) {
                 ca 9: { mã ghép = 1; }
@@ -258,9 +235,9 @@ lớp công khai Bộ Phát AARCH64 {
                 ca 13: { mã ghép = 13; }
                 ca 14: { mã ghép = 11; }
             };
-            nếu (mã ghép >= 0 && độ sâu lệnh[(i) >> 11][(i) & 2047] >= 2 &&
-                sau == 15 &&
-                độ sâu lệnh[(i + 1) >> 11][(i + 1) & 2047] == độ sâu lệnh[(i) >> 11][(i) & 2047] - 1 &&
+            sâu = độ sâu lệnh[i >> 11][i & 2047];
+            nếu (mã ghép >= 0 && sâu >= 2 &&
+                độ sâu lệnh[(i + 1) >> 11][(i + 1) & 2047] == sâu - 1 &&
                 !đích nhảy[(i + 1) >> 11][(i + 1) & 2047]) {
                 ghép nhánh[(i) >> 11][(i) & 2047] = mã ghép;
                 ghép nhánh[(i + 1) >> 11][(i + 1) & 2047] = mã ghép;
@@ -276,25 +253,49 @@ lớp công khai Bộ Phát AARCH64 {
         hằng phép tính = [];
         có hằng so sánh = [];
         hằng so sánh = [];
-        lặp (i = 0; i < số lệnh; i += 1) {
-            nếu ((i & 2047) == 0) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(bỏ nạp, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trái trực tiếp, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn phải trực tiếp, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(hằng trực tiếp, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(có hằng phép tính, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(hằng phép tính, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(có hằng so sánh, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(hằng so sánh, []);
+        nếu (!dùng thành ghi) {
+            // Stack-frame defaults are immutable. Reuse one page of each
+            // value across every page and column instead of allocating O(n)
+            // references for optimizations that cannot run on this path.
+            trang sai = [];
+            trang âm = [];
+            trang không = [];
+            lặp (i = 0; i < số lệnh && i < 2048; i += 1) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(trang sai, sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(trang âm, -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(trang không, 0);
             };
-            bỏ kết quả = máy ảo thêm cuối danh sách(bỏ nạp[i >> 11], sai);
-            bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trái trực tiếp[i >> 11], -1);
-            bỏ kết quả = máy ảo thêm cuối danh sách(nguồn phải trực tiếp[i >> 11], -1);
-            bỏ kết quả = máy ảo thêm cuối danh sách(hằng trực tiếp[i >> 11], -1);
-            bỏ kết quả = máy ảo thêm cuối danh sách(có hằng phép tính[i >> 11], sai);
-            bỏ kết quả = máy ảo thêm cuối danh sách(hằng phép tính[i >> 11], 0);
-            bỏ kết quả = máy ảo thêm cuối danh sách(có hằng so sánh[i >> 11], sai);
-            bỏ kết quả = máy ảo thêm cuối danh sách(hằng so sánh[i >> 11], 0);
+            lặp (i = 0; i < số lệnh; i += 2048) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(bỏ nạp, trang sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trái trực tiếp, trang âm);
+                bỏ kết quả = máy ảo thêm cuối danh sách(hằng phép tính, trang không);
+            };
+            nguồn phải trực tiếp = nguồn trái trực tiếp;
+            hằng trực tiếp = nguồn trái trực tiếp;
+            có hằng phép tính = bỏ nạp;
+            có hằng so sánh = bỏ nạp;
+            hằng so sánh = hằng phép tính;
+        } hoặc {
+            lặp (i = 0; i < số lệnh; i += 1) {
+                nếu ((i & 2047) == 0) {
+                    bỏ kết quả = máy ảo thêm cuối danh sách(bỏ nạp, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trái trực tiếp, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(nguồn phải trực tiếp, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(hằng trực tiếp, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(có hằng phép tính, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(hằng phép tính, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(có hằng so sánh, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(hằng so sánh, []);
+                };
+                bỏ kết quả = máy ảo thêm cuối danh sách(bỏ nạp[i >> 11], sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trái trực tiếp[i >> 11], -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn phải trực tiếp[i >> 11], -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(hằng trực tiếp[i >> 11], -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(có hằng phép tính[i >> 11], sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(hằng phép tính[i >> 11], 0);
+                bỏ kết quả = máy ảo thêm cuối danh sách(có hằng so sánh[i >> 11], sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(hằng so sánh[i >> 11], 0);
+            };
         };
         nếu (dùng thành ghi) {
             lặp (i = 0; i + 2 < số lệnh; i += 1) {
@@ -369,34 +370,34 @@ lớp công khai Bộ Phát AARCH64 {
         // hằng ở mỗi vòng; các phép khác dùng W9 nếu cần scratch.
         // Mark all back-edge intervals with a difference array. Repeatedly
         // filling [target, branch] becomes quadratic for nested loops.
-        thay đổi vòng = [];
-        lặp (i = 0; i <= số lệnh; i += 1) {
-            nếu ((i & 2047) == 0) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(thay đổi vòng, []);
-            };
-            bỏ kết quả = máy ảo thêm cuối danh sách(thay đổi vòng[i >> 11], 0);
-        };
-        lặp (i = 0; i < số lệnh; i += 1) {
-            op = lệnh[(i) >> 11][(i) & 2047];
-            nếu ((op == 16 || op == 15) &&
-                toán hạng lệnh[(i) >> 11][(i) & 2047] >= 0 && toán hạng lệnh[(i) >> 11][(i) & 2047] < i) {
-                đầu vòng = toán hạng lệnh[(i) >> 11][(i) & 2047];
-                thay đổi vòng[(đầu vòng) >> 11][(đầu vòng) & 2047] = thay đổi vòng[(đầu vòng) >> 11][(đầu vòng) & 2047] + 1;
-                thay đổi vòng[(i + 1) >> 11][(i + 1) & 2047] = thay đổi vòng[(i + 1) >> 11][(i + 1) & 2047] - 1;
-            };
-        };
-        trong vòng = [];
-        vòng đang mở = 0;
-        lặp (i = 0; i < số lệnh; i += 1) {
-            nếu ((i & 2047) == 0) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(trong vòng, []);
-            };
-            vòng đang mở += thay đổi vòng[(i) >> 11][(i) & 2047];
-            bỏ kết quả = máy ảo thêm cuối danh sách(trong vòng[i >> 11], vòng đang mở > 0);
-        };
         có hằng giữ = sai;
         hằng giữ = 0;
         nếu (dùng thành ghi && !có lời gọi) {
+            thay đổi vòng = [];
+            lặp (i = 0; i <= số lệnh; i += 1) {
+                nếu ((i & 2047) == 0) {
+                    bỏ kết quả = máy ảo thêm cuối danh sách(thay đổi vòng, []);
+                };
+                bỏ kết quả = máy ảo thêm cuối danh sách(thay đổi vòng[i >> 11], 0);
+            };
+            lặp (i = 0; i < số lệnh; i += 1) {
+                op = lệnh[(i) >> 11][(i) & 2047];
+                nếu ((op == 16 || op == 15) &&
+                    toán hạng lệnh[(i) >> 11][(i) & 2047] >= 0 && toán hạng lệnh[(i) >> 11][(i) & 2047] < i) {
+                    đầu vòng = toán hạng lệnh[(i) >> 11][(i) & 2047];
+                    thay đổi vòng[(đầu vòng) >> 11][(đầu vòng) & 2047] = thay đổi vòng[(đầu vòng) >> 11][(đầu vòng) & 2047] + 1;
+                    thay đổi vòng[(i + 1) >> 11][(i + 1) & 2047] = thay đổi vòng[(i + 1) >> 11][(i + 1) & 2047] - 1;
+                };
+            };
+            trong vòng = [];
+            vòng đang mở = 0;
+            lặp (i = 0; i < số lệnh; i += 1) {
+                nếu ((i & 2047) == 0) {
+                    bỏ kết quả = máy ảo thêm cuối danh sách(trong vòng, []);
+                };
+                vòng đang mở += thay đổi vòng[(i) >> 11][(i) & 2047];
+                bỏ kết quả = máy ảo thêm cuối danh sách(trong vòng[i >> 11], vòng đang mở > 0);
+            };
             // Count loop candidates once, then choose the first eligible
             // instruction with at least two occurrences, as before.
             tần số hằng = {};
@@ -435,17 +436,24 @@ lớp công khai Bộ Phát AARCH64 {
         đích ghi thẳng = [];
         nguồn gán thẳng = [];
         nguồn trả thẳng = [];
-        lặp (i = 0; i < số lệnh; i += 1) {
-            nếu ((i & 2047) == 0) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(bỏ lưu, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(đích ghi thẳng, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn gán thẳng, []);
-                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trả thẳng, []);
+        nếu (!dùng thành ghi) {
+            bỏ lưu = bỏ nạp;
+            đích ghi thẳng = nguồn trái trực tiếp;
+            nguồn gán thẳng = nguồn trái trực tiếp;
+            nguồn trả thẳng = nguồn trái trực tiếp;
+        } hoặc {
+            lặp (i = 0; i < số lệnh; i += 1) {
+                nếu ((i & 2047) == 0) {
+                    bỏ kết quả = máy ảo thêm cuối danh sách(bỏ lưu, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(đích ghi thẳng, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(nguồn gán thẳng, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trả thẳng, []);
+                };
+                bỏ kết quả = máy ảo thêm cuối danh sách(bỏ lưu[i >> 11], sai);
+                bỏ kết quả = máy ảo thêm cuối danh sách(đích ghi thẳng[i >> 11], -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn gán thẳng[i >> 11], -1);
+                bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trả thẳng[i >> 11], -1);
             };
-            bỏ kết quả = máy ảo thêm cuối danh sách(bỏ lưu[i >> 11], sai);
-            bỏ kết quả = máy ảo thêm cuối danh sách(đích ghi thẳng[i >> 11], -1);
-            bỏ kết quả = máy ảo thêm cuối danh sách(nguồn gán thẳng[i >> 11], -1);
-            bỏ kết quả = máy ảo thêm cuối danh sách(nguồn trả thẳng[i >> 11], -1);
         };
         nếu (dùng thành ghi) {
             lặp (i = 0; i + 2 < số lệnh; i += 1) {
@@ -528,13 +536,18 @@ lớp công khai Bộ Phát AARCH64 {
             chọn (mã) {
                 ca 0: {
                     nếu (d >= sâu nhất) { ném "ARM64 eval stack overflow"; };
-                    nửa = biên dịch mã máy trả về(hằng lệnh[(i) >> 11][(i) & 2047]);
+                    giá trị hằng = hằng lệnh[i >> 11][i & 2047];
+                    nếu (giá trị hằng < -2147483647 - 1 || giá trị hằng > 2147483647) {
+                        ném "mã máy V++: hằng nằm ngoài i32";
+                    };
+                    thấp = giá trị hằng & 65535;
+                    cao = (giá trị hằng >> 16) & 65535;
                     đích = 9;
                     nếu (dùng thành ghi) { đích = mình.biên dịch mã máy aarch64 thành ghi(ô nhớ + d, giữ thành ghi); };
                     nếu (đích ghi thẳng[(i) >> 11][(i) & 2047] >= 0) { đích = mình.biên dịch mã máy aarch64 thành ghi(đích ghi thẳng[(i) >> 11][(i) & 2047], giữ thành ghi); };
-                    bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra, 1384120320 + nửa["lo"] * 32 + đích);
-                    nếu (!dùng thành ghi || nửa["hi"] != 0) {
-                        bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra, 1923088384 + nửa["hi"] * 32 + đích);
+                    bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra, 1384120320 + thấp * 32 + đích);
+                    nếu (!dùng thành ghi || cao != 0) {
+                        bỏ kết quả = mình.biên dịch mã máy aarch64 từ máy(ra, 1923088384 + cao * 32 + đích);
                     };
                     nếu (đích ghi thẳng[(i) >> 11][(i) & 2047] < 0) {
                         bỏ kết quả = mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, ô nhớ + d, dùng thành ghi, giữ thành ghi);
@@ -710,6 +723,7 @@ lớp công khai Bộ Phát AARCH64 {
             nếu (giá trị < 0) { giá trị += mô đun; };
             bỏ kết quả = mình.vá từ máy(ra, f["vị trí"], cơ sở + giá trị * hệ số);
         };
+        mình.khối hiện tại = [];
         nếu (từ jit) { trả về {"wordChunks": ra, "size": mình.số byte, "relocations": tái định vị}; };
         nếu (phân khối) { trả về {"chunks": ra, "size": mình.số byte, "relocations": tái định vị}; };
         trả về {"bytes": ra, "relocations": tái định vị};

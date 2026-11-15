@@ -47,9 +47,9 @@ VMSOCK_SYM(vpp_native_os_socket):
     cbz x0, Lo_cam_sai_a
     cmp w19, #10
     b.hi Lo_cam_sai_a
-// Vùng nhớ 68162560 byte; khối điều khiển 128 byte, căn theo 16 byte.
+// Vùng nhớ 135271424 byte; khối điều khiển 128 byte, căn theo 16 byte.
     mov w9, #4992
-    movk w9, #1040, lsl #16
+    movk w9, #2064, lsl #16
     cmp w21, w9
     b.hi Lo_cam_sai_a
     tst w21, #15
@@ -398,7 +398,7 @@ Lo_cam_nhap_xuat_a:
     ldr w21, [x20, #16]
 // Yêu cầu độ lệch + độ dài không vượt kích thước vùng nhớ.
     mov w10, #5120
-    movk w10, #1040, lsl #16
+    movk w10, #2064, lsl #16
     cmp w21, w10
     b.hs Lo_cam_sai_a
     add w11, w21, w9

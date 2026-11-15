@@ -27,8 +27,8 @@
 // Kiểm tra giới hạn cũng ngăn khối điều khiển 1024 byte bị tràn.
     cmp w22, #0
     b.lt Ltien_trinh_khong_hop_le_bat
-    mov w10, #0x52c0
-    movk w10, #0x3fe, lsl #16 // 67000000 - 1024 = 0x03fe 52c0
+    mov w10, #((120000000 - 1024) & 0xffff)
+    movk w10, #((120000000 - 1024) >> 16), lsl #16
     cmp w22, w10
     b.hi Ltien_trinh_khong_hop_le_bat
     tst w22, #15
@@ -75,12 +75,12 @@ Ltien_trinh_tao_bat:
     b.ne Ltien_trinh_khong_hop_le_bat
     tst w11, #7
     b.ne Ltien_trinh_khong_hop_le_bat
-    mov w12, #0x54c0
-    movk w12, #0x3fe, lsl #16 // 67000000 - 512
+    mov w12, #((120000000 - 512) & 0xffff)
+    movk w12, #((120000000 - 512) >> 16), lsl #16
     cmp w10, w12
     b.hi Ltien_trinh_khong_hop_le_bat
-    mov w12, #0x52b8
-    movk w12, #0x3fe, lsl #16 // 67000000 - 1032
+    mov w12, #((120000000 - 1032) & 0xffff)
+    movk w12, #((120000000 - 1032) >> 16), lsl #16
     cmp w11, w12
     b.hi Ltien_trinh_khong_hop_le_bat
     add x22, x21, w10, uxtw
@@ -95,8 +95,8 @@ Ltien_trinh_argv_bat:
     movk w12, #0x80, lsl #16 // 8388624, kích thước dữ liệu heap tối thiểu
     cmp w11, w12
     b.lo Ltien_trinh_khong_hop_le_bat
-    mov w12, #0x46c0
-    movk w12, #0x3fe, lsl #16 // 67000000 - 4096
+    mov w12, #((120000000 - 4096) & 0xffff)
+    movk w12, #((120000000 - 4096) >> 16), lsl #16
     cmp w11, w12
     b.hi Ltien_trinh_khong_hop_le_bat
     add x13, x21, w11, uxtw
@@ -226,13 +226,13 @@ Ltien_trinh_them_dong_bat:
     b.ne Ltien_trinh_sai_moi_truong_bat
     tst w11, #7
     b.ne Ltien_trinh_sai_moi_truong_bat
-    mov w12, #0x54c0
-    movk w12, #0x3fe, lsl #16
+    mov w12, #((120000000 - 512) & 0xffff)
+    movk w12, #((120000000 - 512) >> 16), lsl #16
     cmp w10, w12
     b.hi Ltien_trinh_sai_moi_truong_bat
 // Dùng giới hạn cấp phát an toàn 33824 byte.
-    mov w12, #0xd2a0       // 67000000 - 33824 = 0x03fd d2a0
-    movk w12, #0x3fd, lsl #16
+    mov w12, #((120000000 - 33824) & 0xffff)
+    movk w12, #((120000000 - 33824) >> 16), lsl #16
     cmp w11, w12
     b.hi Ltien_trinh_sai_moi_truong_bat
     add x22, x21, w10, uxtw
@@ -254,8 +254,8 @@ Ltien_trinh_moi_truong_kiem_tra_ghi_de_bat:
     movk w13, #0x80, lsl #16
     cmp w12, w13
     b.lo Ltien_trinh_sai_moi_truong_bat
-    mov w13, #0x46c0
-    movk w13, #0x3fe, lsl #16
+    mov w13, #((120000000 - 4096) & 0xffff)
+    movk w13, #((120000000 - 4096) >> 16), lsl #16
     cmp w12, w13
     b.hi Ltien_trinh_sai_moi_truong_bat
     add x11, x21, w12, uxtw
@@ -294,8 +294,8 @@ Ltien_trinh_moi_truong_them_ghi_de_bat:
     movk w13, #0x80, lsl #16
     cmp w12, w13
     b.lo Ltien_trinh_sai_moi_truong_bat
-    mov w13, #0x46c0
-    movk w13, #0x3fe, lsl #16
+    mov w13, #((120000000 - 4096) & 0xffff)
+    movk w13, #((120000000 - 4096) >> 16), lsl #16
     cmp w12, w13
     b.hi Ltien_trinh_sai_moi_truong_bat
     add x12, x21, w12, uxtw
@@ -447,8 +447,8 @@ Ltien_trinh_doc_bat:
     ldr w9, [x20, #32]
     cmp w9, #0
     b.lt Ltien_trinh_khong_hop_le_bat
-    mov w10, #0x56c0
-    movk w10, #0x3fe, lsl #16
+    mov w10, #((120000000 - 0) & 0xffff)
+    movk w10, #((120000000 - 0) >> 16), lsl #16
     sub w10, w10, w23
     cmp w9, w10
     b.hi Ltien_trinh_khong_hop_le_bat
@@ -588,9 +588,8 @@ Ltien_trinh_khong_hop_le_bat:
 #else
 #if defined(__x86_64__)
 #if defined(__linux__)
-// Bộ biên dịch tự chủ dùng chung mã tiến trình độc lập. Nhánh này kiểm tra theo vùng nhớ khởi động
-// 67 MB; bộ thực thi độc lập có vùng nhớ lớn hơn.
-#define PR_ARENA 67000000
+// Bộ biên dịch tự chủ dùng chung vùng nhớ và mã tiến trình độc lập.
+#define PR_ARENA 135271424
 #if !defined(VPP_PROCESS_HOST_INITIAL_ENVP)
 #define VPP_PROCESS_HOST_ENVIRON 1
 #endif

@@ -17,6 +17,14 @@ hàm chính() {
     nếu (máy đường loại(tệp, 1) != loại tệp || máy đường loại(tệp, 0) != loại tệp) { ném "file kind"; };
     nếu (máy đường loại(thiếu, 1) != -1 || máy đường loại(thiếu, 0) != -1) { ném "missing kind"; };
     nếu (!là thư mục(gốc) || là tệp(gốc) || !là tệp(tệp) || là thư mục(tệp) || đường dẫn tồn tại(thiếu)) { ném "public path predicates"; };
+    lỗi = sai;
+    thử { là tệp(tệp + chuỗi từ byte máy ảo([0]) + "suffix"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    nếu (!lỗi) { ném "path predicate accepted embedded NUL"; };
+    lỗi = sai;
+    thử { đường dẫn tuyệt đối(tệp + chuỗi từ byte máy ảo([0])); }
+    bắt lỗi(e) { lỗi = đúng; };
+    nếu (!lỗi) { ném "absolute path accepted embedded NUL"; };
     nếu (xóa đường dẫn(gốc) != 2 || đường dẫn tồn tại(gốc)) { ném "recursive directory cleanup"; };
     in "NATIVE PATH KIND OK";
 };

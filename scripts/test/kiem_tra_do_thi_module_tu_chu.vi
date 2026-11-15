@@ -71,6 +71,15 @@ hàm chính() {
     in lỗi;
 
     // Đường dẫn lexical ổn định, import không có hậu tố .vi.
+    nếu (biên dịch đồ thị chuẩn đường("gói/biên dịch/đồ thị.vi") != "gói/biên dịch/đồ thị.vi" ||
+        biên dịch đồ thị chuẩn đường("gói//./dữ liệu/../biên dịch/") != "gói/biên dịch" ||
+        biên dịch đồ thị chuẩn đường(".ẩn/..tệp/a.b") != ".ẩn/..tệp/a.b") {
+        ném "Graph path normalization changed";
+    };
+    lỗi = sai;
+    thử { biên dịch đồ thị chuẩn đường("gói/a\\b"); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "dấu phân cách Windows"); };
+    nếu (!lỗi) { ném "Graph accepted Windows separator"; };
     in biên dịch đồ thị chuẩn đường("a/./b/../c") == "a/c";
     in biên dịch đồ thị đích nhập("app/main", "../lib/common") == "lib/common";
     cây = biên dịch phân tích chương trình thuần(

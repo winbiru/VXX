@@ -31,6 +31,7 @@ hàm chính() {
         biến help = "V++ VM ASM: vpp-vm <program.vmb> [compiler arguments]\n"; byte in(help); byte hủy(help); trả về 2;
     };
     vm_init();
+    nếu (máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
     biến platform = máy thư mục thô(6, 0, 0);
     nếu (platform < 0 || platform > 2) { trả về 1; };
     vm_set(4198464, 8, platform);

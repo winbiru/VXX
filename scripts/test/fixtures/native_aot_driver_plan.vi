@@ -12,6 +12,8 @@ nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT chữ ký l
 nhập gói.biên dịch.trình điều khiển AOT.biên dịch AOT công bố cache tự quản;
 nhập gói.biên dịch.phiên AOT.biên dịch AOT chuẩn bị nhúng;
 nhập gói.biên dịch.nguồn tệp.biên dịch nguồn đồ thị;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn chuẩn đường;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị tìm đích;
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
@@ -19,6 +21,7 @@ nhập gói.văn bản.chuỗi.chứa chính xác;
 nhập gói.nhập xuất.đường dẫn.là thư mục;
 nhập gói.nhập xuất.đường dẫn.đường dẫn cùng tệp;
 nhập gói.nhập xuất.đường dẫn.đường dẫn thống kê tệp;
+nhập gói.nhập xuất.thư mục.tạo thư mục;
 
 hàm có đối số(lệnh, giá trị) {
     lặp(i = 0; i < độ dài(lệnh); i++) { nếu (lệnh[i] == giá trị) { trả về đúng; }; };
@@ -61,6 +64,43 @@ hàm kiểm snapshot AST(tạm) {
     };
 };
 
+hàm kiểm đích theo thư mục(tạm) {
+    tạm = biên dịch nguồn chuẩn đường(tạm);
+    con = tạm + "/resolver";
+    tạo thư mục(con);
+    sâu = con + "/nested";
+    tạo thư mục(sâu);
+    gốc = tạm + "/resolver-entry.vi";
+    a = con + "/a.vi"; b = con + "/b.vi"; c = sâu + "/c.vi";
+    ngoài = tạm + "/resolver_shared.vi";
+    trong = con + "/resolver_shared.vi";
+    biên dịch AOT ghi nguồn nhúng(gốc, "nhập resolver.a.*; nhập resolver.b.*; nhập resolver.nested.c.*;");
+    biên dịch AOT ghi nguồn nhúng(a, "nhập resolver_shared.*;");
+    biên dịch AOT ghi nguồn nhúng(b, "nhập resolver_shared.*;");
+    biên dịch AOT ghi nguồn nhúng(c, "nhập resolver_shared.*;");
+    biên dịch AOT ghi nguồn nhúng(ngoài, "hàm giá trị() { trả về 7; };");
+    bộ đệm = {"đường nhập vắng": []};
+    đồ thị = biên dịch nguồn đồ thị(gốc, tạm, bộ đệm);
+    nếu (biên dịch đồ thị tìm đích(đồ thị, a, "resolver_shared") != ngoài ||
+        biên dịch đồ thị tìm đích(đồ thị, b, "resolver_shared") != ngoài ||
+        biên dịch đồ thị tìm đích(đồ thị, c, "resolver_shared") != ngoài) {
+        ném "Resolver lost shared parent lookup";
+    };
+    số vắng = 0;
+    vắng = bộ đệm["đường nhập vắng"];
+    lặp(i = 0; i < độ dài(vắng); i++) {
+        nếu (vắng[i] == trong) { số vắng++; };
+    };
+    nếu (số vắng != 1) { ném "Resolver repeated or lost missing dependency"; };
+    biên dịch AOT ghi nguồn nhúng(trong, "hàm giá trị() { trả về 8; };");
+    đồ thị = biên dịch nguồn đồ thị(gốc, tạm, bộ đệm);
+    nếu (biên dịch đồ thị tìm đích(đồ thị, a, "resolver_shared") != trong ||
+        biên dịch đồ thị tìm đích(đồ thị, b, "resolver_shared") != trong ||
+        biên dịch đồ thị tìm đích(đồ thị, c, "resolver_shared") != trong) {
+        ném "Resolver cached a stale parent lookup across graphs";
+    };
+};
+
 hàm chính() {
     // SHA-256 of the original length-framed cache observations, calculated
     // independently. The byte-oriented fast path must keep existing keys.
@@ -96,6 +136,7 @@ hàm chính() {
         tạm = biên dịch AOT tạo thư mục tạm(gốc);
         nếu (!là thư mục(tạm)) { ném "driver failed to allocate a temporary directory"; };
         kiểm snapshot AST(tạm);
+        kiểm đích theo thư mục(tạm);
         đường = tạm + "/embedded.vi";
         biên dịch AOT ghi nguồn nhúng(đường, "in \"Chào 🌿\";\n");
         có tệp = đường dẫn thống kê tệp(đường);

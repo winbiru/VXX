@@ -11,4 +11,6 @@ hàm chính() {
     in địa_chỉ[0][1] == 8080;
     in độ dài(đầu nối bộ phân giải danh sách("::1", 8080, đúng)) > 0;
     in độ dài(đầu nối bộ phân giải danh sách("127.0.0.1", 0, sai)) > 0;
+    in độ dài(phân giải tên miền phân giải("LOCALHOST.")) > 0;
+    in độ dài(phân giải tên miền phân giải("fixture.localhost")) > 0;
 };

@@ -524,6 +524,24 @@ vpp_freestanding_main:
     cmpl $22, 73776(%r8)
     jne .Lbad_core
     movb $'V', 8396800(%r8)
+    // A failed exec must return ENOENT, reap the child, and close both pipes.
+    COPY_TO_ARENA 8388640, .Lspawn_missing_command, .Lspawn_missing_command_end
+    xorl %edi, %edi
+    movl $73728, %esi
+    call vpp_native_os_process
+    testl %eax, %eax
+    jne .Lbad_core
+    movq vpp_native_arena_base(%rip), %r8
+    cmpl $2, 73776(%r8)
+    jne .Lbad_core
+    cmpl $0, 73728(%r8)
+    jne .Lbad_core
+    cmpl $-1, 73732(%r8)
+    jne .Lbad_core
+    cmpl $-1, 73736(%r8)
+    jne .Lbad_core
+    // The same control block must be reusable after failure.
+    COPY_TO_ARENA 8388640, .Lspawn_command, .Lspawn_command_end
     xorl %edi, %edi
     movl $73728, %esi
     call vpp_native_os_process

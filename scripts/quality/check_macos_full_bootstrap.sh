@@ -47,7 +47,7 @@ check_stage() {
   test "$(/usr/bin/otool -L "$executable" | tail -n +2 | awk '{print $1}')" = /usr/lib/libSystem.B.dylib
   "$executable" --version
   mkdir -p "$out/stage$stage-fixtures"
-  for fixture in native_dynamic_vpp native_aot_private_method native_loop_stack_gc native_path_kind; do
+  for fixture in native_dynamic_vpp native_aot_private_method native_loop_stack_gc native_path_kind native_linux_heap_capacity; do
     "$executable" build "$root/scripts/test/fixtures/$fixture.vi" -o "$out/stage$stage-$fixture" > "$out/stage$stage-$fixture.build.log" 2>&1 || {
       cat "$out/stage$stage-$fixture.build.log" >&2; return 1;
     }

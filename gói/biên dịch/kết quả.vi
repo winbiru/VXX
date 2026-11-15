@@ -1,6 +1,6 @@
 // Snapshot dùng cùng lexer/parser/linker V++ với compiler tự chủ.
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
-nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa gọn;
 nhập gói.biên dịch.liên kết.biên dịch chương trình tự chủ;
 nhập gói.biên dịch.nguồn tệp.biên dịch nguồn nhúng tự chủ;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
@@ -64,8 +64,9 @@ hàm công khai biên dịch snapshot nội bộ(mã nguồn, gốc = ".") {
     };
     gốc = biên dịch chuẩn hóa gốc(gốc);
     thử {
-        từ tố = biên dịch từ tố hóa(mã nguồn);
-        cây = biên dịch phân tích chương trình thuần(mã nguồn);
+        // Lexer compact và parser dùng chung token; linker nhận chính AST này.
+        từ tố = biên dịch từ tố hóa gọn(mã nguồn)["token"];
+        cây = biên dịch phân tích chương trình thuần(mã nguồn, từ tố);
         khai báo = []; có nhập mô đun = sai;
         các mục = cây["câu lệnh"];
         lặp(i = 0; i < độ dài(các mục); i++) {
@@ -77,8 +78,8 @@ hàm công khai biên dịch snapshot nội bộ(mã nguồn, gốc = ".") {
         nếu (có nhập mô đun) {
             thư viện = đọc biến môi trường("VPP_HOME", ".");
             sản phẩm = biên dịch nguồn nhúng tự chủ(mã nguồn,
-                đường dẫn tuyệt đối(gốc), đường dẫn tuyệt đối(thư viện), 0);
-        } hoặc { sản phẩm = biên dịch chương trình tự chủ(mã nguồn); };
+                đường dẫn tuyệt đối(gốc), đường dẫn tuyệt đối(thư viện), 0, sai, cây);
+        } hoặc { sản phẩm = biên dịch chương trình tự chủ(mã nguồn, cây); };
         mã = sản phẩm["bytecode"]; root = [];
         số lệnh gốc = độ dài(mã);
         // The execution artifact appends an entry call (or zero) and HALT.

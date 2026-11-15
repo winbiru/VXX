@@ -4,13 +4,15 @@
 .globl vpp_native_os_socket
 vpp_native_os_socket:
     WIN_VAO
-    cmpl $10, %r12d
+    cmpl $11, %r12d
     ja .Lwin_khong_hop_le
     cmpl $(VPP_ARENA_SIZE-128), %r13d
     ja .Lwin_khong_hop_le
     testl $15, %r13d
     jnz .Lwin_khong_hop_le
     leaq (%rbx,%r13), %r15
+    cmpl $11, %r12d
+    je .Lwin_dns_config
     cmpl $0, .Lwin_wsa_san_sang(%rip)
     jne 1f
     movl $0x202, %ecx
@@ -321,3 +323,181 @@ vpp_native_os_socket:
 .Lwin_wsa_san_sang: .zero 4
 .Lwin_wsa_du_lieu: .zero 512
 .text
+
+// Operation 11: read configured DNS servers, never resolve a hostname.
+// ctl[4] is an arena offset to 8 records {u32 length, u8 address[16]}.
+// GetAdaptersAddresses returns OS-owned layout only inside our temporary
+// malloc buffer; no native pointer crosses the VM boundary.
+.text
+.Lwin_dns_config:
+    movl 16(%r15), %eax
+    testl $15, %eax
+    jnz .Lwin_khong_hop_le
+    cmpl $(VPP_ARENA_SIZE-160), %eax
+    ja .Lwin_khong_hop_le
+    leaq (%rbx,%rax), %rdi
+    movl $15000, -72(%rbp)
+    movl $0, -76(%rbp)
+.Lwin_dns_allocate:
+    movl -72(%rbp), %ecx
+    movl %ecx, -80(%rbp)
+    call malloc
+    testq %rax, %rax
+    jz .Lwin_dns_failed
+    movq %rax, %r14
+    xorl %ecx, %ecx                 // AF_UNSPEC
+    movl $0x27, %edx                // skip unicast/anycast/multicast/friendly name
+    xorl %r8d, %r8d
+    movq %r14, %r9
+    leaq -72(%rbp), %rax
+    movq %rax, 32(%rsp)
+    call GetAdaptersAddresses
+    testl %eax, %eax
+    jz .Lwin_dns_adapters
+    cmpl $232, %eax                 // ERROR_NO_DATA
+    je .Lwin_dns_empty
+    cmpl $111, %eax                 // ERROR_BUFFER_OVERFLOW
+    jne .Lwin_dns_free_failed
+    movq %r14, %rcx
+    call free
+    incl -76(%rbp)
+    cmpl $3, -76(%rbp)
+    ja .Lwin_dns_failed
+    movl -72(%rbp), %eax
+    cmpl $1048576, %eax
+    ja .Lwin_dns_failed
+    cmpl -80(%rbp), %eax
+    jbe .Lwin_dns_failed
+    jmp .Lwin_dns_allocate
+.Lwin_dns_adapters:
+    movl -80(%rbp), %eax
+    addq %r14, %rax
+    movq %rax, -96(%rbp)            // exclusive buffer end
+    movq %r14, %rsi
+    xorl %r12d, %r12d
+    movl $4096, -84(%rbp)          // bound linked-list traversal
+.Lwin_dns_adapter:
+    testq %rsi, %rsi
+    jz .Lwin_dns_done
+    decl -84(%rbp)
+    js .Lwin_dns_free_failed
+    cmpq %r14, %rsi
+    jb .Lwin_dns_free_failed
+    leaq 108(%rsi), %rax
+    cmpq -96(%rbp), %rax
+    ja .Lwin_dns_free_failed
+    cmpl $108, (%rsi)
+    jb .Lwin_dns_free_failed
+    cmpl $1, 104(%rsi)             // IfOperStatusUp
+    jne .Lwin_dns_next_adapter
+    movq 48(%rsi), %r13            // FirstDnsServerAddress
+.Lwin_dns_server:
+    testq %r13, %r13
+    jz .Lwin_dns_next_adapter
+    decl -84(%rbp)
+    js .Lwin_dns_free_failed
+    cmpq %r14, %r13
+    jb .Lwin_dns_free_failed
+    leaq 28(%r13), %rax
+    cmpq -96(%rbp), %rax
+    ja .Lwin_dns_free_failed
+    cmpl $28, (%r13)
+    jb .Lwin_dns_free_failed
+    movq 16(%r13), %rdx            // SOCKET_ADDRESS.lpSockaddr
+    cmpq %r14, %rdx
+    jb .Lwin_dns_free_failed
+    leaq 2(%rdx), %rax
+    cmpq -96(%rbp), %rax
+    ja .Lwin_dns_free_failed
+    cmpw $2, (%rdx)                // AF_INET
+    je .Lwin_dns_ipv4
+    cmpw $23, (%rdx)               // AF_INET6
+    jne .Lwin_dns_next_server
+    cmpl $28, 24(%r13)
+    jb .Lwin_dns_free_failed
+    leaq 28(%rdx), %rax
+    cmpq -96(%rbp), %rax
+    ja .Lwin_dns_free_failed
+    cmpl $0, 24(%rdx)              // scope IDs not supported by wire resolver
+    jne .Lwin_dns_next_server
+    addq $8, %rdx
+    movq (%rdx), %rax
+    orq 8(%rdx), %rax
+    jz .Lwin_dns_next_server       // unspecified address is not a server
+    cmpb $0xfe, (%rdx)
+    jne 1f
+    movzbl 1(%rdx), %eax
+    andl $0xc0, %eax
+    cmpl $0x80, %eax
+    je .Lwin_dns_next_server       // link-local requires an interface scope
+1:
+    movl $16, %ecx
+    jmp .Lwin_dns_record
+.Lwin_dns_ipv4:
+    cmpl $16, 24(%r13)
+    jb .Lwin_dns_free_failed
+    leaq 16(%rdx), %rax
+    cmpq -96(%rbp), %rax
+    ja .Lwin_dns_free_failed
+    addq $4, %rdx
+    cmpl $0, (%rdx)
+    je .Lwin_dns_next_server
+    movl $4, %ecx
+.Lwin_dns_record:
+    // Deduplicate identical servers from multiple active adapters.
+    xorl %r8d, %r8d
+.Lwin_dns_compare:
+    cmpl %r12d, %r8d
+    jae .Lwin_dns_append
+    imull $20, %r8d, %eax
+    leaq (%rdi,%rax), %r9
+    cmpl %ecx, (%r9)
+    jne .Lwin_dns_compare_next
+    movl (%rdx), %eax
+    cmpl %eax, 4(%r9)
+    jne .Lwin_dns_compare_next
+    cmpl $4, %ecx
+    je .Lwin_dns_next_server
+    movl 4(%rdx), %eax
+    cmpl %eax, 8(%r9)
+    jne .Lwin_dns_compare_next
+    movq 8(%rdx), %rax
+    cmpq %rax, 12(%r9)
+    je .Lwin_dns_next_server
+.Lwin_dns_compare_next:
+    incl %r8d
+    jmp .Lwin_dns_compare
+.Lwin_dns_append:
+    imull $20, %r12d, %eax
+    leaq (%rdi,%rax), %r9
+    movl %ecx, (%r9)
+    movl (%rdx), %eax
+    movl %eax, 4(%r9)
+    cmpl $16, %ecx
+    jne 1f
+    movl 4(%rdx), %eax
+    movl %eax, 8(%r9)
+    movq 8(%rdx), %rax
+    movq %rax, 12(%r9)
+1:  incl %r12d
+    cmpl $8, %r12d
+    jae .Lwin_dns_done
+.Lwin_dns_next_server:
+    movq 8(%r13), %r13
+    jmp .Lwin_dns_server
+.Lwin_dns_next_adapter:
+    movq 8(%rsi), %rsi
+    jmp .Lwin_dns_adapter
+.Lwin_dns_empty:
+    xorl %r12d, %r12d
+.Lwin_dns_done:
+    movq %r14, %rcx
+    call free
+    movl %r12d, %eax
+    WIN_RA
+.Lwin_dns_free_failed:
+    movq %r14, %rcx
+    call free
+.Lwin_dns_failed:
+    movl $-1, %eax
+    WIN_RA

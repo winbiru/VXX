@@ -11,5 +11,17 @@ hàm chính() {
     nếu (máy ngủ thô(-1) != 22) { trả về 9; };
     nếu (máy ngủ thô(1000) != 22) { trả về 10; };
     nếu (máy ngủ thô(0) != 0) { trả về 11; };
+    // Raw programs own a separate arena. Probe offsets beyond the old heap.
+    nếu (máy thư mục thô(6, 1, 0) != 120000000) { trả về 12; };
+    nếu (máy đồng hồ thô(0, 110000000) != 0) { trả về 13; };
+    nếu (máy entropy thô(110000016, 32) != 32) { trả về 14; };
+    nếu (máy entropy thô(135271423, 1) != 1) { trả về 15; };
+    máy ghi byte(110001024, 46); máy ghi byte(110001025, 0);
+    nếu (máy thư mục thô(0, 110001024, 110010000) != 0) { trả về 16; };
+    biến n = máy thư mục thô(1, 110010000, 110020000);
+    biến closed = máy thư mục thô(2, 110010000, 0);
+    nếu (n < 0 || closed != 0) { trả về 17; };
+    nếu (máy thực từ nguyên(110040000, 42) != 0) { trả về 18; };
+    nếu (máy thực sang nguyên(110040000) != 42) { trả về 19; };
     trả về 0;
 };

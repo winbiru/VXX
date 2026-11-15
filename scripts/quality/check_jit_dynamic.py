@@ -165,6 +165,13 @@ hàm chính() { f = cộng một; in f(41); c = Kiểu Con(); in c.lấy(); };
             if not re.search(rb'name=(?:[^\n]*\.)?hot_pressure calls=41 i32=41 compiled=1 hits=10\n', pressure):
                 raise RuntimeError(f'hot leaf did not survive GC and byte pressure: {pressure!r}')
             print('PASS adaptive leaf under GC and public byte-slot pressure', flush=True)
+        # An entry outside the checkout must resolve gói.* from VPP_HOME
+        # through the VM-image CLI too, without relying on source ancestors.
+        image = work / 'library.vmb'
+        run(library, 0, b'', mode='--vm-image', guest_args=('-o', str(image)), timeout=120)
+        if not image.is_file() or not image.stat().st_size:
+            raise RuntimeError('VM-image CLI did not serialize the external library fixture')
+        image.unlink()
         if {p.name: p.read_bytes() for p in work.iterdir()} != before:
             raise RuntimeError('JIT changed or created files in its working directory')
     print('V++ DYNAMIC JIT PASS')

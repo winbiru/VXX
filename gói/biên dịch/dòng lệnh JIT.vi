@@ -35,7 +35,7 @@ hàm chính() {
             nếu (đầu + 4 != đối số đếm() || jit đối số(đầu + 2) != "-o") { ném "V++ JIT: --vm-image cần nguồn và -o"; };
             gốc = đọc biến môi trường("VPP_HOME", "");
             nếu (gốc == "") { ném "V++ JIT: cần VPP_HOME"; };
-            biên dịch dòng lệnh VM(["vm-build", jit đối số(đầu + 1), "-o", jit đối số(đầu + 3)], gốc + "/gói");
+            biên dịch dòng lệnh VM(["vm-build", jit đối số(đầu + 1), "-o", jit đối số(đầu + 3)], gốc);
             trả về 0;
         };
         nếu (tệp == "--dynamic" || tệp == "--check-dynamic") {

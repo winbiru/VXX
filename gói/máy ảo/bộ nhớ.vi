@@ -1,7 +1,7 @@
 // Native i32 V++ only: every memory access is an ASM primitive.
 // Reserve byte slots 4..63. The byte/file runtime keeps slots 0..3.
 // Header at 4198464; nonmoving managed heap starts at 8388608.
-// Default limit 67000000; Linux freestanding AOT may use 120000000.
+// Default limit 67000000; native hosts advertise support for 120000000.
 // Allocation-start bitmap [120000000,126975713), heap limit at 127000000.
 // Both are in reserved byte slots, below linker scratch at 134222848.
 hàm vm_get(p, i) { trả về máy đọc số nguyên ba mươi hai bit(p + i * 4); };
@@ -192,13 +192,19 @@ hàm vm_init() {
     vm_set(4198720, 0, 0);
     vm_set(4198464, 0, 8388608);
     vm_set(127000000, 0, 67000000);
+    vm_set(127000000, 1, 1048576);
     trả về 0;
 };
 hàm vm_heap_limit() { trả về vm_get(127000000, 0); };
 hàm vm_gc_due() {
     biến allocated = vm_get(4198464, 9);
+    // The expanded arena can amortize full-heap tracing over more allocations.
+    // Keep the legacy threshold for smaller platform arenas. Recompute the
+    // budget from live bytes after each collection, including reusable holes.
+    nếu (vm_heap_limit() > 67000000) {
+        trả về allocated >= vm_get(127000000, 1);
+    };
     nếu (allocated >= 1048576) { trả về 1; };
-    // Collect earlier under pressure, but only at rooted safepoints.
     trả về allocated >= 524288 && vm_heap_limit() - vm_get(4198464, 0) < 2097152;
 };
 hàm vm_free_bucket(size) {
@@ -325,6 +331,7 @@ hàm vm_collect(root) {
     };
     biến p = 8388608;
     biến previous = 0;
+    biến live = 0;
     lặp(i = 19; i < 29; i++) { vm_set(4198464, i, 0); };
     khi (p < end) {
         biến size = vm_get(p, 0);
@@ -334,6 +341,7 @@ hàm vm_collect(root) {
             nếu (previous != 0) { vm_set(previous, 0, vm_get(previous, 0) + size); }
             hoặc { previous = p; };
         } hoặc {
+            live = live + size;
             nếu (previous != 0) { vm_free_push(previous); };
             previous = 0;
         };
@@ -344,6 +352,12 @@ hàm vm_collect(root) {
         // region so future bump allocations retain the zero-fill invariant.
         máy xóa vùng nhớ(previous, end - previous);
         vm_set(4198464, 0, previous);
+    };
+    nếu (vm_heap_limit() > 67000000) {
+        biến budget = máy chia số nguyên ba mươi hai bit(vm_heap_limit() - 8388608 - live, 8);
+        nếu (budget > 8388608) { budget = 8388608; };
+        nếu (budget < 524288) { budget = 524288; };
+        vm_set(127000000, 1, budget);
     };
     vm_set(4198464, 9, 0);
     trả về 0;

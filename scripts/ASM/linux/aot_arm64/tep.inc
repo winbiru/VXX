@@ -12,7 +12,7 @@
     uxtw x2, w2
     add x10, x1, x2
     mov x11, #0x1400
-    movk x11, #0x410, lsl #16
+    movk x11, #0x810, lsl #16
     cmp x10, x11
     b.hi Lbo_nho_loi
     add x1, x9, x1

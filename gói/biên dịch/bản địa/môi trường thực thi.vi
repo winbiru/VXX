@@ -243,12 +243,15 @@ hàm thực thi đối số dòng lệnh(chỉ mục) {
 // VPP_HOME / getcwd bytes into an arena buffer; it never returns a pointer as
 // i32. Use the normal V++ file API to check candidate source paths.
 hàm thực thi hệ điều hành đường tệp(loại từ tố) {
+    // os_home is the user's HOME in the full runtime, while the historical
+    // i32 bootstrap used VPP_HOME. Resolve the toolchain root explicitly so
+    // raw JIT probes and standalone compilers use the same resource search.
+    nếu (loại từ tố == 0) { trả về thực thi bộ nhớ đệm giá trị môi trường("VPP_HOME"); };
     biến kết quả trả về = thực thi các byte mới();
     nếu (kết quả trả về <= 0) { trả về -1; };
     biến ô nhớ = thực thi các byte ô nhớ(kết quả trả về);
     biến số phần tử = -1;
-    nếu (loại từ tố == 0) { số phần tử = máy thư mục nhà(thực thi nội dung đệm(ô nhớ)); }
-    hoặc { số phần tử = máy thư mục hiện hành(thực thi nội dung đệm(ô nhớ)); };
+    số phần tử = máy thư mục hiện hành(thực thi nội dung đệm(ô nhớ));
     nếu (số phần tử <= 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
     nếu (số phần tử >= 4096) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
     nếu (thực thi các byte dự trữ(kết quả trả về, số phần tử) != 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };

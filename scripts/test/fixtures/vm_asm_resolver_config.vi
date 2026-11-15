@@ -1,0 +1,23 @@
+// Query the OS configuration without sending any DNS traffic. Every returned
+// record must round-trip through the strict numeric resolver and be unique.
+hàm chính() {
+    token = máy bộ phân giải mở("", "", 2);
+    nếu (token < 1342177281) { ném "DNS configuration token"; };
+    addresses = [];
+    khi (đúng) {
+        address = máy bộ phân giải tiếp(token);
+        nếu (address == rỗng) { thoát; };
+        nếu (máy ảo lấy độ dài(addresses) >= 8) { ném "DNS configuration count"; };
+        lặp(i = 0; i < máy ảo lấy độ dài(addresses); i++) {
+            nếu (addresses[i] == address) { ném "DNS configuration duplicate"; };
+        };
+        numeric = máy bộ phân giải mở(address, "53", 1);
+        nếu (máy bộ phân giải tiếp(numeric) != address || máy bộ phân giải tiếp(numeric) != rỗng) {
+            ném "DNS configuration numeric address";
+        };
+        nếu (máy bộ phân giải đóng(numeric) != 1) { ném "DNS numeric close"; };
+        máy ảo thêm cuối danh sách(addresses, address);
+    };
+    nếu (máy bộ phân giải đóng(token) != 1) { ném "DNS configuration close"; };
+    in "DNS WINDOWS CONFIG OK";
+};

@@ -49,7 +49,7 @@ SOCK_SYM(vpp_native_os_socket):
     je .Lo_cam_khong_hop_le_x
     cmpl $10, %ebx
     ja .Lo_cam_khong_hop_le_x
-    cmpl $(68162560-128), %r13d
+    cmpl $(135271424-128), %r13d
     ja .Lo_cam_khong_hop_le_x
     testl $15, %r13d
     jnz .Lo_cam_khong_hop_le_x
@@ -384,11 +384,11 @@ SOCK_SYM(vpp_native_os_socket):
     jle .Lo_cam_khong_hop_le_x
     cmpl $65536, %edx
     jg .Lo_cam_khong_hop_le_x
-    cmpl $(68162560-65536), %esi
+    cmpl $(135271424-65536), %esi
     ja .Lo_cam_khong_hop_le_x
     movl %esi, %eax
     addq %rax, %rdx
-    cmpq $68162560, %rdx
+    cmpq $135271424, %rdx
     ja .Lo_cam_khong_hop_le_x
     movl %esi, %r13d             // libc có thể ghi đè thanh ghi tạm rsi
     call SOCK_SYM(vpp_native_memory_base)

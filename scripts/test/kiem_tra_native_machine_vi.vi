@@ -7,11 +7,47 @@ hàm native thêm lệnh(ra, mã, immediate = 0, operand = 0, depthBefore = 0, s
     thêm(ra, biên dịch mã máy lệnh(mã, immediate, operand, depthBefore, symbol));
 }
 
+hàm native kiểm tra phân khối(ir, hệ, phẳng) {
+    khối byte = biên dịch mã máy hàm("aarch64", ir, hệ, đúng);
+    khối word = biên dịch mã máy hàm("aarch64", ir, hệ, đúng, đúng);
+    vị trí = 0;
+    các khối = khối byte["chunks"];
+    lặp(k = 0; k < độ dài(các khối); k++) {
+        khối = các khối[k];
+        lặp(j = 0; j < độ dài(khối); j++) {
+            nếu (khối[j] != phẳng["bytes"][vị trí]) { ném "AArch64 chunk bytes differ"; };
+            vị trí += 1;
+        };
+    };
+    nếu (vị trí != độ dài(phẳng["bytes"]) || vị trí != khối byte["size"] || vị trí != khối word["size"]) {
+        ném "AArch64 chunk size differs";
+    };
+    vị trí = 0;
+    các khối = khối word["wordChunks"];
+    lặp(k = 0; k < độ dài(các khối); k++) {
+        khối = các khối[k];
+        lặp(j = 0; j < độ dài(khối); j++) {
+            word = khối[j];
+            lặp(n = 0; n < 4; n++) {
+                nếu (((word >> (n * 8)) & 255) != phẳng["bytes"][vị trí]) { ném "AArch64 word bytes differ"; };
+                vị trí += 1;
+            };
+        };
+    };
+    nếu (vị trí != độ dài(phẳng["bytes"])) { ném "AArch64 word size differs"; };
+    nếu (thành chuỗi(khối byte["relocations"]) != thành chuỗi(phẳng["relocations"]) ||
+        thành chuỗi(khối word["relocations"]) != thành chuỗi(phẳng["relocations"])) {
+        ném "AArch64 chunk relocations differ";
+    };
+};
+
 hàm native in byte(kiến_trúc, hệ_điều_hành, tên, tham_số, slot, sâu_nhất, lệnh) {
-    kết_quả = biên dịch mã máy hàm(kiến_trúc, {
+    ir = {
         "parameterCount": tham_số, "slotCount": slot,
         "maxStackDepth": sâu_nhất, "instructions": lệnh
-    }, hệ_điều_hành);
+    };
+    kết_quả = biên dịch mã máy hàm(kiến_trúc, ir, hệ_điều_hành);
+    nếu (kiến_trúc == "aarch64") { native kiểm tra phân khối(ir, hệ_điều_hành, kết_quả); };
     byte = kết_quả["bytes"];
     bảng = "0123456789abcdef";
     hex = "";
@@ -109,6 +145,18 @@ hàm native kiểm tra giữ hằng vòng lặp() {
 }
 
 hàm chính() {
+    // Cross both the 2048-instruction column page and output chunk edges.
+    // A forward jump also checks that each representation patches bytes.
+    lớn = [biên dịch mã máy lệnh("Jump", 0, 2051, 0)];
+    lặp(i = 0; i < 1025; i++) {
+        bỏ kết quả = thêm(lớn, biên dịch mã máy lệnh("PushConstant", -2147483647 - 1, 0, 0));
+        bỏ kết quả = thêm(lớn, biên dịch mã máy lệnh("Drop", 0, 0, 1));
+    };
+    bỏ kết quả = thêm(lớn, biên dịch mã máy lệnh("PushConstant", 42, 0, 0));
+    bỏ kết quả = thêm(lớn, biên dịch mã máy lệnh("Return", 0, 0, 1));
+    ir lớn = {"parameterCount": 0, "slotCount": 32, "maxStackDepth": 1, "instructions": lớn};
+    native kiểm tra phân khối(ir lớn, "macos", biên dịch mã máy hàm("aarch64", ir lớn, "macos"));
+
     // Symbol ABI: toàn bộ miền byte, vị trí đầu/sau và UTF-8 đa byte.
     đầu = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     sau = đầu + "0123456789";

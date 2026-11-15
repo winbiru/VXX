@@ -84,52 +84,65 @@ hàm riêng tư biên dịch nguồn ghi đường vắng(tệp, bộ đệm) {
     };
 };
 
-hàm riêng tư biên dịch nguồn tìm gói(gốc, đích, bộ đệm = rỗng) {
+// Các thư mục nhập khác nhau thường chia sẻ cùng tổ tiên. Cache đường
+// thử (kể cả không tồn tại) chỉ sống trong một lượt dựng đồ thị, tránh
+// chuẩn hóa và stat lặp lại mà vẫn ghi nhận phụ thuộc vắng lần đầu.
+hàm riêng tư biên dịch nguồn thử tệp(đường, bộ đệm, ứng viên) {
+    nếu (ứng viên != rỗng) {
+        nếu (máy ảo có khóa từ điển(ứng viên, đường)) { trả về ứng viên[đường]; };
+    };
+    tệp = biên dịch nguồn chuẩn đường(đường);
+    kết quả = tệp;
+    nếu (!là tệp(tệp)) {
+        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+        kết quả = "";
+    };
+    nếu (ứng viên != rỗng) { ứng viên[đường] = kết quả; };
+    trả về kết quả;
+};
+
+hàm riêng tư biên dịch nguồn tìm gói(gốc, đích, bộ đệm = rỗng, ứng viên = rỗng) {
     tên = biên dịch nguồn tên gói(đích);
     nền = gốc + "/gói/" + tên;
     // Package chính.vi được ưu tiên trước module cùng tên, như Stage 0.
-    tệp = biên dịch nguồn chuẩn đường(nền + "/chính.vi");
-    nếu (là tệp(tệp)) { trả về tệp; };
-    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
-    tệp = biên dịch nguồn chuẩn đường(nền + ".vi");
-    nếu (là tệp(tệp)) { trả về tệp; };
-    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+    tệp = biên dịch nguồn thử tệp(nền + "/chính.vi", bộ đệm, ứng viên);
+    nếu (tệp != "") { trả về tệp; };
+    tệp = biên dịch nguồn thử tệp(nền + ".vi", bộ đệm, ứng viên);
+    nếu (tệp != "") { trả về tệp; };
     // Stage 0 maps bare `nhập tùy chọn` to the persistent preferences API.
     // The optional-value helpers are still reachable explicitly as
     // `gói.lõi.tùy chọn`; preserve that distinction in the self-host compiler.
     tên lõi = tên;
     nếu (tên == "tùy chọn") { tên lõi = "tùy chọn bền vững"; };
-    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên lõi + ".vi");
-    nếu (là tệp(tệp)) { trả về tệp; };
-    biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+    tệp = biên dịch nguồn thử tệp(gốc + "/gói/lõi/" + tên lõi + ".vi", bộ đệm, ứng viên);
+    nếu (tệp != "") { trả về tệp; };
     trả về "";
 };
 
-hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện, bộ đệm = rỗng) {
+hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện, bộ đệm = rỗng, thư mục nhập = rỗng, ứng viên = rỗng) {
     // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
     // khi áp dụng bí danh và gói của toolchain.
-    thư mục = đường dẫn cha(mô đun nhập);
+    nếu (thư mục nhập == rỗng) { thư mục nhập = đường dẫn cha(mô đun nhập); };
+    thư mục = thư mục nhập;
     khi (đúng) {
-        tệp = biên dịch nguồn chuẩn đường(thư mục + "/" + đích + ".vi");
-        nếu (là tệp(tệp)) { trả về tệp; };
-        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
+        tệp = biên dịch nguồn thử tệp(thư mục + "/" + đích + ".vi", bộ đệm, ứng viên);
+        nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
         thư mục = cha;
     };
-    thư mục = đường dẫn cha(mô đun nhập);
+    thư mục = thư mục nhập;
     khi (đúng) {
-        tệp = biên dịch nguồn tìm gói(thư mục, đích, bộ đệm);
+        tệp = biên dịch nguồn tìm gói(thư mục, đích, bộ đệm, ứng viên);
         nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);
         nếu (cha == thư mục || cha == "") { thoát; };
         thư mục = cha;
     };
     nếu (thư viện != "") {
-        tệp = biên dịch nguồn chuẩn đường(thư viện + "/" + đích + ".vi");
-        nếu (là tệp(tệp)) { trả về tệp; };
-        biên dịch nguồn ghi đường vắng(tệp, bộ đệm);
-        tệp = biên dịch nguồn tìm gói(thư viện, đích, bộ đệm);
+        tệp = biên dịch nguồn thử tệp(thư viện + "/" + đích + ".vi", bộ đệm, ứng viên);
+        nếu (tệp != "") { trả về tệp; };
+        tệp = biên dịch nguồn tìm gói(thư viện, đích, bộ đệm, ứng viên);
         nếu (tệp != "") { trả về tệp; };
     };
     ném "biên dịch nguồn: không tìm thấy import '" + đích + "' từ '" + mô đun nhập + "'";
@@ -143,15 +156,18 @@ lớp công khai Bộ Nạp Nguồn {
         mình.bộ đệm = bộ đệm;
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
             "cạnh": [], "thứ tự khởi tạo": [], "thư viện": thư viện,
-            "đích theo yêu cầu": {}};
+            "đích theo yêu cầu": {}, "đích theo thư mục": {}, "thư mục theo nguồn": {}, "ứng viên": {}};
     };
 
     hàm công khai duyệt(mô đun nhập, spec) {
         trạng thái = mình.trạng thái;
-        // Cùng một importer có thể gặp lại cùng spec nhiều lần. Giữ kết quả
-        // tìm tệp cho riêng lượt dựng hiện tại, tránh lặp probe filesystem.
+        // Import cùng tên từ các tệp trong cùng thư mục có cùng thứ tự
+        // tìm kiếm. Chia sẻ bảng theo thư mục trong đúng một lượt dựng;
+        // vẫn giữ chỉ mục theo importer cho linker và mọi cạnh riêng.
         chỉ mục = trạng thái["đích theo yêu cầu"];
         nếu (!máy ảo có khóa từ điển(chỉ mục, mô đun nhập)) {
+            thư mục nhập = đường dẫn cha(mô đun nhập);
+            trạng thái["thư mục theo nguồn"][mô đun nhập] = thư mục nhập;
             chỉ mục[mô đun nhập] = {};
         };
         theo nguồn = chỉ mục[mô đun nhập];
@@ -159,7 +175,18 @@ lớp công khai Bộ Nạp Nguồn {
         nếu (máy ảo có khóa từ điển(theo nguồn, yêu cầu)) {
             đích = theo nguồn[yêu cầu];
         } hoặc {
-            đích = biên dịch nguồn đích(mô đun nhập, yêu cầu, trạng thái["thư viện"], mình.bộ đệm);
+            thư mục nhập = trạng thái["thư mục theo nguồn"][mô đun nhập];
+            theo thư mục = trạng thái["đích theo thư mục"];
+            nếu (!máy ảo có khóa từ điển(theo thư mục, thư mục nhập)) {
+                theo thư mục[thư mục nhập] = {};
+            };
+            đích thư mục = theo thư mục[thư mục nhập];
+            nếu (máy ảo có khóa từ điển(đích thư mục, yêu cầu)) {
+                đích = đích thư mục[yêu cầu];
+            } hoặc {
+                đích = biên dịch nguồn đích(mô đun nhập, yêu cầu, trạng thái["thư viện"], mình.bộ đệm, thư mục nhập, trạng thái["ứng viên"]);
+                đích thư mục[yêu cầu] = đích;
+            };
             theo nguồn[yêu cầu] = đích;
         };
         mức = lấy từ điển(trạng thái["đã thăm"], đích, 0);
@@ -191,17 +218,18 @@ lớp công khai Bộ Nạp Nguồn {
 
     // Embedded source supplies its AST in memory, while imports still use
     // the same resolver and relative base as files on disk.
-    hàm công khai đồ thị(điểm vào, mã nguồn = rỗng) {
+    hàm công khai đồ thị(điểm vào, mã nguồn = rỗng, cây = rỗng) {
         // Mỗi lần dựng bắt đầu bằng trạng thái riêng, kể cả khi tái dùng instance.
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
             "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư viện,
-            "đích theo yêu cầu": {}};
+            "đích theo yêu cầu": {}, "đích theo thư mục": {}, "thư mục theo nguồn": {}, "ứng viên": {}};
         gốc dữ liệu = biên dịch nguồn chuẩn đường(điểm vào);
-        cây = rỗng;
-        nếu (mã nguồn == rỗng) {
-            cây = biên dịch nguồn cây(gốc dữ liệu, mình.bộ đệm);
-        } hoặc {
-            cây = biên dịch phân tích chương trình thuần(mã nguồn);
+        nếu (cây == rỗng) {
+            nếu (mã nguồn == rỗng) {
+                cây = biên dịch nguồn cây(gốc dữ liệu, mình.bộ đệm);
+            } hoặc {
+                cây = biên dịch phân tích chương trình thuần(mã nguồn);
+            };
         };
         trạng thái = mình.trạng thái;
         máy ảo thêm cuối danh sách(trạng thái["ngăn"], gốc dữ liệu);
@@ -364,9 +392,9 @@ hàm công khai biên dịch nguồn tệp tự chủ(điểm vào, thư viện,
 
 // Preserve the importer's directory without creating a .vi file beside it.
 // This also allows scripts to import modules from read-only directories.
-hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện, số worker = rỗng, lọc nhập rộng = sai) {
+hàm công khai biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện, số worker = rỗng, lọc nhập rộng = sai, cây = rỗng) {
     bộ nạp = Bộ Nạp Nguồn(thư viện);
-    đồ thị = bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn);
+    đồ thị = bộ nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã nguồn, cây);
     đồ thị["lọc nhập rộng"] = lọc nhập rộng;
     trả về biên dịch liên kết đồ thị thuần(đồ thị, số worker);
 };

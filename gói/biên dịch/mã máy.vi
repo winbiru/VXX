@@ -60,7 +60,6 @@ hàm công khai biên dịch mã máy lá(kiến trúc, loại, hằng = 0, hệ
 hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu diễn trung gian, hệ điều hành = "linux", phân khối = sai, từ jit = sai) {
     tên = biên dịch thông tin kiến trúc(kiến trúc)["tên"];
     nếu (phân khối && tên != "aarch64") { ném "Machine IR: phân khối chỉ hỗ trợ AArch64"; };
-    biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian);
     chọn (tên) {
         ca "x86_64": {
             nếu (hệ điều hành != "linux" && hệ điều hành != "macos" &&
@@ -75,6 +74,6 @@ hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu 
             };
             trả về biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành, phân khối, từ jit);
         }
-        mặc định: { ném "Machine IR V++ chưa có backend tổng quát: " + tên; }
+        mặc định: { biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian); ném "Machine IR V++ chưa có backend tổng quát: " + tên; }
     };
 };

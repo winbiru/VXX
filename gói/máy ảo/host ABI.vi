@@ -448,44 +448,62 @@ hàm vm_file_rename(a, b) {
     byte hủy(src); byte hủy(dst);
     trả về vm_int(result);
 };
-hàm vm_file_copy(a, b) {
+hàm vm_file_copy(state, a, b) {
+    vm_set(state, 9, 0);
     biến src = vm_path_handle(a); nếu (src < 0) { trả về vm_int(-1); };
     biến dst = vm_path_handle(b); nếu (dst < 0) { byte hủy(src); trả về vm_int(-1); };
     biến src_token = thực thi tệp dữ liệu mở(src, 0);
-    nếu (src_token < 0) { byte hủy(src); byte hủy(dst); trả về vm_int(-1); };
+    nếu (src_token < 0) {
+        biến err = máy lỗi(); nếu (err == 0) { err = 5; };
+        vm_set(state, 9, err); byte hủy(src); byte hủy(dst); trả về vm_int(-1);
+    };
     biến src_fd = vm_file_fd(src_token);
+    // Windows exposes file attributes, not POSIX mode bits. Its fchmod
+    // boundary intentionally rejects requests; ordinary copies use the
+    // destination's inherited Windows permissions.
+    biến posix = vm_get(4198464, 8) != 2;
     biến permissions = 420;
-    nếu (máy thông tin tệp mở(src_fd, 3376) == 0) {
-        biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
-        // All stat adapters normalize st_mode to byte offset 4.
-        permissions = mode & 4095;
+    nếu (posix) {
+        nếu (máy thông tin tệp mở(src_fd, 3376) == 0) {
+            biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
+            // All stat adapters normalize st_mode to byte offset 4.
+            permissions = mode & 4095;
+        };
     };
     biến dst_token = thực thi tệp dữ liệu mở(dst, 1537);
     nếu (dst_token < 0) {
+        biến err = máy lỗi(); nếu (err == 0) { err = 5; };
+        vm_set(state, 9, err);
         tệp đóng(src_token); byte hủy(src); byte hủy(dst); trả về vm_int(-1);
     };
     biến dst_fd = vm_file_fd(dst_token);
-    biến result = 0; biến buffer = vm_alloc(65536, 0);
-    nếu (buffer == 0) { result = -1; };
+    biến result = 0; biến err = 0; biến buffer = vm_alloc(65536, 0);
+    nếu (buffer == 0) { result = -1; err = 12; };
     khi (result == 0) {
         biến count = máy đọc(src_fd, buffer, 65536);
         nếu (count == 0) { thoát; };
         nếu (count < 0) {
-            nếu (máy lỗi() == 4) { bỏ qua; };
+            err = máy lỗi(); nếu (err == 4) { err = 0; bỏ qua; };
             result = -1; thoát;
         };
         biến offset = 0;
         khi (offset < count) {
             biến written = máy ghi(dst_fd, buffer + offset, count - offset);
             nếu (written < 0 && máy lỗi() == 4) { bỏ qua; };
-            nếu (written <= 0) { result = -1; thoát; };
+            nếu (written <= 0) { err = máy lỗi(); result = -1; thoát; };
             offset += written;
         };
     };
-    nếu (result == 0 && máy đặt quyền tệp mở(dst_fd, permissions) != 0) { result = -1; };
-    nếu (tệp đóng(dst_token) != 0) { result = -1; };
-    nếu (tệp đóng(src_token) != 0) { result = -1; };
-    nếu (result != 0) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(dst))); };
+    nếu (result == 0 && posix) {
+        nếu (máy đặt quyền tệp mở(dst_fd, permissions) != 0) { err = máy lỗi(); result = -1; };
+    };
+    nếu (tệp đóng(dst_token) != 0) { nếu (result == 0) { err = máy lỗi(); }; result = -1; };
+    nếu (tệp đóng(src_token) != 0) { nếu (result == 0) { err = máy lỗi(); }; result = -1; };
+    nếu (result != 0) {
+        nếu (err == 0) { err = 5; };
+        máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(dst)));
+    };
+    vm_set(state, 9, err);
     byte hủy(src); byte hủy(dst);
     trả về vm_int(result);
 };
@@ -941,7 +959,7 @@ hàm vm_host(state, op, args) {
         vm_set(state, 9, máy lỗi()); trả về vm_int(trạng_thái_xóa);
     };
     nếu (op == 218) { trả về vm_file_rename(a, b); };
-    nếu (op == 219) { trả về vm_file_copy(a, b); };
+    nếu (op == 219) { trả về vm_file_copy(state, a, b); };
     // Hard-link creation is an optional optimization. Copy-and-rename uses
     // the same immutable cache key when the OS boundary cannot link.
     nếu (op == 220) { trả về vm_int(-1); };
@@ -964,6 +982,7 @@ hàm vm_host(state, op, args) {
         nếu (giá_trị_môi_trường == 0) { trả về 0; };
         lặp(i = 0; i < số_byte_môi_trường; i++) { máy ghi byte(vm_get(giá_trị_môi_trường, 2) + i, máy đọc byte(vùng_môi_trường + i)); }; trả về giá_trị_môi_trường;
     };
+    nếu (op == 178) { trả về vm_system_localtime(a); };
     nếu (op == 179) { trả về vm_dir_mutate(a, 0); };
     nếu (op == 180) { trả về vm_dir_mutate(a, 1); };
     nếu (op == 181) { trả về vm_dir_open(state, a); };

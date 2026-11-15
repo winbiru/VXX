@@ -92,7 +92,7 @@ hàm chính() {
     nếu (máy thư mục thô(8, 0, 0) != -22) { trả về 23; };
     nếu (máy thư mục thô(5, -1, 4096) != -22) { trả về 52; };
     nếu (máy thư mục thô(0, -1, 4096) != -22) { trả về 24; };
-    nếu (máy thư mục thô(0, 4096, 68162560) != -22) { trả về 25; };
+    nếu (máy thư mục thô(0, 4096, 135271424) != -22) { trả về 25; };
     // A boxed POSIX credential must not silently order against a string.
     vm_set(4198464, 1, 0);
     vm_binary(9, high, vm_literal("bad"));

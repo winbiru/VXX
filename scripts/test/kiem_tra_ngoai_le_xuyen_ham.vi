@@ -32,6 +32,19 @@ hàm bat_vao_closure() {
     trả về doc_loi;
 }
 
+// Mỗi lần bắt phải loại khung của các lời gọi con đã thất bại.
+// Vượt giới hạn 4096 khung nếu chúng vẫn còn trên stack sau khi bắt.
+hàm bat_lap() {
+    lặp (i = 0; i < 2200; i++) {
+        thử {
+            goi_giua();
+        } bắt lỗi (e) {
+            nếu (e != "loi-sau") { ném "sai giá trị ngoại lệ"; };
+        };
+        nếu (bat_vao_closure()() != "loi-closure") { ném "sai closure sau khi bắt"; };
+    };
+}
+
 hàm chính() {
     thử {
         bat_va_nem_lai();
@@ -40,5 +53,6 @@ hàm chính() {
     }
     doc_loi = bat_vao_closure();
     in "bat-closure:" + doc_loi();
+    bat_lap();
     in "sau-bat";
 }

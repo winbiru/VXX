@@ -410,7 +410,10 @@ hàm vm_binary_body(op, a, b) {
         nếu (op == 11) { trả về vm_int(x >= y); };
         nếu (op == 12) { trả về vm_int(x <= y); };
         nếu (op != 3 && op != 64) { trả về vm_error(2); };
-        nếu (y == 0) { trả về vm_error(6); };
+        nếu (y == 0) {
+            vm_set(4198464, 13, op);
+            trả về vm_error(6);
+        };
         nếu (x == -2147483648 && y == -1) {
             nếu (op == 3) { trả về vm_int(-2147483648); };
             trả về vm_int(0);
@@ -459,6 +462,9 @@ hàm vm_binary_body(op, a, b) {
     };
     nếu (op == 64) { trả về vm_error(2); };
     biến r = vm_alloc(16, 0); nếu (r == 0) { trả về 0; }; vm_set(r, 0, 2); vm_set(r, 1, op);
-    nếu (op == 3 && vm_truth(b) == 0) { trả về vm_error(6); };
+    nếu (op == 3 && vm_truth(b) == 0) {
+        vm_set(4198464, 13, op);
+        trả về vm_error(6);
+    };
     máy thực phép(r, vm_real(a), vm_real(b)); trả về r;
 };

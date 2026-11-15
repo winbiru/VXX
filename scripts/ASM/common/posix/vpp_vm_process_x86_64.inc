@@ -37,7 +37,7 @@ VM_PROC_SYM(vpp_native_os_process):
     je Lpx_khong_hop_le
     cmpl $4, %r13d
     ja Lpx_khong_hop_le
-    cmpl $(67000000-1024), %r14d
+    cmpl $(120000000-1024), %r14d
     ja Lpx_khong_hop_le
     testl $15, %r14d
     jnz Lpx_khong_hop_le
@@ -61,12 +61,12 @@ Lpx_tao_tien_trinh:
     movl 12(%r12), %eax
     testl $3, %eax
     jnz Lpx_khong_hop_le
-    cmpl $(67000000-512), %eax
+    cmpl $(120000000-512), %eax
     ja Lpx_khong_hop_le
     movl 16(%r12), %ecx
     testl $7, %ecx
     jnz Lpx_khong_hop_le
-    cmpl $(67000000-1032), %ecx
+    cmpl $(120000000-1032), %ecx
     ja Lpx_khong_hop_le
     xorl %r14d, %r14d
 Lpx_argv:
@@ -77,7 +77,7 @@ Lpx_argv:
     movl (%r10,%r14,4), %ecx
     cmpl $8388624, %ecx
     jb Lpx_khong_hop_le
-    cmpl $(67000000-4096), %ecx
+    cmpl $(120000000-4096), %ecx
     ja Lpx_khong_hop_le
     leaq (%rbx,%rcx), %rdx
     movl 16(%r12), %eax
@@ -206,14 +206,14 @@ Lpx_mo_ta_them_dong:
     movl 24(%r12), %ecx
     testl $3, %ecx
     jnz Lpx_sai_moi_truong
-    cmpl $(67000000-512), %ecx
+    cmpl $(120000000-512), %ecx
     ja Lpx_sai_moi_truong
     leaq (%rbx,%rcx), %r10
     movq %r10, 120(%r12)
     movl 56(%r12), %edx
     testl $7, %edx
     jnz Lpx_sai_moi_truong
-    cmpl $(67000000-33824), %edx
+    cmpl $(120000000-33824), %edx
     ja Lpx_sai_moi_truong
     leaq (%rbx,%rdx), %r10
     movq %r10, 112(%r12)
@@ -236,7 +236,7 @@ Lpx_moi_truong_kiem_tra:
     movl (%r10,%rax,4), %ecx
     cmpl $8388624, %ecx
     jb Lpx_sai_moi_truong
-    cmpl $(67000000-4096), %ecx
+    cmpl $(120000000-4096), %ecx
     ja Lpx_sai_moi_truong
     leaq (%rbx,%rcx), %r8
     xorl %r9d, %r9d
@@ -273,7 +273,7 @@ Lpx_moi_truong_them:
     movl (%r10,%r14,4), %ecx
     cmpl $8388624, %ecx
     jb Lpx_sai_moi_truong
-    cmpl $(67000000-4096), %ecx
+    cmpl $(120000000-4096), %ecx
     ja Lpx_sai_moi_truong
     leaq (%rbx,%rcx), %rdx
     movq 112(%r12), %r10
@@ -422,10 +422,10 @@ Lpx_doc:
     cmpl $4096, %r15d
     jg Lpx_khong_hop_le
     movl 32(%r12), %eax
-    cmpl $(67000000-4096), %eax
+    cmpl $(120000000-4096), %eax
     ja Lpx_khong_hop_le
     leal (%rax,%r15), %ecx
-    cmpl $67000000, %ecx
+    cmpl $120000000, %ecx
     ja Lpx_khong_hop_le
     leaq (%rbx,%rax), %r15
     leaq (%r12,%r14,4), %r14

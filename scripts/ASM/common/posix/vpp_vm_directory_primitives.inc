@@ -1,13 +1,9 @@
-// Freestanding Linux AOT can allocate above the legacy VM heap limit.
-#ifdef VPP_VM_DIRECTORY_FREESTANDING
+// The native host maps the expanded arena on all supported targets.
 #define VM_DIR_X86_ARENA 135271424
-#else
-#define VM_DIR_X86_ARENA 68162560
-#endif
 // ABI i32: identity(loại), directory(lệnh, điều khiển, dữ liệu). Lệnh: 0 mở(đường, ô16), 1 đọc(ô16,
 // đệm8192), 2 đóng(ô16), 3 xóa thư mục(đường), 4 tạo thư mục(đường, 0777). Con trỏ DIR giữ tại đây;
 // V++ giải mã bản ghi. Lệnh 5 đọc liên kết (đường, đệm4096); 6 trả nền tảng (0 Darwin, 1 Linux), 7 realpath Darwin.
-// Linux freestanding: lệnh 6 với đối số thứ hai bằng 1 trả giới hạn heap mở rộng.
+// Native hosts: lệnh 6 với đối số thứ hai bằng 1 trả giới hạn heap mở rộng.
 #if defined(__APPLE__)
 #define VM_DIR_SYM(x) _##x
 #define VM_DIR_LIB(x) _##x
@@ -87,6 +83,14 @@ VM_DIR_SYM(vpp_native_os_directory):
     b.hi Lvm_thu_muc_sai_bat
     cmp w19, #6
     b.ne 1f
+#if defined(__APPLE__) || defined(__linux__)
+    cmp w20, #1
+    b.ne 2f
+    mov w0, #(120000000 & 0xffff)
+    movk w0, #(120000000 >> 16), lsl #16
+    VM_TRA_THU_MUC
+2:
+#endif
 #if defined(__APPLE__)
     mov w0, #0
 #else
@@ -102,7 +106,7 @@ VM_DIR_SYM(vpp_native_os_directory):
     tst w20, #7
     b.ne Lvm_thu_muc_sai_bat
     mov w10, #0x13f0
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w20, w10
     b.hi Lvm_thu_muc_sai_bat
     add x23, x21, w20, uxtw
@@ -114,8 +118,8 @@ VM_DIR_SYM(vpp_native_os_directory):
     cmp w19, #2
     b.eq Lvm_thu_muc_dong_bat
     tbnz w22, #31, Lvm_thu_muc_sai_bat
-    mov w10, #0xf400           // Kích thước vùng nhớ trừ 8192 = 0x40ff400
-    movk w10, #0x40f, lsl #16
+    mov w10, #0xf400           // Kích thước vùng nhớ trừ 8192 = 0x80ff400
+    movk w10, #0x80f, lsl #16
     cmp w22, w10
     b.hi Lvm_thu_muc_sai_bat
     add x22, x21, w22, uxtw
@@ -158,7 +162,7 @@ Lvm_thu_muc_dong_bat:
 Lvm_thu_muc_duong_bat:
     tbnz w20, #31, Lvm_thu_muc_sai_bat
     mov w10, #0x400
-    movk w10, #0x410, lsl #16 // Kích thước vùng nhớ trừ 4096
+    movk w10, #0x810, lsl #16 // Kích thước vùng nhớ trừ 4096
     cmp w20, w10
     b.hi Lvm_thu_muc_sai_bat
     add x20, x21, w20, uxtw
@@ -174,7 +178,7 @@ Lvm_thu_muc_duong_bat:
     tst w22, #7
     b.ne Lvm_thu_muc_sai_bat
     mov w10, #0x13f0
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w22, w10
     b.hi Lvm_thu_muc_sai_bat
     add x23, x21, w22, uxtw
@@ -379,13 +383,11 @@ VM_DIR_SYM(vpp_native_os_directory):
     ja Lvm_thu_muc_sai_x86
     cmpl $6, %r15d
     jne 1f
-#ifdef VPP_VM_DIRECTORY_FREESTANDING
     cmpl $1, %r13d
     jne 2f
     movl $120000000, %eax
     VM_TRA_THU_MUC
 2:
-#endif
 #if defined(__APPLE__)
     xorl %eax, %eax
 #else

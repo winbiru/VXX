@@ -1681,6 +1681,9 @@ hàm aot_invoke(id, args, receiver, owner, closure) {
         máy aot gọi(0, id, frame);
     };
     biến result = vm_get(frame, 0);
+    // Khung lỗi vẫn thuộc ngăn xếp hoạt động cho đến khi caller bắt lỗi
+    // hoặc runtime báo lỗi cuối cùng. Không đưa cùng khung vào kho rảnh.
+    nếu (aot_status()) { trả về 0; };
     // Vẫn giữ khung trên ngăn xếp trong lúc kho có thể nới dung lượng.
     biến pool = vm_get(state, 16);
     biến pool_count = vm_get(pool, 1);
@@ -2494,10 +2497,24 @@ hàm aot_catch_value(frame, slot) {
 hàm aot_handle_error(frame) {
     biến handlers = vm_get(frame, 7);
     nếu (vm_get(4198464, 1) != 16 || handlers == 0 || vm_get(handlers, 1) == 0) { trả về -1; };
+    // Các lời gọi con đã trả khỏi native stack, nhưng khung của chúng
+    // vẫn được giữ để chẩn đoán. Khi bắt lỗi phải gỡ đúng các khung con.
+    biến frames = vm_get(aot_state(), 6);
+    khi (vm_get(frames, 1) > 0) {
+        biến top = vm_get(vm_get(frames, 3), vm_get(frames, 1) - 1);
+        nếu (top == frame) { thoát; };
+        vm_pop(frames);
+    };
+    nếu (vm_get(frames, 1) == 0) { trả về -1; };
     biến handler = vm_pop(handlers); biến stack = aot_stack(frame); biến switches = vm_get(frame, 8);
     khi (vm_get(stack, 1) > vm_get(handler, 1)) { vm_pop(stack); };
     nếu (switches != 0) { khi (vm_get(switches, 1) > vm_get(handler, 2)) { vm_pop(switches); }; };
-    vm_append(stack, vm_get(4198464, 3)); vm_set(4198464, 3, 0); vm_set(4198464, 1, 0);
+    // Giữ giá trị ném làm gốc trong lúc thêm vào stack; xóa lỗi trước
+    // để lỗi cấp phát mới không bị che bởi mã ngoại lệ đã được bắt.
+    vm_set(4198464, 1, 0);
+    vm_append(stack, vm_get(4198464, 3));
+    nếu (aot_status()) { trả về -1; };
+    vm_set(4198464, 3, 0); vm_set(4198464, 5, 0);
     trả về vm_get(handler, 0);
 };
 hàm aot_safepoint(frame) {
@@ -2513,7 +2530,8 @@ hàm aot_region(kind, index) {
     // qua bước dọn tài nguyên; initializer không quyết định mã thoát.
     biến result = vm_get(frame, 0); biến exit_code = 0;
     nếu (kind == 2 && vm_tag(result) == 1) { exit_code = vm_get(result, 1); };
-    vm_pop(frames); trả về exit_code;
+    nếu (aot_status() == 0) { vm_pop(frames); };
+    trả về exit_code;
 };
 hàm chính() {
     vm_init();
@@ -2526,8 +2544,8 @@ hàm chính() {
     nếu (executable_length > 0 && executable_length <= 4095) { vm_set(executable, 1, executable_length); }
     hoặc { executable = vm_literal(đối số lấy(0)); };
     vm_set(4198464, 10, executable);
-    // Linux x86-64 AOT uses the full freestanding ASM arena.
-    nếu (platform == 1 && máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
+    // Only a boundary advertising the expanded heap may use it (older seeds retain the legacy limit).
+    nếu (máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
     // Ô thứ 17 giữ kho khung AOT, để GC thấy tất cả khung rảnh.
     biến state = vm_alloc(84, 1); nếu (state == 0) { trả về 1; };
     vm_set(4198464, 2, state);

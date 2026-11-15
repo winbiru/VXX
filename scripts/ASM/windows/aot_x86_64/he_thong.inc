@@ -64,7 +64,8 @@
 .globl vpp_native_os_clock
 vpp_native_os_clock:
     WIN_VAO
-    cmpl $1, %r12d
+    cmpl $2, %r12d
+    je .Lwin_gio_dia_phuong
     ja .Lwin_khong_hop_le
     cmpl $(VPP_ARENA_SIZE-16), %r13d
     ja .Lwin_khong_hop_le
@@ -106,6 +107,91 @@ vpp_native_os_clock:
     xorl %eax, %eax
     WIN_RA
 
+// kind=2: signed Unix seconds in, normalized 64-byte tm out.
+// Use Win32 calendar conversion (including epochs before 1970), not CRT.
+.Lwin_gio_dia_phuong:
+    cmpl $(VPP_ARENA_SIZE-64), %r13d
+    ja .Lwin_khong_hop_le
+    leaq (%rbx,%r13), %r15
+    movq (%r15), %rax
+    movabsq $-11644473600, %rcx
+    cmpq %rcx, %rax
+    jl .Lwin_khong_hop_le
+    movabsq $253402300799, %rcx
+    cmpq %rcx, %rax
+    jg .Lwin_khong_hop_le
+    imulq $10000000, %rax, %rax
+    movabsq $116444736000000000, %rcx
+    addq %rcx, %rax
+    movq %rax, -72(%rbp)
+    leaq -72(%rbp), %rcx
+    leaq -88(%rbp), %rdx
+    call FileTimeToSystemTime
+    testl %eax, %eax
+    jz .Lwin_khong_hop_le
+    xorl %ecx, %ecx
+    leaq -88(%rbp), %rdx
+    leaq -104(%rbp), %r8
+    call SystemTimeToTzSpecificLocalTimeEx
+    testl %eax, %eax
+    jz .Lwin_khong_hop_le
+    leaq -104(%rbp), %rcx
+    leaq -112(%rbp), %rdx
+    call SystemTimeToFileTime
+    testl %eax, %eax
+    jz .Lwin_khong_hop_le
+    movq -112(%rbp), %rax
+    subq -72(%rbp), %rax
+    cqto
+    movl $10000000, %ecx
+    idivq %rcx
+    movq %rax, 40(%r15)
+    movzwl -92(%rbp), %eax
+    movl %eax, 0(%r15)
+    movzwl -94(%rbp), %eax
+    movl %eax, 4(%r15)
+    movzwl -96(%rbp), %eax
+    movl %eax, 8(%r15)
+    movzwl -98(%rbp), %eax
+    movl %eax, 12(%r15)
+    movzwl -102(%rbp), %eax
+    decl %eax
+    movl %eax, 16(%r15)
+    movzwl -104(%rbp), %eax
+    subl $1900, %eax
+    movl %eax, 20(%r15)
+    movzwl -100(%rbp), %eax
+    movl %eax, 24(%r15)
+    // V++ derives yday and validates the normalized calendar.
+    movl $0, 28(%r15)
+    movl $-1, 32(%r15)
+    movl $0, 36(%r15)
+    movq $0, 48(%r15)
+    movq $0, 56(%r15)
+    // Get the rules for the actual local year; never use today's DST flag.
+    subq $224, %rsp
+    movzwl -104(%rbp), %ecx
+    xorl %edx, %edx
+    leaq 32(%rsp), %r8
+    call GetTimeZoneInformationForYear
+    testl %eax, %eax
+    jz 1f
+    movl 32(%rsp), %eax
+    addl 116(%rsp), %eax        // Bias + StandardBias
+    imull $-60, %eax
+    movl 32(%rsp), %edx
+    addl 200(%rsp), %edx        // Bias + DaylightBias
+    imull $-60, %edx
+    movl $0, 32(%r15)
+    cmpl %eax, %edx
+    je 1f
+    cmpl %edx, 40(%r15)
+    jne 1f
+    movl $1, 32(%r15)
+1:
+    xorl %eax, %eax
+    WIN_RA
+
 .globl vpp_native_os_thread_cpu_clock
 vpp_native_os_thread_cpu_clock:
     WIN_VAO
@@ -140,9 +226,13 @@ vpp_native_os_sleep:
 .globl vpp_native_os_entropy
 vpp_native_os_entropy:
     WIN_VAO
+    testl %r13d, %r13d
+    jz .Lwin_khong_hop_le
     cmpl $256, %r13d
     ja .Lwin_khong_hop_le
-    cmpl $(VPP_ARENA_SIZE-256), %r12d
+    movl %r12d, %eax
+    addq %r13, %rax
+    cmpq $VPP_ARENA_SIZE, %rax
     ja .Lwin_khong_hop_le
     xorl %ecx, %ecx
     leaq (%rbx,%r12), %rdx

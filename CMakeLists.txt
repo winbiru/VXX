@@ -25,7 +25,7 @@ add_custom_command(OUTPUT "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/v
   "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o"
   COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/macos/build-vpp-cli.sh" "${CMAKE_BINARY_DIR}" "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" "${VPP_PREBUILT_I32_RUNTIME}" "${VPP_CI_PINNED_FULL_STAGE1}"
   DEPENDS "${CMAKE_BINARY_DIR}/vpp-bootstrap-mode.txt" ${VPP_SOURCES} "${VPP_BOOTSTRAP_FULL}" "${VPP_BOOTSTRAP_I32}" ${VPP_PREBUILT_I32_INPUTS}
-    scripts/macos/build-vpp-cli.sh scripts/build-vpp-aot-runtime.sh scripts/build-vpp-progress.sh scripts/macos/vpp-native-launcher.sh.in bootstrap/macos-arm64/SHA256SUMS
+    scripts/macos/build-vpp-cli.sh scripts/build-vpp-aot-runtime.sh scripts/build-vpp-progress.sh scripts/macos/vpp-native-launcher.sh.in bootstrap/macos-arm64/SHA256SUMS bootstrap/macos-arm64/vpp-full.S.gz
   COMMENT "Khởi tạo bộ biên dịch V++ (xem các mốc tiến độ bên dưới)"
   VERBATIM USES_TERMINAL)
 add_custom_target(vpp-cli ALL DEPENDS "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"

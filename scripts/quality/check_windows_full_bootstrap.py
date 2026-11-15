@@ -109,8 +109,11 @@ def assemble(clang, source, output, env, log, *defines):
 
 
 def link(clang, objects, output, env, log):
-    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-lntdll',
-             '-Wl,--no-insert-timestamp', '-o', output], env, log)
+    # Reserve enough native stack for the runtime's existing 4096-frame
+    # guard to report error=15 before Win32 raises STATUS_STACK_OVERFLOW.
+    # Pages remain demand committed; this does not commit 64 MiB at startup.
+    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-liphlpapi', '-lntdll',
+             '-Wl,--no-insert-timestamp', '-Wl,--stack,67108864', '-o', output], env, log)
     audit_pe(output)
 
 
@@ -124,6 +127,7 @@ def fixture_cases(directory):
     for name, stem, status in [('private-method', 'native_aot_private_method', 0),
                                ('direct-calls', 'native_i32_direct_calls', 0),
                                ('loop-stack-gc', 'native_loop_stack_gc', 0),
+                               ('heap-capacity', 'native_linux_heap_capacity', 0),
                                ('return-semantics', 'native_return_semantics', 42),
                                ('exit-scalar', 'native_exit_scalar', 42),
                                ('protected-loop', 'native_protected_loop', 0)]:
@@ -278,6 +282,11 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         if (len(lines) != 3 or lines[2] != 'DNS VM VI OK' or '203.0.113.47' not in lines[:2]
                 or not any(ip in lines[:2] for ip in ('2001:db8::1', '2001:db8:0:0:0:0:0:1'))):
             raise RuntimeError(f'{dns_log}: packaged DNS provider output mismatch')
+        dns_config_image = smoke / 'dns-config.vmb'
+        command([compiler, 'vm-build', FIXTURES / 'vm_asm_resolver_config.vi', '-o', dns_config_image],
+                env, out / 'package-dns-config-build.log', cwd=smoke)
+        command([extracted / 'bin/vpp-vm.exe', dns_config_image], run_env,
+                out / 'package-dns-config-run.log', expected=b'DNS WINDOWS CONFIG OK\n', cwd=smoke)
         # Exercise the actual installed launcher with no repository VPP_HOME.
         launcher_env = clean_env()
         launcher_env['VPP_AOT_ASSEMBLER'] = clang.as_posix()
