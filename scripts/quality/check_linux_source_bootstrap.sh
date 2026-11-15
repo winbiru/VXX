@@ -21,12 +21,17 @@ cp -R "$ROOT_DIR/gói" "$root/"
 cp "$ROOT_DIR/scripts/build-vpp-progress.sh" "$root/scripts/"
 cp "$ROOT_DIR/scripts/ASM/linux/vpp_linux_host_x86_64.s" "$root/scripts/ASM/linux/"
 cp -R "$ROOT_DIR/scripts/ASM/linux/tu_chu_x86_64" "$root/scripts/ASM/linux/"
-for script in prepare_linux_freestanding_host.sh check_native_elf_linker.sh check_native_elf_partial_linker.py audit_linux_static_elf.sh check_native_assembler.py; do
+# Include the Python helpers imported by the ELF and assembler regressions.
+for script in prepare_linux_freestanding_host.sh check_native_elf_linker.sh \
+    check_native_elf_partial_linker.py check_native_macho_layout.py prepare_raw_jit.py \
+    audit_linux_static_elf.sh check_native_assembler.py; do
     cp "$ROOT_DIR/scripts/quality/$script" "$root/scripts/quality/"
 done
 cp "$ROOT_DIR"/scripts/test/fixtures/native_elf*.vi "$root/scripts/test/fixtures/"
 [[ -z "$(find "$root" -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.bin' \) -print)" ]]
 echo 'SOURCE_BOOTSTRAP_INPUT_OBJECTS=NONE'
+# Resolve imports in the isolated source tree before spending time on self-hosting.
+(cd "$root/scripts/quality" && python3 -I -B -c 'import sys; sys.path.insert(0, "."); import check_native_elf_partial_linker')
 mkdir -p "$out/forbid-tools"
 export VPP_FORBIDDEN_TOOL_LOG="$out/forbidden-tools.log"
 : > "$VPP_FORBIDDEN_TOOL_LOG"
