@@ -285,10 +285,28 @@ jobs:
           New-Item -ItemType Directory -Path $out | Out-Null
           clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
           if ($LASTEXITCODE -ne 0) { throw 'Windows boundary assembly failed' }
+      - name: Bootstrap current Windows i32 compiler from source
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP/windows-seed"
+          $seed = "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe"
+          $compiler = "$out/vpp-i32.exe"
+          $env:VPP_HOME = $env:GITHUB_WORKSPACE.Replace([char]92, [char]47)
+          $env:VPP_NATIVE_NO_CACHE = '1'
+          $env:VPP_NATIVE_TARGET = 'windows-x86_64'
+          $env:VPP_WINDOWS_RUNTIME_OBJECT = "$out/windows-runtime.obj".Replace([char]92, [char]47)
+          $source = "$env:GITHUB_WORKSPACE/gói/biên dịch/bản địa/bộ biên dịch.vi".Replace([char]92, [char]47)
+          # The pinned seed may still emit the previous compiler's PE layout.
+          # Rebuild from current source before starting the three-stage gate.
+          $PSNativeCommandUseErrorActionPreference = $false
+          & $seed build $source -o $compiler 2>&1 | Tee-Object -FilePath "$out/bootstrap.log"
+          if ($LASTEXITCODE -ne 0) { throw "Windows i32 source bootstrap failed: $LASTEXITCODE" }
+          python scripts/quality/check_native_executable_layout.py $compiler
+          if ($LASTEXITCODE -ne 0) { throw 'Rebuilt Windows compiler PE audit failed' }
       - name: Rebuild and execute native Windows compiler
         shell: pwsh
         run: |
-          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:GITHUB_WORKSPACE/bootstrap/windows-x86_64/vpp-i32.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
+          & ./scripts/quality/check_windows_native_pe_selfhosting.ps1 -SeedCompiler "$env:RUNNER_TEMP/windows-seed/vpp-i32.exe" -RuntimeObject "$env:RUNNER_TEMP/windows-seed/windows-runtime.obj" -OutputDirectory "$env:RUNNER_TEMP/windows-selfhost"
       - name: Package and test the Windows i32 distribution
         shell: pwsh
         run: |
@@ -326,6 +344,7 @@ jobs:
         with:
           name: windows-selfhost-logs
           path: |
+            ${{ runner.temp }}/windows-seed/bootstrap.log
             ${{ runner.temp }}/windows-selfhost/*.log
             ${{ runner.temp }}/windows-selfhost/sha256.txt
           if-no-files-found: ignore
