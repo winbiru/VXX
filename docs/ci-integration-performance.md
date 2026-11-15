@@ -579,7 +579,7 @@ mỗi module.
 Thử trên compiler full mới đã tự biên dịch:
 
 ```sh
-python3 scripts/quality/run_native_regression.py --suite full \
+python3 scripts/quality/run_native_regression.py --suite full --backend aot \
   --compiler build-pure-vpp/bin/vpp --jobs 2 --batch-size 2 \
   --logs build-pure-vpp/regression-batch-logs
 ```
@@ -730,5 +730,10 @@ giới hạn dispatcher, build/run barrier, lỗi build chung, lỗi setup HTTP
 và sai golden riêng. Tổng 26 unit test Python trong `scripts/quality`
 PASS. Chưa có số đo tổng suite hoặc kết quả native Linux/Windows cho cơ
 chế này; cần kiểm chứng bằng CI trên cả ba hệ điều hành.
-CTest full hiện vẫn dùng 16 shard độc lập; thay đổi gom module áp dụng
-cho ba job full regression của GitHub Actions và CLI có `--module-suites`.
+Cấu hình trên là kết quả lịch sử của đường AOT. Hiện CTest và GitHub Actions
+chạy một suite full JIT trên mỗi nền tảng, không chia shard hay build lại
+test executable. VM core/directory và ELF partial linker dùng raw JIT với
+nguồn production V++; self-test runner dùng JIT và các tiến trình giả cho
+giao thức compiler. Kiểm tra inventory phải bảo đảm cả 390 ca full/i32
+đều có đường chạy JIT. Thời gian tổng suite cần đo lại trên CI với artifact
+JIT có hỗ trợ `--raw-program` và `--vm-image`.

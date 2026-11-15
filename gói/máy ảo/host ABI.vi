@@ -457,7 +457,7 @@ hàm vm_file_copy(a, b) {
     biến permissions = 420;
     nếu (máy thông tin tệp mở(src_fd, 3376) == 0) {
         biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
-        nếu (vm_get(4198464, 8) == 1) { mode = vm_get(3376, 6); };
+        // All stat adapters normalize st_mode to byte offset 4.
         permissions = mode & 4095;
     };
     biến dst_token = thực thi tệp dữ liệu mở(dst, 1537);

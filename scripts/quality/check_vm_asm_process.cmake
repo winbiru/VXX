@@ -4,7 +4,7 @@ if(WIN32)
     # through the standalone VM, against the same goldens as native AOT.
     foreach(stem IN ITEMS kiem_tra_ffi_process_spawn_windows kiem_tra_ffi_process_timeout_windows)
         set(image "${VPP_OUTPUT_DIR}/${stem}.vmb")
-        execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+        execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
             "${VPP_ROOT}/scripts/test/${stem}.vi" -o "${image}"
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
         if(NOT status STREQUAL "0")
@@ -33,10 +33,20 @@ if(WIN32)
             set(output_path "${probe_native}")
             set(run_command "${probe_native}")
         endif()
-        execute_process(COMMAND "${VPP_NATIVE_COMPILER}" "${mode}" "${probe_source}" -o "${output_path}"
-            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
-        if(NOT status STREQUAL "0")
-            message(FATAL_ERROR "Windows process oracle ${mode} compile: ${status}\n${output}\n${errors}")
+        if(mode STREQUAL "vm-build")
+            set(image_command ${VPP_VM_IMAGE_COMMAND})
+        elseif(DEFINED VPP_JIT)
+            set(run_command "${VPP_JIT}" --dynamic "${probe_source}")
+            unset(image_command)
+        else()
+            set(image_command "${VPP_NATIVE_COMPILER}" build)
+        endif()
+        if(DEFINED image_command)
+            execute_process(COMMAND ${image_command} "${probe_source}" -o "${output_path}"
+                RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
+            if(NOT status STREQUAL "0")
+                message(FATAL_ERROR "Windows process oracle ${mode} compile: ${status}\n${output}\n${errors}")
+            endif()
         endif()
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=$ENV{SystemRoot}/System32"
             "VPP_PROCESS_TEST_PYTHON=${VPP_PYTHON}" "VPP_PROCESS_TEST_PROBE=${probe_script}" ${run_command}
@@ -49,7 +59,7 @@ if(WIN32)
 else()
 set(process_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_process.vi")
 set(process_image "${VPP_OUTPUT_DIR}/process.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${process_fixture}" -o "${process_image}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${process_fixture}" -o "${process_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Process VM fixture compilation failed (${status}):\n${output}\n${errors}")
@@ -67,7 +77,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/process-stale.vi" [=[hàm chính() {
     máy tiến trình đóng(p);
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/process-stale.vi" -o "${VPP_OUTPUT_DIR}/process-stale.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -93,7 +103,7 @@ foreach(expression IN LISTS process_invalid_cases)
     set(bad_source "${VPP_OUTPUT_DIR}/process-invalid-${process_invalid_index}.vi")
     set(bad_image "${VPP_OUTPUT_DIR}/process-invalid-${process_invalid_index}.vmb")
     file(WRITE "${bad_source}" "hàm chính() { ${expression}; };\n")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${bad_source}" -o "${bad_image}"
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${bad_source}" -o "${bad_image}"
         RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
     if(NOT code STREQUAL "0")
         message(FATAL_ERROR "Process invalid-${process_invalid_index} compile: ${code}\n${output}\n${errors}")
@@ -113,9 +123,14 @@ if(WIN32)
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/process-asm-invalid.vi" 
     "hàm chính() { trả về máy tiến trình thô(4, -1); };\n")
-vpp_raw_build("${VPP_OUTPUT_DIR}/process-asm-invalid.vi" "${raw_process}")
+if(DEFINED VPP_JIT)
+    set(raw_command "${VPP_JIT}" "${VPP_OUTPUT_DIR}/process-asm-invalid.vi")
+else()
+    vpp_raw_build("${VPP_OUTPUT_DIR}/process-asm-invalid.vi" "${raw_process}")
+    set(raw_command "${raw_process}")
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
-    "${raw_process}"
+    ${raw_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
 if (NOT status STREQUAL raw_exit AND NOT (WIN32 AND status STREQUAL "-22"))

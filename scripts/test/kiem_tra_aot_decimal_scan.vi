@@ -1,4 +1,3 @@
-nhập gói.chuẩn.chính.*;
 hàm cp26 quét số(các byte, vị trí, n, chữ số, giá trị âm, trong i32, chữ số cuối) {
     khi (vị trí < n) {
         chữ số = các byte[vị trí];

@@ -1,6 +1,7 @@
 // Built once as vpp-jit. User source is compiled and executed in this process.
 nhập gói.biên dịch.JIT.Bộ Biên Dịch JIT;
 nhập gói.biên dịch.JIT động.jit động tệp;
+nhập gói.biên dịch.dòng lệnh VM.biên dịch dòng lệnh VM;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.nhập xuất.tệp.đọc tệp;
@@ -14,7 +15,7 @@ hàm riêng tư jit đối số(i) {
     trả về chuỗi từ byte máy ảo(các byte);
 };
 hàm riêng tư jit giúp đỡ() {
-    in "Usage: vpp jit <source.vi> [--function name] [-- i32 arguments] | vpp jit --dynamic <source.vi> [arguments...] | vpp jit --check-dynamic <source.vi>";
+    in "Usage: vpp jit <source.vi> [--function name] [-- i32 arguments] | vpp jit --raw-program <source.vi> [arguments...] | vpp jit --dynamic <source.vi> [arguments...] | vpp jit --check-dynamic <source.vi> | vpp jit --vm-image <source.vi> -o <image.vmb>";
 };
 hàm chính() {
     nếu (đối số đếm() < 2) {
@@ -27,6 +28,15 @@ hàm chính() {
         nếu (đầu >= đối số đếm()) { ném "V++ JIT: thiếu tệp nguồn"; };
         tệp = jit đối số(đầu);
         nếu (tệp == "--help" || tệp == "-h") { jit giúp đỡ(); trả về 0; };
+        // The VM serialization gate exercises the existing V++ image writer,
+        // without a compiler process or a native test executable.
+        nếu (tệp == "--vm-image") {
+            nếu (đầu + 4 != đối số đếm() || jit đối số(đầu + 2) != "-o") { ném "V++ JIT: --vm-image cần nguồn và -o"; };
+            gốc = đọc biến môi trường("VPP_HOME", "");
+            nếu (gốc == "") { ném "V++ JIT: cần VPP_HOME"; };
+            biên dịch dòng lệnh VM(["vm-build", jit đối số(đầu + 1), "-o", jit đối số(đầu + 3)], gốc + "/gói");
+            trả về 0;
+        };
         nếu (tệp == "--dynamic" || tệp == "--check-dynamic") {
             nếu (đầu + 2 > đối số đếm()) { ném "V++ JIT: --dynamic cần tệp nguồn"; };
             gốc = đọc biến môi trường("VPP_HOME", "");
@@ -42,6 +52,12 @@ hàm chính() {
             nếu (tệp == "--check-dynamic") { ảnh.đóng(); trả về 0; };
             thử { kết quả = ảnh.chạy(đầu + 1); ảnh.đóng(); trả về kết quả; }
             bắt lỗi(e) { ảnh.đóng(); ném e; };
+        };
+        nếu (tệp == "--raw-program") {
+            nếu (đầu + 1 >= đối số đếm()) { ném "V++ JIT: --raw-program cần tệp nguồn"; };
+            bộ = Bộ Biên Dịch JIT(đọc tệp(jit đối số(đầu + 1)), đúng);
+            thử { kết quả = bộ.chạy chương trình(đầu + 1); bộ.đóng(); trả về kết quả; }
+            bắt lỗi(e) { bộ.đóng(); ném e; };
         };
         tên = "chính";
         các đối số = [];

@@ -20,6 +20,11 @@ hàm aot_status() { trả về vm_get(4198464, 1) != 0; };
 // error=2 cho token không hợp lệ; lỗi kiểu/arity/provider không đổi.
 hàm aot_host_call(state, op, args) {
     biến result = vm_host(state, op, args);
+    nếu ((op == 154 || op == 155) && vm_get(4198464, 1) == 2) {
+        vm_set(4198464, 1, 0);
+        biến reason = vm_literal("byte: cần danh sách số nguyên trong 0..255");
+        nếu (aot_status() == 0) { vm_set(4198464, 3, reason); vm_error(16); };
+    };
     biến transport_error = op >= 186 && op <= 192 && vm_get(4198464, 1) == 20;
     biến invalid_token = 0;
     nếu (op >= 185 && op <= 190 && vm_get(4198464, 1) == 2) {
@@ -2481,6 +2486,12 @@ hàm chính() {
     biến platform = máy thư mục thô(6, 0, 0);
     nếu (platform < 0 || platform > 2) { trả về 1; };
     vm_set(4198464, 8, platform);
+    biến executable = vm_string(4095);
+    nếu (executable == 0) { trả về 1; };
+    biến executable_length = máy tệp thực thi lấy(vm_get(executable, 2));
+    nếu (executable_length > 0 && executable_length <= 4095) { vm_set(executable, 1, executable_length); }
+    hoặc { executable = vm_literal(đối số lấy(0)); };
+    vm_set(4198464, 10, executable);
     // Linux x86-64 AOT uses the full freestanding ASM arena.
     nếu (platform == 1 && máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
     // Ô thứ 17 giữ kho khung AOT, để GC thấy tất cả khung rảnh.

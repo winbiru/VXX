@@ -1,4 +1,3 @@
-nhập gói.chuẩn.chính.*;
 hàm cp25 kiểm tra byte(bytes, n, hợp lệ) {
     s = chuỗi từ byte máy ảo(bytes);
     nếu (độ dài(s) != n || độ dài(s) != n || máy ảo kiểm tra utf8(s) != hợp lệ) { ném "UTF8 scan"; };

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run qualified V++ fixtures in JIT and other regressions on their native toolchain."""
+"""Run V++ source regressions in JIT, or explicitly exercise the native toolchain."""
 import argparse
 import collections
 import concurrent.futures
@@ -12,6 +12,7 @@ import os
 import platform
 import re
 import signal
+import struct
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / "scripts/test"
 MANIFEST = TESTS / "regression.json"
+FIXTURE_EXECUTABLE = None
 
 # Explicitly reviewed positive fixtures. Entrypoint, compiler, import-resolution,
 # diagnostic and other context-sensitive probes remain independent executables.
@@ -44,30 +46,37 @@ MODULE_SUITES = {
     "time": ("goi_thoi_gian", "goi_thoi_gian_1_0"),
 }
 HARNESS_KEYS = ("dump", "linker_phase", "vm_phase", "cmake")
-# Only explicitly reviewed language fixtures may run as dynamic JIT guests.
+JIT_I32_HARNESSES = {
+    "checknativeprint.cmake", "checknativebulk.cmake", "checknativebytefile.cmake",
+    "checknativebytesops.cmake", "checknativeread.cmake",
+    "checknativelexer.cmake", "checknativeparser.cmake", "checknativecodegen.cmake",
+}
+# The legacy mixed backend uses this allowlist for reviewed JIT fixtures.
+JIT_VM_PHASES = {"core", "directory", "system", "process", "resolver", "socket", "socket_negative", "tls"}
 JIT_CASE_KEYS = {"id", "suite", "source", "expected", "stdout", "exit", "smoke", "jit"}
 
 
-def toolchain_reason(case):
+def toolchain_reason(case, *, jit_mode=False):
     """Cases whose contract requires a specific compiler or executable."""
-    if case["suite"] == "i32":
-        return "i32 compiler/runtime"
-    if "run_diagnostic_regex" in case or "run_forbidden_regex" in case:
-        return "AOT runtime diagnostic assertion"
-    if "diagnostic" in case:
-        return "compiler diagnostic assertion"
+    if jit_mode and ("dump" in case or case.get("cmake") in JIT_I32_HARNESSES or
+                     case.get("cmake") == "check_native_runtime.cmake" or
+                     case.get("linker_phase") in {"reader", "layout", "patch", "executable", "direct-object", "elf-partial"} or
+                     case.get("vm_phase") in JIT_VM_PHASES):
+        return None
     if any(key in case for key in HARNESS_KEYS):
         return "compiler/linker/VM artifact assertion"
     if case.get("tooling_test"):
+        if jit_mode and case["id"] in {"kiem_tra_chia_nhom_golden", "kiem_tra_do_thi_build", "kiem_tra_regression_runner"}:
+            return None
         return "build tooling and executable fixture"
-    if case["id"] in {"kiem_tra_jit_vpp"}:
-        return "standalone JIT API/runtime assertion"
+    if case.get("dns_mock") and not jit_mode:
+        return "DNS fixture requires the native i32 socket ABI"
     return None
 
 
 def jit_eligible(case, experimental=False):
-    """Do not assume an ordinary AOT fixture is supported by dynamic JIT."""
-    return not toolchain_reason(case) and (
+    """Explicit JIT mode runs every source case outside the native toolchain."""
+    return not toolchain_reason(case, jit_mode=experimental) and (
         experimental or case.get("jit", False) or case.get("compile_reject", False))
 
 
@@ -231,7 +240,7 @@ def load_manifest():
         if case.get("jit") and (case["suite"] != "full" or set(case) - JIT_CASE_KEYS):
             raise ValueError(f"unsupported JIT case configuration: {case['id']}")
     full = [c for c in cases if c["suite"] == "full"]
-    shards = partition(full, 16)
+    shards = partition(full, 1)
     assigned = [c["id"] for shard in shards for c in shard]
     if (sorted(assigned) != sorted(c["id"] for c in full)
             or any(not any("pending" not in c for c in shard) for shard in shards)
@@ -240,11 +249,34 @@ def load_manifest():
     return manifest
 
 
-def execute(command, cwd, env, logs, name, timeout):
+def fixture_process(command, env):
+    """Launch the isolated runner self-test's process doubles.
+
+    Enabled only by the nested runner self-test's explicit CLI flag. Copies
+    must live within its isolated root; ordinary commands keep their real ABI.
+    """
+    command = [str(x) for x in command]
+    if FIXTURE_EXECUTABLE is None:
+        return command, env
+    executable = Path(command[0]).resolve()
+    if not executable.is_relative_to(ROOT) or not executable.is_file():
+        return command, env
+    # Only published mock executables are redirected. Python, CMake and other
+    # host tools (including test scripts under ROOT) are never intercepted.
+    if hashlib.sha256(executable.read_bytes()).digest() != hashlib.sha256(FIXTURE_EXECUTABLE.read_bytes()).digest():
+        return command, env
+    source = ROOT / "scripts/quality/regression_runner_mock.py"
+    if env.get("VPP_TEST_FAKE") != "1" or not source.is_file():
+        raise RuntimeError("invalid runner JIT fixture context")
+    return [sys.executable, str(source), str(executable), *command[1:]], env
+
+
+def execute(command, cwd, env, logs, name, timeout, *, stdin=None):
     start = time.monotonic()
-    with (logs / (name + ".stdout")).open("wb") as out, (logs / (name + ".stderr")).open("wb") as err:
+    command, env = fixture_process(command, env)
+    with (logs / (name + ".stdout")).open("wb") as out, (logs / (name + ".stderr")).open("wb") as err, (stdin.open("rb") if stdin is not None else contextlib.nullcontext(subprocess.DEVNULL)) as input_stream:
         process = subprocess.Popen([str(x) for x in command], cwd=cwd, env=env,
-                                   stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                   stdin=input_stream, stdout=out, stderr=err,
                                    start_new_session=(os.name != "nt"))
         try:
             status = process.wait(timeout=timeout)
@@ -373,8 +405,196 @@ def verify_failure(case, status, logs, stage):
         raise RuntimeError(f"{stage} missing diagnostic: {case['diagnostic']}")
 
 
+def jit_dump(case, jit, source, cwd, env, logs, timeout):
+    # Execute the same compiler library functions used by the native CLI.
+    common = "nhập gói.nhập xuất.tệp.đọc tệp;\nnhập gói.hệ thống.môi trường.đọc biến môi trường;\n"
+    if case["dump"] == "disassemble":
+        imports = ("nhập gói.biên dịch.nguồn tệp.biên dịch nguồn tệp tự chủ;\n"
+                   "nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;\n"
+                   "nhập gói.biên dịch.giải mã bytecode.biên dịch giải mã chương trình;\n")
+        expression = 'biên dịch giải mã chương trình(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn tệp tự chủ(đường, đọc biến môi trường("VPP_HOME", ""))))'
+    else:
+        function = {"dump-ast": "biên dịch hiển thị cây cú pháp", "dump-ir": "biên dịch hiển thị biểu diễn trung gian"}[case["dump"]]
+        imports = "nhập gói.biên dịch.hiển thị cây và IR." + function + ";\n"
+        expression = function + "(đọc tệp(đường))"
+    harness = cwd / "dump.vi"
+    harness.write_text(common + imports + 'hàm chính() { đường = đọc biến môi trường("VPP_TEST_SOURCE", ""); in ' + expression + '; };\n', encoding="utf-8")
+    env = dict(jit_environment(env), VPP_TEST_SOURCE=str(source))
+    for name in ("first", "second"):
+        if execute([jit, "--dynamic", harness], cwd, env, logs, name, timeout):
+            raise RuntimeError(f"JIT {case['dump']} failed")
+        if (logs / (name + ".stderr")).read_bytes():
+            raise RuntimeError(f"JIT {case['dump']} emitted stderr")
+    first = (logs / "first.stdout").read_bytes()
+    if not first.strip() or first != (logs / "second.stdout").read_bytes():
+        raise RuntimeError(f"{case['dump']} produced empty or unstable output")
+
+
+def jit_i32_print(jit, source, cwd, env, logs, timeout):
+    env = jit_environment(env)
+    def check(path, label, status, stdout=None, diagnostic=None):
+        actual = execute([jit, path], cwd, env, logs, label, timeout)
+        out = (logs / (label + ".stdout")).read_bytes()
+        err = (logs / (label + ".stderr")).read_bytes()
+        if actual != status or (stdout is not None and normalize(out) != normalize(stdout)) or (diagnostic and diagnostic.encode() not in out + err):
+            raise RuntimeError(f"JIT i32 print {label}: unexpected exit/output ({actual})")
+        if diagnostic is None and err:
+            raise RuntimeError(f"JIT i32 print {label}: unexpected stderr")
+    check(source, "run", 7, b"-2147483648\n42\n0\n")
+    for label, code, status, stdout, diagnostic in (
+        ("print-variable", "hàm chính() { biến số = 42; in số; trả về 0; };", 0, b"42\n", None),
+        ("string-print", "hàm chính() { in ; trả về 0; };", 1, None, "thiếu toán hạng"),
+        ("legacy-print", "hàm chính() { in số(7); trả về 0; };", 1, None, "hàm chưa định nghĩa"),
+        ("reserved-symbol", "hàm vpp_native_print_i32(x) { trả về x; }; hàm main() { trả về 0; };", 1, None, "dành riêng"),
+    ):
+        probe = cwd / (label + ".vi")
+        probe.write_text(code + "\n", encoding="utf-8")
+        check(probe, label, status, stdout, diagnostic)
+
+
+def jit_i32_io(case, jit, source, cwd, env, logs, timeout):
+    """Preserve the independent byte/file/stdin oracles of the native harnesses."""
+    env = jit_environment(env)
+    kind = case["cmake"]
+
+    def check(path, label, stdout=None, diagnostic=None, stdin=None):
+        status = execute([jit, path], cwd, env, logs, label, timeout, stdin=stdin)
+        out = (logs / (label + ".stdout")).read_bytes()
+        err = (logs / (label + ".stderr")).read_bytes()
+        if diagnostic is not None:
+            if status != 1 or diagnostic.encode() not in out + err:
+                raise RuntimeError(f"{label}: expected JIT rejection {diagnostic!r}, got {status}")
+        elif status or normalize(out) != normalize(stdout) or err:
+            raise RuntimeError(f"{label}: unexpected JIT output/exit {status}")
+
+    if kind == "checknativebulk.cmake":
+        check(source, "run", "4096\n4096\n1820\n0\nNative UTF-8: Việt Nam\n".encode())
+        payload = (cwd / "native-block.bin").read_bytes()
+        if len(payload) != 10012 or hashlib.sha256(payload).hexdigest() != "4a3fb371a00b860295a5096738c28d7dbedd444d52277cc992187b950a0e1047":
+            raise RuntimeError("native bulk file size/hash mismatch")
+        arity = "tệp đọc khối(1)"
+        reserved = ("byte nối", "byte bằng", "byte in", "tệp đọc khối", "tệp ghi khối",
+                    "vpp_native_bytes_concat", "vpp_native_file_read_block")
+    elif kind == "checknativebytefile.cmake":
+        check(source, "run", b"4\n330\n-1\n-2\n")
+        for name in ("vpp-io.in", "vpp-io.out"):
+            if (cwd / name).read_bytes() != bytes.fromhex("00ff0a41"):
+                raise RuntimeError(f"{name}: incorrect binary bytes")
+        arity = "byte thêm(1)"
+        reserved = ("byte mới", "tệp đóng", "vpp_native_bytes_get", "vpp_native_file_close")
+    elif kind == "checknativebytesops.cmake":
+        check(source, "run", b"2097152\n90\n")
+        if (cwd / "native-slice-cap.bin").read_bytes() != b"A":
+            raise RuntimeError("native slice boundary file mismatch")
+        arity = "byte cắt(1, 0)"
+        reserved = ("byte cắt", "byte tìm", "byte làm rỗng", "vpp_native_bytes_slice",
+                    "vpp_native_bytes_find", "vpp_native_bytes_clear")
+    elif kind == "checknativeread.cmake":
+        for label, data, expected in (
+            ("boundary", b"-2147483648\n2147483647\n", b"-2147483648\n0\n2147483647\n0\n"),
+            ("invalid", b"12abc\n-1\n", b"0\n2\n-1\n0\n"),
+            ("overflow", b"2147483648\n0\n", b"0\n3\n0\n0\n"),
+            ("eof", b"", b"0\n1\n0\n1\n"),
+            ("longline", b"9" * 80 + b"\n17\n", b"0\n2\n17\n0\n"),
+            ("whitespace", b"  +42  \n-0\n", b"42\n0\n0\n0\n"),
+        ):
+            input_file = cwd / (label + ".txt")
+            input_file.write_bytes(data)
+            check(source, label, expected, stdin=input_file)
+        arity = "đọc số(12)"
+        reserved = ("đọc số", "vpp_native_read_i32", "vpp_native_read_status")
+    else:
+        raise ValueError(kind)
+    probe = cwd / "bad-arity.vi"
+    probe.write_text(f"hàm chính() {{ trả về {arity}; }};\n", encoding="utf-8")
+    check(probe, "bad-arity", diagnostic="không nhận đối số" if kind == "checknativeread.cmake" else "sai số đối số")
+    for i, name in enumerate(reserved):
+        probe = cwd / f"reserved-{i}.vi"
+        probe.write_text(f"hàm {name}() {{ trả về 0; }}; hàm chính() {{ trả về 0; }};\n", encoding="utf-8")
+        check(probe, f"reserved-{i}", diagnostic="dành riêng")
+
+
+def jit_i32_frontend(case, jit, source, cwd, env, logs, timeout):
+    """Run the original byte-handle lexer/parser harness without an executable."""
+    env = jit_environment(env)
+    native = ROOT / "gói/biên dịch/bản địa"
+    parts = [native / "phân tích từ vựng.vi"]
+    parser = case["cmake"] == "checknativeparser.cmake"
+    if parser:
+        parts.extend(native / name for name in ("từ tố.vi", "phân tích cú pháp.vi", "biểu diễn trung gian.vi"))
+        (cwd / "native-parser-input.vi").write_bytes("// ví dụ\r\nhàm chính() { biến a = 12; trả về a * 4 + 4; };\n".encode())
+    else:
+        (cwd / "native-lexer-input.vi").write_bytes('// header\r\nhàm mẫu(a) { /* chú */ biến x = 12; in "Chào\\n"; trả về x; };\r\n'.encode())
+    parts.append(source)
+    combined = cwd / "frontend.vi"
+    combined.write_text("\n".join(re.sub(r"(?m)^[ \t]*nhập[^\n]*;[ \t]*$", "", part.read_text(encoding="utf-8")) for part in parts), encoding="utf-8")
+    status = execute([jit, combined], cwd, env, logs, "run", timeout)
+    if status or normalize((logs / "run.stdout").read_bytes()) != b"20261017\n" or (logs / "run.stderr").read_bytes():
+        raise RuntimeError(f"native JIT frontend failed: {status}")
+    if not parser:
+        return
+    expected = bytes.fromhex("010000000c0000000300000000000000020000000000000001000000040000000600000000000000010000000400000004000000000000000700000000000000")
+    if (cwd / "native-parser-output.ir").read_bytes() != expected:
+        raise RuntimeError("native parser IR differs from independent wire oracle")
+    reserved = ("byte đẩy số nguyên ba mươi hai bit", "byte đọc số nguyên ba mươi hai bit",
+                "byte ghi số nguyên ba mươi hai bit", "vpp_native_bytes_push_i32",
+                "vpp_native_bytes_load_i32", "vpp_native_bytes_store_i32", "máy chia số nguyên ba mươi hai bit")
+    probes = [(f"reserved-{i}", f"hàm {name}() {{ trả về 0; }}; hàm chính() {{ trả về 0; }};", "dành riêng") for i, name in enumerate(reserved)]
+    probes.extend((label, f"hàm chính() {{ trả về {call}; }};", "sai số đối số") for label, call in (
+        ("bad-parser-arity", "byte ghi số nguyên ba mươi hai bit(1, 2)"),
+        ("bad-native-div-arity", "máy chia số nguyên ba mươi hai bit(52)")))
+    for label, code, diagnostic in probes:
+        path = cwd / (label + ".vi")
+        path.write_text(code + "\n", encoding="utf-8")
+        status = execute([jit, path], cwd, env, logs, label, timeout)
+        if status != 1 or diagnostic.encode() not in (logs / (label + ".stdout")).read_bytes() + (logs / (label + ".stderr")).read_bytes():
+            raise RuntimeError(f"{label}: native JIT parser did not reject with {diagnostic}")
+
+
+def jit_i32_codegen(jit, source, cwd, env, logs, timeout):
+    """Keep the raw codegen oracle and execute the exact emitted Mach-O object."""
+    from check_native_macho_layout import parse, catalog, verify_native_signature
+    env = jit_environment(env)
+    native = ROOT / "gói/biên dịch/bản địa"
+    parts = [native / name for name in ("phân tích từ vựng.vi", "từ tố.vi", "phân tích cú pháp.vi",
+             "biểu diễn trung gian.vi", "sinh mã.vi", "đối tượng.vi")]
+    (cwd / "native-codegen-input.vi").write_text(
+        "hàm chính() { biến x = -159; x /= -3; x %= 52; x += 51; x &= 127; x |= 128; x ^= 128; x <<= 1; x >>= 1; x = ~~x; biến p = 1|2&4; x += p-1; nếu (!sai) { trả về x; }; trả về 1; };\n",
+        encoding="utf-8")
+    combined = cwd / "codegen.vi"
+    combined.write_text("\n".join(re.sub(r"(?m)^[ \t]*nhập[^\n]*;[ \t]*$", "", part.read_text(encoding="utf-8"))
+                                  for part in [*parts, source]), encoding="utf-8")
+    status = execute([jit, combined], cwd, env, logs, "run", timeout)
+    if status or normalize((logs / "run.stdout").read_bytes()) != b"20261017\n" or (logs / "run.stderr").read_bytes():
+        raise RuntimeError(f"native JIT codegen failed: {status}")
+    obj = cwd / "native-codegen-output.o"
+    sections, symbols = parse(obj)
+    if len(sections) != 1 or sections[0][:2] != (0, 0) or sections[0][2] <= 0 or sections[0][4] or symbols != [("_main", 15, 0, 0)]:
+        raise RuntimeError("unexpected native codegen Mach-O layout")
+    # The executable is an output of the linker feature under test, not a
+    # compiled test harness. No external assembler or linker participates.
+    result = cwd / "native-codegen-result"
+    status = execute([jit, "--dynamic", TESTS / "fixtures/native_macho_executable.vi", "|".join(catalog()), result, obj],
+                     cwd, env, logs, "link-oracle", max(timeout, 180))
+    if status or normalize((logs / "link-oracle.stdout").read_bytes()) != b"Mach-O executable: PASS\n" or (logs / "link-oracle.stderr").read_bytes():
+        raise RuntimeError(f"V++ JIT Mach-O link oracle failed: {status}")
+    raw = result.read_bytes()
+    if struct.unpack_from("<4I", raw) != (0xfeedfacf, 0x100000c, 0, 2):
+        raise RuntimeError("invalid executable Mach-O header")
+    verify_native_signature(raw)
+    result.chmod(0o700)
+    if execute(["/usr/bin/codesign", "--verify", result], cwd, env, logs, "signature", 30):
+        raise RuntimeError("native codegen executable signature invalid")
+    status = execute([result], cwd, env, logs, "machine-code", 30)
+    if status != 52 or (logs / "machine-code.stdout").read_bytes() or (logs / "machine-code.stderr").read_bytes():
+        raise RuntimeError(f"native codegen machine code returned {status}, expected 52")
+
+
 def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=None,
              prepared_binary=None, selector=None, jit=None):
+    # Reject a toolchain case before entering any build/harness branch.
+    if jit is not None and (phase == "build" or selector is not None or toolchain_reason(case, jit_mode=True)):
+        raise RuntimeError("invalid JIT execution plan")
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
@@ -395,9 +615,21 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
                 VPP_TEST_CMAKE=shutil.which("cmake") or "cmake",
                 VPP_TEST_SELF=str(binary),
             )
+            if jit is not None and case["id"] == "kiem_tra_regression_runner":
+                env.update(VPP_TEST_SELF=str(jit), VPP_TEST_JIT=str(jit))
         source = ROOT / case["source"]
         if phase == "build" and any(key in case for key in HARNESS_KEYS):
             return True  # These harnesses exercise compilation as part of the test.
+        if jit is not None and "dump" in case:
+            return jit_dump(case, jit, source, cwd, env, logs, timeout)
+        if jit is not None and case.get("cmake") == "checknativeprint.cmake":
+            return jit_i32_print(jit, source, cwd, env, logs, timeout)
+        if jit is not None and case.get("cmake") in {"checknativelexer.cmake", "checknativeparser.cmake"}:
+            return jit_i32_frontend(case, jit, source, cwd, env, logs, timeout)
+        if jit is not None and case.get("cmake") == "checknativecodegen.cmake":
+            return jit_i32_codegen(jit, source, cwd, env, logs, timeout)
+        if jit is not None and case.get("cmake") in JIT_I32_HARNESSES:
+            return jit_i32_io(case, jit, source, cwd, env, logs, timeout)
         if "dump" in case:
             for name in ("first", "second"):
                 if execute([compiler, case["dump"], source], cwd, env, logs, name, timeout):
@@ -407,16 +639,35 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
                 raise RuntimeError(f"{case['dump']} produced empty or unstable output")
             return
         if "linker_phase" in case:
-            status = execute([sys.executable, ROOT / "scripts/quality/check_native_regression_linkers.py",
-                              case["linker_phase"], compiler, cwd], cwd, env, logs,
-                             "harness", max(timeout, case.get("harness_timeout", 3600)))
+            command = [sys.executable, ROOT / "scripts/quality/check_native_regression_linkers.py"]
+            if jit is not None:
+                command += ["--jit", case["linker_phase"], jit, cwd]
+                env = jit_environment(env)
+            else:
+                command += [case["linker_phase"], compiler, cwd]
+            status = execute(command, cwd, env, logs, "harness",
+                             max(timeout, case.get("harness_timeout", 3600)))
             if status:
                 raise RuntimeError(f"Linker {case['linker_phase']} harness exit {status}")
             return
         if "vm_phase" in case:
-            cmd = ["cmake", f"-DVPP_STAGE1={compiler.with_name(executable_name('vpp-i32'))}",
-                   f"-DVPP_NATIVE_COMPILER={compiler}", f"-DVPP_ROOT={ROOT}",
-                   f"-DVPP_OUTPUT_DIR={cwd}", f"-DVPP_VM_PHASE={case['vm_phase']}"]
+            cmake = shutil.which("cmake")
+            if not cmake:
+                raise RuntimeError("CMake is required for the VM oracle")
+            cmd = [cmake, f"-DVPP_ROOT={ROOT}", f"-DVPP_OUTPUT_DIR={cwd}",
+                   f"-DVPP_VM_PHASE={case['vm_phase']}"]
+            if jit is not None:
+                vm = vm or jit.with_name(executable_name("vpp-vm"))
+                if not vm.is_file():
+                    raise RuntimeError(f"packaged standalone VM missing: {vm}")
+                cmd += [f"-DVPP_JIT={jit}", f"-DVPP_PYTHON={sys.executable}"]
+                nm = shutil.which("llvm-nm") or shutil.which("nm")
+                if nm:
+                    cmd.append(f"-DVPP_VM_NM={nm}")
+                env = jit_environment(env)
+            else:
+                cmd += [f"-DVPP_STAGE1={compiler.with_name(executable_name('vpp-i32'))}",
+                        f"-DVPP_NATIVE_COMPILER={compiler}"]
             if vm is not None:
                 # DNS provider discovery uses the VM's directory. Keep each
                 # phase's generated providers beside its own copy of the VM.
@@ -435,6 +686,16 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             if status:
                 raise RuntimeError(f"Standalone VM {case['vm_phase']} harness exit {status}")
             return
+        if jit is not None and case.get("cmake") == "check_native_runtime.cmake":
+            cmake = shutil.which("cmake")
+            if not cmake:
+                raise RuntimeError("CMake is required for the native runtime oracle")
+            cmd = [cmake, f"-DVPP_JIT={jit}", f"-DVPP_ROOT={ROOT}",
+                   f"-DVPP_TARGET={env.get('VPP_NATIVE_TARGET', 'native')}",
+                   f"-DVPP_OUTPUT_DIR={cwd}", "-P", ROOT / "scripts/quality/check_native_runtime.cmake"]
+            if execute(cmd, cwd, jit_environment(env), logs, "harness", timeout):
+                raise RuntimeError("JIT native runtime harness failed")
+            return
         if "cmake" in case:
             cmd = ["cmake", f"-DVPP_EXEC={compiler}", f"-DVPP_STAGE1={compiler}",
                    f"-DVPP_ROOT={ROOT}", f"-DVPP_HOME={env['VPP_HOME']}",
@@ -447,9 +708,11 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
                 raise RuntimeError(f"CMake harness exit {status}")
             return
         if jit is not None:
-            if phase == "build" or selector is not None or toolchain_reason(case):
-                raise RuntimeError("invalid JIT execution plan")
+            original_path = env.get("PATH", "")
             env = jit_environment(env)
+            if case["id"] in {"kiem_tra_do_thi_build", "kiem_tra_regression_runner"}:
+                # The graph fixture invokes fake shell scripts, never a real compiler.
+                env["PATH"] = original_path
             if case.get("compile_reject") or case.get("failure_phase") == "build":
                 status = execute([jit, "--check-dynamic", source], cwd, env, logs, "build", timeout)
                 if binary.exists():
@@ -484,16 +747,29 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             shutil.copytree(TESTS, cwd / "scripts/test", ignore=shutil.ignore_patterns(".*"))
             shutil.copytree(ROOT / "gói", cwd / "gói")
             shutil.copytree(TESTS / "fixtures", cwd / "fixtures", ignore=shutil.ignore_patterns(".*"))
+            if (TESTS / "expected").is_dir():
+                shutil.copytree(TESTS / "expected", cwd / "expected")
         if case.get("dns_mock"):
-            if jit is None:
-                run_dns_mock(binary, cwd, env, logs)
-            else:
+            if jit is not None:
                 run_dns_mock([jit, "--dynamic", source], cwd, env, logs,
-                             server=[jit, "--dynamic", TESTS / "fixtures/native_dns_mock.vi"],
-                             timeout=timeout)
+                             server=[jit, "--raw-program", TESTS / "fixtures/native_dns_mock.vi"])
+            else:
+                run_dns_mock(binary, cwd, env, logs)
             return
         args = case.get("args", []) if selector is None else [selector]
-        command = [jit, "--dynamic", source, *args] if jit is not None else [binary, *args]
+        if jit is not None and case["id"] == "i32-logical-side-effects":
+            # The i32 JIT accepts assignment expressions; it has no module loader.
+            # Flatten only the declared, function-only local module for this case.
+            module, = case["sources"]
+            text = source.read_text(encoding="utf-8")
+            directive = "nhập native_logical_side_effects.*;"
+            if text.count(directive) != 1:
+                raise RuntimeError("unexpected i32 fixture import")
+            combined = cwd / "logical-side-effects.vi"
+            combined.write_text((ROOT / module).read_text(encoding="utf-8") + "\n" + text.replace(directive, "", 1), encoding="utf-8")
+            command = [jit, combined]
+        else:
+            command = [jit, "--dynamic", source, *args] if jit is not None else [binary, *args]
         status = execute(command, cwd, env, logs, "run", timeout)
         if jit is not None:
             if binary.exists():
@@ -618,6 +894,7 @@ def prepare_http(compiler, directory, env, timeout):
 def start_prepared_http(binary, directory, env, timeout=30):
     directory.mkdir(parents=True, exist_ok=True)
     command = [str(x) for x in binary] if isinstance(binary, list) else [str(binary)]
+    command, env = fixture_process(command, env)
     with (directory / "server.log").open("wb") as log:
         process = subprocess.Popen(command, cwd=directory, env=env, stdout=log, stderr=log)
     try:
@@ -656,7 +933,7 @@ def staged_regression(cases, compiler, logs, env, timeout, jobs, record, batch_s
     Compiler/linker/VM harnesses intentionally compile their own inputs as
     part of their assertions. The ordinary AOT run phase never calls build.
     """
-    errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
+    errors = (OSError, RuntimeError, AssertionError, struct.error, subprocess.TimeoutExpired)
     vm = None
     http_binary = None
     setup_errors = {}
@@ -874,7 +1151,7 @@ def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout
             if case.get("dns_mock"):
                 artifact_file(item["directory"] + "/" + executable_name("dns-server"))
     http_binary = artifact_file(plan["http"]) if any(c.get("http") and c["id"] in ready for c in cases) else None
-    errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
+    errors = (OSError, RuntimeError, AssertionError, struct.error, subprocess.TimeoutExpired)
     server = None
     http_error = None
     # The nested runner starts its own HTTP server on the shared port.
@@ -935,18 +1212,24 @@ def run_prepared_regression(cases, compiler, artifacts, plan, logs, env, timeout
                 shutil.copy2(http_log, destination / "server.log")
 
 
-def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record, *, experimental=False):
+def direct_regression(cases, compiler, jit, logs, env, timeout, jobs, record, *, jit_only=False, vm=None):
     """Run sources independently; never build or fall back for a JIT case."""
-    errors = (OSError, RuntimeError, subprocess.TimeoutExpired)
-    guests = [c for c in cases if jit_eligible(c, experimental)]
-    checks = [c for c in cases if not jit_eligible(c, experimental)]
-    print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} AOT/toolchain cases", flush=True)
+    errors = (OSError, RuntimeError, AssertionError, struct.error, subprocess.TimeoutExpired)
+    guests = [c for c in cases if jit_eligible(c, jit_only)]
+    checks = [c for c in cases if not jit_eligible(c, jit_only)]
+    if jit_only:
+        print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} cases requiring JIT migration; no builds", flush=True)
+        for case in checks:
+            record(case, "FAIL", "JIT migration required: " + toolchain_reason(case, jit_mode=True), 0)
+        checks = []
+    else:
+        print(f"PLAN: {len(guests)} direct JIT cases, {len(checks)} AOT/toolchain cases", flush=True)
     server = None
     def run_guest(case):
         start = time.monotonic()
         print(f"START JIT {case['id']}", flush=True)
         try:
-            run_case(case, compiler, logs / case["id"], env, timeout, jit=jit)
+            run_case(case, compiler, logs / case["id"], env, timeout, jit=jit, vm=vm)
             return case, "PASS", "", time.monotonic() - start
         except errors as exc:
             return case, "FAIL", str(exc), time.monotonic() - start
@@ -986,12 +1269,15 @@ def print_failure_logs(directory):
 
 
 def main():
+    global FIXTURE_EXECUTABLE
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--fixture-executable", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--compiler", type=Path)
-    parser.add_argument("--backend", choices=("jit", "aot"),
-                        help="default: qualified JIT + AOT; jit: experimental all ordinary sources; aot: compiler regression")
+    parser.add_argument("--backend", choices=("jit", "aot", "toolchain", "mixed"),
+                        help="jit: source-only, no builds; toolchain: only backend-specific checks; aot: all native checks; mixed: qualified JIT + AOT; default: JIT for all source suites, mixed/AOT for artifacts")
     parser.add_argument("--jit", type=Path,
-                        help="path to packaged JIT (default: vpp-jit beside compiler)")
+                        help="path to packaged JIT (default: sibling of compiler or build-pure-vpp/bin/vpp-jit)")
+    parser.add_argument("--vm", type=Path, help="packaged standalone VM (default: beside JIT)")
     parser.add_argument("--suite", choices=("full", "i32", "smoke"), default="full")
     parser.add_argument("--case", action="append")
     parser.add_argument("--list", action="store_true")
@@ -1010,14 +1296,26 @@ def main():
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--logs", type=Path, default=ROOT / "build-pure-vpp/regression-logs")
     args = parser.parse_args()
+    if args.fixture_executable is not None:
+        if (os.environ.get("VPP_TEST_FAKE") != "1" or
+                not (ROOT / "scripts/quality/regression_runner_mock.py").is_file()):
+            parser.error("--fixture-executable is reserved for the isolated runner self-test")
+        FIXTURE_EXECUTABLE = args.fixture_executable.resolve()
+        if not FIXTURE_EXECUTABLE.is_file():
+            parser.error("runner fixture JIT is missing")
+    if args.backend is None:
+        args.backend = "jit" if args.phase == "all" else ("mixed" if args.suite != "i32" else "aot")
     manifest = load_manifest()
     cases = [c for c in manifest["cases"] if (c["suite"] == args.suite or
-             (args.suite == "smoke" and c.get("smoke")))]
+             (args.suite == "smoke" and c.get("smoke")) or
+             (args.suite == "full" and args.backend == "jit" and c["suite"] == "i32"))]
     if args.case:
         unknown = set(args.case) - {c["id"] for c in cases}
         if unknown:
             parser.error(f"unknown case(s): {sorted(unknown)}")
         cases = [c for c in cases if c["id"] in args.case]
+    if args.backend == "toolchain":
+        cases = [c for c in cases if toolchain_reason(c)]
     if args.inventory:
         print(collections.Counter(c["suite"] + (" pending" if "pending" in c else " active") for c in manifest["cases"]))
         print(f"Unregistered source files: {len(manifest['unregistered_sources'])}")
@@ -1040,25 +1338,33 @@ def main():
         parser.error("--module-suites requires the full suite and --jobs")
     if (args.phase != "all") != (args.artifacts is not None):
         parser.error("--phase build/run requires --artifacts; --phase all does not accept it")
-    direct = args.phase == "all" and args.backend != "aot" and args.suite != "i32"
+    direct = args.phase == "all" and args.backend not in ("aot", "toolchain") and not (args.backend == "mixed" and args.suite == "i32")
     if direct and (args.batch_size != 1 or args.module_suites):
         parser.error("AOT batching/module suites require --backend aot")
     if args.backend == "jit" and args.phase != "all":
         parser.error("direct JIT does not prepare test artifacts")
+    if args.backend == "toolchain" and (args.phase != "all" or args.jit is not None):
+        parser.error("toolchain checks require --phase all and no --jit")
     jit = args.jit.resolve() if args.jit is not None else None
     if jit is not None and not jit.is_file():
         parser.error(f"missing JIT: {jit}")
-    if args.compiler is None:
+    if args.backend == "jit" and jit is None:
+        jit = (args.compiler.resolve().with_name(executable_name("vpp-jit")) if args.compiler else
+               ROOT / "build-pure-vpp/bin" / executable_name("vpp-jit"))
+    if args.compiler is None and args.backend != "jit":
         parser.error("--compiler required")
-    compiler = args.compiler.resolve()
-    if not compiler.is_file():
+    compiler = args.compiler.resolve() if args.compiler is not None else None
+    if args.backend != "jit" and compiler is not None and not compiler.is_file():
         parser.error(f"missing compiler: {compiler}")
     if direct and jit is None:
         jit = compiler.with_name(executable_name("vpp-jit"))
     if direct and not jit.is_file():
         parser.error(f"missing JIT: {jit}")
+    if args.backend == "jit" and args.shard_count != 1:
+        parser.error("JIT regression must run as one suite")
     if args.shard_count > 1:
-        cases = partition(cases, args.shard_count, args.module_suites)[args.shard_index]
+        shards = partition(cases, args.shard_count, args.module_suites)
+        cases = shards[args.shard_index]
         print(f"SHARD {args.shard_index + 1}/{args.shard_count}: {len(cases)} registered cases", flush=True)
     else:
         print(f"SUITE {args.suite}: {len(cases)} registered cases", flush=True)
@@ -1086,7 +1392,7 @@ def main():
         except (OSError, ValueError, KeyError) as exc:
             parser.error(f"invalid test artifact: {exc}")
     env = dict(os.environ)
-    installed = compiler.parent.parent / "share/vpp"
+    installed = (jit if args.backend == "jit" else compiler).parent.parent / "share/vpp"
     env.setdefault("VPP_HOME", str(installed if (installed / "gói").is_dir() else ROOT))
     env.update(VPP_NATIVE_NO_CACHE="1", VPP_FFI_ENV_TEST="vpp-env-ffi-ok", VPP_FFI_ENV_EMPTY_TEST="")
     # Child quality scripts write UTF-8 logs even when Windows redirects stdout.
@@ -1142,7 +1448,7 @@ def main():
                 record(case, "JIT_READY", "source saved in checkout; run with packaged JIT", 0)
     elif direct:
         direct_regression(cases, compiler, jit, logs, env, args.timeout, args.jobs or 1, record,
-                          experimental=args.backend == "jit")
+                          jit_only=args.backend == "jit", vm=args.vm.resolve() if args.vm else None)
     elif args.jobs is not None:
         staged_regression(cases, compiler, logs, env, args.timeout, args.jobs, record,
                           batch_size=args.batch_size, module_suites=args.module_suites)

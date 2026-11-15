@@ -3,7 +3,7 @@
 # close through the real ASM boundary. A denied socket is a failure, not PASS.
 include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_socket_negative.cmake")
 set(socket_image "${socket_dir}/socket-guest.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_ROOT}/scripts/test/fixtures/vm_asm_socket.vi" -o "${socket_image}"
     RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT code STREQUAL "0")

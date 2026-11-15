@@ -18,7 +18,7 @@ import tempfile
 import time
 
 from check_native_macho_layout import (smoke as layout_smoke, patch_smoke, executable_smoke,
-                                       verify_native_signature, parse as parse_macho_object)
+                                       verify_native_signature, parse as parse_macho_object, probe_command)
 
 
 def run(args, env=None, code=0, timeout=1800):
@@ -178,17 +178,25 @@ def macho_reader_expected(path):
     return expected
 
 
+def prepare_probe(compiler, root, out, env, name, *, jit=None):
+    source = root / 'scripts/test/fixtures' / (name + '.vi')
+    if jit is not None:
+        return [jit, '--dynamic', source]
+    probe = out / name
+    run([compiler, 'build', source, '-o', probe], env)
+    return probe
+
+
 def verify_macho_reader(probe, path, env):
-    result, _ = run([probe, path], env)
+    result, _ = run(probe_command(probe, path), env)
     lines = result.stdout.decode().splitlines()
     assert lines[-1] == 'Mach-O reader: PASS' and not result.stderr
     assert [json.loads(line) for line in lines[:-1]] == macho_reader_expected(path), path
     print(f'MACH-O READER ORACLE PASS {path.name} bytes={path.stat().st_size}', flush=True)
 
 
-def macho_reader_smoke(compiler, root, out, env):
-    probe = out / 'native_macho_reader'
-    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_reader.vi', '-o', probe], env)
+def macho_reader_smoke(compiler, root, out, env, *, jit=None):
+    probe = prepare_probe(compiler, root, out, env, 'native_macho_reader', jit=jit)
     # Build a structurally valid ARM64 object without an assembler. A symbol
     # name crosses a 4 KiB page and the file exceeds the restricted i32 arena.
     textoff, textsize = 208, 2 * 1024 * 1024 + 4096
@@ -229,7 +237,7 @@ def macho_reader_smoke(compiler, root, out, env):
         struct.pack_into('<I', malformed, offset, value)
         path = out / f'reader-bad-{name}.o'
         path.write_bytes(malformed)
-        result, _ = run([probe, path], env, code=1)
+        result, _ = run(probe_command(probe, path), env, code=1)
         assert result.stdout.endswith(b'Mach-O reader: REJECT\n') and not result.stderr, name
         path.unlink()
     print(f'MACH-O READER MALFORMED PASS cases={len(mutations)}', flush=True)
@@ -239,18 +247,17 @@ def file_seek_smoke(compiler, root, out, env):
     probe = out / 'native_file_seek'
     run([compiler, 'build', root / 'scripts/test/fixtures/native_file_seek.vi', '-o', probe], env)
     path = out / 'seek-\u1ec7.bin'
-    result, _ = run([probe, path], env)
+    result, _ = run(probe_command(probe, path), env)
     assert result.stdout == b'Native file seek: PASS\n' and not result.stderr
     assert not path.exists()
     print('NATIVE FILE SEEK/TELL PASS (signed i32, overflow, buffering, EOF)', flush=True)
 
 
-def direct_object_smoke(compiler, root, out, env):
-    object_probe = out / 'native_macho_dynamic_object'
-    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_dynamic_object.vi', '-o', object_probe], env)
+def direct_object_smoke(compiler, root, out, env, *, jit=None):
+    object_probe = prepare_probe(compiler, root, out, env, 'native_macho_dynamic_object', jit=jit)
     first, second = out / 'dynamic-object-first.o', out / 'dynamic-object-second.o'
     for path in (first, second):
-        run([object_probe, path], env)
+        run(probe_command(object_probe, path), env)
     assert first.read_bytes() == second.read_bytes()
     parts, symbols = parse_macho_object(first)
     assert parts == [(0, 0, 16, 4, [(0, 0x2d000001)]),
@@ -258,17 +265,13 @@ def direct_object_smoke(compiler, root, out, env):
     assert symbols == [('_caller', 15, 0, 0), ('_callee', 15, 0, 8),
                        ('.local', 14, 1, 16), ('_table', 15, 1, 24)]
     print(f'DIRECT OBJECT PASS sha256={digest(first)}', flush=True)
-    paged_probe = out / 'native_macho_paged_relocations'
-    run([compiler, 'build', root / 'scripts/test/fixtures/native_macho_paged_relocations.vi',
-         '-o', paged_probe], env)
+    paged_probe = prepare_probe(compiler, root, out, env, 'native_macho_paged_relocations', jit=jit)
     paged = out / 'paged-relocations.o'
-    run([paged_probe, paged], env)
+    run(probe_command(paged_probe, paged), env)
     verify_paged_object(paged)
-    chunk_probe = out / 'native_arm64_chunked_object'
-    run([compiler, 'build', root / 'scripts/test/fixtures/native_arm64_chunked_object.vi',
-         '-o', chunk_probe], env)
+    chunk_probe = prepare_probe(compiler, root, out, env, 'native_arm64_chunked_object', jit=jit)
     flat, chunked = out / 'arm64-flat.o', out / 'arm64-chunked.o'
-    result, _ = run([chunk_probe, flat, chunked], env)
+    result, _ = run(probe_command(chunk_probe, flat, chunked), env)
     assert result.stdout == b'ARM64 chunk parity: PASS\n' and not result.stderr
     assert flat.read_bytes() == chunked.read_bytes()
     parts, symbols = parse_macho_object(chunked)

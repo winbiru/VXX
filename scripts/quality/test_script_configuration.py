@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -136,23 +137,85 @@ class OpcodeAbiTests(unittest.TestCase):
 
 
 class RegressionShardTests(unittest.TestCase):
-    def test_backend_specific_diagnostics_stay_on_toolchain(self):
+    def test_raw_jit_abi_matches_both_assembly_resolvers(self):
+        source = (ROOT / 'gói/biên dịch/JIT.vi').read_text()
+        arm = (ROOT / 'scripts/ASM/macos/aot_arm64/jit.inc').read_text()
+        x86 = (ROOT / 'scripts/ASM/common/vpp_jit_x86_64.inc').read_text()
+        mapping = {int(i): name for name, i in re.findall(
+            r'nếu \(tên == "(vpp_native_\w+)"\) \{ id = (\d+); \}', source)}
+        arm_mapping = {int(i): name for i, name in re.findall(
+            r'Ljit_abi_(\d+):\n    adrp x24, _(vpp_native_\w+)@PAGE', arm)}
+        x86_mapping = {int(i): name for i, name in re.findall(
+            r'\.Lvpp_jit_abi_(\d+):\n    leaq (vpp_native_\w+)\(%rip\)', x86)}
+        self.assertTrue(mapping)
+        self.assertEqual(mapping, arm_mapping)
+        self.assertEqual(mapping, x86_mapping)
+        for i in mapping:
+            self.assertIn(f'cmp w20, #{i}\n    b.eq Ljit_abi_{i}', arm)
+            self.assertIn(f'cmpl ${i}, %r12d\n    je .Lvpp_jit_abi_{i}', x86)
+
+    def test_full_jit_includes_i32_without_shards(self):
         spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
         runner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(runner)
+        expected = [c['id'] for c in runner.load_manifest()['cases'] if c['suite'] in ('full', 'i32')]
+        blocked = [(c['id'], runner.toolchain_reason(c, jit_mode=True))
+                   for c in runner.load_manifest()['cases'] if c['id'] in expected
+                   and runner.toolchain_reason(c, jit_mode=True)]
+        self.assertEqual(blocked, [])
+        result = subprocess.run([sys.executable, str(QUALITY / 'run_native_regression.py'),
+                                 '--suite', 'full', '--backend', 'jit', '--list'],
+                                capture_output=True, text=True, check=True)
+        self.assertCountEqual([line.split(' [')[0] for line in result.stdout.splitlines()], expected)
 
+    def test_raw_jit_keeps_production_function_bodies(self):
+        spec = importlib.util.spec_from_file_location('prepare_raw_jit', QUALITY / 'prepare_raw_jit.py')
+        raw = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(raw)
+        originals = {}
+        paths = [ROOT / 'gói/biên dịch/bản địa/môi trường thực thi.vi',
+                 ROOT / 'gói/biên dịch/bản địa/trình liên kết elf.vi']
+        paths += [ROOT / 'gói/máy ảo' / (part + '.vi') for part in raw.VM_PARTS]
+        stems = ('native_heap_allocator', 'native_directory_decode',
+                 'native_elf_partial_linker_archive', 'native_elf_linker_archive')
+        paths += [ROOT / 'scripts/test/fixtures' / (stem + '.vi') for stem in stems]
+        for path in paths:
+            for name, definition in raw.functions(path.read_text(), path):
+                if name != 'chính':
+                    originals[name] = definition[0]
+        with tempfile.TemporaryDirectory() as directory:
+            for stem in stems:
+                source = ROOT / 'scripts/test/fixtures' / (stem + '.vi')
+                destination = raw.prepare(source, Path(directory) / (stem + '.vi'),
+                                          vm_core=stem in stems[:2])
+                selected = dict(raw.functions(destination.read_text(), destination))
+                self.assertIn('chính', selected)
+                for name, definition in selected.items():
+                    if name != 'chính':
+                        self.assertEqual(definition[0], originals[name])
+                self.assertNotIn('thực thi liên kết bên ngoài', selected)
+
+    def test_raw_runtime_abi_matches_bootstrap_arities(self):
+        abi = (ROOT / 'gói/biên dịch/abi lõi bản địa.vi').read_text()
+        parser = (ROOT / 'gói/biên dịch/bản địa/phân tích cú pháp.vi').read_text()
+        lowerer = (ROOT / 'gói/biên dịch/mã máy hạ biểu diễn trung gian.vi').read_text()
+        arities = {int(i): int(n) for i, n in re.findall(
+            r'nếu \(mã định danh == (\d+)\) \{ trả về (\d+);', parser)}
+        entries = re.findall(r'"id": (\d+), "symbol": "(vpp_native_\w+)", "arity": (\d+)', abi)
+        for i, symbol, arity in entries:
+            if int(i) in range(62, 76):
+                self.assertEqual(int(arity), arities[int(i)], symbol)
+                self.assertIn(f' nếu (mục ký hiệu == "{symbol}") {{ trả về {arity}; }};', lowerer)
+
+    def test_diagnostics_are_eligible_for_jit(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
         cases = runner.load_manifest()['cases']
-        diagnostic_cases = [case for case in cases
-                            if 'run_diagnostic_regex' in case or 'run_forbidden_regex' in case]
+        diagnostic_cases = [case for case in cases if any(k in case for k in
+                            ('run_diagnostic_regex', 'run_forbidden_regex', 'diagnostic', 'compile_reject'))]
         self.assertTrue(diagnostic_cases)
-        self.assertTrue(all(runner.toolchain_reason(case) == 'AOT runtime diagnostic assertion'
-                            for case in diagnostic_cases))
-
-        compile_diagnostic = next(case for case in cases if 'diagnostic' in case)
-        self.assertEqual(runner.toolchain_reason(compile_diagnostic),
-                         'compiler diagnostic assertion')
-        jit_syntax = next(case for case in cases if case.get('compile_reject'))
-        self.assertIsNone(runner.toolchain_reason(jit_syntax))
+        self.assertTrue(all(runner.jit_eligible(case, True) for case in diagnostic_cases))
 
     def test_full_shards_keep_all_cases_and_module_groups(self):
         spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
@@ -270,7 +333,7 @@ class WindowsRunnerTests(unittest.TestCase):
             clang.touch()
             compiler.touch()
             argv = ['runner', '--clang', str(clang), 'regression', str(package),
-                    '--suite', 'smoke', '--compiler', str(compiler),
+                    '--suite', 'smoke', '--backend', 'mixed', '--compiler', str(compiler),
                     '--case', 'kiem_tra_aot_i32_run', '--timeout', '37', '--shard-count', '4',
                     '--shard-index', '2', '--phase', 'run', '--artifacts', str(package / 'tests'),
                     '--jit', str(package / 'bin/vpp-jit.exe'), '--logs', str(package / 'logs')]
@@ -280,7 +343,7 @@ class WindowsRunnerTests(unittest.TestCase):
                  mock.patch.object(module.subprocess, 'call', return_value=7) as run:
                 self.assertEqual(module.main(), 7)
             command = run.call_args.args[0]
-            for option, value in (('--compiler', str(compiler.resolve())), ('--suite', 'smoke'),
+            for option, value in (('--compiler', str(compiler.resolve())), ('--suite', 'smoke'), ('--backend', 'mixed'),
                                   ('--case', 'kiem_tra_aot_i32_run'), ('--timeout', '37'),
                                   ('--shard-count', '4'), ('--shard-index', '2'),
                                   ('--phase', 'run'), ('--artifacts', str((package / 'tests').resolve())),
@@ -452,7 +515,7 @@ print('ok')
         self.assertIn('FAIL reject', result.stdout)
         self.assertFalse(self.calls.exists())
 
-    def test_default_regression_routes_only_qualified_guests_to_jit(self):
+    def test_mixed_regression_routes_only_qualified_guests_to_jit(self):
         jit = self.root / 'bin/vpp-jit'
         jit.write_text(f'#!{sys.executable}\n' + """import os, pathlib, sys
 name = pathlib.Path(sys.argv[2]).stem
@@ -464,7 +527,7 @@ assert name == 'regular0' and sys.argv[1] == '--dynamic'
 print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
 """)
         jit.chmod(0o755)
-        options = ('--jit', str(jit), '--jobs', '2', '--case', 'regular0',
+        options = ('--backend', 'mixed', '--jit', str(jit), '--jobs', '2', '--case', 'regular0',
                    '--case', 'regular1', '--case', 'reject')
         result = self.invoke('all', *options)
         self.assertIn('2 direct JIT cases, 1 AOT/toolchain cases', result.stdout)
@@ -476,6 +539,36 @@ print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
         self.assertIn('FAIL regular0', result.stdout)
         calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
         self.assertEqual([Path(call[1]).stem for call in calls], ['regular1', 'regular1'])
+
+    def test_full_jit_runs_dump_without_toolchain(self):
+        jit = self.root / 'bin/vpp-jit'
+        jit.write_text(f'#!{sys.executable}\n' + """import os, pathlib, sys
+assert sys.argv[1] == '--dynamic'
+assert pathlib.Path(sys.argv[2]).stem in ('regular0', 'regular1', 'dump')
+if pathlib.Path(sys.argv[2]).stem == 'dump':
+    assert pathlib.Path(os.environ['VPP_TEST_SOURCE']).stem == 'dump'
+    print('stable compiler dump')
+else:
+    print('bad' if os.environ.get('VPP_PREPARED_TEST_FAIL') else 'ok')
+""")
+        jit.chmod(0o755)
+        selection = ('--case', 'regular0', '--case', 'regular1', '--case', 'dump')
+        self.compiler.unlink()
+        command = [sys.executable, str(self.root / 'scripts/quality/run_native_regression.py'),
+                   '--jit', str(jit), '--logs', str(self.root / 'logs'), *selection]
+        for failed in (False, True):
+            result = subprocess.run(command, env=dict(os.environ, VPP_PREPARED_TEST_FAIL='1' if failed else ''),
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, int(failed), result.stdout + result.stderr)
+            self.assertIn('PASS dump', result.stdout)
+            self.assertIn('3 direct JIT cases, 0 cases requiring JIT migration; no builds', result.stdout)
+            self.assertFalse(self.calls.exists())
+
+    def test_toolchain_mode_runs_only_backend_specific_checks(self):
+        result = self.invoke('all', '--backend', 'toolchain', '--case', 'regular0', '--case', 'dump', '--jobs', '1')
+        self.assertIn('1 passed, 0 failed', result.stdout)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertEqual([call[0] for call in calls], ['dump-ir', 'dump-ir'])
 
     def test_missing_binary_fails_without_rebuild(self):
         options = ('--case', 'regular0')

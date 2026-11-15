@@ -4,6 +4,7 @@
 // 5 publish image: bytes followed by aligned i32 pointer relocation offsets;
 // b = image length. Relocation targets are image-relative i32 offsets.
 // Packet: entry offset, argc, eight i32 arguments, i32 result (44 bytes).
+// 7 invoke standalone zero-arity entry; packet adds argv offset at byte 44.
 // 6 invoke two-i32 leaf at offset zero using arena scratch (left,right,result).
 // Published mappings are immutable RX. Handles are never reused in a process.
 .text
@@ -32,6 +33,8 @@ _vpp_native_jit_service:
     b.eq Ljit_publish
     cmp w19, #4
     b.eq Ljit_address
+    cmp w19, #7
+    b.eq Ljit_lookup
     cmp w19, #6
     b.eq Ljit_lookup
     cmp w19, #2
@@ -82,6 +85,8 @@ Ljit_found:
     mov w0, w21
     mov w1, #4
     bl _vpp_native_bytes_load_i32
+    cmp w19, #7
+    b.eq Ljit_program
     cmp w0, #8
     b.hi Ljit_invalid
     mov w23, #0
@@ -105,6 +110,63 @@ Ljit_arguments:
     mov w1, #40
     bl _vpp_native_bytes_store_i32
     b Ljit_done
+Ljit_program:
+    // No caller handles cross the arena boundary. Reject nested invocation.
+    cbnz w0, Ljit_invalid
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    ldr w9, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    cbnz w9, Ljit_invalid
+    mov w0, w21
+    bl _vpp_native_bytes_length
+    cmp w0, #48
+    b.lt Ljit_invalid
+    mov w0, w21
+    mov w1, #44
+    bl _vpp_native_bytes_load_i32
+    mov w26, w0
+    cmp w26, #0
+    b.le Ljit_invalid
+    bl _vpp_native_argc
+    cmp w26, w0
+    b.hs Ljit_invalid
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    str w26, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    mov x0, #0
+    bl _vpp_native_jit_swap_arena
+    mov x25, x0
+    bl _vpp_native_memory_base
+    cbz x0, Ljit_program_alloc_failed
+    mov x26, x0
+    blr x24
+    str w0, [sp, #112]
+    // Release every live file handle before discarding the guest arena.
+    add x26, x26, #2064
+    mov w23, #64
+Ljit_program_close_files:
+    ldr w0, [x26], #16
+    cbz w0, 1f
+    bl _vpp_native_file_close
+1:  subs w23, w23, #1
+    b.ne Ljit_program_close_files
+    mov x0, x25
+    bl _vpp_native_jit_swap_arena
+    mov x1, #0x1400
+    movk x1, #0x810, lsl #16
+    mov x16, #73
+    svc #0x80
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    str wzr, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    ldr w2, [sp, #112]
+    mov w0, w21
+    mov w1, #40
+    bl _vpp_native_bytes_store_i32
+    b Ljit_done
+Ljit_program_alloc_failed:
+    mov x0, x25
+    bl _vpp_native_jit_swap_arena
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    str wzr, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    b Ljit_resource
 Ljit_leaf:
     // Bounds-check all three words before touching the current arena.
     tst w21, #3
@@ -396,15 +458,426 @@ Ljit_address:
     cmp w0, #8
     b.lt Ljit_invalid
     cmp w20, #1
-    b.eq Ljit_print_address
+    b.eq Ljit_abi_1
     cmp w20, #2
-    b.ne Ljit_invalid
+    b.eq Ljit_abi_2
+    cmp w20, #3
+    b.eq Ljit_abi_3
+    cmp w20, #4
+    b.eq Ljit_abi_4
+    cmp w20, #5
+    b.eq Ljit_abi_5
+    cmp w20, #6
+    b.eq Ljit_abi_6
+    cmp w20, #7
+    b.eq Ljit_abi_7
+    cmp w20, #8
+    b.eq Ljit_abi_8
+    cmp w20, #9
+    b.eq Ljit_abi_9
+    cmp w20, #10
+    b.eq Ljit_abi_10
+    cmp w20, #11
+    b.eq Ljit_abi_11
+    cmp w20, #12
+    b.eq Ljit_abi_12
+    cmp w20, #13
+    b.eq Ljit_abi_13
+    cmp w20, #16
+    b.eq Ljit_abi_16
+    cmp w20, #17
+    b.eq Ljit_abi_17
+    cmp w20, #18
+    b.eq Ljit_abi_18
+    cmp w20, #23
+    b.eq Ljit_abi_23
+    cmp w20, #24
+    b.eq Ljit_abi_24
+    cmp w20, #25
+    b.eq Ljit_abi_25
+    cmp w20, #26
+    b.eq Ljit_abi_26
+    cmp w20, #27
+    b.eq Ljit_abi_27
+    cmp w20, #43
+    b.eq Ljit_abi_43
+    cmp w20, #44
+    b.eq Ljit_abi_44
+    cmp w20, #45
+    b.eq Ljit_abi_45
+    cmp w20, #46
+    b.eq Ljit_abi_46
+    cmp w20, #71
+    b.eq Ljit_abi_71
+    cmp w20, #72
+    b.eq Ljit_abi_72
+    cmp w20, #73
+    b.eq Ljit_abi_73
+    cmp w20, #76
+    b.eq Ljit_abi_76
+    cmp w20, #14
+    b.eq Ljit_abi_14
+    cmp w20, #15
+    b.eq Ljit_abi_15
+    cmp w20, #28
+    b.eq Ljit_abi_28
+    cmp w20, #29
+    b.eq Ljit_abi_29
+    cmp w20, #30
+    b.eq Ljit_abi_30
+    cmp w20, #31
+    b.eq Ljit_abi_31
+    cmp w20, #32
+    b.eq Ljit_abi_32
+    cmp w20, #38
+    b.eq Ljit_abi_38
+    cmp w20, #39
+    b.eq Ljit_abi_39
+    cmp w20, #35
+    b.eq Ljit_abi_35
+    cmp w20, #77
+    b.eq Ljit_abi_77
+    cmp w20, #33
+    b.eq Ljit_abi_33
+    cmp w20, #34
+    b.eq Ljit_abi_34
+    cmp w20, #36
+    b.eq Ljit_abi_36
+    cmp w20, #37
+    b.eq Ljit_abi_37
+    cmp w20, #47
+    b.eq Ljit_abi_47
+    cmp w20, #48
+    b.eq Ljit_abi_48
+    cmp w20, #49
+    b.eq Ljit_abi_49
+    cmp w20, #50
+    b.eq Ljit_abi_50
+    cmp w20, #53
+    b.eq Ljit_abi_53
+    cmp w20, #54
+    b.eq Ljit_abi_54
+    cmp w20, #55
+    b.eq Ljit_abi_55
+    cmp w20, #56
+    b.eq Ljit_abi_56
+    cmp w20, #57
+    b.eq Ljit_abi_57
+    cmp w20, #58
+    b.eq Ljit_abi_58
+    cmp w20, #59
+    b.eq Ljit_abi_59
+    cmp w20, #60
+    b.eq Ljit_abi_60
+    cmp w20, #65
+    b.eq Ljit_abi_65
+    cmp w20, #66
+    b.eq Ljit_abi_66
+    cmp w20, #67
+    b.eq Ljit_abi_67
+    cmp w20, #68
+    b.eq Ljit_abi_68
+    cmp w20, #69
+    b.eq Ljit_abi_69
+    cmp w20, #70
+    b.eq Ljit_abi_70
+    cmp w20, #74
+    b.eq Ljit_abi_74
+    cmp w20, #75
+    b.eq Ljit_abi_75
+    cmp w20, #78
+    b.eq Ljit_abi_78
+    cmp w20, #81
+    b.eq Ljit_abi_81
+    cmp w20, #82
+    b.eq Ljit_abi_82
+    cmp w20, #85
+    b.eq Ljit_abi_85
+    cmp w20, #86
+    b.eq Ljit_abi_86
+    cmp w20, #87
+    b.eq Ljit_abi_87
+    b Ljit_invalid
+Ljit_abi_14:
+    adrp x24, _vpp_native_argc@PAGE
+    add x24, x24, _vpp_native_argc@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_15:
+    adrp x24, _vpp_native_argv@PAGE
+    add x24, x24, _vpp_native_argv@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_28:
+    adrp x24, _vpp_native_memory_read_byte@PAGE
+    add x24, x24, _vpp_native_memory_read_byte@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_29:
+    adrp x24, _vpp_native_memory_write_byte@PAGE
+    add x24, x24, _vpp_native_memory_write_byte@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_30:
+    adrp x24, _vpp_native_memory_read_i32@PAGE
+    add x24, x24, _vpp_native_memory_read_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_31:
+    adrp x24, _vpp_native_memory_write_i32@PAGE
+    add x24, x24, _vpp_native_memory_write_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_32:
+    adrp x24, _vpp_native_memory_bind@PAGE
+    add x24, x24, _vpp_native_memory_bind@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_38:
+    adrp x24, _vpp_native_os_argument_length@PAGE
+    add x24, x24, _vpp_native_os_argument_length@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_39:
+    adrp x24, _vpp_native_os_argument_byte@PAGE
+    add x24, x24, _vpp_native_os_argument_byte@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_1:
+    adrp x24, _vpp_native_print_i32@PAGE
+    add x24, x24, _vpp_native_print_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_2:
     adrp x24, _vpp_native_i32_div@PAGE
     add x24, x24, _vpp_native_i32_div@PAGEOFF
     b Ljit_save_address
-Ljit_print_address:
-    adrp x24, _vpp_native_print_i32@PAGE
-    add x24, x24, _vpp_native_print_i32@PAGEOFF
+Ljit_abi_3:
+    adrp x24, _vpp_native_bytes_new@PAGE
+    add x24, x24, _vpp_native_bytes_new@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_4:
+    adrp x24, _vpp_native_bytes_length@PAGE
+    add x24, x24, _vpp_native_bytes_length@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_5:
+    adrp x24, _vpp_native_bytes_get@PAGE
+    add x24, x24, _vpp_native_bytes_get@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_6:
+    adrp x24, _vpp_native_bytes_append@PAGE
+    add x24, x24, _vpp_native_bytes_append@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_7:
+    adrp x24, _vpp_native_bytes_push_i32@PAGE
+    add x24, x24, _vpp_native_bytes_push_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_8:
+    adrp x24, _vpp_native_bytes_load_i32@PAGE
+    add x24, x24, _vpp_native_bytes_load_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_9:
+    adrp x24, _vpp_native_bytes_store_i32@PAGE
+    add x24, x24, _vpp_native_bytes_store_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_10:
+    adrp x24, _vpp_native_bytes_clear@PAGE
+    add x24, x24, _vpp_native_bytes_clear@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_11:
+    adrp x24, _vpp_native_bytes_concat@PAGE
+    add x24, x24, _vpp_native_bytes_concat@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_12:
+    adrp x24, _vpp_native_bytes_equal@PAGE
+    add x24, x24, _vpp_native_bytes_equal@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_13:
+    adrp x24, _vpp_native_bytes_free@PAGE
+    add x24, x24, _vpp_native_bytes_free@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_16:
+    adrp x24, _vpp_native_file_open_read@PAGE
+    add x24, x24, _vpp_native_file_open_read@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_17:
+    adrp x24, _vpp_native_file_read_block@PAGE
+    add x24, x24, _vpp_native_file_read_block@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_18:
+    adrp x24, _vpp_native_file_close@PAGE
+    add x24, x24, _vpp_native_file_close@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_23:
+    adrp x24, _vpp_native_bytes_slice@PAGE
+    add x24, x24, _vpp_native_bytes_slice@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_24:
+    adrp x24, _vpp_native_bytes_find@PAGE
+    add x24, x24, _vpp_native_bytes_find@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_25:
+    adrp x24, _vpp_native_bytes_print@PAGE
+    add x24, x24, _vpp_native_bytes_print@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_26:
+    adrp x24, _vpp_native_file_open_write@PAGE
+    add x24, x24, _vpp_native_file_open_write@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_27:
+    adrp x24, _vpp_native_file_write_block@PAGE
+    add x24, x24, _vpp_native_file_write_block@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_43:
+    adrp x24, _vpp_native_read_i32@PAGE
+    add x24, x24, _vpp_native_read_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_44:
+    adrp x24, _vpp_native_read_status@PAGE
+    add x24, x24, _vpp_native_read_status@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_45:
+    adrp x24, _vpp_native_file_read_byte@PAGE
+    add x24, x24, _vpp_native_file_read_byte@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_46:
+    adrp x24, _vpp_native_file_write_byte@PAGE
+    add x24, x24, _vpp_native_file_write_byte@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_71:
+    adrp x24, _vpp_native_os_clock@PAGE
+    add x24, x24, _vpp_native_os_clock@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_72:
+    adrp x24, _vpp_native_os_sleep@PAGE
+    add x24, x24, _vpp_native_os_sleep@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_73:
+    adrp x24, _vpp_native_os_entropy@PAGE
+    add x24, x24, _vpp_native_os_entropy@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_76:
+    adrp x24, _vpp_native_os_process@PAGE
+    add x24, x24, _vpp_native_os_process@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_35:
+    adrp x24, _vpp_native_os_write@PAGE
+    add x24, x24, _vpp_native_os_write@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_77:
+    adrp x24, _vpp_native_os_socket@PAGE
+    add x24, x24, _vpp_native_os_socket@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_33:
+    adrp x24, _vpp_native_os_open@PAGE
+    add x24, x24, _vpp_native_os_open@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_34:
+    adrp x24, _vpp_native_os_read@PAGE
+    add x24, x24, _vpp_native_os_read@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_36:
+    adrp x24, _vpp_native_os_close@PAGE
+    add x24, x24, _vpp_native_os_close@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_37:
+    adrp x24, _vpp_native_os_errno@PAGE
+    add x24, x24, _vpp_native_os_errno@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_47:
+    adrp x24, _vpp_native_os_home@PAGE
+    add x24, x24, _vpp_native_os_home@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_48:
+    adrp x24, _vpp_native_os_cwd@PAGE
+    add x24, x24, _vpp_native_os_cwd@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_49:
+    adrp x24, _vpp_native_os_mkstemp@PAGE
+    add x24, x24, _vpp_native_os_mkstemp@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_50:
+    adrp x24, _vpp_native_os_rename@PAGE
+    add x24, x24, _vpp_native_os_rename@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_53:
+    adrp x24, _vpp_native_os_stat@PAGE
+    add x24, x24, _vpp_native_os_stat@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_54:
+    adrp x24, _vpp_native_os_lstat@PAGE
+    add x24, x24, _vpp_native_os_lstat@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_55:
+    adrp x24, _vpp_native_os_access_exec@PAGE
+    add x24, x24, _vpp_native_os_access_exec@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_56:
+    adrp x24, _vpp_native_os_unlink@PAGE
+    add x24, x24, _vpp_native_os_unlink@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_57:
+    adrp x24, _vpp_native_os_env_copy@PAGE
+    add x24, x24, _vpp_native_os_env_copy@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_58:
+    adrp x24, _vpp_native_os_executable_path@PAGE
+    add x24, x24, _vpp_native_os_executable_path@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_59:
+    adrp x24, _vpp_native_os_mkdir@PAGE
+    add x24, x24, _vpp_native_os_mkdir@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_60:
+    adrp x24, _vpp_native_os_fstat@PAGE
+    add x24, x24, _vpp_native_os_fstat@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_65:
+    adrp x24, _vpp_native_f64_from_i32@PAGE
+    add x24, x24, _vpp_native_f64_from_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_66:
+    adrp x24, _vpp_native_f64_binary@PAGE
+    add x24, x24, _vpp_native_f64_binary@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_67:
+    adrp x24, _vpp_native_f64_compare@PAGE
+    add x24, x24, _vpp_native_f64_compare@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_68:
+    adrp x24, _vpp_native_f64_to_i32@PAGE
+    add x24, x24, _vpp_native_f64_to_i32@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_69:
+    adrp x24, _vpp_native_f64_parse@PAGE
+    add x24, x24, _vpp_native_f64_parse@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_70:
+    adrp x24, _vpp_native_f64_text@PAGE
+    add x24, x24, _vpp_native_f64_text@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_74:
+    adrp x24, _vpp_native_os_identity@PAGE
+    add x24, x24, _vpp_native_os_identity@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_75:
+    adrp x24, _vpp_native_os_directory@PAGE
+    add x24, x24, _vpp_native_os_directory@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_78:
+    adrp x24, _vpp_native_os_thread_cpu_clock@PAGE
+    add x24, x24, _vpp_native_os_thread_cpu_clock@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_81:
+    adrp x24, _vpp_native_os_fchmod@PAGE
+    add x24, x24, _vpp_native_os_fchmod@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_82:
+    adrp x24, _vpp_native_memory_zero@PAGE
+    add x24, x24, _vpp_native_memory_zero@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_85:
+    adrp x24, _vpp_native_memory_copy@PAGE
+    add x24, x24, _vpp_native_memory_copy@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_86:
+    adrp x24, _vpp_native_memory_ascii_prefix@PAGE
+    add x24, x24, _vpp_native_memory_ascii_prefix@PAGEOFF
+    b Ljit_save_address
+Ljit_abi_87:
+    adrp x24, _vpp_native_os_seek@PAGE
+    add x24, x24, _vpp_native_os_seek@PAGEOFF
+    b Ljit_save_address
 Ljit_save_address:
     mov w0, w21
     mov w1, #0

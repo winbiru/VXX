@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
 hàm cp33 kiểm(nguồn, mẫu, thay, chuẩn, điểm mã) {
     a = chuỗi từ byte máy ảo(nguồn); b = chuỗi từ byte máy ảo(mẫu); c = chuỗi từ byte máy ảo(thay);
     kết quả = máy ảo thay chuỗi chính xác(a, b, c);

@@ -1,4 +1,5 @@
-nhập gói.biên dịch.JIT.*;
+nhập gói.biên dịch.JIT.Bộ Biên Dịch JIT;
+nhập gói.biên dịch.JIT.jit chạy;
 nhập gói.kiểm thử.khẳng định.*;
 
 hàm chính() {

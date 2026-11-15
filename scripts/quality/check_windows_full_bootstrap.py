@@ -315,6 +315,7 @@ def main():
     regress.add_argument('package', type=Path)
     regress.add_argument('--suite', choices=('full', 'i32', 'smoke'), default='full')
     regress.add_argument('--compiler', type=Path)
+    regress.add_argument('--backend', choices=('jit', 'aot', 'toolchain', 'mixed'))
     regress.add_argument('--case', action='append', default=[])
     regress.add_argument('--timeout', type=int, default=900)
     regress.add_argument('--jobs', type=int, default=2)
@@ -363,6 +364,7 @@ def main():
                                 '--timeout', str(args.timeout), '--logs', str(args.logs.resolve()),
                                 *[arg for case in args.case for arg in ('--case', case)],
                                 '--phase', args.phase,
+                                *(['--backend', args.backend] if args.backend is not None else []),
                                 *(['--artifacts', str(args.artifacts.resolve())] if args.artifacts is not None else []),
                                 *(['--jit', str(args.jit.resolve())] if args.jit is not None else []),
                                 *(['--module-suites'] if args.module_suites else [])], cwd=ROOT, env=env)

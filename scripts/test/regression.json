@@ -2340,7 +2340,8 @@
         "VPP_AOT_TEST_ERROR": "âm"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-1",
@@ -2350,7 +2351,8 @@
         "VPP_AOT_TEST_ERROR": "cuối"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-2",
@@ -2360,7 +2362,8 @@
         "VPP_AOT_TEST_ERROR": "kiểu"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-3",
@@ -2370,7 +2373,8 @@
         "VPP_AOT_TEST_ERROR": "danh sách"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-4",
@@ -2380,7 +2384,8 @@
         "VPP_AOT_TEST_ERROR": "phép toán"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-5",
@@ -2390,7 +2395,8 @@
         "VPP_AOT_TEST_ERROR": "truy cập"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-6",
@@ -2400,7 +2406,8 @@
         "VPP_AOT_TEST_ERROR": "tham số"
       },
       "exit": 1,
-      "stdout": ""
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-7",

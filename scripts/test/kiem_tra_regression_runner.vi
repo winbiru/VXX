@@ -108,9 +108,12 @@ hàm fake() {
 hàm fixture(root, work) {
     tạo thư mục(work + "/scripts/quality"); tạo thư mục(work + "/scripts/test/fixtures");
     tạo thư mục(work + "/gói/máy ảo"); tạo thư mục(work + "/bin");
-    files = ["run_native_regression.py", "check_windows_full_bootstrap.py", "native_golden_costs.tsv"];
+    files = ["run_native_regression.py", "check_windows_full_bootstrap.py", "native_golden_costs.tsv", "regression_runner_mock.py"];
     lặp(i = 0; i < độ dài(files); i++) { sao chép tệp(root + "/scripts/quality/" + files[i], work + "/scripts/quality/" + files[i]); };
     ghi tệp(work + "/gói/máy ảo/chính.vi", "");
+    nếu (env("VPP_TEST_JIT") != "") {
+        tạo thư mục(work + "/processes");
+    };
     ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nif(NOT parent STREQUAL VPP_OUTPUT_DIR)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
     cases = []; unregistered = {"scripts/test/http_fixture.vi": "HTTP support"};
     ghi tệp(work + "/scripts/test/http_fixture.vi", "");
@@ -143,10 +146,16 @@ hàm fixture(root, work) {
 hàm scenario(work, mode, names, batch, module, expected_status) {
     state = work + "/state-" + mode; logs = work + "/logs-" + mode; tạo thư mục(state);
     args = [work + "/scripts/quality/run_native_regression.py", "--compiler", work + "/bin/" + exe("vpp"), "--backend", "aot", "--jobs", "2", "--batch-size", thành chuỗi(batch), "--timeout", "2", "--logs", logs];
+    overrides = {"VPP_TEST_FAKE": "1", "VPP_TEST_MODE": mode, "VPP_TEST_STATE": state, "VPP_TEST_SELF": env("VPP_TEST_SELF"), "VPP_TEST_CMAKE": env("VPP_TEST_CMAKE"), "VPP_COMPILER_PROFILE_FILE": state + "/profile"};
+    nếu (env("VPP_TEST_JIT") != "") {
+        máy ảo thêm cuối danh sách(args, "--fixture-executable"); máy ảo thêm cuối danh sách(args, env("VPP_TEST_JIT"));
+        overrides["TMPDIR"] = work + "/processes"; overrides["TEMP"] = work + "/processes"; overrides["TMP"] = work + "/processes";
+    };
     nếu (module) { máy ảo thêm cuối danh sách(args, "--module-suites"); };
     lặp(i = 0; i < độ dài(names); i++) { máy ảo thêm cuối danh sách(args, "--case"); máy ảo thêm cuối danh sách(args, names[i]); };
-    k = chạy tiến trình(env("VPP_TEST_PYTHON"), args, {"VPP_TEST_FAKE": "1", "VPP_TEST_MODE": mode, "VPP_TEST_STATE": state, "VPP_TEST_SELF": env("VPP_TEST_SELF"), "VPP_TEST_CMAKE": env("VPP_TEST_CMAKE"), "VPP_COMPILER_PROFILE_FILE": state + "/profile"}, 60000);
+    k = chạy tiến trình(env("VPP_TEST_PYTHON"), args, overrides, 60000);
     khẳng định bằng(k["mã thoát"], expected_status, mode + ": " + k["đầu ra"] + k["lỗi"]);
+    khẳng định đúng(là thư mục(logs), mode + ": runner did not create logs: " + k["đầu ra"] + k["lỗi"]);
     dir = logs + "/" + liệt kê thư mục(logs)[0];
     rows = json phân tích(đọc tệp(dir + "/results.json")); results = {};
     lặp(i = 0; i < độ dài(rows); i++) { results[rows[i]["id"]] = rows[i]; };

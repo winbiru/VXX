@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 lớp Hộp { hàm khởi tạo(n) { mình.n = n; }; };
 hàm f() { trả về 1; };
 hàm chuyển tiếp(v) { trả về máy ảo lấy loại(v); };

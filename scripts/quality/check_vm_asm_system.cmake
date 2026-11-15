@@ -1,4 +1,4 @@
-foreach(required IN ITEMS VPP_VM VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
+foreach(required IN ITEMS VPP_VM VPP_VM_IMAGE_COMMAND VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "VM system test missing ${required}")
     endif()
@@ -7,7 +7,7 @@ file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 
 set(source "${VPP_ROOT}/scripts/test/fixtures/vm_asm_system.vi")
 set(image "${VPP_OUTPUT_DIR}/system.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${source}" -o "${image}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${source}" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "System VM fixture compilation failed: ${status}\n${output}\n${errors}")
@@ -21,7 +21,7 @@ endif()
 
 # The raw open failure contract is shared by standalone VM and native AOT.
 set(file_image "${VPP_OUTPUT_DIR}/file-errors.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_ROOT}/scripts/test/kiem_tra_loi_tep_co_cau_truc.vi" -o "${file_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -46,7 +46,7 @@ foreach(expression IN LISTS invalid_cases)
     set(invalid_source "${VPP_OUTPUT_DIR}/system-invalid-${index}.vi")
     set(invalid_image "${VPP_OUTPUT_DIR}/system-invalid-${index}.vmb")
     file(WRITE "${invalid_source}" "hàm chính() { ${expression}; in \"unexpected\"; };\n")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${invalid_source}" -o "${invalid_image}"
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${invalid_source}" -o "${invalid_image}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "Invalid system fixture compilation ${index}: ${status}\n${output}\n${errors}")
@@ -62,8 +62,13 @@ set(boundary "${VPP_OUTPUT_DIR}/native-system-boundary")
 if(WIN32)
     string(APPEND boundary ".exe")
 endif()
-vpp_raw_build("${VPP_ROOT}/scripts/test/fixtures/native_system_boundary.vi" "${boundary}")
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${boundary}"
+if(DEFINED VPP_JIT)
+    set(boundary_command "${VPP_JIT}" "${VPP_ROOT}/scripts/test/fixtures/native_system_boundary.vi")
+else()
+    vpp_raw_build("${VPP_ROOT}/scripts/test/fixtures/native_system_boundary.vi" "${boundary}")
+    set(boundary_command "${boundary}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" ${boundary_command}
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 10)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Raw system boundary bounds check failed: ${status}\n${output}\n${errors}")

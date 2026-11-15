@@ -12,6 +12,9 @@ hàm đối số văn bản(i) {
 };
 
 hàm chính() {
+    lỗi tràn = 84;
+    nếu (ten nền tảng máy ảo() == "linux") { lỗi tràn = 75; };
+    nếu (ten nền tảng máy ảo() == "windows") { lỗi tràn = 132; };
     đường = đối số văn bản(1);
     t = tệp thô mở(đường, 1);
     nếu (tệp thô ghi(t, [0, 255, 65, 66, 67, 68, 69, 70], 8) != 8) { trả về 1; };
@@ -21,8 +24,8 @@ hàm chính() {
     nếu (tệp thô vị trí(t) != 0 || tệp thô mã lỗi() != 0) { trả về 5; };
     // Exercise overflow without writing or allocating a large file.
     nếu (tệp thô dịch(t, 2147483647, 0) != 2147483647) { trả về 6; };
-    nếu (tệp thô dịch(t, 1, 1) != -1 || tệp thô mã lỗi() != 84) { trả về 7; };
-    nếu (tệp thô vị trí(t) != -1 || tệp thô mã lỗi() != 84) { trả về 8; };
+    nếu (tệp thô dịch(t, 1, 1) != -1 || tệp thô mã lỗi() != lỗi tràn) { trả về 7; };
+    nếu (tệp thô vị trí(t) != -1 || tệp thô mã lỗi() != lỗi tràn) { trả về 8; };
     nếu (tệp thô dịch(t, 0, 0) != 0 || tệp thô đóng(t) != 0) { trả về 9; };
 
     đọc = Bộ Đệm Tệp(đường, "đọc", 4);

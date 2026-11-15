@@ -1,5 +1,5 @@
 set(tls_image "${VPP_OUTPUT_DIR}/tls-crypto.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_ROOT}/scripts/test/fixtures/vm_tls_crypto.vi" -o "${tls_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if(NOT status STREQUAL "0")

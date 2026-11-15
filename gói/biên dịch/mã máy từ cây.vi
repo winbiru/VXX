@@ -389,8 +389,12 @@ lớp công khai Bộ Hạ Cây {
     };
 
     // Đây là IR đầu vào độc lập cho bộ hạ native V++, không phải bytecode VM.
-    hàm công khai tạo IR(mã nguồn) {
-        cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn);
+    hàm công khai tạo IR(mã nguồn, phạm vi khối = sai) {
+        cây = rỗng;
+        // Bootstrap i32 sources use block-local declarations. Their names,
+        // calls and scopes are checked by the native lowerer below.
+        nếu (phạm vi khối) { cây = biên dịch phân tích chương trình thuần(mã nguồn); }
+        hoặc { cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn); };
         trạng thái = {"values": [], "nextId": 1, "functions": {}, "arity": {}, "scopes": []};
         câu lệnh = cây["câu lệnh"];
         lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
@@ -467,11 +471,11 @@ lớp công khai Bộ Hạ Cây {
 
     // Cả chương trình dùng chung một lần parse, semantic và IR; mỗi hàm
     // giữ object/relocation riêng để host linker xử lý các lời gọi chéo.
-    hàm công khai sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành = "linux", mặc định thoát = sai) {
+    hàm công khai sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành = "linux", mặc định thoát = sai, phạm vi khối = sai) {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
             mình.báo lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        biểu diễn trung gian = mình.tạo IR(mã nguồn);
+        biểu diễn trung gian = mình.tạo IR(mã nguồn, phạm vi khối);
         các hàm = biểu diễn trung gian["functions"];
         // Đổi symbol sau khi semantic đã binding bằng symbolId. Nhờ vậy cả
         // hàm đích và CALL tới 'chính' cùng hạ thành ABI symbol 'main'.

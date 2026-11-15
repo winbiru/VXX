@@ -80,17 +80,12 @@ if(BUILD_TESTING)
     set_tests_properties(vpp-extension PROPERTIES LABELS smoke)
   endif()
   add_test(NAME vpp-native-smoke COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
-    --suite smoke --compiler "${VPP_BIN}/vpp" --logs "${CMAKE_BINARY_DIR}/regression-logs/smoke")
+    --suite smoke --backend jit --jit "${VPP_BIN}/vpp-jit" --logs "${CMAKE_BINARY_DIR}/regression-logs/smoke")
   set_tests_properties(vpp-native-smoke PROPERTIES TIMEOUT 7200 LABELS smoke)
-  add_test(NAME vpp-native-i32-regression COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
-    --suite i32 --compiler "${VPP_BIN}/vpp-i32" --logs "${CMAKE_BINARY_DIR}/regression-logs/i32")
-  set_tests_properties(vpp-native-i32-regression PROPERTIES TIMEOUT 7200 LABELS "regression;i32")
-  foreach(shard RANGE 0 15)
-    add_test(NAME vpp-native-regression-${shard} COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
-      --compiler "${VPP_BIN}/vpp" --shard-count 16 --shard-index "${shard}"
-      --logs "${CMAKE_BINARY_DIR}/regression-logs/full-${shard}")
-    set_tests_properties(vpp-native-regression-${shard} PROPERTIES TIMEOUT 14400 LABELS "regression;full")
-  endforeach()
+  add_test(NAME vpp-native-regression COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
+    --suite full --backend jit --jit "${VPP_BIN}/vpp-jit" --jobs 2 --timeout 120
+    --logs "${CMAKE_BINARY_DIR}/regression-logs/full")
+  set_tests_properties(vpp-native-regression PROPERTIES TIMEOUT 7200 LABELS "regression;full;jit")
 endif()
 install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)

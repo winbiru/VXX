@@ -206,25 +206,35 @@ Nếu build bằng `scripts/macos/build-vpp-cli.sh`:
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
 ```
 
-CI macOS, Linux và Windows dùng compiler và JIT trong gói V++ đã build.
-Runner mặc định chạy các fixture đã được đánh dấu `jit: true` bằng
-`vpp-jit --dynamic`; các fixture còn lại được build AOT một lần rồi thực thi.
-Không fallback AOT khi một fixture JIT thất bại. Cách này giữ hợp đồng của
-fixture chưa tương thích với giới hạn image JIT hoặc cần runtime bản địa.
-Các kiểm tra compiler/linker/VM/i32, tooling và các API JIT độc lập vẫn chạy theo
-hợp đồng riêng. Test từ chối biên dịch dùng `--check-dynamic`; test argv truyền
-đối số sau đường dẫn nguồn trong `--dynamic`.
+CI macOS, Linux và Windows chạy full regression bằng JIT đã đóng gói.
+Mỗi nền tảng chạy một suite duy nhất với 2 worker, gồm cả các ca i32.
+Suite full đọc nguồn `.vi` trực tiếp bằng JIT đã đóng gói, không build
+executable, không gọi assembler/linker và không fallback AOT.
+Test từ chối cú pháp dùng `--check-dynamic`; các ca i32 chuyên biệt dùng
+JIT i32. Các probe allocator/directory và ELF partial linker dùng
+`--raw-program` với chính các hàm V++ của runtime/linker. Các kiểm tra VM
+dùng `--vm-image` để tạo dữ liệu bytecode rồi chạy VM đã đóng gói.
+Self-test của runner chạy bằng JIT; compiler giả mô phỏng giao thức bằng
+process doubles, không gọi compiler thật. Toàn bộ 390 ca full/i32 được
+đăng ký cho JIT, giữ các giới hạn nền tảng và bộ kiểm tra kết quả riêng.
 
 ```bash
-python3 scripts/quality/run_native_regression.py --compiler "$PACKAGE/bin/vpp" \
-  --jit "$PACKAGE/bin/vpp-jit" --jobs 2
+python3 scripts/quality/run_native_regression.py --suite full --backend jit \
+  --jit "$PACKAGE/bin/vpp-jit" --jobs 2 --timeout 120
 ```
 
-Để kiểm tra riêng đường biên dịch AOT, dùng `--backend aot`. Để thử nghiệm
-JIT trên cả các nguồn chưa được xác nhận tương thích, dùng `--backend jit`.
-Các tùy chọn
-`--phase build/run`, `--artifacts`, `--batch-size`, `--module-suites` chỉ
-phục vụ kiểm tra AOT và tương thích với artifact cũ.
+Có thể chạy chỉ với JIT đã cài đặt, không cần compiler AOT:
+
+```bash
+VPP_JIT="$PACKAGE/bin/vpp-jit" ./run_tests.sh
+```
+
+Trên Windows: `./scripts/windows/run-tests.ps1 -Jit "$package/bin/vpp-jit.exe"`.
+
+Dùng `--backend aot` để kiểm tra riêng toàn bộ đường AOT hoặc
+`--backend mixed` để dùng cách phân tuyến theo `jit: true` trước đây.
+Các tùy chọn `--phase build/run`, `--artifacts`, `--batch-size`,
+`--module-suites` phục vụ kiểm tra AOT và artifact cũ.
 
 ## 6. Chạy chương trình V++
 

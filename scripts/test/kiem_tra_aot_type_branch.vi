@@ -1,4 +1,3 @@
-nhập gói.chuẩn.chính.*;
 lớp Hộp { hàm khởi tạo(n) { mình.n = n; }; };
 hàm f() { trả về 1; };
 hàm kiểm(v, expected) {

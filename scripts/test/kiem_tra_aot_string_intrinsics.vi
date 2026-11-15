@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 hàm tạo nguồn(i) { trả về "Việt𠮷" + thành chuỗi(i); };
 hàm chính() {
     lặp(i = 0; i < 128; i++) {

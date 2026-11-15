@@ -1,5 +1,6 @@
 // Same handle/byte-packet contract as the ARM64 boundary. No host pointers
 // are truncated to i32. V++ emits and relocates all published instructions.
+// Operation 7 runs a standalone zero-arity entry in a fresh arena.
 // Operation 6 invokes a two-i32 leaf using 12 bytes of current arena scratch.
 .text
 .p2align 4
@@ -59,6 +60,8 @@ vpp_native_jit_service:
     je .Lvpp_jit_publish
     cmpl $4, -64(%rbp)
     je .Lvpp_jit_address
+    cmpl $7, -64(%rbp)
+    je .Lvpp_jit_lookup
     cmpl $6, -64(%rbp)
     je .Lvpp_jit_lookup
     cmpl $2, -64(%rbp)
@@ -104,6 +107,8 @@ vpp_native_jit_service:
     JIT_ARG1 %r13d
     JIT_ARG2 $4
     call vpp_native_bytes_load_i32
+    cmpl $7, -64(%rbp)
+    je .Lvpp_jit_program
     cmpl $8, %eax
     ja .Lvpp_jit_invalid
     xorl %r14d, %r14d
@@ -147,6 +152,83 @@ vpp_native_jit_service:
     JIT_ARG2 $40
     call vpp_native_bytes_store_i32
     jmp .Lvpp_jit_done
+.Lvpp_jit_program:
+#if defined(VPP_WINDOWS_STAGE0)
+    jmp .Lvpp_jit_invalid
+#else
+    testl %eax, %eax
+    jne .Lvpp_jit_invalid
+    cmpl $0, vpp_jit_argv_offset(%rip)
+    jne .Lvpp_jit_invalid
+    JIT_ARG1 %r13d
+    call vpp_native_bytes_length
+    cmpl $48, %eax
+    jl .Lvpp_jit_invalid
+    JIT_ARG1 %r13d
+    JIT_ARG2 $44
+    call vpp_native_bytes_load_i32
+    movl %eax, %r14d
+    testl %r14d, %r14d
+    jle .Lvpp_jit_invalid
+    call vpp_native_argc
+    testl %eax, %eax
+    jle .Lvpp_jit_invalid
+    cmpl %eax, %r14d
+    jae .Lvpp_jit_invalid
+    movl %r14d, vpp_jit_argv_offset(%rip)
+    JIT_ARG1 $0
+    call vpp_native_jit_swap_arena
+    movq %rax, %r12
+    call vpp_native_memory_base
+    testq %rax, %rax
+    je .Lvpp_jit_program_alloc_failed
+    movq %rax, %r14
+    call *-104(%rbp)
+    movl %eax, %r15d
+    addq $2064, %r14
+    movl $64, %ebx
+.Lvpp_jit_program_close_files:
+    movl (%r14), %eax
+    testl %eax, %eax
+    je 1f
+    JIT_ARG1 %eax
+    call vpp_native_file_close
+1:  addq $16, %r14
+    decl %ebx
+    jne .Lvpp_jit_program_close_files
+#ifdef _WIN32
+    movq %r12, %rcx
+#else
+    movq %r12, %rdi
+#endif
+    call vpp_native_jit_swap_arena
+#ifdef _WIN32
+    movq %rax, %rcx
+    xorl %edx, %edx
+    movl $0x8000, %r8d
+    call VirtualFree
+#else
+    movq %rax, %rdi
+    movl $135271424, %esi
+    movl $11, %eax
+    syscall
+#endif
+    movl $0, vpp_jit_argv_offset(%rip)
+    JIT_ARG3 %r15d
+    JIT_ARG1 %r13d
+    JIT_ARG2 $40
+    call vpp_native_bytes_store_i32
+    jmp .Lvpp_jit_done
+.Lvpp_jit_program_alloc_failed:
+#ifdef _WIN32
+    movq %r12, %rcx
+#else
+    movq %r12, %rdi
+#endif
+    call vpp_native_jit_swap_arena
+    movl $0, vpp_jit_argv_offset(%rip)
+    jmp .Lvpp_jit_resource
+#endif
 .Lvpp_jit_leaf:
     testl $3, %r13d
     jne .Lvpp_jit_invalid
@@ -505,13 +587,412 @@ vpp_native_jit_service:
     cmpl $8, %eax
     jl .Lvpp_jit_invalid
     cmpl $1, %r12d
-    je .Lvpp_jit_print_address
+    je .Lvpp_jit_abi_1
     cmpl $2, %r12d
-    jne .Lvpp_jit_invalid
+    je .Lvpp_jit_abi_2
+    cmpl $3, %r12d
+    je .Lvpp_jit_abi_3
+    cmpl $4, %r12d
+    je .Lvpp_jit_abi_4
+    cmpl $5, %r12d
+    je .Lvpp_jit_abi_5
+    cmpl $6, %r12d
+    je .Lvpp_jit_abi_6
+    cmpl $7, %r12d
+    je .Lvpp_jit_abi_7
+    cmpl $8, %r12d
+    je .Lvpp_jit_abi_8
+    cmpl $9, %r12d
+    je .Lvpp_jit_abi_9
+    cmpl $10, %r12d
+    je .Lvpp_jit_abi_10
+    cmpl $11, %r12d
+    je .Lvpp_jit_abi_11
+    cmpl $12, %r12d
+    je .Lvpp_jit_abi_12
+    cmpl $13, %r12d
+    je .Lvpp_jit_abi_13
+    cmpl $16, %r12d
+    je .Lvpp_jit_abi_16
+    cmpl $17, %r12d
+    je .Lvpp_jit_abi_17
+    cmpl $18, %r12d
+    je .Lvpp_jit_abi_18
+    cmpl $23, %r12d
+    je .Lvpp_jit_abi_23
+    cmpl $24, %r12d
+    je .Lvpp_jit_abi_24
+    cmpl $25, %r12d
+    je .Lvpp_jit_abi_25
+    cmpl $26, %r12d
+    je .Lvpp_jit_abi_26
+    cmpl $27, %r12d
+    je .Lvpp_jit_abi_27
+    cmpl $43, %r12d
+    je .Lvpp_jit_abi_43
+    cmpl $44, %r12d
+    je .Lvpp_jit_abi_44
+    cmpl $45, %r12d
+    je .Lvpp_jit_abi_45
+    cmpl $46, %r12d
+    je .Lvpp_jit_abi_46
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $71, %r12d
+    je .Lvpp_jit_abi_71
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $72, %r12d
+    je .Lvpp_jit_abi_72
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $73, %r12d
+    je .Lvpp_jit_abi_73
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $76, %r12d
+    je .Lvpp_jit_abi_76
+#endif
+    cmpl $14, %r12d
+    je .Lvpp_jit_abi_14
+    cmpl $15, %r12d
+    je .Lvpp_jit_abi_15
+    cmpl $28, %r12d
+    je .Lvpp_jit_abi_28
+    cmpl $29, %r12d
+    je .Lvpp_jit_abi_29
+    cmpl $30, %r12d
+    je .Lvpp_jit_abi_30
+    cmpl $31, %r12d
+    je .Lvpp_jit_abi_31
+    cmpl $32, %r12d
+    je .Lvpp_jit_abi_32
+    cmpl $38, %r12d
+    je .Lvpp_jit_abi_38
+    cmpl $39, %r12d
+    je .Lvpp_jit_abi_39
+    cmpl $35, %r12d
+    je .Lvpp_jit_abi_35
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $77, %r12d
+    je .Lvpp_jit_abi_77
+#endif
+    cmpl $33, %r12d
+    je .Lvpp_jit_abi_33
+    cmpl $34, %r12d
+    je .Lvpp_jit_abi_34
+    cmpl $36, %r12d
+    je .Lvpp_jit_abi_36
+    cmpl $37, %r12d
+    je .Lvpp_jit_abi_37
+    cmpl $47, %r12d
+    je .Lvpp_jit_abi_47
+    cmpl $48, %r12d
+    je .Lvpp_jit_abi_48
+    cmpl $49, %r12d
+    je .Lvpp_jit_abi_49
+    cmpl $50, %r12d
+    je .Lvpp_jit_abi_50
+    cmpl $53, %r12d
+    je .Lvpp_jit_abi_53
+    cmpl $54, %r12d
+    je .Lvpp_jit_abi_54
+    cmpl $55, %r12d
+    je .Lvpp_jit_abi_55
+    cmpl $56, %r12d
+    je .Lvpp_jit_abi_56
+    cmpl $57, %r12d
+    je .Lvpp_jit_abi_57
+    cmpl $58, %r12d
+    je .Lvpp_jit_abi_58
+    cmpl $59, %r12d
+    je .Lvpp_jit_abi_59
+    cmpl $60, %r12d
+    je .Lvpp_jit_abi_60
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $65, %r12d
+    je .Lvpp_jit_abi_65
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $66, %r12d
+    je .Lvpp_jit_abi_66
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $67, %r12d
+    je .Lvpp_jit_abi_67
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $68, %r12d
+    je .Lvpp_jit_abi_68
+#endif
+#if !defined(_WIN32) || (defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_RAW_BOUNDARY))
+    cmpl $69, %r12d
+    je .Lvpp_jit_abi_69
+#endif
+#if !defined(_WIN32) || (defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_RAW_BOUNDARY))
+    cmpl $70, %r12d
+    je .Lvpp_jit_abi_70
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $74, %r12d
+    je .Lvpp_jit_abi_74
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $75, %r12d
+    je .Lvpp_jit_abi_75
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+    cmpl $78, %r12d
+    je .Lvpp_jit_abi_78
+#endif
+    cmpl $81, %r12d
+    je .Lvpp_jit_abi_81
+    cmpl $82, %r12d
+    je .Lvpp_jit_abi_82
+    cmpl $85, %r12d
+    je .Lvpp_jit_abi_85
+    cmpl $86, %r12d
+    je .Lvpp_jit_abi_86
+    cmpl $87, %r12d
+    je .Lvpp_jit_abi_87
+    jmp .Lvpp_jit_invalid
+.Lvpp_jit_abi_14:
+    leaq vpp_native_argc(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_15:
+    leaq vpp_native_argv(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_28:
+    leaq vpp_native_memory_read_byte(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_29:
+    leaq vpp_native_memory_write_byte(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_30:
+    leaq vpp_native_memory_read_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_31:
+    leaq vpp_native_memory_write_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_32:
+    leaq vpp_native_memory_bind(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_38:
+    leaq vpp_native_os_argument_length(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_39:
+    leaq vpp_native_os_argument_byte(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_1:
+    leaq vpp_native_print_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_2:
     leaq vpp_native_i32_div(%rip), %r15
     jmp .Lvpp_jit_save_address
-.Lvpp_jit_print_address:
-    leaq vpp_native_print_i32(%rip), %r15
+.Lvpp_jit_abi_3:
+    leaq vpp_native_bytes_new(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_4:
+    leaq vpp_native_bytes_length(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_5:
+    leaq vpp_native_bytes_get(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_6:
+    leaq vpp_native_bytes_append(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_7:
+    leaq vpp_native_bytes_push_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_8:
+    leaq vpp_native_bytes_load_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_9:
+    leaq vpp_native_bytes_store_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_10:
+    leaq vpp_native_bytes_clear(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_11:
+    leaq vpp_native_bytes_concat(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_12:
+    leaq vpp_native_bytes_equal(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_13:
+    leaq vpp_native_bytes_free(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_16:
+    leaq vpp_native_file_open_read(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_17:
+    leaq vpp_native_file_read_block(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_18:
+    leaq vpp_native_file_close(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_23:
+    leaq vpp_native_bytes_slice(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_24:
+    leaq vpp_native_bytes_find(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_25:
+    leaq vpp_native_bytes_print(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_26:
+    leaq vpp_native_file_open_write(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_27:
+    leaq vpp_native_file_write_block(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_43:
+    leaq vpp_native_read_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_44:
+    leaq vpp_native_read_status(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_45:
+    leaq vpp_native_file_read_byte(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_46:
+    leaq vpp_native_file_write_byte(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_71:
+    leaq vpp_native_os_clock(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_72:
+    leaq vpp_native_os_sleep(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_73:
+    leaq vpp_native_os_entropy(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_76:
+    leaq vpp_native_os_process(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+.Lvpp_jit_abi_35:
+    leaq vpp_native_os_write(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_77:
+    leaq vpp_native_os_socket(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+.Lvpp_jit_abi_33:
+    leaq vpp_native_os_open(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_34:
+    leaq vpp_native_os_read(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_36:
+    leaq vpp_native_os_close(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_37:
+    leaq vpp_native_os_errno(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_47:
+    leaq vpp_native_os_home(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_48:
+    leaq vpp_native_os_cwd(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_49:
+    leaq vpp_native_os_mkstemp(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_50:
+    leaq vpp_native_os_rename(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_53:
+    leaq vpp_native_os_stat(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_54:
+    leaq vpp_native_os_lstat(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_55:
+    leaq vpp_native_os_access_exec(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_56:
+    leaq vpp_native_os_unlink(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_57:
+    leaq vpp_native_os_env_copy(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_58:
+    leaq vpp_native_os_executable_path(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_59:
+    leaq vpp_native_os_mkdir(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_60:
+    leaq vpp_native_os_fstat(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_65:
+    leaq vpp_native_f64_from_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_66:
+    leaq vpp_native_f64_binary(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_67:
+    leaq vpp_native_f64_compare(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_68:
+    leaq vpp_native_f64_to_i32(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || (defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_RAW_BOUNDARY))
+.Lvpp_jit_abi_69:
+    leaq vpp_native_f64_parse(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || (defined(VPP_WINDOWS_BOUNDARY_TEST) && !defined(VPP_WINDOWS_RAW_BOUNDARY))
+.Lvpp_jit_abi_70:
+    leaq vpp_native_f64_text(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_74:
+    leaq vpp_native_os_identity(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_75:
+    leaq vpp_native_os_directory(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+#if !defined(_WIN32) || defined(VPP_WINDOWS_BOUNDARY_TEST)
+.Lvpp_jit_abi_78:
+    leaq vpp_native_os_thread_cpu_clock(%rip), %r15
+    jmp .Lvpp_jit_save_address
+#endif
+.Lvpp_jit_abi_81:
+    leaq vpp_native_os_fchmod(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_82:
+    leaq vpp_native_memory_zero(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_85:
+    leaq vpp_native_memory_copy(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_86:
+    leaq vpp_native_memory_ascii_prefix(%rip), %r15
+    jmp .Lvpp_jit_save_address
+.Lvpp_jit_abi_87:
+    leaq vpp_native_os_seek(%rip), %r15
+    jmp .Lvpp_jit_save_address
 .Lvpp_jit_save_address:
     JIT_ARG1 %r13d
     JIT_ARG2 $0

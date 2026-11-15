@@ -3,7 +3,12 @@ set(server "${VPP_OUTPUT_DIR}/vm-dns-mock")
 if(WIN32)
     string(APPEND server ".exe")
 endif()
-vpp_raw_build("${VPP_ROOT}/scripts/test/fixtures/native_dns_mock.vi" "${server}")
+if(DEFINED VPP_JIT)
+    set(server "${VPP_ROOT}/scripts/test/fixtures/native_dns_mock.vi")
+    set(server_options --jit "${VPP_JIT}")
+else()
+    vpp_raw_build("${VPP_ROOT}/scripts/test/fixtures/native_dns_mock.vi" "${server}")
+endif()
 foreach(mode IN ITEMS 0 1 2 3 4 10 11 12)
     set(queries 1)
     if(mode LESS 4)
@@ -14,11 +19,11 @@ foreach(mode IN ITEMS 0 1 2 3 4 10 11 12)
         set(queries 2)
     endif()
     set(work "${VPP_OUTPUT_DIR}/vm-dns-mode-${mode}")
-    if(WIN32)
+    if(WIN32 OR DEFINED VPP_JIT)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env
             "VPP_VM_DNS_PROVIDER=${provider}"
             "${VPP_PYTHON}" "${VPP_ROOT}/scripts/quality/run_vm_dns_mock.py"
-            "${server}" "${VPP_VM}" "${dns_image}" "${mode}" "${queries}" "${work}"
+            "${server}" "${VPP_VM}" "${dns_image}" "${mode}" "${queries}" "${work}" ${server_options}
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 40)
     else()
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env

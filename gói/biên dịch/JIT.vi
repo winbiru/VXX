@@ -17,7 +17,7 @@ hàm riêng tư jit nối(đích, nguồn) {
 };
 
 lớp công khai Bộ Biên Dịch JIT {
-    hàm công khai khởi tạo(nguồn) {
+    hàm công khai khởi tạo(nguồn, phạm vi khối = sai) {
         mình.mã = 0;
         mình.gói = 0;
         mình.hàm = {};
@@ -28,7 +28,7 @@ lớp công khai Bộ Biên Dịch JIT {
         nếu (hệ == 1) { kiến trúc = "aarch64"; hệ điều hành = "macos"; };
         nếu (hệ == 3) { hệ điều hành = "windows"; };
         bộ hạ = Bộ Hạ Cây();
-        các hàm = bộ hạ.sinh mã chương trình(nguồn, kiến trúc, hệ điều hành, đúng);
+        các hàm = bộ hạ.sinh mã chương trình(nguồn, kiến trúc, hệ điều hành, đúng, phạm vi khối);
         jit yêu cầu(máy ảo lấy độ dài(các hàm) > 0, "chương trình không có hàm");
         mã = [];
         ký hiệu = {};
@@ -59,6 +59,75 @@ lớp công khai Bộ Biên Dịch JIT {
                         id = 0;
                         nếu (tên == "vpp_native_print_i32") { id = 1; };
                         nếu (tên == "vpp_native_i32_div") { id = 2; };
+                        // ABI lõi bộ đệm/tệp/nhập số; không phân giải FFI tùy ý.
+                        nếu (tên == "vpp_native_bytes_new") { id = 3; };
+                        nếu (tên == "vpp_native_bytes_length") { id = 4; };
+                        nếu (tên == "vpp_native_bytes_get") { id = 5; };
+                        nếu (tên == "vpp_native_bytes_append") { id = 6; };
+                        nếu (tên == "vpp_native_bytes_push_i32") { id = 7; };
+                        nếu (tên == "vpp_native_bytes_load_i32") { id = 8; };
+                        nếu (tên == "vpp_native_bytes_store_i32") { id = 9; };
+                        nếu (tên == "vpp_native_bytes_clear") { id = 10; };
+                        nếu (tên == "vpp_native_bytes_concat") { id = 11; };
+                        nếu (tên == "vpp_native_bytes_equal") { id = 12; };
+                        nếu (tên == "vpp_native_bytes_free") { id = 13; };
+                        nếu (tên == "vpp_native_file_open_read") { id = 16; };
+                        nếu (tên == "vpp_native_file_read_block") { id = 17; };
+                        nếu (tên == "vpp_native_file_close") { id = 18; };
+                        nếu (tên == "vpp_native_bytes_slice") { id = 23; };
+                        nếu (tên == "vpp_native_bytes_find") { id = 24; };
+                        nếu (tên == "vpp_native_bytes_print") { id = 25; };
+                        nếu (tên == "vpp_native_file_open_write") { id = 26; };
+                        nếu (tên == "vpp_native_file_write_block") { id = 27; };
+                        nếu (tên == "vpp_native_read_i32") { id = 43; };
+                        nếu (tên == "vpp_native_read_status") { id = 44; };
+                        nếu (tên == "vpp_native_file_read_byte") { id = 45; };
+                        nếu (tên == "vpp_native_file_write_byte") { id = 46; };
+                        nếu (tên == "vpp_native_os_clock") { id = 71; };
+                        nếu (tên == "vpp_native_os_sleep") { id = 72; };
+                        nếu (tên == "vpp_native_os_entropy") { id = 73; };
+                        nếu (tên == "vpp_native_os_process") { id = 76; };
+                        nếu (tên == "vpp_native_argc") { id = 14; };
+                        nếu (tên == "vpp_native_argv") { id = 15; };
+                        nếu (tên == "vpp_native_memory_read_byte") { id = 28; };
+                        nếu (tên == "vpp_native_memory_write_byte") { id = 29; };
+                        nếu (tên == "vpp_native_memory_read_i32") { id = 30; };
+                        nếu (tên == "vpp_native_memory_write_i32") { id = 31; };
+                        nếu (tên == "vpp_native_memory_bind") { id = 32; };
+                        nếu (tên == "vpp_native_os_argument_length") { id = 38; };
+                        nếu (tên == "vpp_native_os_argument_byte") { id = 39; };
+                        nếu (tên == "vpp_native_os_write") { id = 35; };
+                        nếu (tên == "vpp_native_os_socket") { id = 77; };
+                        nếu (tên == "vpp_native_os_open") { id = 33; };
+                        nếu (tên == "vpp_native_os_read") { id = 34; };
+                        nếu (tên == "vpp_native_os_close") { id = 36; };
+                        nếu (tên == "vpp_native_os_errno") { id = 37; };
+                        nếu (tên == "vpp_native_os_home") { id = 47; };
+                        nếu (tên == "vpp_native_os_cwd") { id = 48; };
+                        nếu (tên == "vpp_native_os_mkstemp") { id = 49; };
+                        nếu (tên == "vpp_native_os_rename") { id = 50; };
+                        nếu (tên == "vpp_native_os_stat") { id = 53; };
+                        nếu (tên == "vpp_native_os_lstat") { id = 54; };
+                        nếu (tên == "vpp_native_os_access_exec") { id = 55; };
+                        nếu (tên == "vpp_native_os_unlink") { id = 56; };
+                        nếu (tên == "vpp_native_os_env_copy") { id = 57; };
+                        nếu (tên == "vpp_native_os_executable_path") { id = 58; };
+                        nếu (tên == "vpp_native_os_mkdir") { id = 59; };
+                        nếu (tên == "vpp_native_os_fstat") { id = 60; };
+                        nếu (tên == "vpp_native_f64_from_i32") { id = 65; };
+                        nếu (tên == "vpp_native_f64_binary") { id = 66; };
+                        nếu (tên == "vpp_native_f64_compare") { id = 67; };
+                        nếu (tên == "vpp_native_f64_to_i32") { id = 68; };
+                        nếu (tên == "vpp_native_f64_parse") { id = 69; };
+                        nếu (tên == "vpp_native_f64_text") { id = 70; };
+                        nếu (tên == "vpp_native_os_identity") { id = 74; };
+                        nếu (tên == "vpp_native_os_directory") { id = 75; };
+                        nếu (tên == "vpp_native_os_thread_cpu_clock") { id = 78; };
+                        nếu (tên == "vpp_native_os_fchmod") { id = 81; };
+                        nếu (tên == "vpp_native_memory_zero") { id = 82; };
+                        nếu (tên == "vpp_native_memory_copy") { id = 85; };
+                        nếu (tên == "vpp_native_memory_ascii_prefix") { id = 86; };
+                        nếu (tên == "vpp_native_os_seek") { id = 87; };
                         jit yêu cầu(id != 0, "symbol ngoài tập i32: " + tên);
                         jit yêu cầu(máy JIT thô(4, id, địa chỉ) == 0, "không lấy được địa chỉ runtime");
                         khi (máy ảo lấy độ dài(mã) % 16 != 0) { máy ảo thêm cuối danh sách(mã, 0); };
@@ -107,7 +176,7 @@ lớp công khai Bộ Biên Dịch JIT {
         jit yêu cầu(mình.mã > 0, "không tạo được vùng nhớ thực thi");
         mình.gói = byte mới();
         nếu (mình.gói <= 0) { máy JIT thô(3, mình.mã, 0); mình.mã = 0; ném "V++ JIT: không cấp được gói gọi"; };
-        lặp(i = 0; i < 11; i++) { byte đẩy số nguyên ba mươi hai bit(mình.gói, 0); };
+        lặp(i = 0; i < 12; i++) { byte đẩy số nguyên ba mươi hai bit(mình.gói, 0); };
     };
 
     hàm công khai chạy(tên = "chính", đối số = rỗng) {
@@ -129,6 +198,19 @@ lớp công khai Bộ Biên Dịch JIT {
             byte ghi số nguyên ba mươi hai bit(mình.gói, 8 + i * 4, giá trị);
         };
         jit yêu cầu(máy JIT thô(2, mình.mã, mình.gói) == 0, "gọi mã máy thất bại");
+        trả về byte đọc số nguyên ba mươi hai bit(mình.gói, 40);
+    };
+
+    // A standalone raw program has its own arena and string argv. The
+    // ordinary call API above continues to accept caller-owned byte handles.
+    hàm công khai chạy chương trình(vị trí đối số) {
+        jit yêu cầu(mình.mã > 0, "phiên đã đóng");
+        mục = lấy từ điển(mình.hàm, "chính", rỗng);
+        jit yêu cầu(mục != rỗng && mục["arity"] == 0, "chương trình cần hàm chính không đối số");
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 0, mục["offset"]);
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 4, 0);
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 44, vị trí đối số);
+        jit yêu cầu(máy JIT thô(7, mình.mã, mình.gói) == 0, "gọi chương trình i32 thất bại");
         trả về byte đọc số nguyên ba mươi hai bit(mình.gói, 40);
     };
 

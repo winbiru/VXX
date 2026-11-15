@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.dữ liệu.json.json.json tạo;
 hàm cp30 kiểm tra(s, start, packed, cursor, expected) {
     ds = [99]; alias = ds;
     r = máy ảo quét dãy số nguyên(s, start, ds, packed);

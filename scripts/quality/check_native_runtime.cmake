@@ -1,17 +1,26 @@
 # Run the native runtime fixture against the V++ runtime and ARM64 ASM.
-if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
+if ((NOT DEFINED VPP_EXEC AND NOT DEFINED VPP_JIT) OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR)
     message(FATAL_ERROR "Native runtime: missing test inputs")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
-include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
 set(source "${VPP_ROOT}/scripts/test/fixtures/native_runtime.vi")
 set(executable "${VPP_OUTPUT_DIR}/native-runtime-check")
 file(REMOVE "${executable}" "${VPP_OUTPUT_DIR}/runtime-owned.bin")
 if(NOT DEFINED ENV{VPP_HOME})
     set(ENV{VPP_HOME} "${VPP_ROOT}")
 endif()
-vpp_native_compile_command("${source}" "${executable}" compile_command)
+if(DEFINED VPP_JIT)
+    set(executable "${VPP_JIT}")
+    set(run_command "${VPP_JIT}" --raw-program "${source}")
+    # The prepared JIT owns the native runtime; its internal AOT ABI symbols
+    # are not evidence of a C++ fallback.
+    set(legacy_symbols "__cxa_|_ZSt|_ZNSt|_Z[0-9]|linkedBytecodeRun|executeVpp")
+else()
+    set(legacy_symbols "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vpp_aot_|linkedBytecodeRun|executeVpp")
+    include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
+    set(run_command "${executable}")
+    vpp_native_compile_command("${source}" "${executable}" compile_command)
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=$ENV{VPP_HOME}"
         ${compile_command}
@@ -19,13 +28,14 @@ execute_process(
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")
     message(FATAL_ERROR "V++ native runtime compilation failed: ${status}\n${errors}\n${output}")
 endif()
+endif()
 # Guard the V++/ASM AOT path against silently relinking the Stage 0 C++
 # driver, VM bridge or legacy native runtime services. Undefined symbols
 # alone miss a statically linked fallback that defines its own ABI symbols.
 if(APPLE)
     set(runtime_nm /usr/bin/nm)
 elseif(UNIX)
-    find_program(runtime_nm NAMES nm llvm-nm)
+    find_program(runtime_nm NAMES nm llvm-nm PATHS /usr/bin /bin)
 endif()
 if(runtime_nm)
     execute_process(COMMAND "${runtime_nm}" -g "${executable}"
@@ -39,7 +49,7 @@ if(runtime_nm)
             audited_symbols "${audited_symbols}")
     endif()
     if(NOT nm_status STREQUAL "0" OR
-        audited_symbols MATCHES "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vpp_aot_|linkedBytecodeRun|executeVpp")
+        audited_symbols MATCHES "${legacy_symbols}")
         message(FATAL_ERROR "V++ native AOT linked C++/Stage 0 symbols: ${nm_status}\n${symbols}\n${nm_errors}")
     endif()
 else()
@@ -56,7 +66,7 @@ if(APPLE)
 elseif(UNIX)
     # Linux also needs a dynamic dependency gate: nm cannot identify a
     # library that is loaded through DT_NEEDED but exposes no used C++ symbol.
-    find_program(runtime_readelf NAMES readelf llvm-readelf)
+    find_program(runtime_readelf NAMES readelf llvm-readelf PATHS /usr/bin /bin)
     if(runtime_readelf)
         execute_process(COMMAND "${runtime_readelf}" -d "${executable}"
             RESULT_VARIABLE dependency_status OUTPUT_VARIABLE dependencies
@@ -69,7 +79,7 @@ elseif(UNIX)
         message(FATAL_ERROR "V++ native AOT dependency audit requires readelf or llvm-readelf on Linux")
     endif()
 endif()
-execute_process(COMMAND "${executable}" "" "Tiếng Việt"
+execute_process(COMMAND ${run_command} "" "Tiếng Việt"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
 if (NOT status EQUAL 52 OR NOT output STREQUAL "-2147483648\n2147483647\n0\n")

@@ -23,7 +23,7 @@ foreach(socket_case IN ITEMS invalid-port stale-token unverified-tls
     set(guest_path "${socket_dir}/socket-${socket_case}.vi")
     set(image_path "${socket_dir}/socket-${socket_case}.vmb")
     file(WRITE "${guest_path}" "${guest_source}")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${guest_path}" -o "${image_path}"
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${guest_path}" -o "${image_path}"
         RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
     if(NOT code STREQUAL "0")
         message(FATAL_ERROR "Socket negative fixture ${socket_case} build: ${code}\n${output}\n${errors}")

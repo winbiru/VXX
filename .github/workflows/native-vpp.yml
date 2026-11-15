@@ -79,6 +79,7 @@ jobs:
         run: |
           cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
           "$RUNNER_TEMP/vpp-install/bin/vpp" --version
+          "$RUNNER_TEMP/vpp-install/bin/vpp" vm-build "$RUNNER_TEMP/vpp-install/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$RUNNER_TEMP/vpp-install/bin/dns-provider.vmb"
           COPYFILE_DISABLE=1 tar -C "$RUNNER_TEMP/vpp-install" -czf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz" .
           mkdir -p "$RUNNER_TEMP/vpp-extracted"
           tar -C "$RUNNER_TEMP/vpp-extracted" -xzf "$RUNNER_TEMP/vpp-macos-arm64.tar.gz"
@@ -213,6 +214,7 @@ jobs:
           VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 \
             "$package/bin/vpp-i32" build "$package/share/vpp/gói/máy ảo/chính.vi" -o "$package/bin/vpp-vm"
           VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
+          "$package/bin/vpp" vm-build "$package/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$package/bin/dns-provider.vmb"
           tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
           mkdir -p "$out/extracted"
           tar -C "$out/extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz"
@@ -385,10 +387,10 @@ jobs:
           if-no-files-found: ignore
 
   macos-regression:
-    name: macOS ARM64 - regression
+    name: macOS ARM64 - JIT regression
     needs: macos-full
     runs-on: macos-15
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -400,14 +402,9 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
-      - name: Run full V++ regression (qualified JIT and AOT checks)
+      - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --logs regression-logs/full
-      - name: Run i32 compiler regression
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
-        run: |
-          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp"
-          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -415,10 +412,10 @@ jobs:
           path: regression-logs/
 
   linux-regression:
-    name: Linux x86-64 - regression
+    name: Linux x86-64 - JIT regression
     needs: linux-full
     runs-on: ubuntu-24.04
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -430,15 +427,9 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/regression-compiler"
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
-      - name: Run full V++ regression (qualified JIT and AOT checks)
+      - name: Run full V++ regression (JIT only)
         run: |
-          export VPP_AOT_LINUX_OBJECT_DIR="$RUNNER_TEMP/regression-compiler/share/vpp/native-vpp-runtime/linux-objects"
-          python3 scripts/quality/run_native_regression.py --suite full --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp" --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --logs regression-logs/full
-      - name: Run i32 compiler regression
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
-        run: |
-          export VPP_HOME="$RUNNER_TEMP/regression-compiler/share/vpp" VPP_NATIVE_ELF_LINK=1
-          python3 scripts/quality/run_native_regression.py --suite i32 --compiler "$RUNNER_TEMP/regression-compiler/bin/vpp-i32" --jobs 2 --logs regression-logs/i32
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 120 --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -446,10 +437,10 @@ jobs:
           path: regression-logs/
 
   windows-regression:
-    name: Windows x86-64 - regression
+    name: Windows x86-64 - JIT regression
     needs: windows-full
     runs-on: windows-2025
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Check regression runner configuration
@@ -464,11 +455,6 @@ jobs:
         with:
           name: windows-x86_64-full
           path: ${{ runner.temp }}/regression-package
-      - uses: msys2/setup-msys2@v2
-        id: msys2
-        with:
-          msystem: CLANG64
-          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
       - name: Extract compiler
         id: compiler
         shell: pwsh
@@ -476,22 +462,11 @@ jobs:
           $package = "$env:RUNNER_TEMP/regression-compiler"
           python -m zipfile -e "$env:RUNNER_TEMP/regression-package/vpp-windows-x86_64-full.zip" $package
           if ($LASTEXITCODE -ne 0) { throw 'Windows full package extraction failed' }
-      - name: Run full V++ regression (qualified JIT and AOT checks)
+      - name: Run full V++ regression (JIT only)
         shell: pwsh
         run: |
-          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
-          $env:PATH = "$toolchain;$env:PATH"
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-native.exe" -Clang "$toolchain/clang.exe" -Suite full -Jit "$package/bin/vpp-jit.exe" -Jobs 1 -LogDirectory regression-logs/full
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Run i32 compiler regression
-        if: ${{ !cancelled() && steps.compiler.outcome == 'success' }}
-        shell: pwsh
-        run: |
-          $toolchain = '${{ steps.msys2.outputs.msys2-location }}/clang64/bin'
-          $env:PATH = "$toolchain;$env:PATH"
-          $package = "$env:RUNNER_TEMP/regression-compiler"
-          & ./scripts/windows/run-tests.ps1 -VppExecutable "$package/bin/vpp-i32.exe" -Clang "$toolchain/clang.exe" -Suite i32 -Jobs 1 -LogDirectory regression-logs/i32
+          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 120 --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

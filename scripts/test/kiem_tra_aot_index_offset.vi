@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.dữ liệu.json.json.*;
 hàm cp28 lấy(a, i) { trả về a[i + 1]; };
 hàm cp28 gán(a, i) { v = a[i + 1]; trả về v; };

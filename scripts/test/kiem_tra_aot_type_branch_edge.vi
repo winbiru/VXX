@@ -1,4 +1,4 @@
-nhập gói.chuẩn.chính.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 hàm tạo kiểm(v) {
     trả về hàm(mới) {
         t = máy ảo lấy loại(v);

@@ -1,4 +1,4 @@
-foreach(required IN ITEMS VPP_VM VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
+foreach(required IN ITEMS VPP_VM VPP_VM_IMAGE_COMMAND VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "VM directory test missing ${required}")
     endif()
@@ -9,7 +9,7 @@ set(providers asm)
 if(WIN32)
     set(stem kiem_tra_ffi_thu_muc_windows)
     set(image "${VPP_OUTPUT_DIR}/directory.vmb")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
         "${VPP_ROOT}/scripts/test/${stem}.vi" -o "${image}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
     if(NOT status STREQUAL "0")
@@ -25,11 +25,11 @@ if(WIN32)
     file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/vm-dir-external")
     file(WRITE "${VPP_OUTPUT_DIR}/vm-dir-external/sentinel" "preserved")
 else()
-find_program(VPP_DIR_SHELL NAMES sh REQUIRED)
+find_program(VPP_DIR_SHELL NAMES sh PATHS /bin /usr/bin REQUIRED)
 set(source "${VPP_OUTPUT_DIR}/directory.vi")
 configure_file("${VPP_ROOT}/scripts/test/fixtures/vm_asm_directory.vi" "${source}" COPYONLY)
 set(image "${VPP_OUTPUT_DIR}/directory.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${source}" -o "${image}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${source}" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Directory fixture compilation failed: ${status}\n${output}\n${errors}")
@@ -54,7 +54,7 @@ foreach(provider IN LISTS providers)
     if (NOT sentinel STREQUAL "preserved")
         message(FATAL_ERROR "Directory ${provider} damaged a symlink target")
     endif()
-    execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=/usr/bin:/bin" "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
         mode "${VPP_OUTPUT_DIR}/vm-dir-mode"
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 10)
     if (NOT status STREQUAL "0")
@@ -65,13 +65,13 @@ endforeach()
 
 file(WRITE "${VPP_OUTPUT_DIR}/pid.vi"
     "hàm chính() { in máy tiến trình mã tiến trình(); in máy tiến trình mã tiến trình cha(); };\n")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${VPP_OUTPUT_DIR}/pid.vi"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${VPP_OUTPUT_DIR}/pid.vi"
     -o "${VPP_OUTPUT_DIR}/pid.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "PID oracle fixture build failed: ${status}\n${output}\n${errors}")
 endif()
-execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=/usr/bin:/bin" "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
     pid "${VPP_VM}" "${VPP_OUTPUT_DIR}/pid.vmb" "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
 if (NOT status STREQUAL "0")
@@ -84,13 +84,13 @@ file(WRITE "${VPP_OUTPUT_DIR}/credentials.vi" [=[hàm chính() {
     in máy tiến trình mã nhóm hiệu lực();
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/credentials.vi" -o "${VPP_OUTPUT_DIR}/credentials.vmb"
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 60)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Credential fixture build failed: ${status}\n${errors}")
 endif()
-execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=/usr/bin:/bin" "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
     credentials "${VPP_VM}" "${VPP_OUTPUT_DIR}/credentials.vmb" "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
 if (NOT status STREQUAL "0")
@@ -113,7 +113,7 @@ foreach(expression IN LISTS invalid_cases)
     set(bad_source "${VPP_OUTPUT_DIR}/directory-invalid-${index}.vi")
     set(bad_image "${VPP_OUTPUT_DIR}/directory-invalid-${index}.vmb")
     file(WRITE "${bad_source}" "hàm chính() { ${expression}; in \"unexpected\"; };\n")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${bad_source}" -o "${bad_image}"
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${bad_source}" -o "${bad_image}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "Directory invalid fixture ${index} build failed: ${status}\n${output}\n${errors}")
@@ -142,8 +142,8 @@ foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục 
 endforeach()
 file(READ "${VPP_ROOT}/scripts/test/fixtures/native_directory_decode.vi" contents)
 file(APPEND "${native_source}" "${contents}\n")
-vpp_raw_build("${native_source}" "${native}" --vm-core)
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${native}"
+vpp_raw_probe("${native_source}" "${native}" VPP_DIRECTORY_COMMAND --vm-core)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" ${VPP_DIRECTORY_COMMAND}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
 if (NOT status STREQUAL "0")

@@ -4,6 +4,8 @@ param(
     [string]$LogDirectory = $env:VPP_TEST_LOG_DIR,
     [ValidateSet('full', 'i32', 'smoke')]
     [string]$Suite = 'full',
+    [ValidateSet('jit', 'aot', 'toolchain', 'mixed')]
+    [string]$Backend,
     [string[]]$Case = @(),
     [ValidateRange(1, 2147483647)]
     [int]$Jobs = 2,
@@ -26,13 +28,17 @@ param(
 )
 
 # Use the same manifest, platform gates, oracles and logs as Unix and CI.
-# Dynamic JIT is opt-in for reviewed full regression fixtures.
+# Full regression runs the packaged JIT without requiring a native toolchain.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'runner-support.ps1')
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $python = Get-VppTestPython
 $options = @('--suite', $Suite)
+if (-not $Backend) {
+    $Backend = if ($Phase -eq 'all') { 'jit' } elseif ($Suite -eq 'i32') { 'aot' } else { 'mixed' }
+}
+$options += @('--backend', $Backend)
 foreach ($id in $Case) { $options += @('--case', $id) }
 
 # Inventory and selection do not require a compiler or a Windows toolchain.
@@ -48,6 +54,20 @@ if ($BatchSize -gt 1 -and $Suite -ne 'full') {
 }
 if ($ModuleSuites -and $Suite -ne 'full') {
     throw 'ModuleSuites requires Suite full'
+}
+if ($Backend -eq 'jit') {
+    if ($Phase -ne 'all' -or $Artifacts -or $BatchSize -gt 1 -or $ModuleSuites) {
+        throw 'JIT requires source regression without AOT artifacts or batches'
+    }
+    if (-not $Jit) {
+        $companion = if ($VppExecutable) { $VppExecutable } else { $NativeCompiler }
+        $Jit = if ($companion) { Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($companion))) 'vpp-jit.exe' } else { Join-Path $repoRoot 'build-pure-vpp/bin/vpp-jit.exe' }
+    }
+    if (-not $LogDirectory) { $LogDirectory = Join-Path $repoRoot 'build-pure-vpp/regression-logs' }
+    $options += @('--jit', (Resolve-Path -LiteralPath $Jit).Path, '--jobs', "$Jobs", '--timeout', "$Timeout", '--logs', $LogDirectory,
+        '--shard-count', "$ShardCount", '--shard-index', "$ShardIndex")
+    & $python (Join-Path $repoRoot 'scripts/quality/run_native_regression.py') @options
+    exit $LASTEXITCODE
 }
 # An explicit compiler path wins over an inherited VPP_NATIVE_COMPILER. An
 # explicit -NativeCompiler still supports callers passing the old host launcher.
