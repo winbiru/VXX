@@ -314,7 +314,7 @@
       "suite": "full",
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=15 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=15 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Vượt\\ quá\\ giới\\ hạn\\ ngăn\\ xếp\\ lời\\ gọi\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\nGợi ý: Kiểm\\ tra\\ độ\\ sâu\\ đệ\\ quy\\ và\\ chuỗi\\ lời\\ gọi\\.\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_dich_vu",
@@ -1196,7 +1196,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_can_so_nguyen.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_chi_so_vuot_pham_vi",
@@ -1205,7 +1205,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_chi_so_vuot_pham_vi.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Chỉ\\ mục\\ hoặc\\ vùng\\ nhớ\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\nGợi ý: Kiểm\\ tra\\ chỉ\\ mục\\ và\\ kích\\ thước\\ dữ\\ liệu\\.\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_chia_cho_0",
@@ -1230,7 +1230,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_du_so_thuc.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_chuyen_so_thuc_that_bai",
@@ -1239,7 +1239,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_chuyen_so_thuc_that_bai.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: thành số thực: giá trị không thể chuyển đổi\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=80\\r?\\nChẩn đoán V\\+\\+: Ngoại\\ lệ\\ chưa\\ được\\ xử\\ lý\\. \\[mã thao tác ghi nhận: OP_NEM\\]\\r?\\nGợi ý: Xem\\ ngoại\\ lệ;\\ dùng\\ thử/bắt\\ lỗi\\ khi\\ phù\\ hợp\\.\\r?\\nV\\+\\+ AOT exception: thành số thực: giá trị không thể chuyển đổi\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_doc_tep_that_bai",
@@ -1248,7 +1248,7 @@
       "historical_expected": "scripts/test/expected/kiem_tra_loi_doc_tep_that_bai.expected",
       "stdout": "",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: [\\s\\S]*đọc tệp: không thể mở tệp để đọc[\\s\\S]*\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=80\\r?\\nChẩn đoán V\\+\\+: Ngoại\\ lệ\\ chưa\\ được\\ xử\\ lý\\. \\[mã thao tác ghi nhận: OP_NEM\\]\\r?\\nGợi ý: Xem\\ ngoại\\ lệ;\\ dùng\\ thử/bắt\\ lỗi\\ khi\\ phù\\ hợp\\.\\r?\\nV\\+\\+ AOT exception: [\\s\\S]*đọc tệp: không thể mở tệp để đọc[\\s\\S]*\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_du_lieu_khong_the_danh_chi_so",
@@ -1257,7 +1257,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_gia_tri_khong_the_goi",
@@ -1266,7 +1266,7 @@
       "historical_expected": "scripts/test/expected/kiem_tra_loi_gia_tri_khong_the_goi.expected",
       "stdout": "",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Hàm,\\ đối\\ tượng\\ gọi\\ hoặc\\ nội\\ tại\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_giam_sai_kieu",
@@ -1275,7 +1275,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_giam_sai_kieu.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_ham_khong_ton_tai",
@@ -1293,7 +1293,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_khong_phai_doi_tuong.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Lớp,\\ đối\\ tượng\\ hoặc\\ thành\\ viên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_kieu_chi_so",
@@ -1302,7 +1302,7 @@
       "historical_expected": "scripts/test/expected/kiem_tra_loi_kieu_chi_so.expected",
       "stdout": "",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_phep_tinh_can_so",
@@ -1311,7 +1311,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_phep_tinh_can_so.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_phuong_thuc_khong_ton_tai",
@@ -1320,7 +1320,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_phuong_thuc_khong_ton_tai.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Lớp,\\ đối\\ tượng\\ hoặc\\ thành\\ viên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_sai_so_luong_doi_so",
@@ -1329,7 +1329,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_sai_so_luong_doi_so.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số\\ lời\\ gọi\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_so_sanh_khac_kieu",
@@ -1338,7 +1338,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_so_sanh_khac_kieu.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_tang_sai_kieu",
@@ -1347,7 +1347,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_tang_sai_kieu.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "kiem_tra_loi_tep_co_cau_truc",
@@ -1362,7 +1362,31 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_tep_gia_thong_bao.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=-?\\d+\\r?\\nV\\+\\+ AOT exception: đọc tệp: không thể mở tệp để đọc\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=80\\r?\\nChẩn đoán V\\+\\+: Ngoại\\ lệ\\ chưa\\ được\\ xử\\ lý\\. \\[mã thao tác ghi nhận: OP_NEM\\]\\r?\\nGợi ý: Xem\\ ngoại\\ lệ;\\ dùng\\ thử/bắt\\ lỗi\\ khi\\ phù\\ hợp\\.\\r?\\nV\\+\\+ AOT exception: đọc tệp: không thể mở tệp để đọc\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_opcode_nem",
+      "source": "scripts/test/kiem_tra_loi_opcode_nem.vi",
+      "suite": "full",
+      "exit": 1,
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=80\\r?\\nChẩn đoán V\\+\\+: Ngoại\\ lệ\\ chưa\\ được\\ xử\\ lý\\. \\[mã thao tác ghi nhận: OP_NEM\\]\\r?\\nGợi ý: Xem\\ ngoại\\ lệ;\\ dùng\\ thử/bắt\\ lỗi\\ khi\\ phù\\ hợp\\.\\r?\\nV\\+\\+ AOT exception: kiểm\\ tra\\ opcode\\ ném\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_opcode_host_byte",
+      "source": "scripts/test/kiem_tra_loi_opcode_host_byte.vi",
+      "suite": "full",
+      "exit": 1,
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=16 opcode=154\\r?\\nChẩn đoán V\\+\\+: Ngoại\\ lệ\\ chưa\\ được\\ xử\\ lý\\. \\[mã thao tác ghi nhận: OP_VM_STRING_FROM_BYTES\\]\\r?\\nGợi ý: Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.\\r?\\nV\\+\\+ AOT exception: byte:\\ cần\\ danh\\ sách\\ số\\ nguyên\\ trong\\ 0\\.\\.255\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_loi_opcode_tien_trinh",
+      "source": "scripts/test/kiem_tra_loi_opcode_tien_trinh.vi",
+      "suite": "full",
+      "exit": 1,
+      "stdout": "",
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=202\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: OP_VM_MACHINE_PROCESS_CLOSE\\]\\r?\\nGợi ý: Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_thuoc_tinh_khong_ton_tai",
@@ -1371,7 +1395,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_thuoc_tinh_khong_ton_tai.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=18 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Lớp,\\ đối\\ tượng\\ hoặc\\ thành\\ viên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_loi_truy_cap_thanh_vien_bi_cam",
@@ -1380,7 +1404,7 @@
       "exit": 1,
       "historical_expected": "scripts/test/expected/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.expected",
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Không\\ có\\ quyền\\ truy\\ cập\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "kiem_tra_lop_mo_rong_compiler",
@@ -2056,7 +2080,7 @@
       "suite": "full",
       "expected": "scripts/test/expected/native_aot_indirect_slot_error.expected",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=13 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Hàm,\\ đối\\ tượng\\ gọi\\ hoặc\\ nội\\ tại\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "native_aot_private_method",
@@ -2350,7 +2374,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Chỉ\\ mục\\ hoặc\\ vùng\\ nhớ\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\nGợi ý: Kiểm\\ tra\\ chỉ\\ mục\\ và\\ kích\\ thước\\ dữ\\ liệu\\.\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-1",
@@ -2361,7 +2385,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Chỉ\\ mục\\ hoặc\\ vùng\\ nhớ\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\nGợi ý: Kiểm\\ tra\\ chỉ\\ mục\\ và\\ kích\\ thước\\ dữ\\ liệu\\.\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-2",
@@ -2372,7 +2396,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "native-aot-index-3",
@@ -2383,7 +2407,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=4 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Chỉ\\ mục\\ hoặc\\ vùng\\ nhớ\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\nGợi ý: Kiểm\\ tra\\ chỉ\\ mục\\ và\\ kích\\ thước\\ dữ\\ liệu\\.\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-4",
@@ -2394,7 +2418,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=2 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số,\\ kiểu\\ hoặc\\ mã\\ tài\\ nguyên\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n(?:Gợi ý: (?:Kiểm\\ tra\\ mã\\ tiến\\ trình\\ và\\ vòng\\ đời\\ tài\\ nguyên\\.|Kiểm\\ tra\\ danh\\ sách\\ byte\\ và\\ giá\\ trị\\ từ\\ 0\\ đến\\ 255\\.)\\r?\\n)?\\Z"
     },
     {
       "id": "native-aot-index-5",
@@ -2405,7 +2429,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Không\\ có\\ quyền\\ truy\\ cập\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-6",
@@ -2416,7 +2440,7 @@
       },
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=14 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Đối\\ số\\ lời\\ gọi\\ không\\ hợp\\ lệ\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "native-aot-index-7",
@@ -2435,7 +2459,7 @@
       "suite": "full",
       "exit": 1,
       "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\n\\Z"
+      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Không\\ có\\ quyền\\ truy\\ cập\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
     },
     {
       "id": "standalone-vm-core",

@@ -10,13 +10,14 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 
 // API parser thuần V++: không gọi snapshot / compiler C++.
-hàm công khai biên dịch phân tích chương trình thuần(mã nguồn, các từ tố = rỗng) {
-    bộ = Bộ Phân Tích Cú Pháp(mã nguồn, các từ tố);
+hàm công khai biên dịch phân tích chương trình thuần(mã nguồn, các từ tố = rỗng, giữ nguồn = sai) {
+    bộ = Bộ Phân Tích Cú Pháp(mã nguồn, các từ tố, giữ nguồn);
     trả về bộ.phân tích();
 };
 
 lớp công khai Bộ Phân Tích Cú Pháp {
-    hàm công khai khởi tạo(mã nguồn, các từ tố = rỗng) {
+    hàm công khai khởi tạo(mã nguồn, các từ tố = rỗng, giữ nguồn = sai) {
+        mình.giữ nguồn = giữ nguồn;
         nếu (các từ tố == rỗng) { các từ tố = biên dịch từ tố hóa gọn(mã nguồn)["token"]; };
         mình.các từ tố = các từ tố;
         mình.vị trí = 0;
@@ -24,6 +25,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
     hàm công khai phân tích() {
         p = {"token": mình.các từ tố, "vị trí": 0, "mã cú pháp cố định": đúng};
         p["tên nhiều từ"] = đúng;
+        nếu (mình.giữ nguồn) { p["giữ nguồn"] = đúng; };
         // Chuyển việc đọc thân hàm về parser câu lệnh, tránh import vòng.
         p["bộ phân tích"] = mình;
         câu lệnh = [];
@@ -31,9 +33,17 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             máy ảo thêm cuối danh sách(câu lệnh, mình.biên dịch chương trình câu lệnh(p));
         };
         mình.vị trí = p["vị trí"];
-        trả về {"loại": "chương trình", "câu lệnh": câu lệnh};
+        kết quả = {"loại": "chương trình", "câu lệnh": câu lệnh};
+        nếu (mình.giữ nguồn) { kết quả["giữ nguồn"] = đúng; };
+        trả về kết quả;
     };
     hàm công khai vị trí() { trả về mình.vị trí; };
+
+    hàm riêng tư khoảng nguồn(p, đầu) {
+        nếu (!mình.giữ nguồn || p["vị trí"] <= đầu) { trả về []; };
+        trả về [biên dịch trường từ tố(p["token"][đầu], 4, "vị trí", 0),
+            biên dịch trường từ tố(p["token"][p["vị trí"] - 1], 5, "kết thúc", 0)];
+    };
 
     hàm riêng tư biên dịch chương trình giá trị(p) {
         trả về biên dịch trường từ tố(biên dịch biểu thức nhìn(p), 1, "giá trị", "");
@@ -107,7 +117,9 @@ lớp công khai Bộ Phân Tích Cú Pháp {
     };
 
     hàm riêng tư biên dịch chương trình hàm(p, chữ ký = sai, ẩn danh = sai) {
+        đầu hàm = p["vị trí"];
         biên dịch biểu thức chờ(p, "hàm");
+        nguồn tên = [];
         phạm vi = "";
         tên = "";
         nếu (!ẩn danh) {
@@ -116,6 +128,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
                 mình.biên dịch chương trình giá trị(p) == "riêng tư") {
                 phạm vi = biên dịch trường từ tố(biên dịch biểu thức lấy(p), 1, "giá trị", "");
             };
+            đầu tên = p["vị trí"];
             loại tên = biên dịch mã loại từ tố(biên dịch biểu thức nhìn(p));
             nếu (loại tên != 1 && loại tên != 2) {
                 biên dịch biểu thức lỗi(p, "cần tên hàm");
@@ -128,9 +141,11 @@ lớp công khai Bộ Phân Tích Cú Pháp {
                 };
                 tên += " " + biên dịch trường từ tố(biên dịch biểu thức lấy(p), 1, "giá trị", "");
             };
+            nếu (mình.giữ nguồn) { nguồn tên = mình.khoảng nguồn(p, đầu tên); };
         };
         biên dịch biểu thức chờ(p, "(");
         tham số = [];
+        nguồn tham số = [];
         mặc định = [];
         khi (mình.biên dịch chương trình giá trị(p) != ")") {
             từ tố = biên dịch biểu thức nhìn(p);
@@ -138,6 +153,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             nếu (loại tham số != 1 && loại tham số != 2) {
                 biên dịch biểu thức lỗi(p, "cần tên tham số");
             };
+            đầu tham số = p["vị trí"];
             tên tham số = mình.biên dịch chương trình giá trị(p);
             biên dịch biểu thức lấy(p);
             // Từ khóa có thể đứng đầu hoặc trong tên tham số ("lặp lại",
@@ -148,6 +164,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
                 tên tham số += " " + biên dịch trường từ tố(biên dịch biểu thức lấy(p), 1, "giá trị", "");
             };
             máy ảo thêm cuối danh sách(tham số, tên tham số);
+            nếu (mình.giữ nguồn) { máy ảo thêm cuối danh sách(nguồn tham số, mình.khoảng nguồn(p, đầu tham số)); };
             giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
                 giá trị = mình.biên dịch chương trình biểu thức(p);
@@ -172,9 +189,14 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         loại hàm = "hàm";
         nếu (ẩn danh) { loại hàm = "hàm ẩn danh"; }
         hoặc { mình.biên dịch chương trình nhận(p, ";"); };
-        trả về {"loại": loại hàm, "tên": tên, "tham số": tham số,
+        kết quả = {"loại": loại hàm, "tên": tên, "tham số": tham số,
                 "mặc định tham số": mặc định, "thân": thân,
                 "phạm vi": phạm vi, "chữ ký": chữ ký};
+        nếu (mình.giữ nguồn) {
+            kết quả["nguồn tên"] = nguồn tên; kết quả["nguồn tham số"] = nguồn tham số;
+            kết quả["nguồn phạm vi"] = mình.khoảng nguồn(p, đầu hàm);
+        };
+        trả về kết quả;
     };
 
     // AST lớp/giao diện độc lập. Lowering bytecode phải xử lý node này trước
@@ -188,7 +210,10 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             mình.biên dịch chương trình giá trị(p) == "riêng tư") {
             phạm vi = biên dịch trường từ tố(biên dịch biểu thức lấy(p), 1, "giá trị", "");
         };
+        đầu tên = p["vị trí"];
         tên = mình.biên dịch chương trình tên kiểu(p, "lớp/giao diện");
+        nguồn tên = [];
+        nếu (mình.giữ nguồn) { nguồn tên = mình.khoảng nguồn(p, đầu tên); };
         kiểu lớp cha = "";
         cha = [];
         triển khai = [];
@@ -223,13 +248,15 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         };
         biên dịch biểu thức chờ(p, "}");
         mình.biên dịch chương trình nhận(p, ";");
-        nếu (danh sách giao diện) {
-            trả về {"loại": "giao diện", "tên": tên, "phạm vi": phạm vi,
-                "giao diện cha": cha, "phương thức": phương thức};
-        };
-        trả về {"loại": "lớp", "tên": tên, "phạm vi": phạm vi,
+        kết quả = {"loại": "lớp", "tên": tên, "phạm vi": phạm vi,
             "lớp cha": kiểu lớp cha, "triển khai": triển khai,
             "phương thức": phương thức};
+        nếu (danh sách giao diện) {
+            kết quả = {"loại": "giao diện", "tên": tên, "phạm vi": phạm vi,
+                "giao diện cha": cha, "phương thức": phương thức};
+        };
+        nếu (mình.giữ nguồn) { kết quả["nguồn tên"] = nguồn tên; };
+        trả về kết quả;
     };
 
     hàm riêng tư biên dịch chương trình chuỗi(p, ngữ cảnh) {
@@ -455,14 +482,19 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         biên dịch biểu thức chờ(p, "thử");
         thân = mình.biên dịch chương trình khối(p);
         biên dịch biểu thức chờ(p, "bắt lỗi");
-        tên lỗi = "";
+        tên lỗi = ""; nguồn tên = [];
         nếu (mình.biên dịch chương trình nhận(p, "(")) {
+            đầu tên = p["vị trí"];
             tên lỗi = mình.biên dịch chương trình tên kiểu(p, "biến bắt lỗi", đúng);
+            nếu (mình.giữ nguồn) { nguồn tên = mình.khoảng nguồn(p, đầu tên); };
             biên dịch biểu thức chờ(p, ")");
         };
+        đầu bắt = p["vị trí"];
         bắt = mình.biên dịch chương trình khối(p);
         mình.biên dịch chương trình nhận(p, ";");
-        trả về {"loại": "thử", "thân": thân, "bắt": bắt, "biến lỗi": tên lỗi};
+        kết quả = {"loại": "thử", "thân": thân, "bắt": bắt, "biến lỗi": tên lỗi};
+        nếu (mình.giữ nguồn) { kết quả["nguồn tên"] = nguồn tên; kết quả["nguồn phạm vi"] = mình.khoảng nguồn(p, đầu bắt); };
+        trả về kết quả;
     };
 
     hàm riêng tư biên dịch chương trình câu lệnh(p) {
@@ -503,7 +535,10 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             // lệnh độc lập để giữ đúng ngữ nghĩa resolve-before-arguments.
             biên dịch biểu thức lấy(p);
             // Cùng quy tắc tên với khai báo hàm, kể cả `in lời chào`.
+            đầu tên = p["vị trí"];
             tên = mình.biên dịch chương trình tên kiểu(p, "hàm cần gọi", đúng);
+            đích gọi = {"loại": "tên", "giá trị": tên};
+            nếu (mình.giữ nguồn) { đích gọi["nguồn tên"] = mình.khoảng nguồn(p, đầu tên); };
             biên dịch biểu thức chờ(p, "(");
             đối số = [];
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {
@@ -515,7 +550,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             biên dịch biểu thức chờ(p, ")");
             biên dịch biểu thức chờ(p, ";");
             trả về {"loại": "biểu thức", "biểu thức": {
-                "loại": "gọi", "hàm": {"loại": "tên", "giá trị": tên},
+                "loại": "gọi", "hàm": đích gọi,
                 "đối số": đối số, "tường minh": đúng,
                 "dòng": biên dịch trường từ tố(từ tố đầu, 2, "dòng", 0),
                 "cột": biên dịch trường từ tố(từ tố đầu, 3, "cột", 0)
@@ -559,13 +594,18 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             biên dịch biểu thức lấy(p);
             // Từ khóa ngữ cảnh vẫn có thể là một phần của định danh nhiều từ,
             // ví dụ "bước cập nhật con trỏ hiện tại". Dấu '=' / ';' kết thúc tên.
+            đầu tên = p["vị trí"];
             tên = mình.biên dịch chương trình tên kiểu(p, "biến", đúng);
+            nguồn tên = [];
+            nếu (mình.giữ nguồn) { nguồn tên = mình.khoảng nguồn(p, đầu tên); };
             giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
                 giá trị = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
-            trả về {"loại": "biến", "tên": tên, "giá trị": giá trị};
+            kết quả = {"loại": "biến", "tên": tên, "giá trị": giá trị};
+            nếu (mình.giữ nguồn) { kết quả["nguồn tên"] = nguồn tên; };
+            trả về kết quả;
         };
         nếu (mã cú pháp == 320) {
             biên dịch biểu thức lấy(p);

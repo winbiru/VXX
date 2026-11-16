@@ -11,6 +11,18 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import socketserver
+
+
+class LoopbackHTTPServer(http.server.HTTPServer):
+    allow_reuse_address = True
+
+    def server_bind(self):
+        # HTTPServer.server_bind calls socket.getfqdn() after binding, which
+        # can block on the host resolver before the fixture publishes its port.
+        # This loopback-only test server needs no hostname lookup.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 def main():
@@ -40,16 +52,15 @@ def main():
             def log_message(self, *args):
                 pass
 
-        class Server(http.server.HTTPServer):
-            allow_reuse_address = True
-
-        with Server(('127.0.0.1', 0), Handler) as server:
+        print('HTTP mock: binding IPv4 loopback', flush=True)
+        with LoopbackHTTPServer(('127.0.0.1', 0), Handler) as server:
             # Publish only after bind/listen. Each nested fixture owns its port.
             port_file = Path.cwd() / 'server.port'
             temporary = port_file.with_suffix('.tmp')
             temporary.write_text(str(server.server_port), encoding='ascii')
             temporary.replace(port_file)
             mark('server-started')
+            print(f'HTTP mock: listening on 127.0.0.1:{server.server_port}', flush=True)
             server.serve_forever()
     elif name in ('vpp', 'vpp-native', 'vpp-i32'):
         op = args[1]

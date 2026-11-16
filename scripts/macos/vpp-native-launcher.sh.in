@@ -8,10 +8,31 @@ else
   root=@VPP_SOURCE_ROOT@
   runtime="$bin/../native-vpp-runtime"
 fi
+# Uninstall is handled before runtime setup and never removes arbitrary prefix trees.
+case ${1:-} in
+  'gỡ cài đặt'|gỡ-cài-đặt|uninstall) shift; set -- --uninstall-native "$@" ;;
+  gỡ) if [[ ${2:-} == 'cài đặt' ]]; then shift 2; set -- --uninstall-native "$@";
+      elif [[ ${2:-} == cài && ${3:-} == đặt ]]; then shift 3; set -- --uninstall-native "$@"; fi ;;
+esac
+if [[ ${1:-} == --uninstall-native ]]; then
+  [[ $# == 1 && -f "$bin/uninstall-native.sh" ]] || { echo 'Không tìm thấy trình gỡ cài đặt hoặc có đối số thừa.' >&2; exit 2; }
+  exec bash "$bin/uninstall-native.sh"
+fi
 export VPP_HOME="${VPP_HOME:-$root}"
 export VPP_AOT_VPP_OBJECT="${VPP_AOT_VPP_OBJECT:-$runtime/runtime.o}"
+# Normalize multiword Vietnamese JIT before the direct run path.
+case ${1:-} in
+  'chạy tức thời'|chạy-tức-thời) shift; set -- jit "$@" ;;
+  chạy) if [[ ${2:-} == 'tức thời' ]]; then shift 2; set -- jit "$@";
+        elif [[ ${2:-} == tức && ${3:-} == thời ]]; then shift 3; set -- jit "$@"; fi ;;
+esac
 if [[ ${1:-} == jit ]]; then
   shift
+  source_file=${1:-}
+  if [[ $source_file == --dynamic || $source_file == --check-dynamic ]]; then source_file=${2:-}; fi
+  if [[ -x "$bin/vpp-tools" && -f $source_file ]]; then
+    "$bin/vpp-tools" "$bin/vpp-native" --kiểm-khóa-nguồn "$source_file"
+  fi
   exec "$bin/vpp-jit" "$@"
 fi
 case "$(uname -s)-$(uname -m)" in
@@ -35,18 +56,60 @@ case "$(uname -s)-$(uname -m)" in
     ;;
 esac
 compiler="$bin/vpp-native"
-if [[ $# == 0 ]]; then exec "$compiler" --help; fi
+if [[ $# == 0 ]]; then
+  if [[ -x "$bin/vpp-tools" ]]; then exec "$bin/vpp-tools" "$compiler"; fi
+  exec "$compiler" --help
+fi
 case "$1" in
-  phiên) if [[ ${2:-} == bản ]]; then shift 2; exec "$compiler" --version "$@"; fi ;;
   run) shift ;;
   chạy) shift ;;
   *.vi) ;;
-  *) exec "$compiler" "$@" ;;
+  build)
+    if [[ -x "$bin/vpp-tools" ]]; then
+      if [[ $# == 4 && -f ${2:-} && ${3:-} == -o ]]; then
+        "$bin/vpp-tools" "$compiler" --kiểm-khóa-nguồn "$2"
+      else
+        exec "$bin/vpp-tools" "$compiler" "$@"
+      fi
+    fi
+    exec "$compiler" "$@" ;;
+  batch-build)
+    if [[ -x "$bin/vpp-tools" ]]; then
+      sources=("$@"); for ((i=1; i<${#sources[@]}; i+=2)); do
+        "$bin/vpp-tools" "$compiler" --kiểm-khóa-nguồn "${sources[i]}"
+      done
+    fi
+    exec "$compiler" "$@" ;;
+  vm-build|emit-program-asm)
+    if [[ -x "$bin/vpp-tools" ]]; then exec "$bin/vpp-tools" "$compiler" "$@"; fi
+    exec "$compiler" "$@" ;;
+  format|lint)
+    if [[ -x "$bin/vpp-tools" && -d ${2:-} ]]; then exec "$bin/vpp-tools" "$compiler" "$@"; fi
+    exec "$compiler" "$@" ;;
+  artifact) shift; set -- --artifact "$@" ;;
+  embed|disassemble|dump-ast|dump-ir) exec "$compiler" "$@" ;;
+  *)
+    if [[ -x "$bin/vpp-tools" ]]; then exec "$bin/vpp-tools" "$compiler" "$@"; fi
+    exec "$compiler" "$@" ;;
 esac
+# Historical compiler selection and artifact execution preserve inherited stdio.
+if [[ ${1:-} == --compiler=vpp ]]; then shift; fi
+if [[ ${1:-} == --compiler=cpp ]]; then
+  echo 'Bộ biên dịch C++ đã được loại bỏ' >&2; exit 2
+fi
+if [[ ${1:-} == --artifact ]]; then
+  if [[ $# != 2 ]]; then echo 'Dùng: vpp chạy --artifact <tệp.vmb>' >&2; exit 2; fi
+  if [[ $2 != *.vmb ]]; then echo 'Chỉ hỗ trợ artifact .vmb; .vbc cũ cần biên dịch lại từ nguồn' >&2; exit 2; fi
+  if [[ ! -f $2 ]]; then echo "Không tìm thấy artifact: $2" >&2; exit 2; fi
+  exec "$bin/vpp-vm" "$2"
+fi
 if [[ $# == 0 || $1 == -* || ! -f $1 ]]; then
   echo 'Usage: vpp run <source.vi> [-- program arguments]' >&2; exit 2
 fi
 source_file=$1
+if [[ -x "$bin/vpp-tools" ]]; then
+  "$bin/vpp-tools" "$compiler" --kiểm-khóa-nguồn "$source_file"
+fi
 shift
 if [[ $# != 0 && $1 == -- ]]; then shift; fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/vpp-run.XXXXXXXX")

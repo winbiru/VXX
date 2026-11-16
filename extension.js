@@ -320,19 +320,7 @@ async function lspDefinition(document, position) {
 
 async function resolveFunctionDefinition(document, position) {
   const semantic = await lspDefinition(document, position).catch(() => null);
-  if (semantic) {
-    const functionName = callableNameAtPosition(document, position);
-    if (functionName) {
-      try {
-        const targetDocument = await vscode.workspace.openTextDocument(semantic.uri);
-        const sourceDefinition = functionDefinitionInDocument(targetDocument, functionName);
-        if (sourceDefinition) return sourceDefinition;
-      } catch (_) {
-        // Keep the semantic location even when the source file cannot be opened here.
-      }
-    }
-    return semantic;
-  }
+  if (semantic) return semantic;
   return fallbackFunctionDefinition(document, position);
 }
 
@@ -465,6 +453,18 @@ function foldVietnamese(value) {
 }
 
 function completionMatch(prefix, label) {
+  // Qualified imports replace the entire typed alias and member prefix.
+  // Otherwise accepting p.tính điểm after p.tính would duplicate p.
+  if (label.includes('.')) {
+    const parts = [...prefix.matchAll(/[\p{L}_][\p{L}\p{N}_]*/gu)];
+    for (const part of parts) {
+      const typed = prefix.slice(part.index);
+      if (!typed.includes('.')) continue;
+      if (!/^[\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*(?:\.(?:[\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*)?)+[ \t]*$/u.test(typed)) continue;
+      if (foldVietnamese(label).startsWith(foldVietnamese(typed))) return { start: part.index, typed };
+    }
+    if (prefix.trimEnd().endsWith('.')) return null;
+  }
   const words = [...prefix.matchAll(/[\p{L}_][\p{L}\p{N}_]*/gu)];
   const last = words[words.length - 1];
   if (!last) return { start: prefix.length, typed: '' };
@@ -585,7 +585,7 @@ function vppImportCompletionItems(document, position, prefix, context) {
   return items;
 }
 
-function vppCompletionItems(document, position, lspItems = [], context = null, triggerCharacter = null) {
+function vppCompletionItems(document, position, lspItems = [], context = null, triggerCharacter = null, semantic = false) {
   if (completionInCommentOrString(document, position)) return [];
 
   const prefix = document.lineAt(position.line).text.slice(0, position.character);
@@ -622,7 +622,7 @@ function vppCompletionItems(document, position, lspItems = [], context = null, t
 
   if (memberAccess) return result;
 
-  for (const symbol of documentSymbols(document)) {
+  for (const symbol of semantic ? [] : documentSymbols(document)) {
     const kind = symbol.kind === vscode.SymbolKind.Function
       ? vscode.CompletionItemKind.Function
       : symbol.kind === vscode.SymbolKind.Class
@@ -752,6 +752,7 @@ class VppLanguageServer {
     this.output.appendLine(`Khởi động: ${this.executable} --lsp`);
     const executableDir = path.dirname(this.executable);
     const candidateHomes = [
+      path.join(executableDir, '..', 'share', 'vpp'),
       executableDir,
       path.dirname(executableDir),
       path.dirname(path.dirname(executableDir)),
@@ -763,7 +764,11 @@ class VppLanguageServer {
     );
     const env = { ...process.env };
     if (vppHome) env.VPP_HOME = vppHome;
-    this.child = spawn(this.executable, ['--lsp'], {
+    const suffix = process.platform === 'win32' ? '.exe' : '';
+    const args = path.basename(this.executable) === `vpp-tools${suffix}`
+      ? [path.join(executableDir, `vpp-native${suffix}`), '--lsp']
+      : ['--lsp'];
+    this.child = spawn(this.executable, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
       env
@@ -945,7 +950,21 @@ class VppLanguageServer {
 function languageServerExecutable(context) {
   const configured = vscode.workspace.getConfiguration('vpp').get('lsp.executable', '').trim();
   if (configured) return configured;
-  return ''; // The autonomous compiler does not yet provide a language server.
+  const suffix = process.platform === 'win32' ? '.exe' : '';
+  const candidates = (vscode.workspace.workspaceFolders || []).map((folder) =>
+    path.join(folder.uri.fsPath, 'build-pure-vpp', 'bin'));
+  if (process.env.VPP_HOME) {
+    candidates.push(path.join(process.env.VPP_HOME, 'bin'),
+      path.join(process.env.VPP_HOME, '..', '..', 'bin'));
+  }
+  if (context?.globalStorageUri?.fsPath) candidates.push(path.join(vmDirectory(context), 'bin'));
+  candidates.push(...(process.env.PATH || '').split(process.platform === 'win32' ? ';' : ':').filter(Boolean));
+  for (const directory of candidates) {
+    if (!path.isAbsolute(directory)) continue;
+    const tools = path.join(directory, `vpp-tools${suffix}`);
+    if (fs.existsSync(tools) && fs.existsSync(path.join(directory, `vpp-native${suffix}`))) return tools;
+  }
+  return '';
 }
 
 function stopWatchingLanguageServerExecutable() {
@@ -983,13 +1002,8 @@ function documentParams(document) {
 }
 
 function renameRequestName(newName) {
-  // The current LSP accepts a single lexer identifier as newName, while V++
-  // declarations also support names consisting of several identifier words.
-  // Request semantic edit ranges using a valid single-word probe in that case.
-  if (!/^[\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)+$/u.test(newName)) {
-    return newName;
-  }
-  return '__vpp_rename_probe';
+  // The native parser validates the actual Vietnamese name and its bindings.
+  return newName;
 }
 
 async function ensureLanguageServer(context) {
@@ -1095,7 +1109,8 @@ function registerLanguageFeatures(context) {
           : null;
         const sourceItems = Array.isArray(response) ? response : (response?.items || []);
         return new vscode.CompletionList(
-          vppCompletionItems(document, position, sourceItems, context, completionContext?.triggerCharacter),
+          vppCompletionItems(document, position, sourceItems, context, completionContext?.triggerCharacter,
+            !!response && !Array.isArray(response) && Array.isArray(response.items)),
           Boolean(response?.isIncomplete)
         );
       }
@@ -1195,7 +1210,7 @@ function registerLanguageFeatures(context) {
         for (const [uri, edits] of Object.entries(result.changes || {})) {
           const target = vscode.Uri.parse(uri);
           for (const edit of edits) {
-            workspaceEdit.replace(target, vscodeRange(edit.range), requestName === newName ? edit.newText : newName);
+            workspaceEdit.replace(target, vscodeRange(edit.range), edit.newText);
           }
         }
         return workspaceEdit;
@@ -1267,6 +1282,10 @@ function activate(context) {
   watchLanguageServerExecutable(context);
   libraryTreeProvider = new VppLibraryTreeProvider(context);
   const libraryCatalogWatcher = vscode.workspace.createFileSystemWatcher('**/vpp-libraries.json');
+  const sourceWatcher = vscode.workspace.createFileSystemWatcher('**/*.vi');
+  const relaySourceChange = (uri, type) => languageServer?.notify('workspace/didChangeWatchedFiles', {
+    changes: [{ uri: uri.toString(), type }]
+  });
   const relayLibraryCatalogChange = (uri, type) => {
     libraryTreeProvider?.refresh();
     languageServer?.notify('workspace/didChangeWatchedFiles', {
@@ -1277,6 +1296,10 @@ function activate(context) {
     vscode.window.registerTreeDataProvider(VPP_LIBRARY_VIEW_ID, libraryTreeProvider),
     libraryTreeProvider.changeEmitter,
     vscode.commands.registerCommand(VPP_REFRESH_LIBRARIES_COMMAND, () => libraryTreeProvider?.refresh()),
+    sourceWatcher,
+    sourceWatcher.onDidCreate((uri) => relaySourceChange(uri, 1)),
+    sourceWatcher.onDidChange((uri) => relaySourceChange(uri, 2)),
+    sourceWatcher.onDidDelete((uri) => relaySourceChange(uri, 3)),
     libraryCatalogWatcher,
     libraryCatalogWatcher.onDidCreate((uri) => relayLibraryCatalogChange(uri, 1)),
     libraryCatalogWatcher.onDidChange((uri) => relayLibraryCatalogChange(uri, 2)),

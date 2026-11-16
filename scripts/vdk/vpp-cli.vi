@@ -1,0 +1,1459 @@
+// Công cụ dòng lệnh cấp dự án, biên dịch bằng V++ trên mọi nền tảng.
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.bộ sưu tập.từ điển.xóa khóa;
+nhập gói.văn bản.chuỗi.chuỗi mã điểm unicode;
+nhập gói.lõi.quản lý gói.*;
+nhập gói.dữ liệu.json.json.json tạo;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.văn bản.chuỗi.kết thúc bằng;
+nhập gói.văn bản.chuỗi.bỏ khoảng trắng;
+nhập gói.biên dịch.đích.*;
+nhập gói.biên dịch.lsp.*;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn chuẩn đường;
+nhập gói.bộ sưu tập.danh sách.tìm chỉ số;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.văn bản.chuỗi.bắt đầu bằng;
+nhập gói.văn bản.chuỗi.chứa chuỗi;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.văn bản.chuỗi.chuẩn hóa unicode;
+nhập gói.văn bản.chuỗi.tách hằng văn bản;
+
+hàm riêng tư cli đối số(i) {
+    h = đối số lấy(i);
+    các byte = [];
+    lặp(j = 0; j < byte dài(h); j++) { máy ảo thêm cuối danh sách(các byte, byte lấy(h, j)); };
+    byte hủy(h);
+    trả về chuỗi từ byte máy ảo(các byte);
+};
+hàm riêng tư cli xuất(kênh, văn bản) {
+    vị trí = 0;
+    khi (đúng) {
+        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 128));
+        n = máy ảo lấy độ dài(bytes);
+        nếu (n == 0) { thoát; };
+        lặp(i = 0; i < n; i++) { nếu (máy ghi byte(3376 + i, bytes[i]) != 0) { ném "Không thể ghi đầu ra"; }; };
+        đã ghi = 0;
+        khi (đã ghi < n) {
+            got = máy ghi(kênh, 3376 + đã ghi, n - đã ghi);
+            nếu (got <= 0) { ném "Không thể ghi đầu ra"; };
+            đã ghi += got;
+        };
+        vị trí += n;
+    };
+};
+hàm riêng tư cli đuôi(args, bắt đầu) {
+    kết quả = [];
+    lặp(i = bắt đầu; i < máy ảo lấy độ dài(args); i++) { máy ảo thêm cuối danh sách(kết quả, args[i]); };
+    trả về kết quả;
+};
+hàm riêng tư cli loại không theo liên kết(đường) {
+    nếu (ten nền tảng máy ảo() == "windows") { trả về đường dẫn loại windows(đường, sai); };
+    trả về đường dẫn loại posix(đường, sai);
+};
+hàm riêng tư cli quét(đường, tệp) {
+    loại = cli loại không theo liên kết(đường);
+    nếu (ten nền tảng máy ảo() == "windows") {
+        nếu (loại == 0) { trả về 0; };
+    } hoặc { nếu (loại == 10) { trả về 0; }; };
+    nếu (là tệp(đường)) {
+        nếu (kết thúc bằng(đường, ".vi")) { máy ảo thêm cuối danh sách(tệp, đường); };
+        trả về 0;
+    };
+    nếu (!là thư mục(đường)) { ném "Không tìm thấy: " + đường; };
+    mục = liệt kê thư mục(đường);
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        nếu (mục[i] != "." && mục[i] != ".." && mục[i] != ".git" && mục[i] != ".vpp") {
+            cli quét(đường dẫn nối(đường, mục[i]), tệp);
+        };
+    };
+    trả về 0;
+};
+hàm riêng tư cli bản kê(tên) {
+    trả về {"schema": 1, "name": tên, "version": "0.1.0", "dependencies": []};
+};
+hàm riêng tư cli khởi tạo(args) {
+    n = máy ảo lấy độ dài(args);
+    nếu (n == 1) { trả về cli khởi tạo mẫu("application", args[0]); };
+    nếu (n == 2) {
+        nếu (args[0] == "backend") { trả về cli khởi tạo mẫu("backend", args[1]); };
+        nếu (args[0] == "ứng dụng" || args[0] == "ứng-dụng" || args[0] == "application" || args[0] == "app") { trả về cli khởi tạo mẫu("application", args[1]); };
+    };
+    nếu (n == 3) {
+        nếu (args[0] == "ứng" && args[1] == "dụng") { trả về cli khởi tạo mẫu("application", args[2]); };
+    };
+    ném "Dùng: vpp khởi tạo [ứng dụng|backend] <thư mục>";
+};
+hàm riêng tư cli khởi tạo mẫu(mẫu, đường) {
+    nếu (đường dẫn tồn tại(đường)) { ném "Đường dẫn đã tồn tại: " + đường; };
+    tên = đường dẫn tên(đường);
+    nếu (!quản lý gói tên hợp lệ(tên)) { ném "Tên dự án không hợp lệ"; };
+    gốc = đọc biến môi trường("VPP_HOME", "");
+    nguồn = đường dẫn nối(gốc, "templates/" + mẫu);
+    nếu (!là thư mục(nguồn)) { ném "Không tìm thấy mẫu dự án: " + nguồn; };
+    cha = đường dẫn cha(đường dẫn tuyệt đối(đường));
+    tạo thư mục(cha);
+    mới = máy thư mục tạo(đường);
+    nếu (mới[0] != 0) { ném "Không thể tạo thư mục dự án: " + đường; };
+    thử {
+        cli sao chép cây(nguồn, đường);
+        tạo thư mục(đường dẫn nối(đường, "gói"));
+        tạo thư mục(đường dẫn nối(đường, "tests"));
+        quản lý gói ghi bản kê(đường dẫn nối(đường, "vpp.json"), cli bản kê(tên));
+    } bắt lỗi(e) { xóa đường dẫn(đường); ném e; };
+    in "Đã khởi tạo dự án: " + đường;
+    trả về 0;
+};
+hàm riêng tư cli sao chép cây(nguồn, đích) {
+    tạo thư mục(đích);
+    mục = liệt kê thư mục(nguồn);
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        a = đường dẫn nối(nguồn, mục[i]);
+        b = đường dẫn nối(đích, mục[i]);
+        loại = cli loại không theo liên kết(a);
+        nếu (ten nền tảng máy ảo() == "windows") {
+            nếu (loại != 1 && loại != 2) { ném "Mẫu chứa mục không hợp lệ: " + a; };
+        } hoặc { nếu (loại != 4 && loại != 8) { ném "Mẫu chứa mục không hợp lệ: " + a; }; };
+        nếu (là thư mục(a)) { cli sao chép cây(a, b); }
+        hoặc nếu (là tệp(a)) { sao chép tệp(a, b); };
+    };
+    trả về 0;
+};
+// Tạo độc quyền; không xóa hoặc tái sử dụng thư mục có sẵn.
+hàm riêng tư cli thư mục tạm() {
+    cha = đọc biến môi trường("TMPDIR", "");
+    nếu (cha == "") { cha = đọc biến môi trường("TEMP", ""); };
+    nếu (cha == "") { cha = đọc biến môi trường("TMP", ""); };
+    nếu (cha == "") {
+        nếu (ten nền tảng máy ảo() == "windows") { cha = thư mục hiện tại(); }
+        hoặc { cha = "/tmp"; };
+    };
+    nếu (!là thư mục(cha)) { ném "Không tìm thấy thư mục tạm: " + cha; };
+    cha = đường dẫn tuyệt đối(cha);
+    tiền tố = "vpp-cli-" + thành chuỗi(mã tiến trình()) + "-";
+    lặp(i = 0; i < 16384; i++) {
+        đường = đường dẫn nối(cha, tiền tố + thành chuỗi(i));
+        kết quả = máy thư mục tạo(đường);
+        nếu (kết quả[0] == 0) { trả về đường; };
+        nếu (kết quả[1] != 1) { ném "Không thể tạo thư mục tạm: " + đường; };
+    };
+    ném "Không thể cấp phát thư mục tạm";
+};
+// Artifact native dùng định dạng VMB của máy ảo ASM; VBC cũ không tương thích.
+hàm riêng tư cli chạy artifact(compiler, args) {
+    nếu (máy ảo lấy độ dài(args) != 1) { ném "Dùng: vpp chạy --artifact <tệp.vmb>"; };
+    đường artifact = args[0];
+    nếu (!kết thúc bằng(đường artifact, ".vmb")) { ném "Chỉ hỗ trợ artifact .vmb; .vbc cũ cần biên dịch lại từ nguồn"; };
+    nếu (!là tệp(đường artifact)) { ném "Không tìm thấy artifact: " + đường artifact; };
+    trình = đường dẫn nối(đường dẫn cha(compiler), "vpp-vm");
+    nếu (ten nền tảng máy ảo() == "windows") { trình += ".exe"; };
+    r = chạy tiến trình(trình, args);
+    cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+    trả về r["mã thoát"];
+};
+hàm riêng tư cli chạy chương trình(compiler, args) {
+    nếu (máy ảo lấy độ dài(args) == 0) { ném "Cần tệp nguồn"; };
+    nguồn = args[0];
+    nếu (!là tệp(nguồn)) { ném "Không tìm thấy tệp: " + nguồn; };
+    cli gói kiểm nguồn(nguồn);
+    gốc = cli thư mục tạm();
+    chương trình = đường dẫn nối(gốc, "program");
+    nếu (ten nền tảng máy ảo() == "windows") { chương trình += ".exe"; };
+    mã = 1;
+    thử {
+        r = chạy tiến trình(compiler, ["build", nguồn, "-o", chương trình]);
+        cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+        mã = r["mã thoát"];
+        nếu (mã == 0) {
+            bắt đầu = 1;
+            nếu (máy ảo lấy độ dài(args) > 1) {
+                nếu (args[1] == "--") { bắt đầu = 2; };
+            };
+            r = chạy tiến trình(chương trình, cli đuôi(args, bắt đầu));
+            cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+            mã = r["mã thoát"];
+        };
+    } bắt lỗi(e) { xóa đường dẫn(gốc); ném e; };
+    xóa đường dẫn(gốc);
+    trả về mã;
+};
+// REPL đọc UTF-8 trực tiếp từ stdin; mỗi dòng là một đoạn mã độc lập
+// theo giao diện 0.9.5. Không chạy lại các dòng trước (tránh lặp hiệu ứng phụ).
+hàm riêng tư cli đọc dòng() {
+    dữ liệu = [];
+    khi (đúng) {
+        n = máy đọc(0, 3376, 1);
+        nếu (n < 0) { ném "Không thể đọc đầu vào"; };
+        nếu (n == 0) {
+            nếu (máy ảo lấy độ dài(dữ liệu) == 0) { trả về rỗng; };
+            thoát;
+        };
+        b = máy đọc byte(3376);
+        nếu (b == 10) { thoát; };
+        nếu (b != 13) { máy ảo thêm cuối danh sách(dữ liệu, b); };
+        nếu (máy ảo lấy độ dài(dữ liệu) > 1048576) { ném "Dòng nhập quá dài"; };
+    };
+    trả về chuỗi từ byte máy ảo(dữ liệu);
+};
+hàm riêng tư cli repl(compiler, args) {
+    nếu (máy ảo lấy độ dài(args) != 0) { ném "Dùng: vpp --repl"; };
+    gốc = cli thư mục tạm();
+    nguồn = đường dẫn nối(gốc, "repl.vi");
+    thử {
+        cli xuất(1, "V++ — phiên tương tác (:giúp, :thoát)\n");
+        khi (đúng) {
+            cli xuất(1, "vpp> ");
+            dòng = cli đọc dòng();
+            nếu (dòng == rỗng) { thoát; };
+            dòng = bỏ khoảng trắng(dòng);
+            nếu (dòng == ":thoát" || dòng == ":quit" || dòng == ":exit") { thoát; };
+            nếu (dòng == ":giúp" || dòng == ":help") {
+                cli xuất(1, "Nhập mã V++ trên một dòng; :thoát để kết thúc.\n");
+            } hoặc nếu (dòng != "") {
+                thử {
+                    ghi tệp(nguồn, dòng + "\n");
+                    cli chạy chương trình(compiler, [nguồn]);
+                } bắt lỗi(e) { cli xuất(2, thành chuỗi(e) + "\n"); };
+            };
+        };
+    } bắt lỗi(e) { xóa đường dẫn(gốc); ném e; };
+    xóa đường dẫn(gốc);
+    trả về 0;
+};
+hàm riêng tư cli kiểm thử(compiler, args) {
+    nếu (máy ảo lấy độ dài(args) > 1) { ném "Dùng: vpp kiểm thử [thư mục|tệp.vi]"; };
+    đường = "tests";
+    nếu (máy ảo lấy độ dài(args) == 1) { đường = args[0]; };
+    tệp = [];
+    cli quét(đường, tệp);
+    sắp xếp(tệp);
+    nếu (máy ảo lấy độ dài(tệp) == 0) { ném "Không tìm thấy tệp kiểm thử"; };
+    đạt = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(tệp); i++) {
+        mã = cli chạy chương trình(compiler, [tệp[i]]);
+        nếu (mã == 0) { đạt += 1; in "ĐẠT " + tệp[i]; }
+        hoặc { in "LỖI " + tệp[i]; };
+    };
+    in thành chuỗi(đạt) + "/" + thành chuỗi(máy ảo lấy độ dài(tệp)) + " kiểm thử đạt";
+    nếu (đạt != máy ảo lấy độ dài(tệp)) { trả về 1; };
+    trả về 0;
+};
+hàm riêng tư cli định dạng(compiler, args, lệnh) {
+    tệp = [];
+    chế độ = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(args); i++) {
+        a = args[i];
+        nếu (a == "--kiểm-tra" || a == "--check") { nếu (chế độ != "") { ném "Chế độ định dạng bị trùng"; }; chế độ = "check"; }
+        hoặc nếu (a == "--ghi-tệp" || a == "--in-place") { nếu (chế độ != "") { ném "Chế độ định dạng bị trùng"; }; chế độ = "write"; }
+        hoặc { cli quét(a, tệp); };
+    };
+    nếu (máy ảo lấy độ dài(tệp) == 0) { ném "Không tìm thấy tệp nguồn"; };
+    sắp xếp(tệp);
+    nếu (lệnh == "lint" && chế độ != "") { ném "Tùy chọn định dạng không dùng cho soát lỗi"; };
+    mã = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(tệp); i++) {
+        r = chạy tiến trình(compiler, [lệnh, tệp[i]]);
+        nếu (r["mã thoát"] != 0) { cli xuất(2, tệp[i] + ": "); };
+        cli xuất(2, r["lỗi"]);
+        nếu (r["mã thoát"] != 0) { cli xuất(1, r["đầu ra"]); mã = 1; }
+        hoặc nếu (lệnh == "format" && chế độ == "write") { ghi tệp(tệp[i], r["đầu ra"]); }
+        hoặc nếu (lệnh == "format" && chế độ == "check") {
+            nếu (đọc tệp(tệp[i]) != r["đầu ra"]) { in "Cần định dạng: " + tệp[i]; mã = 1; };
+        } hoặc { cli xuất(1, r["đầu ra"]); };
+    };
+    trả về mã;
+};
+// Package artifacts use the 0.9.5 FNV-1a format, including CRLF and Vietnamese NFC.
+hàm riêng tư cli gói tên(tên) {
+    nếu (!quản lý gói tên hợp lệ(tên) || bắt đầu bằng(tên, ".") || kết thúc bằng(tên, ".") || kết thúc bằng(tên, " ")) { ném "Tên gói không an toàn: " + tên; };
+    cơ sở = tách hằng văn bản(chuỗi thường(tên), ".")[0];
+    nếu (tìm chỉ số(["con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"], cơ sở) >= 0) { ném "Tên gói dành riêng trên Windows: " + tên; };
+    trả về tên;
+};
+hàm riêng tư cli gói thư mục(gốc) {
+    mục = ["gói", "goi", "packages"];
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        đường = đường dẫn nối(gốc, mục[i]);
+        nếu (đường dẫn tồn tại(đường)) {
+            nếu (cli gói loại(đường) != 2) { ném "Cần thư mục gói thường: " + đường; };
+            trả về mục[i];
+        };
+    };
+    trả về "gói";
+};
+hàm riêng tư cli gói đã cài(gốc) {
+    thư = đường dẫn nối(gốc, cli gói thư mục(gốc));
+    tên = [];
+    nếu (là thư mục(thư)) {
+        mục = liệt kê thư mục(thư);
+        lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+            đường = đường dẫn nối(thư, mục[i]);
+            nếu (là thư mục(đường) && là tệp(đường dẫn nối(đường, "chính.vi"))) {
+                cli gói loại(đường); máy ảo thêm cuối danh sách(tên, cli gói tên(mục[i]));
+            };
+        };
+    };
+    sắp xếp(tên); trả về tên;
+};
+hàm riêng tư cli gói bản kê cũ(gốc, tên) {
+    bản = cli bản kê(tên);
+    metadata = đường dẫn nối(đọc biến môi trường("VPP_HOME", ""), "vpp-language.json");
+    nếu (là tệp(metadata)) { bản["version"] = json phân tích(đọc tệp(metadata))["version"]; };
+    thư = cli gói thư mục(gốc); mục = cli gói đã cài(gốc);
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        quản lý gói thêm phụ thuộc(bản, mục[i], "*", "path", thư + "/" + mục[i], "");
+    };
+    trả về bản;
+};
+hàm riêng tư cli gói loại(đường) {
+    loại = cli loại không theo liên kết(đường);
+    nếu (ten nền tảng máy ảo() == "windows") {
+        nếu (loại == 1) { trả về 1; }; nếu (loại == 2) { trả về 2; };
+    } hoặc { nếu (loại == 8) { trả về 1; }; nếu (loại == 4) { trả về 2; }; };
+    ném "Mục gói không phải tệp hoặc thư mục thường: " + đường;
+};
+hàm riêng tư cli gói cây(gốc, tương đối, đích, tệp, bỏ quản lý) {
+    đường = gốc;
+    nếu (tương đối != "") { đường = đường dẫn nối(gốc, tương đối); };
+    loại = cli gói loại(đường);
+    nếu (loại == 1) {
+        chuẩn = chuẩn hóa unicode(tương đối);
+        nếu (máy ảo có khóa từ điển(tệp, chuẩn)) { ném "Trùng tên tệp chuẩn hóa: " + chuẩn; };
+        tệp[chuẩn] = đường;
+        nếu (đích != "") { sao chép tệp(đường, đường dẫn nối(đích, tương đối)); };
+        trả về 0;
+    };
+    nếu (đích != "") { tạo thư mục(đường dẫn nối(đích, tương đối)); };
+    mục = liệt kê thư mục(đường);
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        tên = mục[i];
+        nếu (bỏ quản lý && tương đối == "" && (tên == ".git" || tên == ".vpp" || tên == "vpp.lock" || tên == "gói" || tên == "goi" || tên == "packages")) { bỏ qua; };
+        con = tên;
+        nếu (tương đối != "") { con = tương đối + "/" + tên; };
+        cli gói cây(gốc, con, đích, tệp, bỏ quản lý);
+    };
+    trả về 0;
+};
+hàm riêng tư cli gói băm byte(h, b) {
+    x = h[0]; y = b; p = 1; k = 0;
+    lặp(i = 0; i < 8; i++) {
+        nếu (x % 2 != y % 2) { k += p; };
+        x = làm tròn xuống(x / 2); y = làm tròn xuống(y / 2); p *= 2;
+    };
+    h[0] = k;
+    mới = []; nhớ = 0;
+    lặp(i = 0; i < 8; i++) {
+        v = h[i] * 179 + nhớ;
+        nếu (i >= 1) { v += h[i - 1]; };
+        nếu (i >= 5) { v += h[i - 5]; };
+        máy ảo thêm cuối danh sách(mới, v % 256);
+        nhớ = làm tròn xuống(v / 256);
+    };
+    lặp(i = 0; i < 8; i++) { h[i] = mới[i]; };
+    trả về 0;
+};
+hàm riêng tư cli gói băm(gốc) {
+    tệp = {};
+    cli gói cây(gốc, "", "", tệp, sai);
+    tên = khóa từ điển(tệp); sắp xếp(tên);
+    h = [37, 35, 34, 132, 228, 156, 242, 203];
+    lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+        b = chuỗi thành byte máy ảo(tên[i]);
+        lặp(j = 0; j < máy ảo lấy độ dài(b); j++) { cli gói băm byte(h, b[j]); };
+        cli gói băm byte(h, 0);
+        phần = chuỗi thường(tên[i]); chuẩn = sai;
+        đuôi = [".vi", ".vvm", ".json", ".md", ".txt", ".toml", ".yaml", ".yml", ".xml", ".csv", ".tsv"];
+        lặp(j = 0; j < máy ảo lấy độ dài(đuôi); j++) { nếu (kết thúc bằng(phần, đuôi[j])) { chuẩn = đúng; }; };
+        b = đọc các byte tệp(tệp[tên[i]]);
+        số byte = máy ảo lấy độ dài(b);
+        lặp(j = 0; j < số byte; j++) {
+            nếu (chuẩn && b[j] == 13) {
+                nếu (j + 1 < số byte) { nếu (b[j + 1] == 10) { bỏ qua; }; };
+            };
+            cli gói băm byte(h, b[j]);
+        };
+        cli gói băm byte(h, 255);
+    };
+    hex = "0123456789abcdef"; kết quả = "fnv1a64:";
+    lặp(i = 7; i >= 0; i--) { kết quả += hex[làm tròn xuống(h[i] / 16)] + hex[h[i] % 16]; };
+    trả về kết quả;
+};
+hàm riêng tư cli gói an toàn thư mục(đường) {
+    nếu (đường dẫn tồn tại(đường)) { nếu (cli gói loại(đường) != 2) { ném "Cần thư mục thường: " + đường; }; }
+    hoặc { tạo thư mục(đường); };
+    trả về 0;
+};
+hàm riêng tư cli gói chép(nguồn, đích) {
+    loại = cli gói loại(nguồn);
+    tạo thư mục(đích);
+    nếu (loại == 1) { sao chép tệp(nguồn, đường dẫn nối(đích, "chính.vi")); }
+    hoặc { cli gói cây(nguồn, "", đích, {}, đúng); };
+    trả về 0;
+};
+hàm riêng tư cli gói đường(gốc, đường) {
+    nếu (đường dẫn là tuyệt đối(đường)) { trả về đường dẫn tuyệt đối(đường); };
+    trả về đường dẫn tuyệt đối(đường dẫn nối(gốc, đường));
+};
+hàm riêng tư cli gói git(args) {
+    r = chạy tiến trình("git", args, {"GIT_TERMINAL_PROMPT": "0"});
+    nếu (r["mã thoát"] != 0) { ném "Git: " + r["lỗi"]; };
+    trả về bỏ khoảng trắng(r["đầu ra"]);
+};
+hàm riêng tư cli gói git revision(nguồn, ref) {
+    nếu (ref == "" || bắt đầu bằng(ref, "-")) { ném "Tham chiếu Git không hợp lệ"; };
+    // HEAD của checkout detached không còn là HEAD của remote.
+    nếu (ref == "HEAD") { ref = "refs/remotes/origin/HEAD"; };
+    thử {
+        trả về cli gói git(["-C", nguồn, "rev-parse", "--verify", "--end-of-options", ref + "^{commit}"]);
+    } bắt lỗi(e) {
+        // clone --no-checkout chỉ tạo local branch mặc định; các nhánh khác
+        // được lưu trong refs/remotes/origin/.
+        nhánh = ref;
+        nếu (bắt đầu bằng(ref, "refs/heads/")) { nhánh = cắt chuỗi(ref, 11, máy ảo lấy độ dài(ref) - 11); }
+        hoặc nếu (bắt đầu bằng(ref, "refs/")) { ném e; };
+        trả về cli gói git(["-C", nguồn, "rev-parse", "--verify", "--end-of-options", "refs/remotes/origin/" + nhánh + "^{commit}"]);
+    };
+};
+hàm riêng tư cli gói đọc bản kê(đường) {
+    bản = json phân tích(đọc tệp(đường));
+    nếu (loại của(bản) != "từ điển") { ném "Bản kê không hợp lệ"; };
+    bản["schema"] = lấy từ điển(bản, "schema", 1);
+    bản["version"] = lấy từ điển(bản, "version", "0.1.0");
+    nếu (!máy ảo có khóa từ điển(bản, "dependencies")) {
+        phụ = []; cũ = lấy từ điển(bản, "gói", []);
+        nếu (loại của(cũ) != "danh sách") { ném "Danh sách gói cũ không hợp lệ"; };
+        lặp(i = 0; i < máy ảo lấy độ dài(cũ); i++) {
+            tên = cli gói tên(cũ[i]);
+            máy ảo thêm cuối danh sách(phụ, {"name": tên, "version": "*", "source": "path", "location": cli gói thư mục(đường dẫn cha(đường dẫn tuyệt đối(đường))) + "/" + tên});
+        };
+        bản["dependencies"] = phụ;
+    };
+    phụ = bản["dependencies"];
+    nếu (loại của(phụ) != "danh sách") { ném "Danh sách phụ thuộc không hợp lệ"; };
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ); i++) {
+        m = phụ[i];
+        nếu (loại của(m) != "từ điển") { ném "Phụ thuộc không hợp lệ"; };
+        m["version"] = lấy từ điển(m, "version", "*");
+        m["source"] = lấy từ điển(m, "source", "registry");
+        m["location"] = lấy từ điển(m, "location", "");
+        nếu (m["source"] == "git") { m["ref"] = lấy từ điển(m, "ref", "HEAD"); };
+    };
+    k = quản lý gói kiểm tra bản kê(bản);
+    nếu (k["hợp lệ"] != 1) { ném k["lỗi"]; };
+    trả về bản;
+};
+hàm riêng tư cli gói kho(vị trí) {
+    marker = đường dẫn nối(vị trí, "vpp-registry.json");
+    nếu (!là tệp(marker)) { ném "Kho gói không hợp lệ: " + vị trí; };
+    cli gói loại(vị trí); cli gói loại(marker);
+    dữ liệu = json phân tích(đọc tệp(marker));
+    nếu (loại của(dữ liệu) != "từ điển") { ném "Metadata kho không hợp lệ"; };
+    nếu (lấy từ điển(dữ liệu, "schema", 0) != 1) { ném "Schema kho không hợp lệ"; };
+    trả về 0;
+};
+hàm riêng tư cli gói nguồn(mục, gốc, kho, tạm, chính xác = "") {
+    tên = cli gói tên(mục["name"]);
+    loại = mục["source"]; vị trí = mục["location"]; phiên = mục["version"];
+    revision = "";
+    nếu (loại == "path") { nguồn = cli gói đường(gốc, vị trí); vị trí = nguồn; }
+    hoặc nếu (loại == "registry") {
+        nếu (vị trí == "") { vị trí = kho; };
+        nếu (vị trí == "") { vị trí = đọc biến môi trường("VPP_REGISTRY", ""); };
+        nếu (vị trí == "") { ném "Chưa chỉ định kho gói"; };
+        vị trí = cli gói đường(gốc, vị trí);
+        cli gói kho(vị trí);
+        thư = đường dẫn nối(vị trí, tên); cli gói loại(thư); tốt = "";
+        mục con = liệt kê thư mục(thư);
+        lặp(i = 0; i < máy ảo lấy độ dài(mục con); i++) {
+            v = mục con[i];
+            nếu (!quản lý gói phiên bản ngữ nghĩa hợp lệ(v)) { bỏ qua; };
+            nếu (quản lý gói khớp khoảng(v, phiên)) {
+                nếu (tốt == "") { tốt = v; }
+                hoặc nếu (quản lý gói số sánh phiên bản ngữ nghĩa(v, tốt) > 0) { tốt = v; };
+            };
+        };
+        nếu (tốt == "") { ném "Không tìm thấy phiên bản gói: " + tên; };
+        nguồn = đường dẫn nối(thư, tốt);
+    } hoặc nếu (loại == "git") {
+        nếu (bắt đầu bằng(vị trí, "-")) { ném "Địa chỉ Git không hợp lệ"; };
+        nếu (đường dẫn tồn tại(cli gói đường(gốc, vị trí))) { vị trí = cli gói đường(gốc, vị trí); };
+        nguồn = đường dẫn nối(tạm, "git-" + tên);
+        cli gói git(["-c", "protocol.ext.allow=never", "clone", "--no-checkout", "--", vị trí, nguồn]);
+        ref = lấy từ điển(mục, "ref", "HEAD");
+        nếu (chính xác != "") { ref = chính xác; };
+        revision = cli gói git revision(nguồn, ref);
+        cli gói git(["-C", nguồn, "checkout", "--detach", revision]);
+    } hoặc { ném "Nguồn gói không hợp lệ: " + loại; };
+    cli gói loại(nguồn);
+    bản = cli bản kê(tên);
+    nếu (là thư mục(nguồn) && là tệp(đường dẫn nối(nguồn, "vpp.json"))) { bản = cli gói đọc bản kê(đường dẫn nối(nguồn, "vpp.json")); };
+    nếu (loại == "registry" && (bản["name"] != tên || bản["version"] != tốt)) { ném "Metadata registry không khớp: " + tên; };
+    nếu (!quản lý gói khớp khoảng(bản["version"], phiên)) { ném "Xung đột phiên bản: " + tên + " " + bản["version"] + " / " + phiên; };
+    trả về {"name": tên, "version": bản["version"], "source": loại, "location": vị trí, "revision": revision, "path": nguồn, "manifest": bản};
+};
+hàm riêng tư cli gói duyệt(mục, gốc, kho, tạm, bảng, đang) {
+    tên = cli gói tên(mục["name"]);
+    nếu (tìm chỉ số(đang, tên) >= 0) { ném "Vòng lặp phụ thuộc: " + tên; };
+    nếu (máy ảo có khóa từ điển(bảng, tên)) {
+        cũ = bảng[tên];
+        nếu (!quản lý gói khớp khoảng(cũ["version"], mục["version"]) || cũ["source"] != mục["source"]) { ném "Xung đột phụ thuộc: " + tên; };
+        nếu (mục["source"] == "path" && cũ["location"] != cli gói đường(gốc, mục["location"])) { ném "Xung đột nguồn: " + tên; };
+        nếu (mục["source"] == "registry") {
+            địa chỉ = mục["location"]; nếu (địa chỉ == "") { địa chỉ = kho; }; nếu (địa chỉ == "") { địa chỉ = đọc biến môi trường("VPP_REGISTRY", ""); };
+            nếu (địa chỉ == "" || cũ["location"] != cli gói đường(gốc, địa chỉ)) { ném "Xung đột kho gói: " + tên; };
+        };
+        nếu (mục["source"] == "git") {
+            địa chỉ = mục["location"];
+            nếu (đường dẫn tồn tại(cli gói đường(gốc, địa chỉ))) { địa chỉ = cli gói đường(gốc, địa chỉ); };
+            nếu (địa chỉ != cũ["location"]) { ném "Xung đột nguồn Git: " + tên; };
+            ref = lấy từ điển(mục, "ref", "HEAD");
+            revision = cli gói git revision(cũ["path"], ref);
+            nếu (revision != cũ["revision"]) { ném "Xung đột revision Git: " + tên; };
+        };
+        trả về 0;
+    };
+    r = cli gói nguồn(mục, gốc, kho, tạm);
+    bảng[tên] = r;
+    máy ảo thêm cuối danh sách(đang, tên);
+    con = r["manifest"]["dependencies"];
+    thư = r["path"]; nếu (là tệp(thư)) { thư = đường dẫn cha(thư); };
+    nếu (r["source"] == "registry") { kho = r["location"]; };
+    lặp(i = 0; i < máy ảo lấy độ dài(con); i++) { cli gói duyệt(con[i], thư, kho, tạm, bảng, đang); };
+    máy ảo xóa vị trí danh sách(đang, máy ảo lấy độ dài(đang) - 1);
+    trả về 0;
+};
+hàm riêng tư cli gói khóa đọc(gốc) {
+    tệp = đường dẫn nối(gốc, "vpp.lock");
+    nếu (!là tệp(tệp)) { ném "Không tìm thấy vpp.lock"; };
+    bản = json phân tích(đọc tệp(tệp));
+    nếu (loại của(bản) != "từ điển") { ném "Khóa không hợp lệ"; };
+    nếu (lấy từ điển(bản, "schema", 0) != 1 || loại của(lấy từ điển(bản, "packages", rỗng)) != "danh sách") { ném "Schema khóa không hợp lệ"; };
+    tên = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(bản["packages"]); i++) {
+        mục = bản["packages"][i];
+        nếu (loại của(mục) != "từ điển") { ném "Mục khóa không hợp lệ"; };
+        n = cli gói tên(mục["name"]);
+        loại = lấy từ điển(mục, "source", "");
+        nếu (tìm chỉ số(["path", "registry", "git"], loại) < 0 || loại của(lấy từ điển(mục, "location", rỗng)) != "chuỗi") { ném "Nguồn khóa không hợp lệ: " + n; };
+        nếu (mục["location"] == "") { ném "Thiếu nguồn khóa: " + n; };
+        nếu (loại == "git") {
+            revision = lấy từ điển(mục, "revision", "");
+            dài = máy ảo lấy độ dài(revision);
+            nếu (dài != 40 && dài != 64) { ném "Revision khóa không hợp lệ: " + n; };
+            lặp(j = 0; j < dài; j++) { nếu (!chứa chuỗi("0123456789abcdef", revision[j])) { ném "Revision khóa không hợp lệ: " + n; }; };
+        };
+        nếu (tìm chỉ số(tên, n) >= 0 || !quản lý gói phiên bản ngữ nghĩa hợp lệ(mục["version"])) { ném "Khóa gói không hợp lệ: " + n; };
+        máy ảo thêm cuối danh sách(tên, n);
+        nếu (mục["resolved"] != cli gói thư mục(gốc) + "/" + n) { ném "Đường dẫn khóa không hợp lệ"; };
+        cli gói khóa băm(mục["fingerprint"]);
+    };
+    trả về bản["packages"];
+};
+hàm riêng tư cli gói khóa băm(băm) {
+    nếu (!bắt đầu bằng(băm, "fnv1a64:") || máy ảo lấy độ dài(băm) != 24) { ném "Fingerprint không hợp lệ"; };
+    lặp(i = 8; i < 24; i++) { nếu (!chứa chuỗi("0123456789abcdef", băm[i])) { ném "Fingerprint không hợp lệ"; }; };
+    trả về "fnv1a64-" + cắt chuỗi(băm, 8, 16);
+};
+hàm riêng tư cli gói kiểm khóa(gốc) {
+    nếu (!là tệp(đường dẫn nối(gốc, "vpp.lock"))) { trả về 0; };
+    mục = cli gói khóa đọc(gốc);
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+        thư = đường dẫn nối(gốc, mục[i]["resolved"]);
+        nếu (!là thư mục(thư)) { ném "Thiếu gói: " + mục[i]["name"] + "; hãy chạy vpp gói phục hồi"; };
+        nếu (cli gói băm(thư) != mục[i]["fingerprint"]) { ném "Gói thiếu hoặc sai fingerprint: " + mục[i]["name"] + "; hãy chạy vpp gói phục hồi"; };
+    };
+    trả về 0;
+};
+hàm riêng tư cli gói kiểm nguồn(nguồn) {
+    gốc = đường dẫn cha(đường dẫn tuyệt đối(nguồn));
+    khi (gốc != "") {
+        nếu (là tệp(đường dẫn nối(gốc, "vpp.lock"))) { trả về cli gói kiểm khóa(gốc); };
+        cha = đường dẫn cha(gốc); nếu (cha == gốc) { thoát; }; gốc = cha;
+    };
+    trả về 0;
+};
+hàm riêng tư cli gói cache(gốc, mục, nguồn, tạm) {
+    cache = đường dẫn nối(gốc, ".vpp/cache"); cli gói an toàn thư mục(cache);
+    đích = đường dẫn nối(cache, cli gói khóa băm(mục["fingerprint"]));
+    nếu (đường dẫn tồn tại(đích)) {
+        nếu (cli gói băm(đích) == mục["fingerprint"]) { trả về 0; };
+        ném "Cache bị thay đổi: " + đích;
+    };
+    mới = đường dẫn nối(tạm, "cache-" + mục["name"]);
+    cli gói cây(nguồn, "", mới, {}, sai);
+    nếu (cli gói băm(mới) != mục["fingerprint"]) { ném "Cache fingerprint không khớp"; };
+    đổi tên tệp(mới, đích);
+    trả về 0;
+};
+// Stage every artifact before touching the installed tree. Back up only the
+// destinations named by the old/new locks, and restore on a failed rename.
+hàm riêng tư cli gói công bố(gốc, tạm, bản, mục, cũ, ghi bản) {
+    gói gốc = cli gói thư mục(gốc); thư = đường dẫn nối(gốc, gói gốc); cli gói an toàn thư mục(thư);
+    tên = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) { máy ảo thêm cuối danh sách(tên, mục[i]["name"]); };
+    lặp(i = 0; i < máy ảo lấy độ dài(cũ); i++) {
+        n = cũ[i]["name"]; nếu (tìm chỉ số(tên, n) < 0) { máy ảo thêm cuối danh sách(tên, n); };
+    };
+    sao lưu = đường dẫn nối(tạm, "backup"); tạo thư mục(sao lưu);
+    mới = đường dẫn nối(tạm, "packages");
+    ghi tệp(đường dẫn nối(tạm, "new-lock"), json tạo({"schema": 1, "packages": mục}) + "\n");
+    nếu (ghi bản) { quản lý gói ghi bản kê(đường dẫn nối(tạm, "new-manifest"), bản); };
+    di chuyển = []; đã cài = []; tài liệu = [];
+    thử {
+        lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+            n = tên[i]; đích = đường dẫn nối(thư, n);
+            nguồn = đường dẫn nối(mới, n);
+            nếu (đường dẫn tồn tại(đích) && là thư mục(nguồn)) {
+                nếu (cli gói loại(đích) == 2) {
+                    nếu (cli gói băm(đích) == cli gói băm(nguồn)) { bỏ qua; };
+                };
+            };
+            nếu (đường dẫn tồn tại(đích)) {
+                quản lý = sai;
+                lặp(j = 0; j < máy ảo lấy độ dài(cũ); j++) { nếu (cũ[j]["name"] == n && cũ[j]["resolved"] == gói gốc + "/" + n) { quản lý = đúng; }; };
+                nếu (!quản lý) { ném "Không ghi đè gói chưa được quản lý: " + n; };
+                cli gói loại(đích); đổi tên tệp(đích, đường dẫn nối(sao lưu, n));
+                máy ảo thêm cuối danh sách(di chuyển, n);
+            };
+            nguồn = đường dẫn nối(mới, n);
+            nếu (là thư mục(nguồn)) { đổi tên tệp(nguồn, đích); máy ảo thêm cuối danh sách(đã cài, n); };
+        };
+        tài = ["vpp.lock"]; mới tên = ["new-lock"];
+        nếu (ghi bản) { máy ảo thêm cuối danh sách(tài, "vpp.json"); máy ảo thêm cuối danh sách(mới tên, "new-manifest"); };
+        lặp(i = 0; i < máy ảo lấy độ dài(tài); i++) {
+            đích = đường dẫn nối(gốc, tài[i]); backup = đường dẫn nối(tạm, "old-" + tài[i]);
+            nếu (đường dẫn tồn tại(đích)) { cli gói loại(đích); đổi tên tệp(đích, backup); };
+            máy ảo thêm cuối danh sách(tài liệu, tài[i]);
+            đổi tên tệp(đường dẫn nối(tạm, mới tên[i]), đích);
+        };
+    } bắt lỗi(e) {
+        lặp(i = 0; i < máy ảo lấy độ dài(tài liệu); i++) {
+            đích = đường dẫn nối(gốc, tài liệu[i]); backup = đường dẫn nối(tạm, "old-" + tài liệu[i]);
+            nếu (đường dẫn tồn tại(đích)) { xóa đường dẫn(đích); };
+            nếu (đường dẫn tồn tại(backup)) { đổi tên tệp(backup, đích); };
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(đã cài); i++) { xóa đường dẫn(đường dẫn nối(thư, đã cài[i])); };
+        lặp(i = 0; i < máy ảo lấy độ dài(di chuyển); i++) { đổi tên tệp(đường dẫn nối(sao lưu, di chuyển[i]), đường dẫn nối(thư, di chuyển[i])); };
+        ném e;
+    };
+    trả về 0;
+};
+hàm riêng tư cli gói tạm(gốc) {
+    nhà = đường dẫn nối(gốc, ".vpp"); cli gói an toàn thư mục(nhà);
+    tiền = "stage-" + thành chuỗi(mã tiến trình()) + "-";
+    lặp(i = 0; i < 16384; i++) {
+        đường = đường dẫn nối(nhà, tiền + thành chuỗi(i)); r = máy thư mục tạo(đường);
+        nếu (r[0] == 0) { trả về đường; }; nếu (r[1] != 1) { ném "Không thể tạo staging gói"; };
+    };
+    ném "Không thể cấp phát staging gói";
+};
+hàm riêng tư cli gói đồng bộ(bản, chế độ, offline, ghi bản) {
+    gốc = thư mục hiện tại(); tạm = cli gói tạm(gốc); mục = []; cũ = [];
+    thử {
+        nếu (là tệp("vpp.lock")) { cũ = cli gói khóa đọc(gốc); };
+        mới = đường dẫn nối(tạm, "packages"); tạo thư mục(mới);
+        nếu (chế độ == "restore") {
+            mục = cli gói khóa đọc(gốc);
+            lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+                m = mục[i]; đích = đường dẫn nối(mới, m["name"]);
+                cache = đường dẫn nối(gốc, ".vpp/cache/" + cli gói khóa băm(m["fingerprint"]));
+                đã cài = đường dẫn nối(gốc, m["resolved"]);
+                nguồn phục hồi = "";
+                nếu (là thư mục(đã cài)) {
+                    nếu (cli gói băm(đã cài) == m["fingerprint"]) { nguồn phục hồi = đã cài; };
+                };
+                nếu (nguồn phục hồi == "" && là thư mục(cache)) {
+                    nếu (cli gói băm(cache) == m["fingerprint"]) { nguồn phục hồi = cache; };
+                };
+                nếu (nguồn phục hồi != "") { cli gói cây(nguồn phục hồi, "", đích, {}, sai); }
+                hoặc {
+                    nếu (offline) { ném "Thiếu cache ngoại tuyến: " + m["name"]; };
+                    r = cli gói nguồn(m, gốc, "", tạm, lấy từ điển(m, "revision", ""));
+                    nếu (r["version"] != m["version"]) { ném "Phiên bản phục hồi không khớp: " + m["name"]; };
+                    nếu (m["source"] == "git") { nếu (r["revision"] != m["revision"]) { ném "Revision phục hồi không khớp: " + m["name"]; }; };
+                    cli gói chép(r["path"], đích);
+                };
+                nếu (cli gói băm(đích) != m["fingerprint"]) { ném "Fingerprint không khớp: " + m["name"]; };
+                cli gói cache(gốc, m, đích, tạm);
+            };
+        } hoặc {
+            bảng = {}; phụ = bản["dependencies"];
+            lặp(i = 0; i < máy ảo lấy độ dài(phụ); i++) { cli gói duyệt(phụ[i], gốc, "", tạm, bảng, []); };
+            tên = khóa từ điển(bảng); sắp xếp(tên);
+            lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+                r = bảng[tên[i]]; đích = đường dẫn nối(mới, tên[i]);
+                nếu (là thư mục(r["path"])) {
+                    cha = đường dẫn chuẩn(tạm); nguồn chuẩn = đường dẫn chuẩn(r["path"]);
+                    nếu (cha == nguồn chuẩn || bắt đầu bằng(cha, nguồn chuẩn + "/") || bắt đầu bằng(cha, nguồn chuẩn + "\\")) { ném "Không cài gói vào trong chính nguồn"; };
+                };
+                cli gói chép(r["path"], đích);
+                m = {"name": tên[i], "version": r["version"], "source": r["source"], "location": r["location"], "resolved": cli gói thư mục(gốc) + "/" + tên[i], "fingerprint": cli gói băm(đích)};
+                nếu (r["source"] == "git") { m["revision"] = r["revision"]; };
+                nếu (chế độ == "lock") {
+                    đã cài = đường dẫn nối(gốc, m["resolved"]);
+                    nếu (!là thư mục(đã cài)) { ném "Thiếu gói: " + tên[i]; };
+                    nếu (cli gói băm(đã cài) != m["fingerprint"]) { ném "Gói chưa đồng bộ: " + tên[i]; };
+                };
+                cli gói cache(gốc, m, đích, tạm);
+                máy ảo thêm cuối danh sách(mục, m);
+            };
+        };
+        nếu (chế độ == "lock") {
+            khóa mới = đường dẫn nối(tạm, "new-lock");
+            ghi tệp(khóa mới, json tạo({"schema": 1, "packages": mục}) + "\n");
+            đổi tên tệp(khóa mới, đường dẫn nối(gốc, "vpp.lock"));
+        } hoặc { cli gói công bố(gốc, tạm, bản, mục, cũ, ghi bản); };
+    } bắt lỗi(e) {
+        nếu (là thư mục(đường dẫn nối(tạm, "backup"))) { ném thành chuỗi(e) + "; staging được giữ tại " + tạm; };
+        xóa đường dẫn(tạm); ném e;
+    };
+    xóa đường dẫn(tạm);
+    in "Đã đồng bộ " + thành chuỗi(máy ảo lấy độ dài(mục)) + " gói";
+    trả về 0;
+};
+hàm riêng tư cli gói thêm nguồn(bản, args) {
+    nếu (máy ảo lấy độ dài(args) < 1 || máy ảo lấy độ dài(args) > 2) { ném "Dùng: vpp gói cài đặt <nguồn> [tên]"; };
+    s = args[0]; tên = ""; loại = "path"; ref = ""; phiên = "*"; vị trí = s;
+    nếu (máy ảo lấy độ dài(args) == 2) { tên = args[1]; };
+    nếu (bắt đầu bằng(s, "registry:") || bắt đầu bằng(s, "registry+")) {
+        loại = "registry"; vị trí = "";
+        nếu (bắt đầu bằng(s, "registry:")) { s = cắt chuỗi(s, 9, máy ảo lấy độ dài(s) - 9); }
+        hoặc {
+            phần = tách hằng văn bản(cắt chuỗi(s, 9, máy ảo lấy độ dài(s) - 9), "#");
+            nếu (máy ảo lấy độ dài(phần) != 2) { ném "Dùng registry+<kho>#<tên>@<khoảng>"; };
+            vị trí = phần[0]; s = phần[1];
+        };
+        phần = tách hằng văn bản(s, "@");
+        nếu (máy ảo lấy độ dài(phần) > 2 || (tên != "" && tên != phần[0])) { ném "Tên registry không hợp lệ"; };
+        tên = phần[0]; nếu (máy ảo lấy độ dài(phần) == 2) { phiên = phần[1]; };
+    } hoặc nếu (bắt đầu bằng(s, "git+")) {
+        loại = "git"; phần = tách hằng văn bản(cắt chuỗi(s, 4, máy ảo lấy độ dài(s) - 4), "#");
+        nếu (máy ảo lấy độ dài(phần) > 2) { ném "Địa chỉ Git không hợp lệ"; };
+        vị trí = phần[0]; ref = "HEAD"; nếu (máy ảo lấy độ dài(phần) == 2) { ref = phần[1]; };
+        nếu (tên == "") { tên = đường dẫn tên(vị trí); nếu (kết thúc bằng(tên, ".git")) { tên = đường dẫn thân(tên); }; };
+    } hoặc {
+        cli gói loại(s);
+        nếu (là thư mục(s) && là tệp(đường dẫn nối(s, "vpp.json"))) {
+            nguồn = cli gói đọc bản kê(đường dẫn nối(s, "vpp.json"));
+            nếu (tên == "") { tên = nguồn["name"]; }; phiên = nguồn["version"];
+        } hoặc nếu (tên == "") { tên = đường dẫn tên(s); nếu (là tệp(s)) { tên = đường dẫn thân(s); }; };
+    };
+    cli gói tên(tên);
+    nếu (quản lý gói có phụ thuộc(bản, tên)) { quản lý gói xóa phụ thuộc(bản, tên); };
+    quản lý gói thêm phụ thuộc(bản, tên, phiên, loại, vị trí, ref);
+    trả về cli gói đồng bộ(bản, "sync", sai, đúng);
+};
+hàm riêng tư cli gói phát hành(bản, args) {
+    nếu (máy ảo lấy độ dài(args) != 1) { ném "Dùng: vpp gói phát hành <kho>"; };
+    kho = đường dẫn tuyệt đối(args[0]); cli gói an toàn thư mục(kho);
+    gốc = thư mục hiện tại(); nếu (bắt đầu bằng(kho, gốc + "/") || kho == gốc || bắt đầu bằng(kho, gốc + "\\")) { ném "Kho phải nằm ngoài dự án"; };
+    marker = đường dẫn nối(kho, "vpp-registry.json");
+    nếu (đường dẫn tồn tại(marker)) { cli gói kho(kho); };
+    tên = cli gói tên(bản["name"]); thư = đường dẫn nối(kho, tên); cli gói an toàn thư mục(thư);
+    đích = đường dẫn nối(thư, bản["version"]); tạm = cli gói tạm(kho); mới = đường dẫn nối(tạm, "artifact");
+    thử {
+        cli gói chép(gốc, mới);
+        nếu (đường dẫn tồn tại(đích)) {
+            nếu (cli gói băm(đích) != cli gói băm(mới)) { ném "Phiên bản đã phát hành không thể thay đổi"; };
+        } hoặc { đổi tên tệp(mới, đích); };
+        nếu (!đường dẫn tồn tại(marker)) { ghi tệp(marker, "{\"schema\":1}\n"); };
+    } bắt lỗi(e) { xóa đường dẫn(tạm); ném e; };
+    xóa đường dẫn(tạm); in "Đã phát hành " + tên + "@" + bản["version"]; trả về 0;
+};
+
+hàm riêng tư cli gói lệnh(lệnh) {
+    nếu (lệnh == "khởi tạo" || lệnh == "khởi-tạo" || lệnh == "init") { trả về "init"; };
+    nếu (lệnh == "danh sách" || lệnh == "danh-sách" || lệnh == "list") { trả về "list"; };
+    nếu (lệnh == "thông tin" || lệnh == "thông-tin" || lệnh == "info") { trả về "info"; };
+    nếu (lệnh == "kiểm tra" || lệnh == "kiểm-tra" || lệnh == "has" || lệnh == "check") { trả về "has"; };
+    nếu (lệnh == "thêm" || lệnh == "add") { trả về "add"; };
+    nếu (lệnh == "cài đặt" || lệnh == "cài-đặt" || lệnh == "install" || lệnh == "cai" || lệnh == "caidat") { trả về "install"; };
+    nếu (lệnh == "phát hành" || lệnh == "phát-hành" || lệnh == "publish") { trả về "publish"; };
+    nếu (lệnh == "đồng bộ" || lệnh == "đồng-bộ" || lệnh == "sync" || lệnh == "cập nhật" || lệnh == "cập-nhật" || lệnh == "update") { trả về "sync"; };
+    nếu (lệnh == "khóa" || lệnh == "lock") { trả về "lock"; };
+    nếu (lệnh == "phục hồi" || lệnh == "phục-hồi" || lệnh == "restore") { trả về "restore"; };
+    nếu (lệnh == "xóa" || lệnh == "xoa" || lệnh == "remove") { trả về "remove"; };
+    nếu (lệnh == "thống kê" || lệnh == "thống-kê" || lệnh == "stats") { trả về "stats"; };
+    trả về "";
+};
+hàm riêng tư cli gói(args) {
+    nếu (máy ảo lấy độ dài(args) == 0) { ném "Dùng: vpp gói khởi tạo|danh sách|cài đặt|thêm|xóa|thông tin|kiểm tra|đồng bộ|cập nhật|khóa|phục hồi|phát hành|thống kê"; };
+    lệnh = args[0]; n = 1;
+    nếu (máy ảo lấy độ dài(args) > 1) {
+        a = lệnh + " " + args[1];
+        nếu (cli gói lệnh(a) != "") { lệnh = a; n = 2; };
+    };
+    lệnh = cli gói lệnh(lệnh);
+    args = cli đuôi(args, n); n = máy ảo lấy độ dài(args);
+    nếu (lệnh == "") { ném "Lệnh gói không hợp lệ"; };
+    nếu (lệnh == "list" || lệnh == "info" || lệnh == "has" || lệnh == "stats") { trả về cli gói xử lý(lệnh, args); };
+    cli gói an toàn thư mục(".vpp");
+    // AOT 1.0 chưa hỗ trợ opcode khóa tệp; mkdir là primitive độc quyền
+    // trên cả ba hệ điều hành. Không tự xóa khóa của tiến trình khác.
+    khóa = ".vpp/project-lock";
+    trạng thái = máy thư mục tạo(khóa);
+    nếu (trạng thái[0] != 0) { ném "Dự án đang được khóa: .vpp/project-lock; chỉ xóa khóa nếu chắc chắn không còn tiến trình quản lý gói"; };
+    thử { kết quả = cli gói xử lý(lệnh, args); }
+    bắt lỗi(e) { xóa đường dẫn(khóa); ném e; };
+    xóa đường dẫn(khóa);
+    trả về kết quả;
+};
+hàm riêng tư cli gói xử lý(lệnh, args) {
+    n = máy ảo lấy độ dài(args);
+    nếu (lệnh == "init") {
+        nếu (n > 1 || đường dẫn tồn tại("vpp.json")) { ném "vpp.json đã tồn tại hoặc đối số không hợp lệ"; };
+        tên = đường dẫn tên(thư mục hiện tại());
+        nếu (n == 1) { tên = args[0]; };
+        cli gói tên(tên);
+        cli gói an toàn thư mục(cli gói thư mục(thư mục hiện tại()));
+        quản lý gói ghi bản kê("vpp.json", cli gói bản kê cũ(thư mục hiện tại(), tên));
+        in "Đã khởi tạo: " + tên;
+        trả về 0;
+    };
+    nếu (lệnh == "stats") { trả về cli thống kê(args); };
+    nếu (lệnh == "list") {
+        nếu (n != 0) { ném "Dùng: vpp gói danh sách"; };
+        mục = [];
+        nếu (là tệp("vpp.json")) {
+            bản = cli gói đọc bản kê("vpp.json"); phụ = bản["dependencies"];
+            lặp(i = 0; i < máy ảo lấy độ dài(phụ); i++) { máy ảo thêm cuối danh sách(mục, phụ[i]["name"]); };
+            sắp xếp(mục);
+        } hoặc { mục = cli gói đã cài(thư mục hiện tại()); };
+        lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) { in mục[i]; };
+        trả về 0;
+    };
+    nếu (lệnh == "info" || lệnh == "has") {
+        nếu (n != 1) { ném "Cần tên gói"; };
+        tên = cli gói tên(args[0]);
+        thư = đường dẫn nối(cli gói thư mục(thư mục hiện tại()), tên);
+        nếu (lệnh == "has") {
+            nếu (là tệp(đường dẫn nối(thư, "chính.vi"))) { in "có"; trả về 0; };
+            in "không"; trả về 1;
+        };
+        nếu (!là thư mục(thư)) { ném "Không tìm thấy gói: " + tên; };
+        in "Tên gói: " + tên;
+        in "Đường dẫn: " + đường dẫn tuyệt đối(thư);
+        in "Tệp chính: " + đường dẫn nối(thư, "chính.vi");
+        trả về 0;
+    };
+    phục hồi = lệnh == "restore";
+    nếu (lệnh == "install") {
+        nếu (n == 0) { phục hồi = đúng; }
+        hoặc nếu (args[0] == "--offline" || args[0] == "--ngoại-tuyến") { phục hồi = đúng; };
+    };
+    nếu (phục hồi) {
+        offline = sai;
+        nếu (n > 0) {
+            nếu (n != 1 || (args[0] != "--offline" && args[0] != "--ngoại-tuyến")) { ném "Tùy chọn phục hồi không hợp lệ"; };
+            offline = đúng;
+        };
+        trả về cli gói đồng bộ({}, "restore", offline, sai);
+    };
+    bản = cli gói bản kê cũ(thư mục hiện tại(), đường dẫn tên(thư mục hiện tại()));
+    nếu (là tệp("vpp.json")) { bản = cli gói đọc bản kê("vpp.json"); }
+    hoặc nếu (lệnh != "add" && lệnh != "install") { ném "Không tìm thấy vpp.json"; };
+    nếu (lệnh == "add" || lệnh == "install") { trả về cli gói thêm nguồn(bản, args); };
+    nếu (lệnh == "publish") { trả về cli gói phát hành(bản, args); };
+    nếu (lệnh == "sync" || lệnh == "lock") {
+        nếu (n != 0) { ném "Lệnh không nhận đối số"; };
+        trả về cli gói đồng bộ(bản, lệnh, sai, sai);
+    };
+    nếu (lệnh == "remove") {
+        nếu (n != 1) { ném "Cần tên phụ thuộc đã khai báo"; };
+        nếu (!quản lý gói có phụ thuộc(bản, args[0])) { ném "Cần tên phụ thuộc đã khai báo"; };
+        quản lý gói xóa phụ thuộc(bản, args[0]);
+        trả về cli gói đồng bộ(bản, "sync", sai, đúng);
+    };
+    ném "Lệnh gói không hợp lệ";
+};
+// Kiểm tra qua pipeline native đầy đủ; sản phẩm tạm không được thực thi.
+hàm riêng tư cli dựng(compiler, args) {
+    nếu (máy ảo lấy độ dài(args) != 1) { ném "Dùng: vpp dựng <tệp.vi>"; };
+    cli gói kiểm nguồn(args[0]);
+    gốc = cli thư mục tạm();
+    mã = 1;
+    thử {
+        r = chạy tiến trình(compiler, ["build", args[0], "-o", đường dẫn nối(gốc, "verify-program")]);
+        cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+        mã = r["mã thoát"];
+    } bắt lỗi(e) { xóa đường dẫn(gốc); ném e; };
+    xóa đường dẫn(gốc);
+    trả về mã;
+};
+hàm riêng tư cli đích(args) {
+    nếu (máy ảo lấy độ dài(args) != 0) { ném "Dùng: vpp --list-targets"; };
+    in "Kiến trúc | bit | thứ tự byte | định dạng đã đăng ký";
+    tên = biên dịch danh sách kiến trúc();
+    lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+        mục = biên dịch thông tin kiến trúc(tên[i]);
+        thứ tự = "big endian";
+        nếu (mục["little endian"]) { thứ tự = "little endian"; };
+        dạng = "ELF";
+        nếu (tên[i] == "x86_64" || tên[i] == "aarch64") { dạng += ", COFF, Mach-O"; }
+        hoặc nếu (tên[i] == "i386") { dạng += ", COFF"; };
+        in tên[i] + " | " + thành chuỗi(mục["bit"]) + " | " + thứ tự + " | " + dạng;
+    };
+    in "Đối tượng native: x86_64, aarch64; đích raw/ASM tùy backend.";
+    in "AOT chương trình đầy đủ: macOS ARM64, Linux/Windows x86_64.";
+    in "JIT thử nghiệm: macOS ARM64, Linux x86_64/ARM64, Windows x86_64.";
+    trả về 0;
+};
+hàm riêng tư cli thống kê(args) {
+    nếu (máy ảo lấy độ dài(args) != 0) { ném "Dùng: vpp thống kê"; };
+    in "Dự án: " + đường dẫn tên(thư mục hiện tại());
+    nếu (là tệp("vpp.json")) { in "Bản kê: có"; } hoặc { in "Bản kê: không"; };
+    số gói = 0;
+    thư = cli gói thư mục(thư mục hiện tại());
+    nếu (là thư mục(thư)) {
+        mục = liệt kê thư mục(thư);
+        lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+            nếu (là thư mục(đường dẫn nối(thư, mục[i])) || kết thúc bằng(mục[i], ".vi")) { số gói += 1; };
+        };
+    };
+    in "Số gói: " + thành chuỗi(số gói);
+    trả về 0;
+};
+
+// LSP truyền JSON UTF-8 qua stdin/stdout. Compiler xử lý bản chụp riêng,
+// không ghi lại tài liệu chưa lưu và không chạy mã của người dùng.
+hàm riêng tư cli lsp đọc() {
+    dài = -1;
+    khi (đúng) {
+        dòng = cli đọc dòng();
+        nếu (dòng == rỗng) { trả về rỗng; };
+        nếu (dòng == "") { thoát; };
+        nếu (bắt đầu bằng(chuỗi thường(dòng), "content-length:")) {
+            nếu (dài != -1) { ném "Content-Length trùng"; };
+            dài = thành số nguyên(bỏ khoảng trắng(cắt chuỗi(dòng, 15, máy ảo lấy độ dài(dòng) - 15)));
+        };
+    };
+    nếu (dài <= 0 || dài > 16777216) { ném "Content-Length không hợp lệ"; };
+    dữ liệu = [];
+    khi (máy ảo lấy độ dài(dữ liệu) < dài) {
+        còn = dài - máy ảo lấy độ dài(dữ liệu);
+        nếu (còn > 128) { còn = 128; };
+        n = máy đọc(0, 3376, còn);
+        nếu (n <= 0) { ném "Gói LSP bị cắt"; };
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(dữ liệu, máy đọc byte(3376 + i)); };
+    };
+    trả về json phân tích(chuỗi từ byte máy ảo(dữ liệu));
+};
+hàm riêng tư cli lsp gửi chữ(chữ) {
+    n = máy ảo lấy độ dài(chuỗi thành byte máy ảo(chữ));
+    cli xuất(1, "Content-Length: " + thành chuỗi(n) + "\r\n\r\n" + chữ);
+};
+hàm riêng tư cli lsp gửi(bản) { cli lsp gửi chữ(json tạo(bản)); };
+hàm riêng tư cli lsp kết quả(id, kết quả) {
+    cli lsp gửi({"jsonrpc": "2.0", "id": id, "result": kết quả});
+};
+hàm riêng tư cli lsp lỗi(id, mã, chữ) {
+    cli lsp gửi({"jsonrpc": "2.0", "id": id, "error": {"code": mã, "message": chữ}});
+};
+hàm riêng tư cli lsp đường(uri) {
+    nếu (!bắt đầu bằng(uri, "file:///")) { trả về ""; };
+    b = chuỗi thành byte máy ảo(uri);
+    r = [];
+    i = 7;
+    khi (i < máy ảo lấy độ dài(b)) {
+        nếu (b[i] == 37) {
+            nếu (i + 2 >= máy ảo lấy độ dài(b)) { ném "URI không hợp lệ"; };
+            h = chuỗi thường(chuỗi từ byte máy ảo([b[i + 1]]));
+            l = chuỗi thường(chuỗi từ byte máy ảo([b[i + 2]]));
+            a = -1; c = -1;
+            lặp(j = 0; j < 16; j++) {
+                nếu ("0123456789abcdef"[j] == h) { a = j; };
+                nếu ("0123456789abcdef"[j] == l) { c = j; };
+            };
+            nếu (a < 0 || c < 0 || a * 16 + c == 0) { ném "URI không hợp lệ"; };
+            máy ảo thêm cuối danh sách(r, a * 16 + c);
+            i += 3;
+        } hoặc { máy ảo thêm cuối danh sách(r, b[i]); i += 1; };
+    };
+    đường = chuỗi từ byte máy ảo(r);
+    nếu (ten nền tảng máy ảo() == "windows") {
+        nếu (máy ảo lấy độ dài(đường) >= 3) {
+            nếu (đường[2] == ":") { đường = cắt chuỗi(đường, 1, máy ảo lấy độ dài(đường) - 1); };
+        };
+    };
+    trả về đường;
+};
+// URI và catalog dùng cùng hợp đồng với LSP 0.9.5.
+hàm riêng tư cli lsp uri(đường) {
+    đường = đường dẫn tuyệt đối(đường);
+    b = chuỗi thành byte máy ảo(đường); hex = "0123456789ABCDEF";
+    r = "file://";
+    nếu (!bắt đầu bằng(đường, "/")) { r += "/"; };
+    lặp(i = 0; i < máy ảo lấy độ dài(b); i++) {
+        c = b[i];
+        nếu (c == 92 && ten nền tảng máy ảo() == "windows") { r += "/"; }
+        hoặc nếu ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c == 47 || c == 95 || c == 46 || c == 58 || c == 126 || c == 45) {
+            r += chuỗi từ byte máy ảo([c]);
+        } hoặc { r += "%" + hex[làm tròn xuống(c / 16)] + hex[c % 16]; };
+    };
+    trả về r;
+};
+hàm riêng tư cli lsp catalog(gốc) {
+    nếu (gốc != "") {
+        p = đường dẫn nối(gốc, "vpp-libraries.json");
+        nếu (là tệp(p)) { trả về p; };
+    };
+    home = đọc biến môi trường("VPP_HOME", "");
+    nếu (home != "") {
+        p = đường dẫn nối(home, "vpp-libraries.json");
+        nếu (là tệp(p)) { trả về p; };
+    };
+    nếu (gốc == "") { gốc = thư mục hiện tại(); };
+    gốc = đường dẫn tuyệt đối(gốc);
+    khi (đúng) {
+        p = đường dẫn nối(gốc, "vpp-libraries.json");
+        nếu (là tệp(p)) { trả về p; };
+        cha = đường dẫn cha(gốc);
+        nếu (cha == gốc || cha == "") { thoát; };
+        gốc = cha;
+    };
+    trả về "";
+};
+hàm riêng tư cli lsp thư viện(gốc) {
+    p = cli lsp catalog(gốc);
+    nếu (p == "") { trả về {"revision": "", "catalogUri": rỗng, "libraries": [], "diagnostics": [{"severity": "error", "message": "Không tìm thấy vpp-libraries.json từ VPP_HOME hoặc thư mục dự án."}]}; };
+    uri = cli lsp uri(p);
+    thử {
+        b = đọc các byte tệp(p);
+        h = [131, 3, 157, 115, 176, 15, 101, 20];
+        lặp(i = 0; i < máy ảo lấy độ dài(b); i++) { cli gói băm byte(h, b[i]); };
+        hex = "0123456789abcdef"; mã = "";
+        lặp(i = 7; i >= 0; i--) { mã += hex[làm tròn xuống(h[i] / 16)] + hex[h[i] % 16]; };
+        khi (máy ảo lấy độ dài(mã) > 1) {
+            nếu (mã[0] != "0") { thoát; };
+            mã = cắt chuỗi(mã, 1, máy ảo lấy độ dài(mã) - 1);
+        };
+        bản = json phân tích(chuỗi từ byte máy ảo(b));
+        mục = bản["libraries"]; kết quả = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+            m = mục[i];
+            id = lấy từ điển(m, "id", ""); nguồn = lấy từ điển(m, "sourceRoot", ""); entry = lấy từ điển(m, "entry", "");
+            nếu (id == "" || nguồn == "" || entry == "") { bỏ qua; };
+            thư = đường dẫn nối(đường dẫn cha(p), nguồn);
+            máy ảo thêm cuối danh sách(kết quả, {"id": id, "displayName": lấy từ điển(m, "displayName", ""), "version": lấy từ điển(m, "version", ""), "stability": lấy từ điển(m, "stability", ""), "kind": lấy từ điển(m, "kind", ""), "sourceRoot": nguồn, "entry": entry, "rootUri": cli lsp uri(thư), "entryUri": cli lsp uri(đường dẫn nối(thư, entry))});
+        };
+        trả về {"revision": lấy từ điển(bản, "sdkVersion", "") + ":" + mã, "catalogUri": uri, "libraries": kết quả, "diagnostics": []};
+    } bắt lỗi(e) {
+        trả về {"revision": "", "catalogUri": uri, "libraries": [], "diagnostics": [{"severity": "error", "message": thành chuỗi(e)}]};
+    };
+};
+hàm riêng tư cli lsp vị trí(nguồn, dòng, byte cột) {
+    dòng hiện = 0; cột = 0; byte hiện = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+        nếu (dòng hiện == dòng && byte hiện >= byte cột) { thoát; };
+        ch = nguồn[i];
+        nếu (ch == "\n") {
+            nếu (dòng hiện == dòng) { thoát; };
+            dòng hiện += 1; cột = 0; byte hiện = 0;
+        } hoặc {
+            mã = chuỗi mã điểm unicode(ch);
+            nếu (mã > 65535) { cột += 2; } hoặc { cột += 1; };
+            byte hiện += máy ảo lấy độ dài(chuỗi thành byte máy ảo(ch));
+        };
+    };
+    trả về {"line": dòng hiện, "character": cột};
+};
+// Chuyển giữa UTF-8 của compiler và UTF-16 của LSP.
+hàm riêng tư cli lsp từ byte(nguồn, byte đích) {
+    dòng = 0; cột = 0; hiện = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+        nếu (hiện >= byte đích) { thoát; };
+        ch = nguồn[i];
+        hiện += máy ảo lấy độ dài(chuỗi thành byte máy ảo(ch));
+        nếu (ch == "\n") { dòng += 1; cột = 0; }
+        hoặc { nếu (chuỗi mã điểm unicode(ch) > 65535) { cột += 2; } hoặc { cột += 1; }; };
+    };
+    trả về {"line": dòng, "character": cột};
+};
+hàm riêng tư cli lsp tới byte(nguồn, vị trí) {
+    dòng = 0; cột = 0; byte hiện = 0;
+    đích dòng = lấy từ điển(vị trí, "line", -1);
+    đích cột = lấy từ điển(vị trí, "character", -1);
+    lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+        nếu (dòng == đích dòng && cột == đích cột) { trả về byte hiện; };
+        ch = nguồn[i];
+        nếu (dòng == đích dòng && ch == "\n") { trả về -1; };
+        byte hiện += máy ảo lấy độ dài(chuỗi thành byte máy ảo(ch));
+        nếu (ch == "\n") { dòng += 1; cột = 0; }
+        hoặc { nếu (chuỗi mã điểm unicode(ch) > 65535) { cột += 2; } hoặc { cột += 1; }; };
+    };
+    nếu (dòng == đích dòng && cột == đích cột) { trả về byte hiện; };
+    trả về -1;
+};
+hàm riêng tư cli lsp khoảng(nguồn, khoảng) {
+    trả về {"start": cli lsp từ byte(nguồn, khoảng[0]), "end": cli lsp từ byte(nguồn, khoảng[1])};
+};
+hàm riêng tư cli lsp nguồn mở(tài liệu) {
+    nguồn mở = {}; các uri = khóa từ điển(tài liệu);
+    lặp(i = 0; i < máy ảo lấy độ dài(các uri); i++) {
+        đường mở = cli lsp đường(các uri[i]);
+        nếu (đường mở != "") { nguồn mở[biên dịch nguồn chuẩn đường(đường mở)] = tài liệu[các uri[i]]; };
+    };
+    trả về nguồn mở;
+};
+hàm riêng tư cli lsp gửi gợi ý(id, sổ, vị trí, chưa đủ) {
+    cờ = "false"; nếu (chưa đủ) { cờ = "true"; };
+    cli lsp gửi chữ("{\"jsonrpc\":\"2.0\",\"id\":" + json tạo(id) +
+        ",\"result\":{\"isIncomplete\":" + cờ + ",\"items\":" + json tạo(lsp gợi ý(sổ, vị trí)) + "}}");
+};
+hàm riêng tư cli lsp ngữ nghĩa(id, lệnh, uri, tài liệu, chỉ mục, dự phòng, tham số) {
+    nếu (!máy ảo có khóa từ điển(tài liệu, uri)) {
+        cli lsp kết quả(id, rỗng); trả về rỗng;
+    };
+    nguồn = tài liệu[uri];
+    vị trí = cli lsp tới byte(nguồn, lấy từ điển(tham số, "position", {}));
+    nếu (vị trí < 0) { cli lsp kết quả(id, rỗng); trả về rỗng; };
+    nếu (!máy ảo có khóa từ điển(chỉ mục, uri)) {
+        thử {
+            sổ mới = lsp chỉ mục(nguồn, cli lsp đường(uri), đọc biến môi trường("VPP_HOME", ""), cli lsp nguồn mở(tài liệu));
+            chỉ mục[uri] = sổ mới;
+            dự phòng[uri] = sổ mới;
+        } bắt lỗi(e) {
+            nếu (lệnh == "textDocument/completion") {
+                nếu (máy ảo có khóa từ điển(dự phòng, uri)) {
+                    sổ cũ = dự phòng[uri];
+                    cli lsp gửi gợi ý(id, sổ cũ, lsp vị trí dự phòng(sổ cũ, nguồn, vị trí), đúng);
+                    trả về rỗng;
+                };
+            };
+            ném e;
+        };
+    };
+    sổ = chỉ mục[uri];
+    nếu (lệnh == "textDocument/completion") {
+        cli lsp gửi gợi ý(id, sổ, vị trí, sai);
+        trả về rỗng;
+    };
+    mục = lsp tại(sổ, vị trí);
+    nếu (mục == rỗng) { cli lsp kết quả(id, rỗng); trả về rỗng; };
+    ký hiệu = sổ["ký hiệu"][mục["id"]];
+    nếu (lệnh == "textDocument/definition") {
+        uri đích = uri; nguồn đích = nguồn;
+        đường đích = lấy từ điển(ký hiệu, "đường", "");
+        nếu (đường đích != "") { uri đích = cli lsp uri(đường đích); nguồn đích = ký hiệu["nguồn"]; };
+        cli lsp kết quả(id, {"uri": uri đích, "range": cli lsp khoảng(nguồn đích, ký hiệu["khoảng"])});
+    } hoặc nếu (lệnh == "textDocument/hover") {
+        chữ = ký hiệu["chi tiết"];
+        nếu (ký hiệu["kiểu"] == 6) { chữ += " " + ký hiệu["tên"]; };
+        cli lsp kết quả(id, {"contents": {"kind": "plaintext", "value": chữ}, "range": cli lsp khoảng(nguồn, mục["khoảng"])});
+    } hoặc {
+        tên = lấy từ điển(tham số, "newName", "");
+        nếu (!ký hiệu["an toàn"] || !lsp tên mới hợp lệ(tên)) {
+            cli lsp lỗi(id, -32602, "Không thể đổi tên ký hiệu này an toàn"); trả về rỗng;
+        };
+        các id = khóa từ điển(sổ["ký hiệu"]);
+        lặp(i = 0; i < máy ảo lấy độ dài(các id); i++) {
+            khác = sổ["ký hiệu"][các id[i]];
+            nếu (khác["id"] != mục["id"] && khác["tên"] == tên) {
+                cli lsp lỗi(id, -32602, "Tên mới trùng ký hiệu"); trả về rỗng;
+            };
+        };
+        sửa = []; các vị trí = sổ["vị trí"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các vị trí); i++) {
+            dùng = các vị trí[i];
+            nếu (dùng["id"] != mục["id"]) { bỏ qua; };
+            khoảng = dùng["khoảng"];
+            cũ = máy ảo cắt chuỗi theo byte(nguồn, khoảng[0], khoảng[1] - khoảng[0]);
+            nếu (chứa chuỗi(cũ, "/") || chứa chuỗi(cũ, "\n") || chứa chuỗi(cũ, "\r")) {
+                cli lsp lỗi(id, -32602, "Tên chứa chú thích hoặc xuống dòng"); trả về rỗng;
+            };
+            máy ảo thêm cuối danh sách(sửa, {"range": cli lsp khoảng(nguồn, khoảng), "newText": tên});
+        };
+        nếu (!lsp xác minh đổi tên(sổ, nguồn, mục["id"], tên, cli lsp đường(uri),
+                đọc biến môi trường("VPP_HOME", ""), cli lsp nguồn mở(tài liệu))) {
+            cli lsp lỗi(id, -32602, "Đổi tên làm thay đổi liên kết ký hiệu"); trả về rỗng;
+        };
+        đổi = {}; đổi[uri] = sửa;
+        cli lsp kết quả(id, {"changes": đổi});
+    };
+    trả về rỗng;
+};
+hàm riêng tư cli lsp chẩn đoán(compiler, tạm, uri, nguồn) {
+    snapshot = đường dẫn nối(tạm, "buffer.vi");
+    ghi tệp(snapshot, nguồn);
+    đường = cli lsp đường(uri);
+    gốc = thư mục hiện tại();
+    nếu (đường != "") { gốc = đường dẫn cha(đường); };
+    r = chạy tiến trình(compiler, ["lint", snapshot, "--base", gốc]);
+    chẩn = [];
+    nếu (r["mã thoát"] != 0) {
+        chữ = bỏ khoảng trắng(r["lỗi"] + r["đầu ra"]);
+        nếu (chữ == "") { chữ = "Không thể soát lỗi mã nguồn"; };
+        dòng = 0; cột = 0;
+        phần = tách hằng văn bản(chữ, ":");
+        nếu (máy ảo lấy độ dài(phần) >= 3) {
+            thử {
+                dòng = thành số nguyên(phần[0]) - 1;
+                cột = thành số nguyên(phần[1]) - 1;
+            } bắt lỗi(e) { dòng = 0; cột = 0; };
+        };
+        nếu (dòng < 0) { dòng = 0; };
+        nếu (cột < 0) { cột = 0; };
+        a = cli lsp vị trí(nguồn, dòng, cột);
+        z = cli lsp vị trí(nguồn, dòng, cột + 1);
+        máy ảo thêm cuối danh sách(chẩn, {"range": {"start": a, "end": z}, "severity": 1, "source": "V++", "message": chữ});
+    };
+    cli lsp gửi({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics", "params": {"uri": uri, "diagnostics": chẩn}});
+};
+hàm riêng tư cli lsp(compiler) {
+    tạm = cli thư mục tạm();
+    tài liệu = {}; chỉ mục = {}; dự phòng = {}; dừng = sai; mã = 1; gốc = "";
+    thử {
+        khi (đúng) {
+            bản = cli lsp đọc();
+            nếu (bản == rỗng) { thoát; };
+            lệnh = lấy từ điển(bản, "method", "");
+            id = lấy từ điển(bản, "id", rỗng);
+            tham số = lấy từ điển(bản, "params", {});
+            nếu (lệnh == "exit") { nếu (dừng) { mã = 0; }; thoát; };
+            nếu (lệnh == "initialize") {
+                uri gốc = lấy từ điển(tham số, "rootUri", rỗng);
+                nếu (loại của(uri gốc) == "chuỗi") { gốc = cli lsp đường(uri gốc); };
+                // Boolean của runtime là i32; giao thức LSP yêu cầu JSON true.
+                cli lsp gửi chữ("{\"jsonrpc\":\"2.0\",\"id\":" + json tạo(id) + ",\"result\":{\"capabilities\":{\"textDocumentSync\":1,\"documentFormattingProvider\":true,\"completionProvider\":{},\"definitionProvider\":true,\"hoverProvider\":true,\"renameProvider\":true}}}");
+                bỏ qua;
+            };
+            nếu (lệnh == "shutdown") { dừng = đúng; cli lsp kết quả(id, rỗng); bỏ qua; };
+            nếu (dừng) {
+                nếu (máy ảo có khóa từ điển(bản, "id")) { cli lsp lỗi(id, -32600, "Máy chủ đã dừng"); };
+                bỏ qua;
+            };
+            nếu (lệnh == "vpp/libraryRoots") { cli lsp kết quả(id, cli lsp thư viện(gốc)); bỏ qua; };
+            nếu (lệnh == "workspace/didChangeWatchedFiles") {
+                chỉ mục = {}; dự phòng = {};
+                đổi = lấy từ điển(tham số, "changes", []);
+                lặp(i = 0; i < máy ảo lấy độ dài(đổi); i++) {
+                    nếu (kết thúc bằng(lấy từ điển(đổi[i], "uri", ""), "/vpp-libraries.json")) {
+                        cli lsp gửi({"jsonrpc": "2.0", "method": "vpp/libraryRootsChanged", "params": cli lsp thư viện(gốc)});
+                        thoát;
+                    };
+                };
+                bỏ qua;
+            };
+            doc = lấy từ điển(tham số, "textDocument", {});
+            uri = lấy từ điển(doc, "uri", "");
+            nếu (lệnh == "textDocument/didOpen") {
+                tài liệu[uri] = doc["text"];
+                chỉ mục = {}; dự phòng = {};
+                cli lsp chẩn đoán(compiler, tạm, uri, tài liệu[uri]);
+            } hoặc nếu (lệnh == "textDocument/didChange") {
+                đổi = tham số["contentChanges"];
+                nếu (máy ảo lấy độ dài(đổi) > 0) {
+                    tài liệu[uri] = đổi[máy ảo lấy độ dài(đổi) - 1]["text"];
+                    sổ cũ = lấy từ điển(dự phòng, uri, rỗng);
+                    chỉ mục = {}; dự phòng = {};
+                    nếu (sổ cũ != rỗng) { dự phòng[uri] = sổ cũ; };
+                    cli lsp chẩn đoán(compiler, tạm, uri, tài liệu[uri]);
+                };
+            } hoặc nếu (lệnh == "textDocument/didClose") {
+                xóa khóa(tài liệu, uri);
+                chỉ mục = {}; dự phòng = {};
+                cli lsp gửi({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics", "params": {"uri": uri, "diagnostics": []}});
+            } hoặc nếu (lệnh == "textDocument/completion" || lệnh == "textDocument/definition" ||
+                lệnh == "textDocument/hover" || lệnh == "textDocument/rename") {
+                thử {
+                    cli lsp ngữ nghĩa(id, lệnh, uri, tài liệu, chỉ mục, dự phòng, tham số);
+                } bắt lỗi(e) {
+                    nếu (lệnh == "textDocument/completion") { cli lsp kết quả(id, []); }
+                    hoặc { cli lsp kết quả(id, rỗng); };
+                };
+            } hoặc nếu (lệnh == "textDocument/formatting") {
+                nếu (!máy ảo có khóa từ điển(tài liệu, uri)) {
+                    cli lsp lỗi(id, -32602, "Tài liệu chưa mở"); bỏ qua;
+                };
+                nguồn = tài liệu[uri]; snapshot = đường dẫn nối(tạm, "buffer.vi");
+                ghi tệp(snapshot, nguồn);
+                r = chạy tiến trình(compiler, ["format", snapshot]);
+                nếu (r["mã thoát"] != 0) { cli lsp lỗi(id, -32603, r["lỗi"]); }
+                hoặc {
+                    z = cli lsp vị trí(nguồn, 2147483647, 2147483647);
+                    cli lsp kết quả(id, [{"range": {"start": {"line": 0, "character": 0}, "end": z}, "newText": r["đầu ra"]}]);
+                };
+            } hoặc nếu (máy ảo có khóa từ điển(bản, "id")) {
+                cli lsp lỗi(id, -32601, "Phương thức chưa hỗ trợ");
+            };
+        };
+    } bắt lỗi(e) { xóa đường dẫn(tạm); ném e; };
+    xóa đường dẫn(tạm);
+    trả về mã;
+};
+
+// Chuẩn hóa alias lịch sử, giữ nguyên giá trị tùy chọn và kiểm tra đúng tệp nguồn.
+hàm riêng tư cli biên dịch lệnh(compiler, lệnh, args) {
+    đầu = []; vị trí = []; đích = ""; xuất exe = sai; đã chọn compiler = sai;
+    hết = sai; n = máy ảo lấy độ dài(args);
+    lặp(i = 0; i < n; i++) {
+        a = args[i];
+        nếu (!hết && a == "--") { hết = đúng; máy ảo thêm cuối danh sách(đầu, a); bỏ qua; };
+        nếu (!hết && bắt đầu bằng(a, "--compiler=")) {
+            nếu (a != "--compiler=vpp" || đã chọn compiler) { ném "Chỉ hỗ trợ --compiler=vpp một lần"; };
+            đã chọn compiler = đúng; bỏ qua;
+        };
+        nếu (!hết && (a == "--emit-exe-selfhost" || a == "--emit-exe-vpp")) {
+            nếu (xuất exe) { ném "Trùng chế độ xuất executable"; };
+            xuất exe = đúng; bỏ qua;
+        };
+        nếu (!hết && (a == "-o" || a == "--đầu-ra" || a == "--target" || a == "--base" || a == "--emit-obj" || a == "--emit-obj-selfhost" || a == "--emit-raw" || a == "--emit-asm")) {
+            nếu (i + 1 >= n) { ném "Thiếu giá trị: " + a; };
+            i += 1; giá trị = args[i];
+            nếu (a == "--đầu-ra") { a = "-o"; };
+            nếu (a == "--target") { nếu (đích != "") { ném "Trùng target"; }; đích = giá trị; };
+            máy ảo thêm cuối danh sách(đầu, a); máy ảo thêm cuối danh sách(đầu, giá trị);
+            bỏ qua;
+        };
+        nếu (hết || !bắt đầu bằng(a, "-")) { máy ảo thêm cuối danh sách(vị trí, a); };
+        máy ảo thêm cuối danh sách(đầu, a);
+    };
+    nếu (máy ảo lấy độ dài(vị trí) > 0) { cli gói kiểm nguồn(vị trí[0]); };
+    nếu (xuất exe) {
+        nếu (lệnh != "build" || đích == "" || máy ảo lấy độ dài(vị trí) != 2 || máy ảo lấy độ dài(đầu) != 4) { ném "Dùng: vpp build --target <triple> --emit-exe-selfhost <nguồn> <đầu ra>"; };
+        host = "aarch64-apple-darwin";
+        nếu (ten nền tảng máy ảo() == "linux") { host = "x86_64-unknown-linux-gnu"; };
+        nếu (ten nền tảng máy ảo() == "windows") { host = "x86_64-pc-windows-msvc"; };
+        nếu (biên dịch bộ ba chuẩn(biên dịch phân tích đích(đích)) != host) { ném "Executable đầy đủ chỉ hỗ trợ đích native của SDK hiện tại"; };
+        đầu = [vị trí[0], "-o", vị trí[1]];
+    };
+    nếu (lệnh == "build" && máy ảo lấy độ dài(đầu) == 1 && máy ảo lấy độ dài(vị trí) == 1) { trả về cli dựng(compiler, đầu); };
+    lệnh đầy đủ = [lệnh];
+    lặp(i = 0; i < máy ảo lấy độ dài(đầu); i++) { máy ảo thêm cuối danh sách(lệnh đầy đủ, đầu[i]); };
+    r = chạy tiến trình(compiler, lệnh đầy đủ);
+    cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]); trả về r["mã thoát"];
+};
+hàm chính() {
+    thử {
+        compiler = cli đối số(1);
+        args = [];
+        lặp(i = 2; i < đối số đếm(); i++) { máy ảo thêm cuối danh sách(args, cli đối số(i)); };
+        nếu (máy ảo lấy độ dài(args) == 0) { args = ["trợ giúp"]; };
+        lệnh = args[0]; n = 1;
+        nếu (lệnh == "biên-dịch-máy-ảo" || lệnh == "biên dịch máy ảo") { lệnh = "vm-build"; };
+        nếu (lệnh == "chạy-tức-thời" || lệnh == "chạy tức thời") { lệnh = "jit"; };
+        // Khớp cụm dài trước cụm ngắn để không tách nhầm lệnh.
+        nếu (máy ảo lấy độ dài(args) >= 4) {
+            nếu (args[0] == "biên" && args[1] == "dịch" && args[2] == "máy" && args[3] == "ảo") { lệnh = "vm-build"; n = 4; };
+        };
+        nếu (n == 1 && máy ảo lấy độ dài(args) >= 3) {
+            nếu ((args[0] == "biên dịch" && args[1] == "máy" && args[2] == "ảo") || (args[0] == "biên" && args[1] == "dịch" && args[2] == "máy ảo")) { lệnh = "vm-build"; n = 3; };
+            nếu (args[0] == "chạy" && args[1] == "tức" && args[2] == "thời") { lệnh = "jit"; n = 3; };
+        };
+        nếu (n == 1 && máy ảo lấy độ dài(args) > 1) {
+            nếu (args[0] == "biên dịch" && args[1] == "máy ảo") { lệnh = "vm-build"; n = 2; };
+            nếu (args[0] == "chạy" && args[1] == "tức thời") { lệnh = "jit"; n = 2; };
+        };
+        nếu (n == 1 && máy ảo lấy độ dài(args) > 1) {
+            a = lệnh + " " + args[1];
+            nếu (a == "trợ giúp" || a == "giúp đỡ" || a == "phiên bản" || a == "chẩn đoán" || a == "bác sĩ" || a == "thống kê" || a == "danh sách" || a == "thông tin" || a == "kiểm tra" || a == "khởi tạo" || a == "kiểm thử" || a == "soát lỗi" || a == "định dạng" || a == "giải mã" || a == "--giải mã" || a == "--soát lỗi" || a == "--định dạng" || a == "biên dịch" || cli gói lệnh(a) != "") { lệnh = a; n = 2; };
+        };
+        args = cli đuôi(args, n);
+        nếu (lệnh == "trợ giúp" || lệnh == "trợ-giúp" || lệnh == "giúp đỡ" || lệnh == "giúp-đỡ" || lệnh == "--trợ-giúp" || lệnh == "help" || lệnh == "commands" || lệnh == "--help" || lệnh == "-h") {
+            in "V++ — công cụ dòng lệnh";
+            in "  chạy <tệp.vi> | biên dịch <tệp.vi> --đầu-ra <tệp> | dựng <tệp.vi>";
+            in "  chạy --artifact <tệp.vmb>";
+            in "  gỡ cài đặt                      Gỡ các tệp V++ đã cài";
+            in "  chạy tức thời <tệp.vi> | biên dịch máy ảo <tệp.vi> --đầu-ra <tệp.vmb>";
+            in "  khởi tạo [tên] | new [tên] | khởi tạo ứng dụng|backend <thư mục> | kiểm thử [đường dẫn]";
+            in "  --soát-lỗi <đường dẫn> | --định-dạng <đường dẫn> [--kiểm-tra|--ghi-tệp]";
+            in "  --giải-mã | --dump-ast | --dump-ir <tệp.vi>";
+            in "  gói khởi tạo|thêm|cài đặt|xóa|danh sách|thông tin|kiểm tra|đồng bộ|cập nhật|khóa|phục hồi|phát hành|thống kê";
+            in "  --repl | --lsp | phiên bản | chẩn đoán | nơi | thống kê | --list-targets";
+            trả về 0;
+        };
+        nếu (lệnh == "jit") {
+            nếu (máy ảo lấy độ dài(args) > 0) {
+                i = 0;
+                nếu (args[0] == "--dynamic" || args[0] == "--check-dynamic") { i = 1; };
+                nếu (i < máy ảo lấy độ dài(args)) { nếu (là tệp(args[i])) { cli gói kiểm nguồn(args[i]); }; };
+            };
+            trình = đường dẫn nối(đường dẫn cha(compiler), "vpp-jit");
+            nếu (ten nền tảng máy ảo() == "windows") { trình += ".exe"; };
+            r = chạy tiến trình(trình, args);
+            cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+            trả về r["mã thoát"];
+        };
+        nếu (lệnh == "--lsp" || lệnh == "lsp") { trả về cli lsp(compiler); };
+        nếu (lệnh == "--repl" || lệnh == "repl") { trả về cli repl(compiler, args); };
+        nếu (lệnh == "khởi tạo" || lệnh == "khởi-tạo" || lệnh == "init" || lệnh == "new") {
+            nếu (máy ảo lấy độ dài(args) > 1) { trả về cli khởi tạo(args); };
+            đầu = ["init"]; lặp(i = 0; i < máy ảo lấy độ dài(args); i++) { máy ảo thêm cuối danh sách(đầu, args[i]); };
+            trả về cli gói(đầu);
+        };
+        nếu (lệnh == "kiểm thử" || lệnh == "kiểm-thử" || lệnh == "test") { trả về cli kiểm thử(compiler, args); };
+        nếu (lệnh == "gói" || lệnh == "package" || lệnh == "pkg") { trả về cli gói(args); };
+        nếu (cli gói lệnh(lệnh) != "") {
+            đầu = [lệnh]; lặp(i = 0; i < máy ảo lấy độ dài(args); i++) { máy ảo thêm cuối danh sách(đầu, args[i]); };
+            trả về cli gói(đầu);
+        };
+        nếu (lệnh == "artifact") { trả về cli chạy artifact(compiler, args); };
+        nếu (lệnh == "chạy" || lệnh == "run") {
+            nếu (máy ảo lấy độ dài(args) > 0) {
+                nếu (args[0] == "--compiler=cpp") { ném "Bộ biên dịch C++ đã được loại bỏ"; };
+                nếu (args[0] == "--compiler=vpp") { args = cli đuôi(args, 1); };
+            };
+            nếu (máy ảo lấy độ dài(args) > 0) {
+                nếu (args[0] == "--artifact") {
+                    trả về cli chạy artifact(compiler, cli đuôi(args, 1));
+                };
+            };
+            trả về cli chạy chương trình(compiler, args);
+        };
+        nếu (kết thúc bằng(lệnh, ".vi")) {
+            đầu = [lệnh];
+            lặp(i = 0; i < máy ảo lấy độ dài(args); i++) { máy ảo thêm cuối danh sách(đầu, args[i]); };
+            trả về cli chạy chương trình(compiler, đầu);
+        };
+        nếu (lệnh == "soát lỗi" || lệnh == "soát-lỗi" || lệnh == "--soát-lỗi" || lệnh == "--soát lỗi" || lệnh == "--lint" || lệnh == "lint") { trả về cli định dạng(compiler, args, "lint"); };
+        nếu (lệnh == "định dạng" || lệnh == "định-dạng" || lệnh == "--định-dạng" || lệnh == "--định dạng" || lệnh == "--format" || lệnh == "format") { trả về cli định dạng(compiler, args, "format"); };
+        nếu (lệnh == "nơi" || lệnh == "where") { in thư mục hiện tại(); trả về 0; };
+        nếu (lệnh == "chẩn đoán" || lệnh == "chẩn-đoán" || lệnh == "doctor" || lệnh == "bác sĩ" || lệnh == "diagnose") {
+            in "Nền tảng: " + ten nền tảng máy ảo();
+            in "Bộ biên dịch: " + compiler;
+            gốc = đọc biến môi trường("VPP_HOME", "");
+            in "Thư viện: " + gốc;
+            nếu (!là tệp(compiler) || !là thư mục(đường dẫn nối(gốc, "gói"))) { trả về 1; };
+            trả về 0;
+        };
+        nếu (lệnh == "thống kê" || lệnh == "stats") {
+            trả về cli thống kê(args);
+        };
+        nếu (lệnh == "targets" || lệnh == "--list-targets" || lệnh == "đích") { trả về cli đích(args); };
+        nếu (lệnh == "--kiểm-khóa-nguồn") {
+            nếu (máy ảo lấy độ dài(args) != 1) { ném "Cần tệp nguồn"; };
+            trả về cli gói kiểm nguồn(args[0]);
+        };
+        nếu (lệnh == "dựng") { trả về cli dựng(compiler, args); };
+        nếu (lệnh == "biên dịch" || lệnh == "biên-dịch") { lệnh = "build"; };
+        nếu (lệnh == "build" || lệnh == "vm-build" || lệnh == "emit-program-asm") { trả về cli biên dịch lệnh(compiler, lệnh, args); };
+        nếu (lệnh == "batch-build") {
+            lặp(i = 0; i < máy ảo lấy độ dài(args); i += 2) { cli gói kiểm nguồn(args[i]); };
+        };
+        nếu (lệnh == "giải mã" || lệnh == "giải-mã" || lệnh == "--giải-mã" || lệnh == "--giải mã" || lệnh == "--disassemble") { lệnh = "disassemble"; };
+        nếu (lệnh == "--dump-ast") { lệnh = "dump-ast"; };
+        nếu (lệnh == "--dump-ir") { lệnh = "dump-ir"; };
+        nếu (lệnh == "phiên bản" || lệnh == "version" || lệnh == "-v" || lệnh == "--version" || lệnh == "--phiên-bản" || lệnh == "phiên-bản") {
+            nếu (máy ảo lấy độ dài(args) != 0) { ném "Dùng: vpp phiên bản"; };
+            metadata = đường dẫn nối(đọc biến môi trường("VPP_HOME", ""), "vpp-language.json");
+            bản = json phân tích(đọc tệp(metadata));
+            in "V++ " + bản["version"];
+            trả về 0;
+        };
+        đầu = [lệnh];
+        lặp(i = 0; i < máy ảo lấy độ dài(args); i++) { máy ảo thêm cuối danh sách(đầu, args[i]); };
+        r = chạy tiến trình(compiler, đầu);
+        cli xuất(1, r["đầu ra"]); cli xuất(2, r["lỗi"]);
+        trả về r["mã thoát"];
+    } bắt lỗi(e) { cli xuất(2, thành chuỗi(e) + "\n"); trả về 1; };
+};

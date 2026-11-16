@@ -1,0 +1,367 @@
+// SDK selection and management are implemented in V++; launchers preserve stdio.
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tồn tại;
+nhập gói.nhập xuất.đường dẫn.đường dẫn nối;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tên;
+nhập gói.nhập xuất.đường dẫn.thư mục hiện tại;
+nhập gói.nhập xuất.đường dẫn.là tệp;
+nhập gói.nhập xuất.đường dẫn.là thư mục;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.văn bản.chuỗi.chứa chuỗi;
+nhập gói.hệ thống.tiến trình.tiến trình nháy windows;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+
+hàm riêng tư vdk đối số(i) {
+    h = đối số lấy(i);
+    các byte = [];
+    lặp(j = 0; j < byte dài(h); j++) { máy ảo thêm cuối danh sách(các byte, byte lấy(h, j)); };
+    byte hủy(h);
+    trả về chuỗi từ byte máy ảo(các byte);
+};
+hàm riêng tư vdk phiên bản hợp lệ(v) {
+    nếu (loại của(v) != "chuỗi" || v == "" || v == "." || v == "..") { trả về sai; };
+    ký tự = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.-_+";
+    lặp(i = 0; i < máy ảo lấy độ dài(v); i++) {
+        nếu (!chứa chuỗi(ký tự, v[i])) { trả về sai; };
+    };
+    trả về đúng;
+};
+hàm riêng tư vdk pin() {
+    thư mục = thư mục hiện tại();
+    khi (thư mục != "") {
+        tệp = đường dẫn nối(thư mục, "vdk.json");
+        nếu (đường dẫn tồn tại(tệp)) {
+            thử {
+                dữ liệu = json phân tích(đọc tệp(tệp));
+                nếu (loại của(dữ liệu) != "từ điển") { ném "vdk.json phải là đối tượng"; };
+                v = lấy từ điển(dữ liệu, "version", rỗng);
+                nếu (!vdk phiên bản hợp lệ(v)) { ném "version không hợp lệ"; };
+                trả về v;
+            } bắt lỗi(e) { ném "vdk.json không hợp lệ: " + tệp; };
+        };
+        cha = đường dẫn cha(thư mục);
+        nếu (cha == thư mục) { trả về ""; };
+        thư mục = cha;
+    };
+    trả về "";
+};
+hàm riêng tư vdk ứng viên(gốc, pin) {
+    nếu (gốc == "") { trả về ""; };
+    thử {
+        gốc = đường dẫn tuyệt đối(gốc);
+        tệp = đường dẫn nối(gốc, "vdk-release.json");
+        nếu (!là tệp(tệp)) { trả về ""; };
+        bản = json phân tích(đọc tệp(tệp));
+        nếu (loại của(bản) != "từ điển") { trả về ""; };
+        nếu (lấy từ điển(bản, "schema", 0) != 1 || lấy từ điển(bản, "name", "") != "VDK") { trả về ""; };
+        v = lấy từ điển(bản, "version", rỗng);
+        nếu (!vdk phiên bản hợp lệ(v) || (pin != "" && v != pin)) { trả về ""; };
+        trả về gốc;
+    } bắt lỗi(e) { trả về ""; };
+};
+hàm riêng tư vdk chọn(gốc, chỉ định) {
+    pin = vdk pin();
+    nếu (chỉ định != "") {
+        đã chọn = vdk ứng viên(chỉ định, pin);
+        nếu (đã chọn == "") { ném "SDK chỉ định không hợp lệ hoặc không khớp phiên bản " + pin + ": " + chỉ định; };
+        trả về đã chọn;
+    };
+    nếu (pin != "") {
+        kho = "";
+        nếu (ten nền tảng máy ảo() == "windows") {
+            nhà = đọc biến môi trường("LOCALAPPDATA", "");
+            nếu (nhà != "") { kho = đường dẫn nối(nhà, "VPP/vdk"); };
+        } hoặc {
+            nhà = đọc biến môi trường("HOME", "");
+            nếu (nhà != "") { kho = đường dẫn nối(nhà, ".vpp/vdk"); };
+        };
+        nếu (kho != "") {
+            đã chọn = vdk ứng viên(đường dẫn nối(kho, pin), pin);
+            nếu (đã chọn != "") { trả về đã chọn; };
+        };
+    };
+    đã chọn = vdk ứng viên(đọc biến môi trường("VDK_HOME", ""), pin);
+    nếu (đã chọn != "") { trả về đã chọn; };
+    vpp = đọc biến môi trường("VPP_HOME", "");
+    đã chọn = vdk ứng viên(vpp, pin);
+    nếu (đã chọn != "") { trả về đã chọn; };
+    nếu (vpp != "") {
+        nếu (là thư mục(vpp)) {
+            vpp = đường dẫn tuyệt đối(vpp);
+            cha = đường dẫn cha(vpp);
+            nếu (đường dẫn tên(vpp) == "vpp" && đường dẫn tên(cha) == "share") {
+                đã chọn = vdk ứng viên(đường dẫn cha(cha), pin);
+                nếu (đã chọn != "") { trả về đã chọn; };
+            };
+        };
+    };
+    đã chọn = vdk ứng viên(gốc, pin);
+    nếu (đã chọn != "") { trả về đã chọn; };
+    ném "Không tìm thấy VDK phù hợp: " + pin;
+};
+// Phân tích lệnh một lần, dùng chung cho launcher POSIX và Windows.
+// Kết quả: nhóm lệnh, tên nội bộ ASCII, số từ đã nhận.
+hàm riêng tư vdk tùy chọn gốc(lệnh) {
+    trả về lệnh == "--vdk-home" || lệnh == "--thư-mục-vdk";
+};
+hàm riêng tư vdk bắt đầu(vị trí) {
+    nếu (đối số đếm() > vị trí) {
+        nếu (vdk tùy chọn gốc(vdk đối số(vị trí))) {
+            nếu (đối số đếm() <= vị trí + 1) { ném "Cần đường dẫn SDK sau --thư-mục-vdk"; };
+            nếu (vdk đối số(vị trí + 1) == "") { ném "Đường dẫn SDK trống"; };
+            trả về vị trí + 2;
+        };
+    };
+    trả về vị trí;
+};
+hàm riêng tư vdk phân loại(vị trí) {
+    a = ""; b = ""; c = ""; d = "";
+    n = đối số đếm();
+    nếu (n > vị trí) { a = vdk đối số(vị trí); };
+    nếu (n > vị trí + 1) { b = vdk đối số(vị trí + 1); };
+    nếu (n > vị trí + 2) { c = vdk đối số(vị trí + 2); };
+    nếu (n > vị trí + 3) { d = vdk đối số(vị trí + 3); };
+    nếu (a == "gỡ cài đặt" || a == "gỡ-cài-đặt" || a == "uninstall") { trả về ["uninstall", "uninstall", 1]; };
+    nếu (a == "gỡ" && b == "cài đặt") { trả về ["uninstall", "uninstall", 2]; };
+    nếu (a == "gỡ" && b == "cài" && c == "đặt") { trả về ["uninstall", "uninstall", 3]; };
+    nếu (a == "cài hiển thị" || a == "cài-hiển-thị" || a == "install-display" || a == "cai-hien-thi") { trả về ["display", "install", 1]; };
+    nếu (a == "cài" && b == "hiển thị") { trả về ["display", "install", 2]; };
+    nếu (a == "cài" && b == "hiển" && c == "thị") { trả về ["display", "install", 3]; };
+    nếu (a == "gỡ hiển thị" || a == "gỡ-hiển-thị" || a == "remove-display") { trả về ["display", "remove", 1]; };
+    nếu (a == "gỡ" && b == "hiển thị") { trả về ["display", "remove", 2]; };
+    nếu (a == "gỡ" && b == "hiển" && c == "thị") { trả về ["display", "remove", 3]; };
+    nếu (a == "kiểm tra hiển thị" || a == "kiểm-tra-hiển-thị" || a == "check-display") { trả về ["display", "check", 1]; };
+    nếu (a == "kiểm tra" && b == "hiển thị") { trả về ["display", "check", 2]; };
+    nếu (a == "kiểm" && b == "tra" && c == "hiển thị") { trả về ["display", "check", 3]; };
+    nếu (a == "kiểm tra" && b == "hiển" && c == "thị") { trả về ["display", "check", 3]; };
+    nếu (a == "kiểm" && b == "tra" && c == "hiển" && d == "thị") { trả về ["display", "check", 4]; };
+    nếu (a == "kiểm" && b == "tra hiển thị") { trả về ["display", "check", 2]; };
+    nếu (a == "chạy tức thời" || a == "chạy-tức-thời" || a == "jit") { trả về ["jit", "jit", 1]; };
+    nếu (a == "chạy" && b == "tức thời") { trả về ["jit", "jit", 2]; };
+    nếu (a == "chạy" && b == "tức" && c == "thời") { trả về ["jit", "jit", 3]; };
+    nếu (a == "chạy" || a == "run") {
+        nếu (b == "--artifact" || (b == "--compiler=vpp" && c == "--artifact") || b == "--compiler=cpp") { trả về ["raw", "raw", 0]; };
+        trả về ["run", "run", 1];
+    };
+    nếu (a == "biên dịch máy ảo" || a == "biên-dịch-máy-ảo" || a == "vm-build") { trả về ["forward", "vm-build", 1]; };
+    nếu (a == "biên dịch" && b == "máy ảo") { trả về ["forward", "vm-build", 2]; };
+    nếu (a == "biên dịch" && b == "máy" && c == "ảo") { trả về ["forward", "vm-build", 3]; };
+    nếu (a == "biên" && b == "dịch" && c == "máy ảo") { trả về ["forward", "vm-build", 3]; };
+    nếu (a == "biên" && b == "dịch" && c == "máy" && d == "ảo") { trả về ["forward", "vm-build", 4]; };
+    nếu (a == "biên dịch" || a == "biên-dịch" || a == "build") { trả về ["forward", "build", 1]; };
+    nếu (a == "biên" && b == "dịch") { trả về ["forward", "build", 2]; };
+    nếu (a == "kiểm tra" || a == "kiểm-tra" || a == "lint") { trả về ["forward", "lint", 1]; };
+    nếu (a == "kiểm" && b == "tra") { trả về ["forward", "lint", 2]; };
+    nếu (a == "trợ giúp" || a == "trợ-giúp" || a == "giúp đỡ" || a == "--trợ-giúp" || a == "trợ" || a == "giúp" ||
+        a == "" || a == "help" || a == "--help" || a == "-h" ||
+        a == "version" || a == "--version" || a == "-v" || a == "--phiên-bản" || a == "phiên bản" || a == "phiên-bản" || a == "phiên" ||
+        a == "doctor" || a == "diagnose" || a == "chẩn đoán" || a == "chẩn-đoán" || a == "chẩn" ||
+        a == "library" || a == "thư viện" || a == "thư-viện" || a == "thư") { trả về ["info", "info", 0]; };
+    trả về ["raw", "raw", 0];
+};
+hàm riêng tư vdk quản lý(gốc) {
+    bản = json phân tích(đọc tệp(đường dẫn nối(gốc, "vdk-release.json")));
+    các lệnh = [];
+    bắt đầu = 1;
+    nếu (đối số đếm() > 2) {
+        nếu (vdk tùy chọn gốc(vdk đối số(1))) { bắt đầu = 3; };
+    };
+    lặp(i = bắt đầu; i < đối số đếm(); i++) { máy ảo thêm cuối danh sách(các lệnh, vdk đối số(i)); };
+    n = máy ảo lấy độ dài(các lệnh);
+    lệnh = "";
+    nếu (n > 0) { lệnh = các lệnh[0]; };
+    k = 1;
+    nếu (n > 1) {
+        nếu ((lệnh == "phiên" && các lệnh[1] == "bản") || (lệnh == "chẩn" && các lệnh[1] == "đoán") || (lệnh == "thư" && các lệnh[1] == "viện") || (lệnh == "trợ" && các lệnh[1] == "giúp") || (lệnh == "giúp" && các lệnh[1] == "đỡ")) {
+            lệnh = lệnh + " " + các lệnh[1]; k = 2;
+        };
+    };
+    nếu (lệnh == "version" || lệnh == "--version" || lệnh == "-v" || lệnh == "--phiên-bản" || lệnh == "phiên bản" || lệnh == "phiên-bản") {
+        nếu (n != k) { trả về 2; };
+        in "VDK " + bản["version"];
+        in "Nền tảng: " + bản["platform"] + "/" + bản["arch"];
+        in "Thư mục SDK: " + gốc;
+        trả về 0;
+    };
+    nếu (lệnh == "doctor" || lệnh == "diagnose" || lệnh == "chẩn đoán" || lệnh == "chẩn-đoán") {
+        nếu (n != k) { trả về 2; };
+        thiếu = 0;
+        các tệp = [bản["executables"]["vpp"], bản["executables"]["native"], bản["executables"]["i32"], bản["executables"]["vm"], bản["executables"]["jit"], bản["executables"]["vdk"], bản["executables"]["vdkInfo"], bản["libraryCatalog"], "bin/dns-provider.vmb", "share/vpp/native-vpp-runtime/runtime.o", "share/vpp/vpp-language.json"];
+        máy ảo thêm cuối danh sách(các tệp, bản["executables"]["tools"]);
+        máy ảo thêm cuối danh sách(các tệp, "share/vpp/templates/application/src/chính.vi");
+        máy ảo thêm cuối danh sách(các tệp, "share/vpp/templates/backend/application.vi");
+        runtime = "share/vpp/native-vpp-runtime/";
+        nền = bản["platform"];
+        nếu (nền == "windows") { máy ảo thêm cuối danh sách(các tệp, "bin/vdk-display.ps1"); }
+        hoặc { máy ảo thêm cuối danh sách(các tệp, "bin/vdk-display.sh"); };
+        nếu (nền == "macos") {
+            máy ảo thêm cuối danh sách(các tệp, runtime + "platform.o");
+            máy ảo thêm cuối danh sách(các tệp, runtime + "dynamic-bridge.o");
+        } hoặc {
+            nếu (nền == "linux") {
+                máy ảo thêm cuối danh sách(các tệp, "share/vpp/scripts/quality/audit_linux_static_elf.sh");
+                đối tượng = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
+                lặp(j = 0; j < máy ảo lấy độ dài(đối tượng); j++) {
+                    máy ảo thêm cuối danh sách(các tệp, runtime + "linux-objects/" + đối tượng[j] + ".o");
+                };
+            } hoặc {
+                nếu (nền == "windows") {
+                    đối tượng = ["runtime-core.o", "platform.o", "raw-platform.o", "vm-platform.o"];
+                    lặp(j = 0; j < máy ảo lấy độ dài(đối tượng); j++) {
+                        máy ảo thêm cuối danh sách(các tệp, runtime + đối tượng[j]);
+                    };
+                    máy ảo thêm cuối danh sách(các tệp, "share/vpp/windows-runtime.obj");
+                } hoặc { in "LỖI nền tảng SDK"; thiếu = thiếu + 1; };
+            };
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(các tệp); i++) {
+            nếu (là tệp(đường dẫn nối(gốc, các tệp[i]))) { in "ĐẠT " + các tệp[i]; }
+            hoặc { in "THIẾU " + các tệp[i]; thiếu = thiếu + 1; };
+        };
+        nếu (!là thư mục(đường dẫn nối(gốc, bản["packageRoot"]))) { in "THIẾU " + bản["packageRoot"]; thiếu = thiếu + 1; }
+        hoặc { in "ĐẠT " + bản["packageRoot"]; };
+        thử {
+            danh mục = json phân tích(đọc tệp(đường dẫn nối(gốc, bản["libraryCatalog"])));
+            ngôn ngữ = json phân tích(đọc tệp(đường dẫn nối(gốc, "share/vpp/vpp-language.json")));
+            nếu (danh mục["sdkVersion"] != bản["version"] || ngôn ngữ["version"] != bản["version"]) { ném "phiên bản không khớp"; };
+            thành phần = ["compiler", "runtime", "stdlib", "tooling"];
+            lặp(i = 0; i < máy ảo lấy độ dài(thành phần); i++) {
+                nếu (bản["components"][thành phần[i]] != bản["version"]) { ném "component phiên bản không khớp"; };
+            };
+            in "ĐẠT phiên bản siêu dữ liệu SDK";
+        } bắt lỗi(e) { in "LỖI phiên bản siêu dữ liệu SDK"; thiếu = thiếu + 1; };
+        nếu (thiếu > 0) { trả về 1; };
+        // Compiler --version currently reports its identity rather than a
+        // numerical version. Check execution and metadata independently.
+        thử {
+            trình dịch = "bin/vpp-native";
+            nếu (nền == "windows") { trình dịch = trình dịch + ".exe"; };
+            nếu (bản["executables"]["native"] != trình dịch) { ném "đường dẫn trình biên dịch không khớp"; };
+            kết quả = chạy tiến trình(đường dẫn nối(gốc, trình dịch), ["--version"], {}, 10000);
+            nếu (kết quả["mã thoát"] != 0 || !chứa chuỗi(kết quả["đầu ra"], "V++")) { ném "không khởi chạy được trình biên dịch"; };
+            in "ĐẠT kiểm tra khởi chạy trình biên dịch";
+        } bắt lỗi(e) { in "LỖI kiểm tra khởi chạy trình biên dịch"; trả về 1; };
+        trả về 0;
+    };
+    nếu (lệnh == "library" || lệnh == "thư viện" || lệnh == "thư-viện") {
+        nếu (n <= k) { in "Cách dùng: vdk thư viện danh sách [--json]"; trả về 2; };
+        nếu (các lệnh[k] == "danh") {
+            nếu (n <= k + 1) { trả về 2; };
+            nếu (các lệnh[k + 1] != "sách") { trả về 2; };
+            k = k + 2;
+        } hoặc {
+            nếu (các lệnh[k] != "list" && các lệnh[k] != "danh sách") { trả về 2; };
+            k = k + 1;
+        };
+        nội dung = đọc tệp(đường dẫn nối(gốc, bản["libraryCatalog"]));
+        nếu (n == k + 1) {
+            nếu (các lệnh[k] == "--json") { in nội dung; trả về 0; };
+        };
+        nếu (n != k) { trả về 2; };
+        danh mục = json phân tích(nội dung);
+        nhóm = danh mục["moduleGroups"];
+        lặp(i = 0; i < máy ảo lấy độ dài(nhóm); i++) { in nhóm[i]["name"]; };
+        thư viện = danh mục["libraries"];
+        lặp(i = 0; i < máy ảo lấy độ dài(thư viện); i++) { in thư viện[i]["id"]; };
+        trả về 0;
+    };
+    nếu (lệnh == "" || lệnh == "help" || lệnh == "--help" || lệnh == "-h" || lệnh == "trợ giúp" || lệnh == "trợ-giúp" || lệnh == "--trợ-giúp" || lệnh == "giúp đỡ") {
+        nếu (n > k) { trả về 2; };
+        in "VDK — Bộ công cụ phát triển V++";
+        in "Cách dùng: vdk [--thư-mục-vdk <đường dẫn>] <lệnh>";
+        in "  trợ giúp                       Hướng dẫn sử dụng";
+        in "  phiên bản                      Thông tin SDK";
+        in "  chẩn đoán                      Kiểm tra SDK";
+        in "  thư viện danh sách [--json]     Danh mục thư viện";
+        in "  gỡ cài đặt                    Gỡ các tệp SDK đã cài";
+        in "  cài hiển thị                   Cài cấu hình UTF-8 cho terminal";
+        in "  kiểm tra hiển thị              Kiểm tra tiếng Việt";
+        in "  gỡ hiển thị                    Gỡ cấu hình UTF-8 của VDK";
+        in "  biên dịch <nguồn.vi> --đầu-ra <tệp>";
+        in "  chạy <nguồn.vi> [-- đối số...]";
+        in "  chạy tức thời <nguồn.vi> [-- đối số...]";
+        in "  kiểm tra <nguồn.vi>            Kiểm tra mã nguồn";
+        in "  biên-dịch-máy-ảo <nguồn.vi> --đầu-ra <tệp.vmb>";
+        in "Các tên lệnh tiếng Anh vẫn được hỗ trợ để tương thích.";
+        trả về 0;
+    };
+    in "VDK: lệnh quản lý không hợp lệ";
+    trả về 2;
+};
+hàm chính() {
+    thử {
+        nội bộ = "";
+        nếu (đối số đếm() > 1) { nội bộ = vdk đối số(1); };
+        nếu (nội bộ == "--resolve-home") {
+            nếu (đối số đếm() != 4) { trả về 2; };
+            in vdk chọn(vdk đối số(2), vdk đối số(3));
+            trả về 0;
+        };
+        nếu (nội bộ == "--select-sdk") {
+            nếu (đối số đếm() < 3) { trả về 2; };
+            đầu = vdk bắt đầu(3);
+            chỉ định = "";
+            nếu (đầu == 5) { chỉ định = vdk đối số(4); };
+            in vdk chọn(vdk đối số(2), chỉ định);
+            trả về 0;
+        };
+        nếu (nội bộ == "--route") {
+            đầu = vdk bắt đầu(2);
+            tuyến = vdk phân loại(đầu);
+            nếu (tuyến[0] == "display" || tuyến[0] == "uninstall") {
+                nếu (đầu + tuyến[2] != đối số đếm()) { ném "Lệnh không nhận thêm đối số"; };
+            };
+            in tuyến[0] + " " + tuyến[1] + " " + thành chuỗi(tuyến[2]);
+            trả về 0;
+        };
+        nếu (nội bộ == "--windows-tail" || nội bộ == "--windows-source" || nội bộ == "--windows-program-tail") {
+            đầu = vdk bắt đầu(2);
+            tuyến = vdk phân loại(đầu);
+            bắt đầu = đầu + tuyến[2];
+            dòng = "";
+            nếu (nội bộ == "--windows-source" || nội bộ == "--windows-program-tail") {
+                nếu (tuyến[0] != "run" || bắt đầu >= đối số đếm()) { ném "Cách dùng: vdk chạy <nguồn.vi> [-- đối số...]"; };
+                nếu (vdk đối số(bắt đầu) == "--compiler=vpp") { bắt đầu += 1; };
+                nếu (bắt đầu >= đối số đếm()) { ném "Cần tệp nguồn"; };
+                nguồn = vdk đối số(bắt đầu);
+                nếu (!là tệp(nguồn)) { ném "Không tìm thấy tệp nguồn: " + nguồn; };
+                nếu (nội bộ == "--windows-source") { in tiến trình nháy windows(nguồn); trả về 0; };
+                bắt đầu = bắt đầu + 1;
+                nếu (bắt đầu < đối số đếm()) {
+                    nếu (vdk đối số(bắt đầu) == "--") { bắt đầu = bắt đầu + 1; };
+                };
+            } hoặc {
+                nếu (tuyến[0] == "forward") { dòng = tiến trình nháy windows(tuyến[1]); };
+            };
+            hết tùy chọn = sai;
+            giá trị = sai;
+            lặp(i = bắt đầu; i < đối số đếm(); i++) {
+                đối = vdk đối số(i);
+                nếu (chứa chuỗi(đối, "\n") || chứa chuỗi(đối, "\r")) { ném "Windows CMD không hỗ trợ đối số xuống dòng"; };
+                nếu (nội bộ == "--windows-tail" && tuyến[0] == "forward") {
+                    nếu (giá trị) { giá trị = sai; }
+                    hoặc nếu (!hết tùy chọn) {
+                        nếu (đối == "--") { hết tùy chọn = đúng; }
+                        hoặc {
+                            nếu (đối == "--đầu-ra") { đối = "-o"; };
+                            nếu (đối == "-o" || đối == "--base" || đối == "--target" || đối == "--function" || đối == "--emit-obj" || đối == "--emit-obj-selfhost" || đối == "--emit-raw" || đối == "--emit-asm") { giá trị = đúng; };
+                        };
+                    };
+                };
+                nếu (dòng != "") { dòng = dòng + " "; };
+                dòng = dòng + tiến trình nháy windows(đối);
+            };
+            in dòng;
+            trả về 0;
+        };
+        gốc = đọc biến môi trường("VDK_HOME", "");
+        nếu (gốc == "") { ném "thiếu VDK_HOME"; };
+        trả về vdk quản lý(gốc);
+    } bắt lỗi(e) { in "VDK: " + e; trả về 2; };
+};

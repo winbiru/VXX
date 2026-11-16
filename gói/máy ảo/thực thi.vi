@@ -285,7 +285,12 @@ hàm vm_step_body(state, frames) {
         vm_pop(handlers); trả về vm_jump(frame, a);
     };
     nếu (op == 83) { biến value = vm_pop(stack); nếu (b >= 0) { vm_store(state, frame, b, value); }; trả về 0; };
-    nếu (op == 80) { trả về vm_throw(state, vm_pop(stack)); };
+    nếu (op == 80) {
+        vm_set(4198464, 13, op);
+        biến value = vm_pop(stack);
+        nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+        trả về vm_throw(state, value);
+    };
     nếu (op == 14 || op == 15 || op == 16 || op == 17 || op == 20 || op == 22 || op == 26 || op == 28 || op == 29 || op == 38) { trả về 0; };
     biến arity = vm_host_arity(op);
     nếu (arity >= 0) { trả về vm_host_result(state, stack, op, vm_take(stack, arity)); };

@@ -93,6 +93,7 @@ venv/
 node_modules/
 .cache/
 *.md
+!docs/chuan-ngu-phap-tieng-viet.md
 !docs/concurrency-workers.md
 !docs/ci-integration-performance.md
 !docs/ci-stall-investigation-2026-11-12.md

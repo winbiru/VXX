@@ -1,0 +1,54 @@
+// Định dạng lỗi cuối cùng cho AOT/JIT/VM bằng V++ và thao tác ASM thô.
+// Không cấp phát giá trị trên heap khách. Vùng tạm 3376..3583 được dành
+// riêng cho chẩn đoán sau lỗi; không gọi trong safepoint hoặc worker đang chạy.
+nhập mã lỗi.*;
+nhập mã thao tác.*;
+nhập thông báo.*;
+
+hàm chẩn đoán ghi chữ(nội dung) {
+    biến chiều dài = byte dài(nội dung);
+    nếu (chiều dài > 0 && chiều dài <= 208) {
+        lặp (i = 0; i < chiều dài; i++) {
+            máy ghi byte(3376 + i, byte lấy(nội dung, i));
+        };
+        máy ghi(2, 3376, chiều dài);
+    };
+    byte hủy(nội dung);
+    trả về 0;
+};
+
+hàm chẩn đoán ghi số(số) {
+    biến âm = số < 0;
+    nếu (số > 0) { số = 0 - số; };
+    biến vị trí = 3392;
+    khi (đúng) {
+        biến thương = máy chia số nguyên ba mươi hai bit(số, 10);
+        vị trí = vị trí - 1;
+        máy ghi byte(vị trí, 48 + thương * 10 - số);
+        số = thương;
+        nếu (số == 0) { thoát; };
+    };
+    nếu (âm) { vị trí = vị trí - 1; máy ghi byte(vị trí, 45); };
+    máy ghi(2, vị trí, 3392 - vị trí);
+    trả về 0;
+};
+
+hàm chẩn đoán ghi lỗi(tiền tố, mã, thao tác) {
+    // Dòng đầu giữ nguyên hợp đồng log máy đọc của runtime.
+    chẩn đoán ghi chữ(tiền tố);
+    chẩn đoán ghi số(mã);
+    chẩn đoán ghi chữ(" opcode=");
+    chẩn đoán ghi số(thao tác);
+    chẩn đoán ghi chữ("\nChẩn đoán V++: ");
+    chẩn đoán ghi chữ(chẩn đoán thông báo lỗi(mã));
+    chẩn đoán ghi chữ(" [mã thao tác ghi nhận: ");
+    chẩn đoán ghi chữ(chẩn đoán tên mã thao tác(thao tác));
+    chẩn đoán ghi chữ("]\n");
+    biến gợi ý = chẩn đoán gợi ý lỗi(mã, thao tác);
+    nếu (byte dài(gợi ý) > 0) {
+        chẩn đoán ghi chữ("Gợi ý: ");
+        chẩn đoán ghi chữ(gợi ý);
+        chẩn đoán ghi chữ("\n");
+    } hoặc { byte hủy(gợi ý); };
+    trả về 0;
+};

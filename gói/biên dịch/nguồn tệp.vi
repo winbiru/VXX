@@ -154,6 +154,7 @@ lớp công khai Bộ Nạp Nguồn {
     hàm công khai khởi tạo(thư viện, bộ đệm = rỗng) {
         mình.thư viện = thư viện;
         mình.bộ đệm = bộ đệm;
+        mình.nguồn mở = rỗng;
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
             "cạnh": [], "thứ tự khởi tạo": [], "thư viện": thư viện,
             "đích theo yêu cầu": {}, "đích theo thư mục": {}, "thư mục theo nguồn": {}, "ứng viên": {}};
@@ -204,7 +205,13 @@ lớp công khai Bộ Nạp Nguồn {
         nếu (mức == 2) { trả về đúng; };
         trạng thái["đã thăm"][đích] = 1;
         máy ảo thêm cuối danh sách(trạng thái["ngăn"], đích);
-        cây = biên dịch nguồn cây(đích, mình.bộ đệm);
+        cây = rỗng;
+        nếu (mình.nguồn mở != rỗng) {
+            nếu (máy ảo có khóa từ điển(mình.nguồn mở, đích)) {
+                cây = biên dịch phân tích chương trình thuần(mình.nguồn mở[đích]);
+            };
+        };
+        nếu (cây == rỗng) { cây = biên dịch nguồn cây(đích, mình.bộ đệm); };
         máy ảo thêm cuối danh sách(trạng thái["mô đun"], {"định danh": đích, "cây": cây});
         các phần nhập = biên dịch đồ thị quét nhập(cây);
         lặp(i = 0; i < máy ảo lấy độ dài(các phần nhập); i++) {
@@ -218,7 +225,8 @@ lớp công khai Bộ Nạp Nguồn {
 
     // Embedded source supplies its AST in memory, while imports still use
     // the same resolver and relative base as files on disk.
-    hàm công khai đồ thị(điểm vào, mã nguồn = rỗng, cây = rỗng) {
+    hàm công khai đồ thị(điểm vào, mã nguồn = rỗng, cây = rỗng, nguồn mở = rỗng) {
+        mình.nguồn mở = nguồn mở;
         // Mỗi lần dựng bắt đầu bằng trạng thái riêng, kể cả khi tái dùng instance.
         mình.trạng thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
             "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư viện,

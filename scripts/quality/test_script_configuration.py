@@ -26,6 +26,43 @@ class MachoProbeTimeoutTests(unittest.TestCase):
         self.assertEqual(module.probe_timeout(Path('probe'), 30), 30)
 
 
+class HTTPFixtureTests(unittest.TestCase):
+    def test_mock_bind_does_not_resolve_hostname(self):
+        spec = importlib.util.spec_from_file_location('regression_runner_mock', QUALITY / 'regression_runner_mock.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        server = module.LoopbackHTTPServer.__new__(module.LoopbackHTTPServer)
+        def bind(instance):
+            instance.server_address = ('127.0.0.1', 49152)
+        with mock.patch.object(module.socketserver.TCPServer, 'server_bind', bind), \
+             mock.patch('socket.getfqdn', side_effect=AssertionError('unexpected DNS lookup')):
+            server.server_bind()
+        self.assertEqual(server.server_name, '127.0.0.1')
+        self.assertEqual(server.server_port, 49152)
+
+    def test_unpublished_mock_port_does_not_probe_fixed_port(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        process = mock.Mock()
+        process.poll.return_value = None
+        opener = mock.Mock()
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(runner, 'fixture_process', return_value=(['mock-server'], {})), \
+             mock.patch.object(runner.subprocess, 'Popen', return_value=process), \
+             mock.patch.object(runner.urllib.request, 'build_opener', return_value=opener), \
+             mock.patch.object(runner.time, 'monotonic', side_effect=[0, 0, 2]), \
+             mock.patch.object(runner.time, 'sleep'), \
+             mock.patch.object(runner, 'stop_http') as stop:
+            directory = Path(tmp)
+            (directory / 'server.port').write_text('18080')  # stale port from a previous process
+            with self.assertRaisesRegex(RuntimeError, r'unpublished port .*fixture=mock; last error=FileNotFoundError'):
+                runner.start_prepared_http(directory / 'server', directory, {}, timeout=1)
+            self.assertFalse((directory / 'server.port').exists())
+        opener.open.assert_not_called()
+        stop.assert_called_once_with(process)
+
+
 @unittest.skipUnless(os.name == 'posix', 'Bash bootstrap runs on POSIX hosts')
 class RuntimeCacheTests(unittest.TestCase):
     def setUp(self):
@@ -144,6 +181,71 @@ class OpcodeAbiTests(unittest.TestCase):
         result = self.check_abi()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('ASM VM host ABI mismatch', result.stderr)
+
+
+class DiagnosticCatalogTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location('diagnostic_catalog', QUALITY / 'generate_diagnostic_catalog.py')
+        self.catalog = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.catalog)
+
+    def source(self, name):
+        return (ROOT / 'gói/chẩn đoán' / name).read_text(encoding='utf-8')
+
+    def test_generated_catalogs_and_abi(self):
+        self.catalog.verify_abi(ROOT)
+        for name in self.catalog.CATALOGS:
+            with self.subTest(name=name):
+                source = self.source(name)
+                self.assertEqual(self.catalog.regenerate(source), source)
+                entries = self.catalog.rows(source)
+                size, length = map(int, re.search(r'chẩn đoán tra bảng\(bảng, (\d+), (\d+),', source).groups())
+                words = []
+                for line in source.splitlines():
+                    if line.startswith('    chẩn đoán nạp bảng(bảng, '):
+                        for word in line.removeprefix('    chẩn đoán nạp bảng(bảng, ').removesuffix(');').split(', '):
+                            words.append(-2147483648 if word == '(0 - 2147483647 - 1)' else int(word))
+                packed = b''.join(word.to_bytes(4, 'little', signed=True) for word in words)[:size]
+                raw = bytearray()
+                cursor = 0
+                while cursor < size:
+                    flags = packed[cursor]
+                    cursor += 1
+                    for bit in range(8):
+                        if len(raw) == length:
+                            break
+                        self.assertLess(cursor, size)
+                        if flags & (1 << bit):
+                            self.assertLess(cursor + 1, size)
+                            ref = int.from_bytes(packed[cursor:cursor + 2], 'little')
+                            cursor += 2
+                            distance = (ref >> 5) + 1
+                            self.assertLessEqual(distance, len(raw))
+                            for _ in range((ref & 31) + 3):
+                                raw.append(raw[-distance])
+                        else:
+                            raw.append(packed[cursor])
+                            cursor += 1
+                self.assertEqual(len(raw), length)
+                self.assertEqual(cursor, size)
+                self.assertEqual(raw.decode('utf-8').split('\0'),
+                                 [entries.get(i, '') for i in range(max(entries) + 1)] + [''])
+                self.assertLessEqual(max(len(v.encode('utf-8')) for v in entries.values()), 208)
+
+    def test_runtime_error_coverage(self):
+        codes = {0}
+        for source in (ROOT / 'gói/máy ảo').rglob('*.vi'):
+            codes.update(map(int, re.findall(r'\bvm_error\(\s*(\d+)\s*\)', source.read_text(encoding='utf-8'))))
+        self.assertEqual(set(self.catalog.rows(self.source('mã lỗi.vi'))), codes)
+
+    def test_duplicate_stale_and_out_of_range_entries(self):
+        source = self.source('mã lỗi.vi')
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            self.catalog.rows(source + '\n// 16: Trùng mã\n')
+        changed = source.replace('// 16: Ngoại lệ chưa được xử lý.', '// 16: Ngoại lệ mới.')
+        self.assertNotEqual(self.catalog.regenerate(changed), changed)
+        generated = self.catalog.regenerate(source + '\n// 25: Lỗi mới.\n')
+        self.assertIn('mã >= 0 && mã <= 25', generated)
 
 
 class RegressionShardTests(unittest.TestCase):

@@ -276,6 +276,9 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
                  '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
         command([stage3, 'build', ROOT / 'gói/biên dịch/dòng lệnh JIT.vi',
                  '-o', package / 'bin/vpp-jit.exe'], env, out / 'package-jit-build.log')
+        shutil.copytree(ROOT / 'templates', package / 'share/vpp/templates', dirs_exist_ok=True)
+        command([stage3, 'build', ROOT / 'scripts/vdk/vpp-cli.vi',
+                 '-o', package / 'bin/vpp-tools.exe'], env, out / 'package-tools-build.log')
         shutil.copy2(ROOT / 'scripts/windows/vpp-windows-launcher.cmd', package / 'bin/vpp.cmd')
         with zipfile.ZipFile(archive, 'x', zipfile.ZIP_DEFLATED) as z:
             for path in sorted(package.rglob('*')):

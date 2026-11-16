@@ -69,6 +69,53 @@ Xem thêm [các chương trình ví dụ](examples/) và [tham chiếu ngôn ng�
 
 Có thể xem các bản phát hành tại [GitHub Releases](https://github.com/winbiru/VXX/releases). Khi xây dựng từ source, chọn đúng quy trình theo hệ điều hành và kiến trúc CPU.
 
+### Gói phát hành VPP và VDK
+
+CI tạo các gói từ bộ biên dịch native hiện tại đã qua kiểm tra bootstrap, không sử dụng binary phát hành cũ. Mỗi gói có tệp `.sha256` tương ứng.
+
+| Nền tảng | VPP | VDK 1.0.0 |
+| --- | --- | --- |
+| Linux x86_64 | `vpp-linux-x64.tar.gz` | `vdk-1.0.0-linux-x64.tar.gz` |
+| macOS ARM64 | `vpp-macos.tar.gz` | `vdk-1.0.0-macos-arm64.tar.gz` |
+| Windows x86_64 | `vpp-windows-x64.zip` | `vdk-1.0.0-windows-x64.zip` |
+
+Cả hai gói có compiler, runtime, VM, JIT và thư viện chuẩn. VDK bổ sung manifest, tài liệu, template dự án, ví dụ, metadata editor và CLI quản lý viết bằng V++ (`vdk-info`), với launcher theo nền tảng. Sau khi giải nén, thêm thư mục `bin` vào `PATH`:
+
+```sh
+vdk trợ giúp
+vdk phiên bản
+vdk chẩn đoán
+vdk thư viện danh sách
+vdk thư viện danh sách --json
+vdk cài hiển thị
+vdk kiểm tra hiển thị
+vdk biên dịch hello.vi --đầu-ra hello
+vdk chạy hello.vi
+vdk chạy tức thời hello.vi
+vdk kiểm tra hello.vi
+vdk biên-dịch-máy-ảo hello.vi --đầu-ra hello.vmb
+vdk gỡ hiển thị
+```
+
+Lệnh tiếng Việt là giao diện chính; alias tiếng Anh vẫn tương thích. Cài hiển thị là tùy chọn, chỉ sửa profile người dùng. Mở terminal mới sau khi cài/gỡ. Nếu chưa gõ được dấu, dùng `vdk cai-hien-thi`. Tùy chọn `--vdk-home` tương đương `--thư-mục-vdk`.
+
+Khóa phiên bản SDK theo dự án bằng tệp `vdk.json`:
+
+```json
+{"version": "1.0.0"}
+```
+
+VDK tìm tệp gần nhất từ thư mục làm việc lên các thư mục cha. Khi có pin, VDK chọn
+bản phù hợp từ `~/.vpp/vdk/<version>` (Linux/macOS) hoặc
+`%LOCALAPPDATA%/VPP/vdk/<version>` (Windows), rồi đến `VDK_HOME`, `VPP_HOME` và
+SDK chứa launcher. `vdk --thư-mục-vdk <đường-dẫn> phiên bản` chỉ định SDK tường minh
+và vẫn phải khớp pin. Pin sai hoặc thiếu phiên bản yêu cầu sẽ trả lỗi.
+Xem [hướng dẫn VDK](docs/installation.md#cài-đặt-vdk-và-chọn-phiên-bản-sdk).
+
+Linux/Windows vẫn cần toolchain clang/LLD phù hợp cho AOT; không đóng kèm toolchain bên ngoài. Kiểm tra SHA-256 bằng `sha256sum -c <tên-gói>.sha256` (Linux), `shasum -a 256 -c <tên-gói>.sha256` (macOS), hoặc so sánh `Get-FileHash <tên-gói> -Algorithm SHA256` trên Windows.
+
+Build gói trên macOS: `cmake --build build-pure-vpp --target vpp-release-packages`. Kết quả nằm tại `build-pure-vpp/release-candidates/`. CI tải các gói ứng viên lên Actions; sự kiện publish GitHub Release chỉ đính kèm gói sau khi regression thành công và checksum hợp lệ, không ghi đè asset có sẵn.
+
 ### macOS ARM64 (Apple Silicon)
 
 Yêu cầu CMake 3.20 trở lên, Bash và Xcode Command Line Tools. CMake ở root hiện được cấu hình dành cho nền tảng này.
@@ -184,6 +231,7 @@ flowchart TD
 | [`gói/biên dịch/`](gói/biên%20dịch/) | Lexer, AST, semantic analysis, module graph, IR, AOT, bytecode, JIT, CLI và các backend mã máy |
 | [`gói/biên dịch/bản địa/`](gói/biên%20dịch/bản%20địa/) | Compiler i32, assembler, encoder và linker native |
 | [`gói/máy ảo/`](gói/máy%20ảo/) | Nạp/thực thi chương trình, runtime, giá trị, bộ nhớ, syscall, host ABI và worker |
+| [`gói/chẩn đoán/`](gói/chẩn%20đoán/đọc%20trước.md) | Danh mục mã lỗi, tên opcode, gợi ý và định dạng lỗi tiếng Việt dùng chung cho runtime AOT/JIT/VM |
 | [`gói/lõi/`](gói/lõi/) | API nền tảng của thư viện chuẩn, đồng thời, toán học, định dạng, quản lý gói |
 | [`gói/`](gói/) | Các mô đun thư viện chuẩn theo lĩnh vực |
 | [`scripts/ASM/`](scripts/ASM/) | Machine ABI, bộ nhớ, I/O, syscall, worker và các primitive theo nền tảng |
@@ -249,7 +297,7 @@ Extension VS Code hỗ trợ tô màu cú pháp `.vi`, gợi ý từ khóa/impor
 ./scripts/vpp-lang install --editor vscode
 ```
 
-Script cũng hỗ trợ Cursor và VSCodium. LSP là tùy chọn dành cho server tương thích được cấu hình riêng; mặc định extension sử dụng khả năng phân tích cục bộ (`vpp.lsp.enabled=false`). Compiler tự chủ hiện có formatter, linter, AST/IR dump và disassembler tích hợp.
+Script cũng hỗ trợ Cursor và VSCodium. LSP native (`vpp --lsp`) viết bằng V++ có chẩn đoán, định dạng, catalog thư viện, gợi ý theo phạm vi, đi đến khai báo, hover chữ ký hàm và đổi tên ký hiệu cục bộ. Completion có thể dùng chỉ mục hợp lệ gần nhất khi đang gõ mã chưa hoàn chỉnh; rename kiểm tra lại liên kết ký hiệu trên nguồn ứng viên. Bật `vpp.lsp.enabled=true` để sử dụng máy chủ native; mặc định extension vẫn dùng phân tích cục bộ. Đổi tên xuyên mô-đun và phân giải đầy đủ phương thức OOP chưa được hỗ trợ. Xem [hợp đồng CLI và LSP](docs/cli.md#repl-và-lsp) để biết phạm vi hỗ trợ. Compiler tự chủ hiện có formatter, linter, AST/IR dump và disassembler tích hợp.
 
 ## Kiểm thử và chất lượng
 
