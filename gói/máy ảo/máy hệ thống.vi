@@ -43,3 +43,282 @@ hàm vm_system_entropy(length) {
     };
     trả về vm_system_bytes(raw, count);
 };
+
+// Local time uses integer day/second pairs, so even a signed 64-bit epoch
+// outside i32 seconds never wraps. All timezone policy is shared V++ code.
+hàm vm_tz_floor(n, d) {
+    biến q = máy chia số nguyên ba mươi hai bit(n, d);
+    nếu (n - q * d < 0) { q = q - 1; };
+    trả về q;
+};
+hàm vm_tz_days(y, m, d) {
+    nếu (m <= 2) { y = y - 1; m = m + 9; } hoặc { m = m - 3; };
+    biến era = vm_tz_floor(y, 400);
+    biến yr = y - era * 400;
+    trả về era * 146097 + yr * 365 + yr / 4 - yr / 100 + (153 * m + 2) / 5 + d - 1 - 719468;
+};
+hàm vm_tz_weekday(day) { trả về day + 4 - vm_tz_floor(day + 4, 7) * 7; };
+hàm vm_tz_civil(day, sec, raw, offset, dst) {
+    biến delta = vm_tz_floor(sec + offset, 86400);
+    day = day + delta; sec = sec + offset - delta * 86400;
+    biến z = day + 719468;
+    biến era = vm_tz_floor(z, 146097);
+    biến doe = z - era * 146097;
+    biến yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    biến y = yoe + era * 400;
+    biến doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    biến mp = (5 * doy + 2) / 153;
+    biến d = doy - (153 * mp + 2) / 5 + 1;
+    biến m = mp + 3;
+    nếu (mp >= 10) { m = mp - 9; };
+    nếu (m <= 2) { y = y + 1; };
+    nếu (y < 0 || y > 9999) { trả về -1; };
+    vm_set(raw, 0, sec % 60); vm_set(raw, 1, sec / 60 % 60); vm_set(raw, 2, sec / 3600);
+    vm_set(raw, 3, d); vm_set(raw, 4, m - 1); vm_set(raw, 5, y - 1900);
+    vm_set(raw, 6, vm_tz_weekday(day)); vm_set(raw, 7, day - vm_tz_days(y, 1, 1));
+    vm_set(raw, 8, dst); vm_set(raw, 10, offset); vm_set(raw, 11, 0);
+    nếu (offset < 0) { vm_set(raw, 11, -1); };
+    trả về 0;
+};
+// Decode signed big/little-endian time into two words; saturate beyond the
+// supported calendar only for comparisons to TZif transition sentinels.
+hàm vm_tz_epoch(raw, width, little, pair) {
+    biến high = raw; nếu (little == 1) { high = raw + width - 1; };
+    biến neg = máy đọc byte(high) >= 128;
+    biến day = 0; biến sec = 0;
+    lặp (i = 0; i < width; i++) {
+        biến at = raw + i; nếu (little == 1) { at = raw + width - 1 - i; };
+        biến b = máy đọc byte(at); nếu (neg) { b = 255 - b; };
+        nếu (day > 4000000) { day = 4000001; sec = 0; thoát; };
+        sec = sec * 256 + b; day = day * 256 + sec / 86400; sec = sec % 86400;
+    };
+    nếu (day > 4000000) { day = 4000001; sec = 0; };
+    nếu (neg) { day = -day - 1; sec = 86399 - sec; };
+    vm_set(pair, 0, day); vm_set(pair, 1, sec); trả về 0;
+};
+hàm vm_tz_be32(p) {
+    biến n = máy đọc byte(p);
+    nếu (n >= 128) { n = n - 256; };
+    lặp (i = 1; i < 4; i++) { n = n * 256 + máy đọc byte(p + i); };
+    trả về n;
+};
+hàm vm_tz_digit(b) { trả về b >= 48 && b <= 57; };
+hàm vm_tz_alpha(b) { trả về (b >= 65 && b <= 90) || (b >= 97 && b <= 122); };
+// cursor = [absolute position, exclusive end]. Negative results reject invalid TZ.
+hàm vm_tz_peek(c) {
+    nếu (vm_get(c, 0) >= vm_get(c, 1)) { trả về 0; };
+    trả về máy đọc byte(vm_get(c, 0));
+};
+hàm vm_tz_take(c, b) {
+    nếu (vm_tz_peek(c) != b) { trả về 0; };
+    vm_set(c, 0, vm_get(c, 0) + 1); trả về 1;
+};
+hàm vm_tz_num(c, limit) {
+    biến n = 0; biến count = 0;
+    khi (vm_tz_digit(vm_tz_peek(c))) {
+        n = n * 10 + vm_tz_peek(c) - 48; count = count + 1;
+        nếu (n > limit || count > 6) { trả về -1; };
+        vm_set(c, 0, vm_get(c, 0) + 1);
+    };
+    nếu (count == 0) { trả về -1; }; trả về n;
+};
+hàm vm_tz_name(c) {
+    biến count = 0;
+    nếu (vm_tz_take(c, 60)) {
+        khi (vm_tz_alpha(vm_tz_peek(c)) || vm_tz_digit(vm_tz_peek(c)) || vm_tz_peek(c) == 43 || vm_tz_peek(c) == 45) {
+            vm_set(c, 0, vm_get(c, 0) + 1); count = count + 1;
+        };
+        nếu (vm_tz_take(c, 62) == 0) { trả về 0; };
+    } hoặc {
+        khi (vm_tz_alpha(vm_tz_peek(c))) { vm_set(c, 0, vm_get(c, 0) + 1); count = count + 1; };
+    };
+    trả về count >= 3;
+};
+// POSIX offsets are west of UTC. Rule times can be signed and exceed 24h.
+hàm vm_tz_hms(c, limit) {
+    biến sign = 1;
+    nếu (vm_tz_take(c, 45)) { sign = -1; } hoặc { vm_tz_take(c, 43); };
+    biến h = vm_tz_num(c, limit); nếu (h < 0) { trả về 2147483647; };
+    biến m = 0; biến s = 0;
+    nếu (vm_tz_take(c, 58)) {
+        m = vm_tz_num(c, 59); nếu (m < 0) { trả về 2147483647; };
+        nếu (vm_tz_take(c, 58)) { s = vm_tz_num(c, 59); nếu (s < 0) { trả về 2147483647; }; };
+    };
+    trả về sign * (h * 3600 + m * 60 + s);
+};
+hàm vm_tz_rule(c, year, out) {
+    biến jan = vm_tz_days(year, 1, 1); biến day = jan;
+    nếu (vm_tz_take(c, 77)) {
+        biến m = vm_tz_num(c, 12);
+        nếu (m < 1 || vm_tz_take(c, 46) == 0) { trả về 0; };
+        biến w = vm_tz_num(c, 5);
+        nếu (w < 1 || vm_tz_take(c, 46) == 0) { trả về 0; };
+        biến d = vm_tz_num(c, 6); nếu (d < 0) { trả về 0; };
+        biến first = vm_tz_days(year, m, 1);
+        day = first + (d - vm_tz_weekday(first) + 7) % 7 + (w - 1) * 7;
+        nếu (w == 5 && day >= vm_tz_days(year, m + 1, 1)) { day = day - 7; };
+    } hoặc nếu (vm_tz_take(c, 74)) {
+        biến d = vm_tz_num(c, 365); nếu (d < 1) { trả về 0; };
+        day = jan + d - 1;
+        nếu (d >= 60 && vm_tz_days(year, 3, 1) - jan == 60) { day = day + 1; };
+    } hoặc {
+        biến d = vm_tz_num(c, 365); nếu (d < 0) { trả về 0; };
+        day = jan + d;
+    };
+    biến time = 7200; biến basis = 0;
+    nếu (vm_tz_take(c, 47)) {
+        time = vm_tz_hms(c, 167); nếu (time == 2147483647) { trả về 0; };
+        nếu (vm_tz_take(c, 115)) { basis = 1; }
+        hoặc nếu (vm_tz_take(c, 117) || vm_tz_take(c, 103) || vm_tz_take(c, 122)) { basis = 2; }
+        hoặc { vm_tz_take(c, 119); };
+    };
+    vm_set(out, 0, day); vm_set(out, 1, time); vm_set(out, 2, basis); trả về 1;
+};
+hàm vm_tz_before(day, sec, other_day, other_sec) {
+    biến shift = vm_tz_floor(other_sec, 86400);
+    other_day = other_day + shift; other_sec = other_sec - shift * 86400;
+    trả về day < other_day || (day == other_day && sec < other_sec);
+};
+hàm vm_tz_posix(start, end, day, sec, raw) {
+    biến c = vm_alloc(8, 0); nếu (c == 0) { trả về -1; };
+    vm_set(c, 0, start); vm_set(c, 1, end);
+    nếu (start == end) { trả về vm_tz_civil(day, sec, raw, 0, 0); };
+    nếu (vm_tz_name(c) == 0) { trả về -1; };
+    biến west = vm_tz_hms(c, 24);
+    nếu (west < -86400 || west > 86400) { trả về -1; };
+    biến standard = -west;
+    nếu (vm_tz_peek(c) == 0) { trả về vm_tz_civil(day, sec, raw, standard, 0); };
+    nếu (vm_tz_name(c) == 0) { trả về -1; };
+    biến daylight = standard + 3600;
+    nếu (vm_tz_peek(c) != 44 && vm_tz_peek(c) != 0) {
+        west = vm_tz_hms(c, 24);
+        nếu (west < -86400 || west > 86400) { trả về -1; };
+        daylight = -west;
+    };
+    nếu (daylight < -86400 || daylight > 86400) { trả về -1; };
+    nếu (vm_tz_civil(day, sec, raw, standard, 0) < 0) { trả về -1; };
+    biến year = vm_get(raw, 5) + 1900;
+    biến a = vm_alloc(12, 0); biến b = vm_alloc(12, 0);
+    nếu (a == 0 || b == 0) { trả về -1; };
+    // With no explicit rules, require the platform zone file instead of
+    // guessing a jurisdiction's DST dates.
+    nếu (vm_tz_take(c, 44) == 0 || vm_tz_rule(c, year, a) == 0 ||
+        vm_tz_take(c, 44) == 0 || vm_tz_rule(c, year, b) == 0 || vm_tz_peek(c) != 0) { trả về -1; };
+    biến at = vm_get(a, 1); biến bt = vm_get(b, 1);
+    nếu (vm_get(a, 2) != 2) { at = at - standard; };
+    nếu (vm_get(b, 2) == 0) { bt = bt - daylight; }
+    hoặc nếu (vm_get(b, 2) == 1) { bt = bt - standard; };
+    biến after_a = vm_tz_before(day, sec, vm_get(a, 0), at) == 0;
+    biến before_b = vm_tz_before(day, sec, vm_get(b, 0), bt);
+    biến northern = vm_tz_before(vm_get(a, 0) + vm_tz_floor(at, 86400), at - vm_tz_floor(at, 86400) * 86400, vm_get(b, 0), bt);
+    biến dst = after_a && before_b;
+    nếu (northern == 0) { dst = after_a || before_b; };
+    nếu (dst) { trả về vm_tz_civil(day, sec, raw, daylight, 1); };
+    trả về vm_tz_civil(day, sec, raw, standard, 0);
+};
+// Validate the TZif block before calculating offsets into an untrusted file.
+hàm vm_tz_block(p, end, width) {
+    nếu (p > end - 44 || vm_tz_be32(p) != 1415211366) { trả về -1; };
+    biến utc = vm_tz_be32(p + 20); biến std = vm_tz_be32(p + 24);
+    biến leap = vm_tz_be32(p + 28); biến times = vm_tz_be32(p + 32);
+    biến types = vm_tz_be32(p + 36); biến chars = vm_tz_be32(p + 40);
+    nếu (types < 1 || types > 256 || times < 0 || times > 100000 || chars < 1 || chars > 100000 ||
+        leap < 0 || leap > 10000 || (std != 0 && std != types) || (utc != 0 && utc != types)) { trả về -1; };
+    biến size = 44 + times * (width + 1) + types * 6 + chars + leap * (width + 4) + std + utc;
+    nếu (size > end - p) { trả về -1; }; trả về p + size;
+};
+hàm vm_tz_tzif(p, end, day, sec, raw) {
+    biến width = 4; biến next = vm_tz_block(p, end, width);
+    nếu (next < 0) { trả về -1; };
+    biến version = máy đọc byte(p + 4);
+    nếu (version == 50 || version == 51 || version == 52) {
+        p = next; width = 8; next = vm_tz_block(p, end, width);
+        nếu (next < 0) { trả về -1; };
+    } hoặc nếu (version != 0) { trả về -1; };
+    // Leap-aware right/ files use a different epoch convention.
+    nếu (vm_tz_be32(p + 28) != 0) { trả về -1; };
+    biến times = vm_tz_be32(p + 32); biến types = vm_tz_be32(p + 36);
+    biến table = p + 44; biến indices = table + times * width; biến info = indices + times;
+    biến pair = vm_alloc(8, 0); nếu (pair == 0) { trả về -1; };
+    biến lo = 0; biến hi = times;
+    khi (lo < hi) {
+        biến mid = lo + (hi - lo) / 2;
+        vm_tz_epoch(table + mid * width, width, 0, pair);
+        nếu (vm_tz_before(day, sec, vm_get(pair, 0), vm_get(pair, 1))) { hi = mid; }
+        hoặc { lo = mid + 1; };
+    };
+    nếu (lo == times && width == 8 && next < end - 2 && máy đọc byte(next) == 10 && máy đọc byte(end - 1) == 10) {
+        trả về vm_tz_posix(next + 1, end - 1, day, sec, raw);
+    };
+    biến kind = 0;
+    nếu (lo > 0) { kind = máy đọc byte(indices + lo - 1); };
+    nếu (kind >= types) { trả về -1; };
+    biến offset = vm_tz_be32(info + kind * 6); biến dst = máy đọc byte(info + kind * 6 + 4);
+    nếu (offset < -86400 || offset > 86400 || dst > 1) { trả về -1; };
+    trả về vm_tz_civil(day, sec, raw, offset, dst);
+};
+hàm vm_tz_file(path, day, sec, raw) {
+    biến handle = vm_path_handle(path); nếu (handle < 0) { trả về -1; };
+    biến token = thực thi tệp dữ liệu mở(handle, 0); byte hủy(handle);
+    nếu (token < 0) { trả về -1; };
+    biến data = vm_alloc(1048577, 0);
+    nếu (data == 0) { tệp đóng(token); trả về -1; };
+    biến n = 0; biến fd = vm_file_fd(token);
+    khi (n < 1048577) {
+        biến got = máy đọc(fd, data + n, 1048577 - n);
+        nếu (got < 0 && máy lỗi() == 4) { bỏ qua; };
+        nếu (got < 0) { tệp đóng(token); trả về -1; };
+        nếu (got == 0) { thoát; }; n = n + got;
+    };
+    tệp đóng(token);
+    nếu (n > 1048576) { trả về -1; };
+    trả về vm_tz_tzif(data, data + n, day, sec, raw);
+};
+hàm vm_system_localtime(epoch) {
+    nếu (vm_tag(epoch) != 4 || vm_get(epoch, 1) != 8) { trả về vm_error(2); };
+    biến raw = vm_alloc(64, 0); biến pair = vm_alloc(8, 0);
+    nếu (raw == 0 || pair == 0) { trả về 0; };
+    lặp (i = 0; i < 8; i++) {
+        biến item = vm_at(epoch, i);
+        nếu (vm_tag(item) != 1) { trả về vm_error(2); };
+        biến b = vm_number(item); nếu (b < 0 || b > 255) { trả về vm_error(2); };
+        máy ghi byte(raw + i, b);
+    };
+    vm_tz_epoch(raw, 8, 1, pair);
+    biến day = vm_get(pair, 0); biến sec = vm_get(pair, 1);
+    nếu (day < -719529 || day > 2932897) { trả về vm_error(20); };
+    biến tz = vm_alloc(4096, 0); nếu (tz == 0) { trả về 0; };
+    biến name = vm_path_handle(vm_literal("TZ"));
+    nếu (name < 0) { trả về 0; };
+    biến n = máy giá trị môi trường lấy(thực thi nội dung đệm(thực thi các byte ô nhớ(name)), tz);
+    byte hủy(name);
+    biến platform = vm_get(4198464, 8);
+    biến status = -1;
+    nếu (n < 0 && platform == 2) {
+        status = máy đồng hồ thô(2, raw);
+        nếu (status == 0) {
+            biến offset = vm_get(raw, 10); biến dst = vm_get(raw, 8);
+            nếu (offset < -86400 || offset > 86400) { trả về vm_error(20); };
+            status = vm_tz_civil(day, sec, raw, offset, dst);
+        };
+    } hoặc nếu (n < 0) {
+        status = vm_tz_file(vm_literal("/etc/localtime"), day, sec, raw);
+    } hoặc nếu (n < 4096) {
+        status = vm_tz_posix(tz, tz + n, day, sec, raw);
+        nếu (status < 0 && n > 0 && platform != 2) {
+            biến start = 0; nếu (máy đọc byte(tz) == 58) { start = 1; };
+            nếu (start < n) {
+                biến prefix = vm_literal("/usr/share/zoneinfo/");
+                biến plen = vm_get(prefix, 1);
+                nếu (máy đọc byte(tz + start) == 47) { plen = 0; };
+                biến path = vm_string(plen + n - start);
+                nếu (path == 0) { trả về 0; };
+                nếu (plen > 0) { máy sao chép vùng nhớ(vm_get(path, 2), vm_get(prefix, 2), plen); };
+                máy sao chép vùng nhớ(vm_get(path, 2) + plen, tz + start, n - start);
+                status = vm_tz_file(path, day, sec, raw);
+            };
+        };
+    };
+    nếu (status != 0) { trả về vm_error(20); };
+    trả về vm_system_bytes(raw, 64);
+};

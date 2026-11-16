@@ -1,0 +1,20 @@
+// The historical native_control_flow_smoke.c tests these 36 combinations.
+nhập native_logical_side_effects.*;
+
+hàm logic_test_value(i) {
+    nếu (i == 0) { trả về -13; };
+    nếu (i == 1) { trả về -1; };
+    nếu (i == 2) { trả về 0; };
+    nếu (i == 3) { trả về 1; };
+    nếu (i == 4) { trả về 2; };
+    trả về 13;
+};
+
+hàm chính() {
+    lặp (i = 0; i < 6; i = i + 1) {
+        lặp (j = 0; j < 6; j = j + 1) {
+            in logic_vet(logic_test_value(i), logic_test_value(j));
+        };
+    };
+    trả về 0;
+};

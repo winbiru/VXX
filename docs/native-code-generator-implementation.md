@@ -83,7 +83,7 @@ relocation và tên callee do assembler có thể rút gọn encoding. Với COF
 fixture chứa tên hàm dài để kiểm tra symbol string table. Xuất `--emit-raw`
 cho hàm còn lời gọi chưa liên kết phải báo lỗi tường minh chứa `CALL`.
 Trên máy macOS kiểm tra ngày 13/10/2026, **12/12 CTest native liên quan
-đã đạt**. Cùng ngày, tám ELF AArch64 object từ `src/tests/kiem_tra_native_calls.vi`
+đã đạt**. Cùng ngày, tám ELF AArch64 object từ `scripts/test/kiem_tra_native_calls.vi`
 được sinh bởi `vpp-cli` trên macOS, liên kết bằng GCC trong Docker Ubuntu 24.04
 ARM64 và **thực thi thành công dưới Linux ARM64**, in `native_calls_ok`.
 Đây là kiểm thử Linux ARM64 thật trong container; không phải QEMU hoặc
@@ -142,7 +142,7 @@ Linux AArch64, Linux x86-64 và Windows x86-64. Nguồn kiểm chứng
 `scripts/quality/native_machine_cpp_oracle.cpp` biên dịch các fixture bằng
 pipeline C++, hạ thành Machine IR và gọi trực tiếp **encoder C++ gốc**
 `emitMachineFunction`, không đi qua V++ bridge. Kết quả được so với
-fixture `src/tests/kiem_tra_native_machine_vi.vi` (Machine IR được xây
+fixture `scripts/test/kiem_tra_native_machine_vi.vi` (Machine IR được xây
 trong V++) và byte thực của `vpp-cli --emit-raw` hoặc `--emit-obj`.
 Với `goi_bon`, oracle còn yêu cầu relocation tới symbol `bon`; CLI
 được kiểm tra trên object có chứa byte mã máy và bộ kiểm tra relocation
@@ -167,7 +167,7 @@ gian/negation vượt phạm vi được dựng trực tiếp thành compiler IR
 chính bộ lowerer, do frontend loại một số literal bất hợp lệ trước bước này.
 Các ca lỗi bắt buộc cả C++ lẫn V++ cùng từ chối, không chấp nhận wrap hoặc
 giả lập kết quả. File kiểm thử: `scripts/quality/native_machine_cpp_oracle.cpp`,
-nguồn fixture: `src/tests/kiem_tra_native_i32_boundaries.vi`.
+nguồn fixture: `scripts/test/kiem_tra_native_i32_boundaries.vi`.
 
 **Đường production đã tích hợp một phần:** CLI gọi `compileRawLeafVpp` để
 nhận diện và phát hàm lá i32 trên 16 kiến trúc **trong một lần chạy VM**.
@@ -216,17 +216,17 @@ còn AArch64 dùng `w0/w1`. Có thể yêu cầu CLI xuất file `.s` để ki�
 
 ```sh
 build/bin/vpp-cli build --target x86_64-linux-gnu --emit-asm cong \
-  src/tests/kiem_tra_native_leaf.vi build/cong-x86_64.s
+  scripts/test/kiem_tra_native_leaf.vi build/cong-x86_64.s
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-asm cong \
-  src/tests/kiem_tra_native_leaf.vi build/cong-arm64.s
+  scripts/test/kiem_tra_native_leaf.vi build/cong-arm64.s
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-raw cong \
-  src/tests/kiem_tra_native_leaf.vi build/cong-arm64.bin
+  scripts/test/kiem_tra_native_leaf.vi build/cong-arm64.bin
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-obj cong \
-  src/tests/kiem_tra_native_leaf.vi build/cong-arm64.o
+  scripts/test/kiem_tra_native_leaf.vi build/cong-arm64.o
 build/bin/vpp-cli build --target x86_64-linux-gnu --emit-obj cong \
-  src/tests/kiem_tra_native_leaf.vi build/cong-linux-x64.o
+  scripts/test/kiem_tra_native_leaf.vi build/cong-linux-x64.o
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-obj tru \
-  src/tests/kiem_tra_native_leaf.vi build/tru-arm64.o
+  scripts/test/kiem_tra_native_leaf.vi build/tru-arm64.o
 ```
 
 File x86-64 sử dụng `mov eax, edi; add eax, esi; ret`, còn ARM64 phát
@@ -346,9 +346,9 @@ CTest `vpp-target-*` đã đạt. C++ vẫn nhận diện host và cung cấp or
 ```sh
 ctest --test-dir build --output-on-failure -R 'vpp-(raw-machine|raw-object|target-|native-)'
 build/bin/vpp-cli build --target aarch64-linux-gnu --emit-obj ket_hop \
-  src/tests/kiem_tra_native_calls.vi build/ket_hop-aarch64-linux.o
+  scripts/test/kiem_tra_native_calls.vi build/ket_hop-aarch64-linux.o
 build/bin/vpp-cli build --target x86_64-windows-msvc --emit-asm ket_hop \
-  src/tests/kiem_tra_native_calls.vi build/ket_hop-win64.s
+  scripts/test/kiem_tra_native_calls.vi build/ket_hop-win64.s
 ```
 
 Chỉ file `.o` với đầy đủ các symbol callee được linker của hệ đích giải
@@ -373,7 +373,7 @@ MIPS, LoongArch, s390x và SPARC**. Registry phân biệt endianness và biến 
 
 ```sh
 build/bin/vpp-cli --list-targets
-build/bin/vpp-cli build --target riscv64-unknown-linux-gnu src/tests/kiem_tra_machine_jit.vi
+build/bin/vpp-cli build --target riscv64-unknown-linux-gnu scripts/test/kiem_tra_machine_jit.vi
 ```
 
 Lệnh đầu tiên liệt kê các kiến trúc cùng định dạng object (ELF,
@@ -426,9 +426,9 @@ Trên **macOS ARM64, Linux ARM64/x86-64 hoặc Windows x86-64**, chạy
 một file `.vi` bằng CLI được build cho đúng hệ điều hành:
 
 ```sh
-VPP_ENABLE_MACHINE_JIT=1 build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi
+VPP_ENABLE_MACHINE_JIT=1 build/bin/vpp-cli scripts/test/kiem_tra_machine_jit.vi
 VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-  build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi
+  build/bin/vpp-cli scripts/test/kiem_tra_machine_jit.vi
 ```
 
 Windows PowerShell (x64, bản dựng CMake đa cấu hình):
@@ -439,7 +439,7 @@ cmake --build build --config Release
 $env:VPP_HOME = (Get-Location).Path
 $env:VPP_ENABLE_MACHINE_JIT = "1"
 $env:VPP_MACHINE_JIT_STATS = "1"
-& .\build\bin\Release\vpp-cli.exe src/tests/kiem_tra_machine_jit.vi
+& .\build\bin\Release\vpp-cli.exe scripts/test/kiem_tra_machine_jit.vi
 ```
 
 Linux x86-64/aarch64 (cần các phụ thuộc build của dự án, gồm libffi):
@@ -448,7 +448,7 @@ Linux x86-64/aarch64 (cần các phụ thuộc build của dự án, gồm libff
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-  build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi
+  build/bin/vpp-cli scripts/test/kiem_tra_machine_jit.vi
 ```
 
 Đường chạy này phát và thực thi **lệnh máy thật**. macOS ARM64 sử dụng
@@ -511,8 +511,8 @@ RW → `mprotect` RX; Windows x86-64 dùng `VirtualAlloc` RW →
 `VPP_ENABLE_MACHINE_JIT` là **tùy chọn thử nghiệm** trên các nền tảng
 được nêu ở trên. Kiến trúc khác báo lỗi nền tảng chưa hỗ trợ.
 `VPP_ENABLE_JIT` vẫn dùng JIT dạng closure C++ trước đây. Kết quả và
-đường lỗi cần so sánh bằng `src/tests/kiem_tra_machine_jit.vi` với
-`src/tests/expected/kiem_tra_machine_jit.expected`; `run_tests.sh` chạy
+đường lỗi cần so sánh bằng `scripts/test/kiem_tra_machine_jit.vi` với
+`scripts/test/expected/kiem_tra_machine_jit.expected`; `run_tests.sh` chạy
 trên Darwin ARM64 hoặc Linux ARM64/x86-64, `scripts/windows/run-tests.ps1`
 chạy Win64. Hardening C++ so sánh bytecode/closure/native, kiểm tra
 integer boundary, nhánh, lỗi tràn, DAG, vòng gọi và giới hạn call depth.
@@ -677,7 +677,7 @@ giới hạn i32 và ABI như mô tả phía trên.
 
 ```sh
 build/bin/vpp-cli build --target aarch64-apple-darwin --emit-obj-selfhost \
-  sum src/tests/nativeaotsmoke.vi /tmp/sum.o
+  sum scripts/test/nativeaotsmoke.vi /tmp/sum.o
 ```
 
 Kiểm thử `vpp-native-selfhost-host-link` xuất object cho `twice`, `sum`
@@ -687,7 +687,7 @@ relocation, vòng lặp `bỏ qua`/`thoát`, biến cục bộ và tham số tr�
 hàm. Test đồng thời yêu cầu phép chia chưa hỗ trợ phải trả lỗi và không
 sinh artifact. Test này chỉ được đăng ký khi CMake nhận ra compiler và
 target host native tương thích; Windows COFF chưa được harness này xác
-nhận trên Windows thực tế. `src/tests/kiemtranativetuchu.vi` kiểm tra
+nhận trên Windows thực tế. `scripts/test/kiemtranativetuchu.vi` kiểm tra
 logic self-host trực tiếp trong V++ (interpreter và JIT).
 Trên macOS ARM64 ngày 14/10/2026, CTest smoke `vpp-native-selfhost-host-link`
 đạt với cả nguồn `.vi` nằm ngoài repository; năm bài kiểm thử parity và

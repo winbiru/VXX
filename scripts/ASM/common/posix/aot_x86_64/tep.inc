@@ -10,7 +10,12 @@ PUBLIC(vpp_native_os_open):
     cmpl $1537, %esi
     jne 1f
     movl $577, %esi
+    jmp 2f
 1:
+    cmpl $521, %esi             // Darwin O_WRONLY|O_CREAT|O_APPEND
+    jne 2f
+    movl $1089, %esi            // Linux O_WRONLY|O_CREAT|O_APPEND
+2:
 #endif
     movl $438, %edx             // 0666, chịu ảnh hưởng umask của tiến trình
 #ifdef __APPLE__
@@ -30,6 +35,31 @@ PUBLIC(vpp_native_os_close):
 #else
     jmp Llinux_dong
 #endif
+// Signed i32 position, checked against the full 64-bit lseek result.
+.globl PUBLIC(vpp_native_os_seek)
+PUBLIC(vpp_native_os_seek):
+    movslq %esi, %rsi
+    subq $8, %rsp
+#ifdef __APPLE__
+    call LIB(lseek)
+#else
+    movl $8, %eax
+    syscall
+    call Llinux_goi_he_thong_ket_qua
+#endif
+    testq %rax, %rax
+    js 1f
+    cmpq $2147483647, %rax
+    jle 1f
+#ifdef __APPLE__
+    call LIB(__error)
+    movl $84, (%rax)
+#else
+    movl $75, vpp_linux_host_errno(%rip)
+#endif
+    movl $-1, %eax
+1:  addq $8, %rsp
+    ret
 .globl PUBLIC(vpp_native_os_errno)
 PUBLIC(vpp_native_os_errno):
 #ifdef __APPLE__

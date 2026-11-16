@@ -1,0 +1,22 @@
+hàm chính() {
+    in mã trung gian chạy máy ảo([[41,42,0,0],[43,0,0,0]], [], [], []) == "42\n";
+    in mã trung gian chạy máy ảo([[65,0,0,0],[43,0,0,0]], ["Tiếng Việt"], [], []) == "Tiếng Việt\n";
+    in mã trung gian chạy máy ảo([[39,0,0,0],[43,0,0,0]], [], [[0,-1,[[41,42,0,0],[40,0,0,0]]]], [["m",[[41,99,0,0],[43,0,0,0]]]]) == "99\n42\n";
+    lỗi = sai;
+    thử { mã trung gian chạy máy ảo([[2147483647,0,0,0]], [], [], []); }
+    bắt lỗi(e) { lỗi = e == "bytecode không hợp lệ: opcode"; };
+    in lỗi;
+    lỗi = sai;
+    thử { mã trung gian chạy máy ảo([[1,0,0]], [], [], []); }
+    bắt lỗi(e) { lỗi = e == "bytecode không hợp lệ: mỗi lệnh cần 4 trường"; };
+    in lỗi;
+    lỗi = sai;
+    thử { mã trung gian chạy máy ảo([], [], [[1,0,[]]], []); }
+    bắt lỗi(e) { lỗi = e == "bytecode không hợp lệ: function ID"; };
+    in lỗi;
+    lỗi = sai;
+    thử { mã trung gian chạy máy ảo([], [], [], [["m",[]],["m",[]]]); }
+    bắt lỗi(e) { lỗi = e == "bytecode không hợp lệ: trùng định danh initializer"; };
+    in lỗi;
+    in mã trung gian chạy máy ảo([[41,7,0,0],[43,0,0,0]], [], [], []) == "7\n";
+};

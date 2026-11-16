@@ -20,8 +20,13 @@ vpp_native_os_open:
     cmpl $4, %edx           // Thăm dò nguồn bộ thực thi bằng đọc không chặn
     je 1f
     cmpl $1537, %edx        // Darwin O_WRONLY|O_CREAT|O_TRUNC
-    jne Lmo_loi
+    jne 3f
     movl $0x8301, %edx      // _O_BINARY|_O_CREAT|_O_TRUNC|_O_WRONLY
+    jmp 2f
+3:
+    cmpl $521, %edx         // Darwin O_WRONLY|O_CREAT|O_APPEND
+    jne Lmo_loi
+    movl $0x8109, %edx      // _O_BINARY|_O_CREAT|_O_APPEND|_O_WRONLY
     jmp 2f
 1:  movl $0x8000, %edx      // _O_RDONLY|_O_BINARY
 2:  movl $0x180, %r8d       // _S_IREAD|_S_IWRITE
@@ -34,6 +39,21 @@ Lmo_loi:
 .globl vpp_native_os_close
 vpp_native_os_close:
     jmp _close
+// _lseeki64 returns a 64-bit offset; check before returning i32.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    movslq %edx, %rdx
+    subq $40, %rsp
+    call _lseeki64
+    testq %rax, %rax
+    js 1f
+    cmpq $2147483647, %rax
+    jle 1f
+    call _errno
+    movl $132, (%rax) // UCRT EOVERFLOW
+    movl $-1, %eax
+1:  addq $40, %rsp
+    ret
 .globl vpp_native_os_errno
 vpp_native_os_errno:
     subq $40, %rsp

@@ -1,0 +1,37 @@
+nhập gói.biên dịch.đọc macho.Đối Tượng MachO;
+nhập gói.biên dịch.bố trí macho.*;
+nhập gói.biên dịch.vá macho.*;
+nhập gói.văn bản.chuỗi.tách hằng văn bản;
+
+hàm đối số văn bản(i) {
+    h = đối số lấy(i);
+    bytes = [];
+    lặp(j = 0; j < byte dài(h); j++) { bỏ kết quả = máy ảo thêm cuối danh sách(bytes, byte lấy(h, j)); };
+    bỏ kết quả = byte hủy(h);
+    trả về chuỗi từ byte máy ảo(bytes);
+};
+
+hàm chính() {
+    đối tượng = [];
+    thử {
+        cho phép = {};
+        tên = tách hằng văn bản(đối số văn bản(1), "|");
+        lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) { cho phép[tên[i]] = đúng; };
+        lặp(i = 2; i < đối số đếm(); i++) { bỏ kết quả = máy ảo thêm cuối danh sách(đối tượng, Đối Tượng MachO(đối số văn bản(i))); };
+        k = macho lập kế hoạch(đối tượng, cho phép);
+        lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i++) {
+            o = đối tượng[i];
+            lặp(j = 0; j < o.số phần(); j++) {
+                bản vá = macho bản vá phần(o, j, k["positions"][i][j], k["symbols"][i]);
+                in [i, j, máy ảo lấy độ dài(bản vá)];
+                lặp(q = 0; q < máy ảo lấy độ dài(bản vá); q++) { in bản vá[q]; };
+            };
+            bỏ kết quả = o.đóng();
+        };
+        in "Mach-O patch: PASS";
+    } bắt lỗi(e) {
+        lặp(i = 0; i < máy ảo lấy độ dài(đối tượng); i++) { thử { bỏ kết quả = đối tượng[i].đóng(); } bắt lỗi(lỗi đóng) {}; };
+        in e;
+        trả về 1;
+    };
+};

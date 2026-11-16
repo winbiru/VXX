@@ -1,0 +1,18 @@
+hàm hot_pressure(a, b) { trả về a + b; };
+hàm chính() {
+    lặp(i = 0; i < 40; i++) { kết quả = hot_pressure(i, 1); };
+    // Force GC after specialization, keeping the profile and leaf alive.
+    lặp(i = 0; i < 16000; i++) { rác = [i]; thêm(rác, rác); };
+    handles = [];
+    lặp(i = 0; i < 4; i++) {
+        h = byte mới();
+        nếu (h <= 0) { trả về 1; };
+        thêm(handles, h);
+    };
+    nếu (byte mới() != -1) { trả về 2; };
+    kết quả = hot_pressure(19, 23);
+    lặp(i = 0; i < 4; i++) {
+        nếu (byte hủy(handles[i]) != 0) { trả về 3; };
+    };
+    in kết quả;
+};

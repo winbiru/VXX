@@ -1,0 +1,26 @@
+nhập gói.biên dịch.đối tượng macho động.Bộ Ghi MachO Động;
+
+hàm chính() {
+    h = đối số lấy(1); a = [];
+    lặp(i = 0; i < byte dài(h); i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(a, byte lấy(h, i)); };
+    bỏ kết quả = byte hủy(h);
+    o = Bộ Ghi MachO Động(chuỗi từ byte máy ảo(a));
+    b = []; r = [];
+    lặp(i = 0; i < 1500; i += 1) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(r, {"offset": i * 4, "symbol": "callee"});
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, 0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, 0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, 0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, 148);
+    };
+    lặp(i = 0; i < 4; i += 1) { bỏ kết quả = máy ảo thêm cuối danh sách(b, [192,3,95,214][i]); };
+    phát = {"bytes": b, "relocations": r};
+    bỏ kết quả = o.ghi hàm("caller0", phát);
+    bỏ kết quả = o.ghi hàm("caller1", phát);
+    bỏ kết quả = o.ghi hàm("caller2", phát);
+    bỏ kết quả = o.ghi hàm("callee", {"bytes": [64,5,128,82,192,3,95,214], "relocations": []});
+    bỏ kết quả = o.bắt đầu dữ liệu();
+    bỏ kết quả = o.nhãn("_table", đúng);
+    lặp(i = 0; i < 4500; i += 1) { bỏ kết quả = o.con trỏ("_callee"); };
+    bỏ kết quả = o.hoàn tất();
+};

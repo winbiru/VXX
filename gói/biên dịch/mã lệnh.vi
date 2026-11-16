@@ -9,12 +9,17 @@ lớp công khai Bộ Đọc Mã Lệnh {
         kết quả = [];
         lặp(i = 0; i < máy ảo lấy độ dài(mã trung gian thô); i++) {
             lệnh = mã trung gian thô[i];
-            máy ảo thêm cuối danh sách(kết quả, {
+            mục = {
                 "op": lệnh[0],
                 "toán hạng": lệnh[1],
                 "chỉ số": lệnh[2],
                 "giá trị": lệnh[3]
-            });
+            };
+            // Metadata nội bộ; wire ABI vẫn chỉ chứa bốn i32.
+            nếu (máy ảo lấy độ dài(lệnh) == 6) {
+                mục["dòng"] = lệnh[4]; mục["cột"] = lệnh[5];
+            };
+            máy ảo thêm cuối danh sách(kết quả, mục);
         };
         trả về kết quả;
     };

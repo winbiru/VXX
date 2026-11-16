@@ -1,0 +1,18 @@
+nhập gói.dữ liệu.json.json.*;
+hàm chính() {
+    dài = "";
+    lặp(i = 0; i < 128; i++) { dài += "Việt 🚀"; };
+    in json phân tích("{" + json chuỗi(dài) + ":1}")[dài] == 1;
+    in json phân tích("{\"\":2}")[""] == 2;
+    in json phân tích("{\"a\\\"b\":3}")["a\"b"] == 3;
+    in json phân tích("{\"a\\\\b\":4}")["a\\b"] == 4;
+    in json phân tích("{\"\\uD83D\\uDE80\":5}")["🚀"] == 5;
+    in json phân tích("{\"a\":1,\"a\":6}")["a"] == 6;
+    in json phân tích("{\"a\":{\"b\":7}}")["a"]["b"] == 7;
+    mẫu lỗi = ["{\"abc", "{\"a\\x\":1}", "{\"a" + chuỗi từ byte máy ảo([11]) + "b\":1}", "{\"a\" 1}"];
+    đếm = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(mẫu lỗi); i++) {
+        thử { json phân tích(mẫu lỗi[i]); } bắt lỗi(e) { đếm += 1; };
+    };
+    in đếm == 4;
+};

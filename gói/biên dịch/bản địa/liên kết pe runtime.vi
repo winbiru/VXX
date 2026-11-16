@@ -36,10 +36,10 @@ hàm pe rt tìm(kho, sym, ns, str, tên) {
 hàm pe rt thư viện(tên) {
     biến khóa = "|"; byte nối(khóa, tên); byte thêm(khóa, 124);
     biến kết quả = -1;
-    biến danh sách = "|VirtualAlloc|MultiByteToWideChar|WideCharToMultiByte|MoveFileExW|GetFileInformationByHandle|CreateFileW|CloseHandle|GetLastError|SetLastError|GetEnvironmentVariableW|GetModuleFileNameW|GetCommandLineW|LocalFree|";
+    biến danh sách = "|VirtualAlloc|VirtualFree|TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|VirtualProtect|FlushInstructionCache|MultiByteToWideChar|WideCharToMultiByte|MoveFileExW|GetFileInformationByHandle|CreateFileW|CloseHandle|WaitForSingleObject|GetLastError|SetLastError|GetEnvironmentVariableW|GetModuleFileNameW|GetCommandLineW|LocalFree|";
     nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 1; };
     byte hủy(danh sách);
-    danh sách = "|_read|_write|_wopen|_close|_errno|_wunlink|_wmkdir|_waccess|_wmktemp_s|_get_osfhandle|_wgetcwd|realloc|calloc|malloc|free|_wspawnvp|_cwait|atexit|";
+    danh sách = "|_read|_write|_wopen|_close|_errno|_wunlink|_wmkdir|_waccess|_wmktemp_s|_get_osfhandle|_lseeki64|_wgetcwd|realloc|calloc|malloc|free|_beginthreadex|_wspawnvp|_cwait|atexit|";
     nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 2; };
     byte hủy(danh sách);
     danh sách = "|CommandLineToArgvW|";
@@ -277,7 +277,7 @@ hàm pe rt tạo(coff, runtime, kết quả) {
             lặp (j = 0; j < 3; j++) { byte thêm(kết quả, 6); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 0); };
             đối tượng i32(kết quả, 0); đối tượng i32(kết quả, data rva + macho rt căn(byte dài(dữ liệu), 4096)); đối tượng i32(kết quả, 512); đối tượng i32(kết quả, 0);
             byte thêm(kết quả, 3); byte thêm(kết quả, 0); byte thêm(kết quả, 0); byte thêm(kết quả, 1);
-            đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096); đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+            đối tượng u64(kết quả, 67108864); đối tượng u64(kết quả, 4096); đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
             đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 16);
             lặp (j = 0; j < 16; j++) {
                 biến v = 0; biến kích thước thư mục dữ liệu = 0;

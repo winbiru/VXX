@@ -157,7 +157,7 @@ class SnippetString {
   constructor(value) { this.value = value; }
 }
 
-function loadExtension(platform, workspaceRoots, existsSync = fs.existsSync) {
+function loadExtension(platform, workspaceRoots, existsSync = fs.existsSync, configuredLsp = '') {
   const vscode = {
     Position, Range, DocumentSymbol, SignatureHelp, SignatureInformation, ParameterInformation,
     CompletionItem, SnippetString,
@@ -166,7 +166,7 @@ function loadExtension(platform, workspaceRoots, existsSync = fs.existsSync) {
     SymbolKind: { Class: 1, Interface: 2, Function: 3, Module: 4, Variable: 5 },
     workspace: {
       workspaceFolders: workspaceRoots.map((fsPath) => ({ uri: { fsPath } })),
-      getConfiguration: () => ({ get: () => '' })
+      getConfiguration: () => ({ get: (key) => key === 'lsp.executable' ? configuredLsp : '' })
     }
   };
   const mockedFs = { ...fs, existsSync, statSync: () => ({ isFile: () => true }) };
@@ -295,10 +295,13 @@ const fixtureRoot = path.join(root, '__mock_windows_workspace__');
 const expectedWindows = path.join(fixtureRoot, 'build/bin/Release/vpp-cli.exe');
 const winExt = loadExtension('win32', [fixtureRoot], (candidate) =>
   candidate === path.join(fixtureRoot, 'vpp-libraries.json') || candidate === expectedWindows);
-assert.equal(winExt.languageServerExecutable({ globalStorageUri: { fsPath: '/tmp/vpp-extension' } }), expectedWindows);
+assert.equal(winExt.languageServerExecutable({ globalStorageUri: { fsPath: '/tmp/vpp-extension' } }), '');
 const expectedUnix = path.join(fixtureRoot, 'build/bin/vpp');
 const unixExt = loadExtension('darwin', [fixtureRoot], (candidate) =>
   candidate === path.join(fixtureRoot, 'vpp-libraries.json') || candidate === expectedUnix);
-assert.equal(unixExt.languageServerExecutable({ globalStorageUri: { fsPath: '/tmp/vpp-extension' } }), expectedUnix);
+assert.equal(unixExt.languageServerExecutable({ globalStorageUri: { fsPath: '/tmp/vpp-extension' } }), '');
+const configuredLsp = path.join(fixtureRoot, 'external-lsp');
+assert.equal(loadExtension('darwin', [fixtureRoot], fs.existsSync, configuredLsp)
+  .languageServerExecutable({}), configuredLsp);
 
 console.log('V++ extension regressions: PASS');

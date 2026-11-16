@@ -108,7 +108,7 @@ vpp_native_sha_end:
     call vpp_native_memory_base
     testq %rax, %rax
     jz .Lsha_cuoi_sai
-    cmpl $68162528, %r13d // Đích cần 32 byte
+    cmpl $(135271424-32), %r13d // Đích cần 32 byte
     ja .Lsha_cuoi_sai
     leaq 3904(%rax), %r12
     leaq (%rax,%r13), %rbx

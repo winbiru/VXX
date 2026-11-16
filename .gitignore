@@ -36,10 +36,10 @@ bin/
 .DS_Store
 *.dmg
 # Test artifacts
-src/tests/.tmp/
-src/tests/.tmp_*
-src/tests/.tmp.*/
-src/tests/.perf_batch/
+scripts/test/.tmp/
+scripts/test/.tmp_*
+scripts/test/.tmp.*/
+scripts/test/.perf_batch/
 *.actual
 dist/
 *.vsix
@@ -104,6 +104,7 @@ node_modules/
 !benchmark/NATIVE.md
 !benchmark/UNICODE_JSON_AB.md
 !benchmark/languages/BULK_BENCHMARK.md
+!benchmark/languages/README.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
 !docs/vm-asm.md
@@ -122,3 +123,11 @@ node_modules/
 /gói/máy ảo/__aot_probe_*.vi
 /gói/máy ảo/__tham_do_aot.vi
 /gói/máy ảo/_codex_diag_*.vi
+
+# Document provenance of the native bootstrap seed.
+!/bootstrap/README.md
+
+# Pinned Windows V++/ASM bootstrap executable.
+!/bootstrap/windows-x86_64/vpp-i32.exe
+
+*.Graphify*

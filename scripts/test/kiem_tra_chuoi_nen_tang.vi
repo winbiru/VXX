@@ -1,0 +1,190 @@
+nhập gói.chuẩn.chính.*;
+
+hàm chính() {
+    văn_bản = "a𠮷Việt";
+    in ký tự tại(văn_bản, 1);
+    in con chuỗi(văn_bản, 1, 4);
+    in tìm chuỗi chính xác(văn_bản, "Việt");
+    in tìm chuỗi chính xác(văn_bản, "missing") == rỗng;
+    in bắt đầu bằng(văn_bản, "a𠮷");
+    in kết thúc bằng(văn_bản, "Việt");
+    in chứa chính xác(văn_bản, "𠮷V");
+    in thay chính xác("aba𠮷aba", "aba", "X");
+    in thay chính xác("ab", "", "-");
+
+    nbsp = ký tự unicode(160);
+    em_space = ký tự unicode(8195);
+    narrow_nbsp = ký tự unicode(8239);
+    ideographic_space = ký tự unicode(12288);
+    zero_width_space = ký tự unicode(8203);
+    in là khoảng trắng unicode(nbsp);
+    in là khoảng trắng unicode(em_space);
+    in là khoảng trắng unicode(narrow_nbsp);
+    in là khoảng trắng unicode(ideographic_space);
+    in !là khoảng trắng unicode(zero_width_space);
+    in bỏ khoảng trắng(nbsp + em_space + "Việt" + narrow_nbsp + ideographic_space) == "Việt";
+    in bỏ khoảng trắng đầu(nbsp + "A" + em_space) == "A" + em_space;
+    in bỏ khoảng trắng cuối(nbsp + "A" + em_space) == nbsp + "A";
+    in bỏ khoảng trắng(nbsp + em_space) == "";
+    in chuẩn hóa khoảng trắng("a" + nbsp + em_space + "b") == "a b";
+    in đếm từ("a" + em_space + "b" + ideographic_space + "c") == 3;
+    in từ dài nhất("a" + em_space + "Việt" + nbsp + "b") == "Việt";
+    in là anagram("a" + narrow_nbsp + "b", "ba");
+
+    bytes_việt = chuỗi thành các byte("Việt");
+    in chuỗi từ các byte(bytes_việt) == "Việt";
+    ký_tự_thay = ký tự unicode(65533);
+    in chuỗi từ các byte([226, 130], "UTF-8", "THAY_THẾ") == ký_tự_thay;
+    thử {
+        in chuỗi từ các byte([226, 130]);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    phần = tách hằng văn bản("a::b::", "::");
+    in độ dài(phần);
+    lặp(i = 0; i < độ dài(phần); i++) {
+        in "[" + phần[i] + "]";
+    };
+
+    builder = bộ dựng chuỗi(16);
+    bộ dựng thêm(builder, "Việt");
+    bộ dựng thêm(builder, " Nam");
+    bộ dựng chèn(builder, 4, " đẹp");
+    in bộ dựng kết quả(builder);
+    bộ dựng xóa(builder, 4, 8);
+    in bộ dựng kết quả(builder);
+    bộ dựng thay(builder, 0, 4, "V++");
+    in bộ dựng kết quả(builder);
+    bộ dựng đảo(builder);
+    in bộ dựng kết quả(builder);
+
+    mảnh = ["Xin ", ", số ", "!"];
+    giá_trị = ["V++", 42];
+    template = mẫu chuỗi(mảnh, giá_trị);
+    mảnh[0] = "Đổi ";
+    in nội suy mẫu(template);
+
+    processor = hàm(t) {
+        parts = lấy từ điển(t, "mảnh", []);
+        values = lấy từ điển(t, "giá trị", []);
+        trả về parts[0] + "[" + thành chuỗi(values[0]) + "]" + parts[1] +
+               thành chuỗi(values[1]) + parts[2];
+    };
+    in xử lý mẫu(template, processor);
+
+    thử {
+        in ký tự tại("x", 1);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    nhỏ = bộ dựng chuỗi(2);
+    thử {
+        bộ dựng thêm(nhỏ, "abc");
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    byte_hẹp = bộ dựng chuỗi(10, 5);
+    thử {
+        bộ dựng thêm(byte_hẹp, "Việt");
+    } bắt lỗi (e) {
+        in e;
+    };
+    bộ dựng thêm(byte_hẹp, "abc");
+    in bộ dựng số byte(byte_hẹp);
+
+    thử {
+        bộ dựng thêm([], "x");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        mẫu chuỗi("x", []);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    // KMP trên byte phải giữ chỉ số code point và không khớp giữa UTF-8.
+    in tìm chuỗi chính xác("xxaab", "aab") == 2;
+    in tìm chuỗi chính xác("a𠮷Việt", "Việt", 2) == 2;
+    in tìm chuỗi chính xác("a𠮷Việt", "Việt", 3) == rỗng;
+    in tìm chuỗi chính xác("a𠮷", "", 2) == 2;
+    in tìm chuỗi chính xác("abc", "abc") == 0;
+    in thay chính xác("aaaaa", "aa", "X") == "XXa";
+    in thay chính xác("abababa", "aba", "X") == "XbX";
+    // So khớp theo khối i32 phải xử lý cả mẫu 1..4 byte và UTF-8 dài hơn.
+    in thay chính xác("aaaa", "a", "X") == "XXXX";
+    in thay chính xác("abcaba", "abc", "R") == "Raba";
+    in thay chính xác("aaaa", "aaaa", "R") == "R";
+    in thay chính xác("xViệtyViệt", "Việt", "V++") == "xV++yV++";
+    in thay chính xác("🚀🚀!", "🚀", "*") == "**!";
+    in thay chính xác("é🚀", "é🚀", "!") == "!";
+    in thay chính xác("", "", ":") == ":";
+    in thay chính xác("a𠮷", "", ":") == ":a:𠮷:";
+
+    byte sai = chuỗi từ byte máy ảo([169]);
+    văn bản sai = chuỗi từ byte máy ảo([195, 169, 169]);
+    in tìm chuỗi chính xác("é", byte sai) == rỗng;
+    in tìm chuỗi chính xác(văn bản sai, byte sai) == 1;
+    in thay chính xác(văn bản sai, byte sai, "X") == "éX";
+    byte thay = chuỗi thành byte máy ảo(thay chính xác(
+        chuỗi từ byte máy ảo([226, 130]), "", "-"));
+    in độ dài(byte thay) == 5 && byte thay[0] == 45 && byte thay[1] == 226 &&
+       byte thay[2] == 45 && byte thay[3] == 130 && byte thay[4] == 45;
+    // Vị trí khớp trên mọi lane của từ i32 và phần dư cuối nguồn.
+    in thay chính xác("abcVabcV", "V", "X") == "abcXabcX" &&
+       thay chính xác("Vabc", "V", "X") == "Xabc" &&
+       thay chính xác("aVbc", "V", "X") == "aXbc" &&
+       thay chính xác("abVc", "V", "X") == "abXc";
+    in thay chính xác("abcdefghijk", "Z", "X") == "abcdefghijk";
+    nul = chuỗi từ byte máy ảo([0]);
+    in thay chính xác("abcd" + nul + "é" + nul, nul, "X") == "abcdXéX";
+    // Không được dùng công thức cộng độ dài nếu hai byte lỗi ghép thành UTF-8.
+    ghép = thay chính xác(chuỗi từ byte máy ảo([195, 88, 169]), "X", "");
+    in ghép == "é" && độ dài(ghép) == 1;
+    in độ dài(chuỗi từ byte máy ảo([226, 130]) + "abcdefgh" + "🚀") == 11;
+    // Mọi byte ASCII, kể cả NUL/DEL, khớp sau một từ đầy byte lỗi.
+    // Kiểm tra cả lane trong từ i32 và đuôi ngắn hơn bốn byte.
+    đúng_tất_cả = đúng;
+    đệm = chuỗi từ byte máy ảo([255, 128, 195, 255, 128]);
+    lặp(b = 0; b < 128; b++) {
+        mẫu = chuỗi từ byte máy ảo([b]);
+        tiền = đệm;
+        lặp(lane = 0; lane < 4; lane++) {
+            nguồn = tiền + mẫu + đệm + mẫu;
+            nếu (thay chính xác(nguồn, mẫu, "R") != tiền + "R" + đệm + "R") {
+                đúng_tất_cả = sai;
+            };
+            nếu (thay chính xác(tiền, mẫu, "R") != tiền) { đúng_tất_cả = sai; };
+            tiền += chuỗi từ byte máy ảo([255]);
+        };
+    };
+    in đúng_tất_cả;
+    // Quét ASCII theo khối 16 byte và giữ biên UTF-8 khi thay chuỗi dài.
+    ascii dài = "0123456789abcdef";
+    lặp(i = 0; i < 9; i++) { ascii dài += ascii dài; };
+    in độ dài(ascii dài) == 8192;
+    in độ dài(ascii dài + "🚀x") == 8194;
+    lặp(i = 0; i < 16; i++) {
+        đầu = máy ảo cắt chuỗi theo byte(ascii dài, 0, i);
+        in độ dài(đầu + "🚀" + ascii dài) == i + 8193;
+    };
+    mẫu dài = "Việt 🚀";
+    lặp(i = 0; i < 8; i++) { mẫu dài += mẫu dài; };
+    in thay chính xác(mẫu dài + "!" + mẫu dài, mẫu dài, "X") == "X!X";
+    in thay chính xác(mẫu dài, mẫu dài, "X") == "X";
+    in thay chính xác("é", chuỗi từ byte máy ảo([195]), "X") == "é";
+    in thay chính xác(chuỗi từ byte máy ảo([195, 88, 169]), "X", "") == "é";
+    // NFC: mọi nguyên âm trong bảng, các đoạn đã chuẩn hóa và dấu độc lập.
+    dựng sẵn = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊOÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
+    phân rã = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵAÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊOÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
+    in chuẩn hóa unicode(dựng sẵn) == dựng sẵn;
+    in chuẩn hóa unicode(phân rã) == dựng sẵn;
+    in chuẩn hóa unicode("̣́á🚀𠮷ḅ́") == "̣́á🚀𠮷ḅ́";
+    in chuẩn hóa unicode("ậ Á̆ á́") == "ậ Á̆ á́";
+    in chuẩn hóa unicode("中 Ω") == "中 Ω" && chuẩn hóa unicode("") == "";
+    lỗi unicode = chuỗi từ byte máy ảo([195, 255, 128]);
+    in chuẩn hóa unicode(lỗi unicode + "á" + lỗi unicode) == lỗi unicode + "á" + lỗi unicode;
+};

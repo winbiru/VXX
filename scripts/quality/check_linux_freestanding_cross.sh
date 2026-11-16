@@ -19,7 +19,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
     "$ROOT_DIR/scripts/ASM/linux/vpp_linux_start_x86_64.S" -o "$OUTPUT_DIR/start.o"
 "$CC" -target x86_64-unknown-linux-gnu -c \
     "$ROOT_DIR/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S" -o "$OUTPUT_DIR/syscalls.o"
-"$CC" -target x86_64-unknown-linux-gnu -c \
+"$CC" -target x86_64-unknown-linux-gnu -DVPP_LINUX_SYSCALL_PROBE_ONLY=1 -c \
     "$ROOT_DIR/scripts/ASM/linux/vpp_linux_runtime_core_x86_64.S" -o "$OUTPUT_DIR/runtime-core.o"
 "$CC" -target x86_64-unknown-linux-gnu -c \
     "$ROOT_DIR/scripts/ASM/linux/vpp_linux_directory_x86_64.S" \
@@ -91,7 +91,7 @@ unresolved="$OUTPUT_DIR/.freestanding-unresolved.tmp"
 trap 'rm -f "$defined" "$referenced" "$unresolved"' EXIT
 : > "$defined"
 : > "$referenced"
-for object in start syscalls runtime-core directory sha256 process socket probe socket-probe; do
+for object in start syscalls runtime-core directory sha256 process socket probe socket-probe numeric; do
     nm -g "$OUTPUT_DIR/$object.o" | awk \
         'NF >= 2 && $(NF-1) != "U" && $(NF-1) ~ /^[A-Za-z]$/ { print $NF }' \
         >> "$defined"

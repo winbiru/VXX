@@ -1,0 +1,25 @@
+hàm hot_add(a, b) { trả về a + b; };
+hàm hot_sub(a, b) { trả về a - b; };
+hàm hot_mul(a, b) { trả về a * b; };
+hàm hot_and(a, b) { trả về a & b; };
+hàm hot_or(a, b) { trả về a | b; };
+hàm hot_xor(a, b) { trả về a ^ b; };
+hàm cold_add(a, b) { trả về a + b; };
+hàm generic_add(a, b) { trả về (a + b) + 1; };
+hàm chính() {
+    lặp(i = 0; i < 40; i++) {
+        a = hot_add(i, -3);
+        b = hot_sub(i, -3);
+        c = hot_mul(i, -3);
+        d = hot_and(i, -3);
+        e = hot_or(i, -3);
+        f = hot_xor(i, -3);
+        g = generic_add(i, 1);
+    };
+    in a; in b; in c; in d; in e; in f; in g;
+    in hot_add("Tiếng ", "Việt");
+    in hot_add(1.25, 2.5);
+    in hot_add(2147483647, 1);
+    in hot_add(-2147483648, -1);
+    in cold_add(19, 23);
+};

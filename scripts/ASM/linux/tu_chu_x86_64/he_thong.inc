@@ -16,7 +16,7 @@ vpp_native_os_clock:
     movl -8(%rbp), %esi
     cmpl $1, %edi
     ja Lvm_he_thong_sai_x86
-    cmpl $68162544, %esi
+    cmpl $(135271424 - 16), %esi
     ja Lvm_he_thong_sai_x86
     addq %r10, %rsi
     testl %edi, %edi
@@ -43,7 +43,7 @@ vpp_native_os_thread_cpu_clock:
     movq %rax, %r10
     movl -4(%rbp), %edi
     movl -8(%rbp), %esi
-    cmpl $68162544, %esi
+    cmpl $(135271424 - 16), %esi
     ja Lvm_he_thong_sai_x86
     addq %r10, %rsi
     movl $3, %edi

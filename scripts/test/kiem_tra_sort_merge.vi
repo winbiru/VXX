@@ -1,0 +1,105 @@
+nhập gói.bộ sưu tập.danh sách.*;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.bộ sưu tập.bộ giá trị.thành bộ giá trị;
+// Reference implementation preserves comparison and partial mutation order.
+hàm cp37 gốc(ds) {
+    n = máy ảo lấy độ dài(ds);
+    lặp(i = 0; i < n; i++) {
+        đổi = sai;
+        lặp(j = 0; j + 1 < n - i; j++) {
+            nếu (ds[j] > ds[j + 1]) {
+                tạm = ds[j]; ds[j] = ds[j + 1]; ds[j + 1] = tạm; đổi = đúng;
+            };
+        };
+        nếu (!đổi) { thoát; };
+    };
+    trả về rỗng;
+};
+hàm cp37 so(ds, chuẩn) {
+    nếu (máy ảo lấy độ dài(ds) != máy ảo lấy độ dài(chuẩn)) { ném "sort length"; };
+    lặp(i = 0; i < máy ảo lấy độ dài(ds); i++) {
+        a = ds[i]; b = chuẩn[i];
+        nếu (a != b && !(a != a && b != b)) { ném "sort element"; };
+    };
+};
+hàm cp37 hoán vị(n, chế độ) {
+    ds = []; chuẩn = [];
+    lặp(j = 0; j < n; j++) {
+        x = j;
+        nếu (chế độ == 1) { x = n - 1 - j; }
+        hoặc nếu (chế độ == 2) { x = (j * 37 + 13) % n; }
+        hoặc nếu (chế độ == 3 && n > 1 && j == 0) { x = 1; }
+        hoặc nếu (chế độ == 3 && n > 1 && j == 1) { x = 0; };
+        máy ảo thêm cuối danh sách(ds, x);
+        máy ảo thêm cuối danh sách(chuẩn, j);
+    };
+    bí danh = ds;
+    nếu (sắp xếp(ds) != rỗng) { ném "sort return"; };
+    cp37 so(bí danh, chuẩn);
+};
+hàm cp37 đối chiếu(ds, chuẩn) {
+    e1 = rỗng; e2 = rỗng;
+    thử { sắp xếp(ds); } bắt lỗi(e) { e1 = e; };
+    thử { cp37 gốc(chuẩn); } bắt lỗi(e) { e2 = e; };
+    nếu (e1 != e2) { ném "sort error"; };
+    cp37 so(ds, chuẩn);
+};
+hàm chính() {
+    ca lỗi = đọc biến môi trường("CP37_SORT_ERROR", "");
+    nếu (ca lỗi == "mixed") {
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 40; i++) {
+        x = 40 - i;
+        nếu (i == 35) { x = "x"; };
+        máy ảo thêm cuối danh sách(ds, x); máy ảo thêm cuối danh sách(chuẩn, x);
+    };
+    cp37 đối chiếu(ds, chuẩn);
+        trả về rỗng;
+    };
+    nếu (ca lỗi == "tuple") {
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 40; i++) {
+        máy ảo thêm cuối danh sách(ds, 40 - i);
+        máy ảo thêm cuối danh sách(chuẩn, 40 - i);
+    };
+    cp37 đối chiếu(thành bộ giá trị(ds), thành bộ giá trị(chuẩn));
+        trả về rỗng;
+    };
+
+    kích thước = [0, 1, 2, 31, 32, 33, 127, 128, 129, 511, 512, 513];
+    lặp(k = 0; k < máy ảo lấy độ dài(kích thước); k++) {
+        lặp(c = 0; c < 4; c++) { cp37 hoán vị(kích thước[k], c); };
+    };
+    giá trị = [-2147483647 - 1, -9, 0, 1, 2147483647];
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 129; i++) {
+        x = giá trị[(i * 7 + 3) % 5];
+        máy ảo thêm cuối danh sách(ds, x); máy ảo thêm cuối danh sách(chuẩn, x);
+    };
+    cp37 đối chiếu(ds, chuẩn);
+    giá trị = ["", chuỗi từ byte máy ảo([0]), "A", "a", chuỗi từ byte máy ảo([128]), "á", "Việt", "🚀", chuỗi từ byte máy ảo([255])];
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 129; i++) {
+        x = giá trị[(i * 7 + 3) % 9];
+        máy ảo thêm cuối danh sách(ds, x); máy ảo thêm cuối danh sách(chuẩn, x);
+    };
+    cp37 đối chiếu(ds, chuẩn);
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 40; i++) {
+        x = 40.0 - i;
+        nếu (i == 20) { x = thành số thực("nan"); };
+        máy ảo thêm cuối danh sách(ds, x); máy ảo thêm cuối danh sách(chuẩn, x);
+    };
+    cp37 đối chiếu(ds, chuẩn);
+    // Mixed numeric comparisons succeed through the two initial passes.
+    ds = []; chuẩn = [];
+    lặp(i = 0; i < 40; i++) {
+        x = 40 - i;
+        nếu (i % 2 == 0) { x = x + 0.5; };
+        máy ảo thêm cuối danh sách(ds, x); máy ảo thêm cuối danh sách(chuẩn, x);
+    };
+    cp37 đối chiếu(ds, chuẩn);
+    cp37 đối chiếu("abc", "abc");
+    in "CP37 stable sort PASS";
+};

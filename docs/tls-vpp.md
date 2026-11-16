@@ -32,7 +32,7 @@ trao đổi khóa, chữ ký/chứng chỉ, trust store, hostname và cleanup.
 ## Kiểm chứng
 
 `scripts/quality/check_vm_tls_crypto.cmake` biên dịch fixture
-`src/tests/fixtures/vm_tls_crypto.vi` rồi chạy trên VM V++/ASM với PATH rỗng.
+`scripts/test/fixtures/vm_tls_crypto.vi` rồi chạy trên VM V++/ASM với PATH rỗng.
 Test nằm trong `vpp-vm-asm`, kiểm tra vector ChaCha20, Poly1305, HKDF và
 AEAD; 16 vị trí tag bị sửa; key/nonce/byte/độ dài sai; record với padding;
 hai record liên tiếp; header/AAD mẫu đối chiếu oracle; state đã hỏng và

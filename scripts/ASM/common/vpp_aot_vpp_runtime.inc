@@ -1,5 +1,7 @@
 #if defined(__linux__) && defined(__x86_64__)
 #include "../linux/vpp_aot_vpp_runtime_x86_64.inc"
+#elif defined(_WIN32) && defined(__x86_64__)
+#include "../windows/vpp_aot_vpp_runtime_x86_64.inc"
 #else
 // ASM đổi con trỏ, đọc siêu dữ liệu và gọi máy gián tiếp. Giá trị động, khung gọi, bao đóng, ngoại
 // lệ và GC được viết bằng V++.
@@ -8,6 +10,17 @@
 #endif
 .text
 .p2align 2
+// The active program spec is scoped to a dynamic JIT execution. All
+// indirect metadata reads (including optimized fold paths) share this macro.
+.macro AOT_ACTIVE_SPEC
+    adrp x9, _vpp_jit_active_spec@PAGE
+    ldr x9, [x9, _vpp_jit_active_spec@PAGEOFF]
+    cbnz x9, 9f
+    adrp x9, _vpp_aot_spec@PAGE
+    add x9, x9, _vpp_aot_spec@PAGEOFF
+9:
+.endm
+
 .macro AOT_VPP ten, so_doi_so
     .globl _vpp_native_dynamic_\ten
 _vpp_native_dynamic_\ten:
@@ -68,6 +81,10 @@ _vpp_native_dynamic_\ten:
     bl _vpp_native_memory_base
     cbz x0, Laot_gap_khung_du_phong
     mov x19, x0
+    mov w9, #0x1144
+    movk w9, #0x40, lsl #16
+    ldr w9, [x19, w9, uxtw]
+    cbnz w9, Laot_gap_khung_du_phong
     add x21, x19, w20, uxtw
 
     // Chỉ dùng cache cục bộ. Frame toàn cục/constructor cần tra scope đầy đủ.
@@ -187,8 +204,7 @@ Laot_gap_khung_callee_hop:
     ldr w12, [x10, #4]
 Laot_gap_khung_co_callee:
     tbnz w12, #31, Laot_gap_khung_du_phong
-    adrp x9, _vpp_aot_spec@PAGE
-    add x9, x9, _vpp_aot_spec@PAGEOFF
+    AOT_ACTIVE_SPEC
     ldr x10, [x9, #80]
     cmp x12, x10
     b.hs Laot_gap_khung_du_phong
@@ -306,6 +322,8 @@ Laot_gap_khung_tra:
 .endm
 
 #include "vpp_aot_vpp_exports.inc"
+// Appended source-site helper; old bridge indices are unchanged.
+AOT_VPP source_site, 2
 
 // Tra một slot cục bộ theo đúng đường nhanh của vm_cell: bốn ô nội tuyến
 // rồi bốn mục cache. Không tìm thấy thì trả 0 để caller dùng đường đầy đủ.
@@ -388,11 +406,43 @@ Laot_doc_i32_nhanh_sai:
     mov w1, #0
     ret
 
+// Trusted registration: install the fixed callback only after opening the root registry.
+Lworker_aot_register:
+    stp x29, x30, [sp, #-16]!
+    mov w0, #11
+    mov w1, #0
+    mov w2, #0
+    bl _vpp_native_worker_service
+    cbnz w0, 1f
+    adrp x0, _vpp_worker_aot_entry_callback@PAGE
+    add x0, x0, _vpp_worker_aot_entry_callback@PAGEOFF
+    bl _vpp_native_worker_set_entry
+1:  ldp x29, x30, [sp], #16
+    ret
+_vpp_worker_aot_entry_callback:
+    sub sp, sp, #48
+    str x30, [sp, #32]
+    str w1, [sp]
+    str x0, [sp, #40]
+    bl _vpp_fn_aot_worker_entry
+    mov w1, w0
+    ldr x0, [sp, #40]
+    ldr x30, [sp, #32]
+    add sp, sp, #48
+    b _vpp_native_worker_compact_result
+
 // info(trường, chỉ số, byte) chỉ trả dữ liệu; giữ con trỏ máy đủ độ rộng bên trong ASM.
 .globl _vpp_native_aot_info
 _vpp_native_aot_info:
-    adrp x9, _vpp_aot_spec@PAGE
-    add x9, x9, _vpp_aot_spec@PAGEOFF
+    cmp w0, #108
+    b.eq Ljit_dynamic_address
+    cmp w0, #109
+    b.eq Ljit_dynamic_run
+    cmp w0, #110
+    b.eq Ljit_dynamic_active
+    cmp w0, #111
+    b.eq Lworker_aot_register
+    AOT_ACTIVE_SPEC
     cmp w0, #4
     b.hi Laot_thong_tin_bang
     cmp w0, #3
@@ -410,6 +460,8 @@ Laot_thong_tin_bien_dich:
     ret
 Laot_thong_tin_bang:
     tbnz w1, #31, Laot_thong_tin_sai
+    cmp w0, #40
+    b.hs Laot_thong_tin_ffi
     cmp w0, #11
     b.hi Laot_thong_tin_ham
     cmp w0, #10
@@ -435,7 +487,7 @@ Laot_thong_tin_ham:
     cmp w0, #30
     b.hs Laot_thong_tin_ham_i32
     sub w0, w0, #20
-    cmp w0, #2
+    cmp w0, #3
     b.hi Laot_thong_tin_sai
     ldr x10, [x9, #16]
     cmp x1, x10
@@ -457,6 +509,54 @@ Laot_thong_tin_ham_i32:
     add x10, x10, #8
     ldr w0, [x10, x0, lsl #2]
     ret
+// Foreign descriptor: id/result, four C strings, parameter/extent arrays.
+Laot_thong_tin_ffi:
+    cmp w0, #47
+    b.hi Laot_thong_tin_sai
+    ldr x10, [x9, #64]
+    cmp x1, x10
+    b.hs Laot_thong_tin_sai
+    ldr x10, [x9, #72]
+    mov x11, #72
+    madd x10, x1, x11, x10
+    cmp w0, #44
+    b.hs Laot_thong_tin_ffi_signature
+    sub w0, w0, #40
+    add x10, x10, #8
+    ldr x10, [x10, x0, lsl #3]
+    cmp w2, #127
+    b.hi Laot_thong_tin_sai
+    cbz x10, Laot_thong_tin_sai
+    mov w11, #0
+Laot_thong_tin_ffi_byte:
+    ldrb w0, [x10, x11]
+    cmp w11, w2
+    b.eq Laot_thong_tin_ffi_return
+    cbz w0, Laot_thong_tin_sai
+    add w11, w11, #1
+    b Laot_thong_tin_ffi_byte
+Laot_thong_tin_ffi_signature:
+    cmp w0, #44
+    b.eq Laot_thong_tin_ffi_result
+    cmp w0, #45
+    b.eq Laot_thong_tin_ffi_params
+    cmp w0, #46
+    b.eq Laot_thong_tin_ffi_extents
+    ldr w0, [x10]
+    ret
+Laot_thong_tin_ffi_result:
+    ldr w0, [x10, #4]
+    ret
+Laot_thong_tin_ffi_params:
+    ldr x0, [x10, #40]
+    b Laot_thong_tin_ffi_count
+Laot_thong_tin_ffi_extents:
+    ldr x0, [x10, #56]
+Laot_thong_tin_ffi_count:
+    cmp x0, #0
+    cset w0, ne
+Laot_thong_tin_ffi_return:
+    ret
 Laot_thong_tin_sai:
     mov w0, #-1
     ret
@@ -465,8 +565,7 @@ Laot_thong_tin_sai:
 // khung đã quản lý.
 .globl _vpp_native_aot_invoke
 _vpp_native_aot_invoke:
-    adrp x9, _vpp_aot_spec@PAGE
-    add x9, x9, _vpp_aot_spec@PAGEOFF
+    AOT_ACTIVE_SPEC
     cmp w0, #2
     b.eq Laot_goi_ham_muc
     tbnz w1, #31, Laot_thong_tin_sai
@@ -499,8 +598,7 @@ Laot_goi_ham_goi:
 .globl _vpp_native_aot_invoke_i32
 _vpp_native_aot_invoke_i32:
     tbnz w0, #31, Laot_goi_i32_sai
-    adrp x9, _vpp_aot_spec@PAGE
-    add x9, x9, _vpp_aot_spec@PAGEOFF
+    AOT_ACTIVE_SPEC
     ldr x10, [x9, #80]
     cmp x0, x10
     b.hs Laot_goi_i32_sai
@@ -622,8 +720,7 @@ _vpp_native_aot_fold_i32:
     str x30, [sp, #80]
     tbnz w0, #31, Laot_gap_i32_sai
     mov w28, w1
-    adrp x9, _vpp_aot_spec@PAGE
-    add x9, x9, _vpp_aot_spec@PAGEOFF
+    AOT_ACTIVE_SPEC
     ldr x10, [x9, #80]
     cmp x0, x10
     b.hs Laot_gap_i32_sai
@@ -667,5 +764,131 @@ Laot_gap_i32_tra:
     ldp x21, x22, [sp, #16]
     ldp x19, x20, [sp], #96
     ret
+
+
+// Explicit runtime address table. Indices follow vpp_aot_vpp_exports.inc,
+// mirrored by JIT động.vi. No arbitrary process symbol lookup.
+Ljit_dynamic_address:
+    stp x19, x20, [sp, #-48]!
+    stp x21, x30, [sp, #16]
+    mov w19, w1
+    mov w20, w2
+    cmp w19, #(Ljit_dynamic_table_end - Ljit_dynamic_table)/8
+    b.hs Ljit_dynamic_address_bad
+    mov w0, w20
+    bl _vpp_native_bytes_length
+    cmp w0, #8
+    b.lt Ljit_dynamic_address_bad
+    adrp x9, Ljit_dynamic_table@PAGE
+    add x9, x9, Ljit_dynamic_table@PAGEOFF
+    ldr x21, [x9, w19, uxtw #3]
+    mov w0, w20
+    mov w1, #0
+    mov w2, w21
+    bl _vpp_native_bytes_store_i32
+    cbnz w0, Ljit_dynamic_address_bad
+    mov w0, w20
+    mov w1, #4
+    lsr x2, x21, #32
+    bl _vpp_native_bytes_store_i32
+    b Ljit_dynamic_address_done
+Ljit_dynamic_address_bad:
+    mov w0, #-1
+Ljit_dynamic_address_done:
+    ldp x21, x30, [sp, #16]
+    ldp x19, x20, [sp], #48
+    ret
+
+Ljit_dynamic_active:
+    adrp x9, _vpp_jit_active_spec@PAGE
+    ldr x9, [x9, _vpp_jit_active_spec@PAGEOFF]
+    cmp x9, #0
+    cset w0, ne
+    ret
+
+// Run a generated full-language entry in a fresh native arena. The host's
+// compiler heap and metadata stay untouched; restore them before returning.
+// Nested dynamic execution is rejected, since some OS scratch is global.
+Ljit_dynamic_run:
+    stp x19, x20, [sp, #-64]!
+    stp x21, x22, [sp, #16]
+    stp x23, x30, [sp, #32]
+    // High byte carries guest argv offset; low 24 bits carry metadata offset.
+    lsr w23, w2, #24
+    and w20, w2, #0xffffff
+    adrp x19, _vpp_jit_active_spec@PAGE
+    add x19, x19, _vpp_jit_active_spec@PAGEOFF
+    ldr x9, [x19]
+    cbnz x9, Ljit_dynamic_run_bad
+    mov w0, w1
+    bl _vpp_native_jit_image
+    cbz x0, Ljit_dynamic_run_bad
+    tst w20, #7
+    b.ne Ljit_dynamic_run_bad
+    cmp w1, #96
+    b.lo Ljit_dynamic_run_bad
+    sub w1, w1, #96
+    cmp w20, w1
+    b.hi Ljit_dynamic_run_bad
+    add x20, x0, w20, uxtw
+    bl _vpp_native_argc
+    cmp w0, #0
+    b.le Ljit_dynamic_run_bad
+    cmp w23, w0
+    b.hs Ljit_dynamic_run_bad
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    str w23, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    str x20, [x19]
+    mov x0, #0
+    bl _vpp_native_jit_swap_arena
+    mov x21, x0
+    bl _vpp_native_memory_base
+    cbz x0, Ljit_dynamic_run_alloc_bad
+    bl _vpp_native_jit_guest_begin
+    bl _main
+    mov w22, w0
+    bl _vpp_native_jit_guest_end
+    b Ljit_dynamic_run_restore
+Ljit_dynamic_run_alloc_bad:
+    mov w22, #-2
+Ljit_dynamic_run_restore:
+    mov x0, x21
+    bl _vpp_native_jit_swap_arena
+    cbz x0, Ljit_dynamic_run_restored
+    mov x1, #0x1400
+    movk x1, #0x810, lsl #16
+    mov x16, #73
+    svc #0x80
+Ljit_dynamic_run_restored:
+    adrp x9, _vpp_jit_argv_offset@PAGE
+    str wzr, [x9, _vpp_jit_argv_offset@PAGEOFF]
+    str xzr, [x19]
+    mov w0, w22
+    b Ljit_dynamic_run_done
+Ljit_dynamic_run_bad:
+    mov w0, #-2
+Ljit_dynamic_run_done:
+    ldp x23, x30, [sp, #32]
+    ldp x21, x22, [sp, #16]
+    ldp x19, x20, [sp], #64
+    ret
+
+.section __DATA,__const
+.p2align 3
+Ljit_dynamic_table:
+.purgem AOT_VPP
+.purgem AOT_VPP_GAP_I32
+.macro AOT_VPP ten, so_doi_so
+    .quad _vpp_native_dynamic_\ten
+.endm
+.macro AOT_VPP_GAP_I32 ten, so_doi_so
+    .quad _vpp_native_dynamic_\ten
+.endm
+#include "vpp_aot_vpp_exports.inc"
+    .quad _vpp_native_i32_div
+    .quad _vpp_native_print_i32
+    .quad _vpp_native_dynamic_source_site
+Ljit_dynamic_table_end:
+.zerofill __DATA,__bss,_vpp_jit_active_spec,8,3
 
 #endif

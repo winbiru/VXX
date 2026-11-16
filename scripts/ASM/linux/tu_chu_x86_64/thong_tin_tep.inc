@@ -29,6 +29,8 @@ vpp_native_os_stat:
     testl %eax, %eax
     jne 2f
     movq -32(%rbp), %r10
+    movl 4(%r10), %r9d
+    movl %r9d, 200(%r10)
     movl 24(%r10), %r9d
     movl %r9d, 4(%r10)
 2:
@@ -63,6 +65,8 @@ vpp_native_os_lstat:
     testl %eax, %eax
     jne 2f
     movq -32(%rbp), %r10
+    movl 4(%r10), %r9d
+    movl %r9d, 200(%r10)
     movl 24(%r10), %r9d
     movl %r9d, 4(%r10)
 2:
@@ -94,6 +98,8 @@ vpp_native_os_fstat:
     testl %eax, %eax
     jne 2f
     movq -32(%rbp), %r10
+    movl 4(%r10), %r9d
+    movl %r9d, 200(%r10)
     movl 24(%r10), %r9d
     movl %r9d, 4(%r10)
 2:

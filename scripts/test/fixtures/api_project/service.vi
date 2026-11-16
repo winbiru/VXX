@@ -1,0 +1,130 @@
+nhập scripts.test.fixtures.api_project.repository.*;
+nhập scripts.test.fixtures.api_project.entity.*;
+nhập scripts.test.fixtures.api_project.dto.*;
+nhập scripts.test.fixtures.api_project.mapper.*;
+nhập scripts.test.fixtures.api_project.giao_dien.service.*;
+
+lớp công khai UserService triển khai UserServiceContract {
+    // Nhận dependency từ composition root để service không tự tạo repository/mapper.
+    hàm khởi tạo(repository, mapper) {
+        mình.repository = repository;
+        mình.mapper = mapper;
+    };
+
+    hàm riêng tư validateToken(từ tố) {
+        nếu (từ tố == "") {
+            trả về "401|missing-từ tố";
+        };
+        nếu (từ tố != "Bearer demo-token") {
+            trả về "401|invalid-từ tố";
+        };
+        trả về "";
+    };
+
+    hàm công khai getUsers(dbSession, từ tố) {
+        tokenErr = mình.validateToken(từ tố);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+
+        repository = mình.repository;
+        dbRes = repository.findAllUsers(dbSession);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "200|users=[an,binh,chi]";
+    };
+
+    hàm công khai createUser(dbSession, từ tố, payload) {
+        tokenErr = mình.validateToken(từ tố);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapper = mình.mapper;
+        mapperRes = mapper.toCreateEntity(payload);
+        nếu (mapperRes == "MAPPER_ERR|missing-body") {
+            trả về "400|missing-body";
+        };
+
+        entityRes = UserEntity.ofUsername("an");
+        nếu (entityRes == "ENTITY_ERR|missing-username") {
+            trả về "400|missing-body";
+        };
+
+        repository = mình.repository;
+        dbRes = repository.createUser(dbSession, payload);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "201|created-user";
+    };
+
+    hàm công khai updateUser(dbSession, từ tố, userId, payload) {
+        tokenErr = mình.validateToken(từ tố);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapper = mình.mapper;
+        mapperRes = mapper.toUpdateEntity(userId, payload);
+        nếu (mapperRes == "MAPPER_ERR|missing-user-id") {
+            trả về "400|missing-user-id";
+        };
+        nếu (mapperRes == "MAPPER_ERR|missing-body") {
+            trả về "400|missing-body";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+
+        entityRes = UserEntity.mergeName("an", "an-nguyen");
+        nếu (entityRes == "ENTITY_ERR|missing-name") {
+            trả về "400|missing-body";
+        };
+
+        repository = mình.repository;
+        dbRes = repository.updateUser(dbSession, userId, payload);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "200|updated-user";
+    };
+
+    hàm công khai deleteUser(dbSession, từ tố, userId) {
+        tokenErr = mình.validateToken(từ tố);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        nếu (userId == "") {
+            trả về "400|missing-user-id";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+
+        repository = mình.repository;
+        dbRes = repository.deleteUser(dbSession, userId);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "204|deleted";
+    };
+
+    hàm công khai searchUsers(dbSession, từ tố, keyword) {
+        tokenErr = mình.validateToken(từ tố);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapper = mình.mapper;
+        mapperRes = mapper.toSearchEntity(keyword);
+        nếu (mapperRes == "MAPPER_ERR|missing-keyword") {
+            trả về "400|missing-keyword";
+        };
+
+        repository = mình.repository;
+        dbRes = repository.searchUsers(dbSession, keyword);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về mapper.toUsersResponse(dbRes);
+    };
+};

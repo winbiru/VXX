@@ -1,0 +1,6 @@
+nhập scripts.test.modules.math.* như toan;
+
+hàm chính() {
+    in toan.tong(2, 3);
+    in toan.mul(4, 5);
+};

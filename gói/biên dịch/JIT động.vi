@@ -1,0 +1,327 @@
+// Native ARM64/x86-64 in-memory image writer. The AOT lowering emits native
+// instructions; this sink replaces the object writer, not the code generator.
+// All symbol resolution, branch layout and metadata construction are V++.
+nhập gói.biên dịch.asm chương trình.biên dịch asm chương trình;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn tệp tự chủ;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn nhúng tự chủ;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+hàm riêng tư ảnh cần(ok, lỗi) {
+    nếu (!ok) { ném "V++ JIT động: " + lỗi; };
+};
+// Keep in lockstep with vpp_aot_vpp_exports.inc and the bridge table.
+hàm riêng tư ảnh runtime() {
+    trả về [
+        "vpp_native_dynamic_integer",
+        "vpp_native_dynamic_string",
+        "vpp_native_dynamic_floating",
+        "vpp_native_dynamic_null",
+        "vpp_native_dynamic_load",
+        "vpp_native_dynamic_load_inline",
+        "vpp_native_dynamic_is_i32",
+        "vpp_native_dynamic_read_i32",
+        "vpp_native_dynamic_initialize",
+        "vpp_native_dynamic_assign",
+        "vpp_native_dynamic_assign_slot",
+        "vpp_native_dynamic_copy_slot",
+        "vpp_native_dynamic_index_update",
+        "vpp_native_dynamic_store_integer",
+        "vpp_native_dynamic_parameter",
+        "vpp_native_dynamic_increment",
+        "vpp_native_dynamic_increment_slot",
+        "vpp_native_dynamic_increment_slot_discard",
+        "vpp_native_dynamic_update_integer_slot",
+        "vpp_native_dynamic_update_numeric_slots",
+        "vpp_native_dynamic_compare_integer_slot",
+        "vpp_native_dynamic_compare_type_slot",
+        "vpp_native_dynamic_compare_type_forward_slot",
+        "vpp_native_dynamic_compare_integer_range",
+        "vpp_native_dynamic_compare_integer_outside_range",
+        "vpp_native_dynamic_compare_integer_or_range",
+        "vpp_native_dynamic_compare_integer_set",
+        "vpp_native_dynamic_compare_integer_or_and",
+        "vpp_native_dynamic_compare_numeric_slots",
+        "vpp_native_dynamic_compare_numeric_slots_and",
+        "vpp_native_dynamic_not_slot_and",
+        "vpp_native_dynamic_byte_scan_loop",
+        "vpp_native_dynamic_decimal_scan_loop",
+        "vpp_native_dynamic_counted_scalar_loop",
+        "vpp_native_dynamic_counted_scalar_loop_tail",
+        "vpp_native_dynamic_simple_scalar_loop",
+        "vpp_native_dynamic_simple_scalar_loop_tail",
+        "vpp_native_dynamic_numeric_add_loop",
+        "vpp_native_dynamic_numeric_add_loop_tail",
+        "vpp_native_dynamic_list_append_i32_loop",
+        "vpp_native_dynamic_list_mod_sum_loop",
+        "vpp_native_dynamic_range_mod_sum_i32_loop",
+        "vpp_native_dynamic_indirect_i32_fold_loop",
+        "vpp_native_dynamic_binary",
+        "vpp_native_dynamic_negate",
+        "vpp_native_dynamic_list",
+        "vpp_native_dynamic_map",
+        "vpp_native_dynamic_index",
+        "vpp_native_dynamic_index_slot",
+        "vpp_native_dynamic_index_compare_integer",
+        "vpp_native_dynamic_index_compare_integer_outside_range",
+        "vpp_native_dynamic_index_compare_integer_pair",
+        "vpp_native_dynamic_index_store_slot",
+        "vpp_native_dynamic_index_offset",
+        "vpp_native_dynamic_index_store_integer_op",
+        "vpp_native_dynamic_index_mod_equal",
+        "vpp_native_dynamic_index_mod_add_if_equal",
+        "vpp_native_dynamic_index_string_slot",
+        "vpp_native_dynamic_index_equal",
+        "vpp_native_dynamic_set_index",
+        "vpp_native_dynamic_call",
+        "vpp_native_dynamic_call_small",
+        "vpp_native_dynamic_call_quad",
+        "vpp_native_dynamic_method_direct_small",
+        "vpp_native_dynamic_indirect",
+        "vpp_native_dynamic_indirect_slot",
+        "vpp_native_dynamic_callee_id",
+        "vpp_native_dynamic_callee_slot_id",
+        "vpp_native_dynamic_method_id",
+        "vpp_native_dynamic_fast_args",
+        "vpp_native_dynamic_fast_arg",
+        "vpp_native_dynamic_ascii_index_arg",
+        "vpp_native_dynamic_method_top_id",
+        "vpp_native_dynamic_fast_receiver_result",
+        "vpp_native_dynamic_fast_result",
+        "vpp_native_dynamic_fast_result_slot",
+        "vpp_native_dynamic_closure",
+        "vpp_native_dynamic_define_class",
+        "vpp_native_dynamic_define_method",
+        "vpp_native_dynamic_construct",
+        "vpp_native_dynamic_property",
+        "vpp_native_dynamic_method",
+        "vpp_native_dynamic_print",
+        "vpp_native_dynamic_return_value",
+        "vpp_native_dynamic_return_slot",
+        "vpp_native_dynamic_return_integer",
+        "vpp_native_dynamic_return_negated_slot",
+        "vpp_native_dynamic_list_append_add",
+        "vpp_native_dynamic_intrinsic",
+        "vpp_native_dynamic_native_core",
+        "vpp_native_dynamic_foreign",
+        "vpp_native_dynamic_switch_begin",
+        "vpp_native_dynamic_switch_end",
+        "vpp_native_dynamic_throw_value",
+        "vpp_native_dynamic_try_begin",
+        "vpp_native_dynamic_try_end",
+        "vpp_native_dynamic_catch_value",
+        "vpp_native_dynamic_safepoint",
+        "vpp_native_dynamic_condition",
+        "vpp_native_dynamic_case",
+        "vpp_native_dynamic_default",
+        "vpp_native_dynamic_failed",
+        "vpp_native_dynamic_handle_error",
+        "vpp_native_i32_div",
+        "vpp_native_print_i32",
+        "vpp_native_dynamic_source_site"
+    ];
+};
+
+lớp công khai Bộ Ghi Ảnh JIT {
+    hàm công khai khởi tạo() {
+        mình.hệ = máy JIT thô(0, 0, 0);
+        ảnh cần(mình.hệ >= 1 && mình.hệ <= 3, "host chưa hỗ trợ");
+        mình.đệm = máy JIT thô(10, 16777216, 0);
+        ảnh cần(mình.đệm > 0, "không cấp được bộ đệm JIT");
+        mình.kích thước = 0;
+        mình.ký hiệu = {};
+        mình.gọi = [];
+        mình.con trỏ chờ = [];
+        mình.phần = 1;
+        mình.mã = 0;
+        mình.spec = -1;
+    };
+    hàm riêng tư dài() { trả về mình.kích thước; };
+    hàm riêng tư ghi byte(b) {
+        ảnh cần(mình.dài() < 16777216, "ảnh vượt 16 MiB");
+        ảnh cần(máy JIT thô(12, mình.đệm, b) == 0, "không ghi được ảnh");
+        mình.kích thước = mình.kích thước + 1;
+    };
+    hàm riêng tư ghi dãy(b) {
+        n = máy ảo lấy độ dài(b);
+        ảnh cần(n <= 16777216 - mình.dài(), "ảnh vượt 16 MiB");
+        // Native byte storage writes words little-endian; avoid a virtual
+        // method and length query for every emitted instruction byte.
+        i = 0;
+        khi (i + 4 <= n) {
+            word = b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24);
+            bỏ kết quả = mình.ghi word(word);
+            i += 4;
+        };
+        khi (i < n) {
+            bỏ kết quả = mình.ghi byte(b[i]);
+            i += 1;
+        };
+    };
+    hàm riêng tư ghi word(n) {
+        ảnh cần(mình.dài() <= 16777212, "ảnh vượt 16 MiB");
+        ảnh cần(máy JIT thô(11, mình.đệm, n) == 0, "không ghi được word");
+        mình.kích thước = mình.kích thước + 4;
+    };
+    hàm riêng tư định nghĩa(tên) {
+        ảnh cần(lấy từ điển(mình.ký hiệu, tên, -1) < 0, "ký hiệu trùng: " + tên);
+        mình.ký hiệu[tên] = mình.dài();
+    };
+    hàm công khai ghi hàm(tên, phát) {
+        ảnh cần(mình.phần == 1, "đã kết thúc mã");
+        khi (mình.dài() % 4 != 0) { bỏ kết quả = mình.ghi byte(0); };
+        bỏ kết quả = mình.định nghĩa("_" + tên);
+        bắt đầu = mình.dài();
+        từ máy = lấy từ điển(phát, "wordChunks", rỗng);
+        khối = lấy từ điển(phát, "chunks", rỗng);
+        nếu (từ máy != rỗng) {
+            ảnh cần(mình.hệ == 1, "wordChunks cần ARM64");
+            lặp(i = 0; i < máy ảo lấy độ dài(từ máy); i++) {
+                trang = từ máy[i];
+                lặp(j = 0; j < máy ảo lấy độ dài(trang); j++) { bỏ kết quả = mình.ghi word(trang[j]); };
+            };
+            ảnh cần(mình.dài() - bắt đầu == phát["size"], "kích thước wordChunks sai");
+        }
+        hoặc nếu (khối == rỗng) { bỏ kết quả = mình.ghi dãy(phát["bytes"]); }
+        hoặc {
+            lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) {
+                bỏ kết quả = mình.ghi dãy(khối[i]);
+            };
+            ảnh cần(mình.dài() - bắt đầu == phát["size"], "kích thước khối sai");
+        };
+        n = mình.dài() - bắt đầu;
+        ảnh cần(n > 0 && (mình.hệ != 1 || n % 4 == 0), "kích thước mã sai");
+        r = phát["relocations"];
+        trước = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(r); i++) {
+            p = r[i]["offset"];
+            ảnh cần(p > trước && p >= 0 && p <= n - 4, "CALL offset sai");
+            nếu (mình.hệ == 1) {
+                ảnh cần(p % 4 == 0 && máy JIT thô(14, mình.đệm, bắt đầu + p) == -1811939328, "CALL opcode ARM64 sai");
+            } hoặc {
+                ảnh cần(p > 0 && máy JIT thô(13, mình.đệm, bắt đầu + p - 1) == 232 && máy JIT thô(14, mình.đệm, bắt đầu + p) == 0, "CALL opcode x86-64 sai");
+            };
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.gọi, [bắt đầu + p, "_" + r[i]["symbol"]]);
+            trước = p;
+        };
+    };
+    hàm công khai bắt đầu dữ liệu() {
+        ảnh cần(mình.phần == 1, "đã bắt đầu dữ liệu");
+        mình.phần = 2;
+        bỏ kết quả = mình.căn dữ liệu();
+    };
+    hàm công khai nhãn(tên, toàn cục = sai) {
+        ảnh cần(mình.phần == 2, "nhãn ngoài dữ liệu");
+        bỏ kết quả = mình.định nghĩa(tên);
+    };
+    hàm công khai dữ liệu byte(b) {
+        ảnh cần(mình.phần == 2, "ngoài dữ liệu");
+        bỏ kết quả = mình.ghi dãy(b);
+    };
+    hàm công khai dữ liệu word(n) {
+        ảnh cần(mình.phần == 2, "ngoài dữ liệu");
+        bỏ kết quả = mình.ghi word(n);
+    };
+    hàm công khai dữ liệu dài(n) {
+        bỏ kết quả = mình.dữ liệu word(n);
+        bỏ kết quả = mình.dữ liệu word(0);
+    };
+    hàm công khai căn dữ liệu() {
+        khi (mình.dài() % 8 != 0) { bỏ kết quả = mình.ghi byte(0); };
+    };
+    hàm công khai con trỏ(tên) {
+        ảnh cần(mình.phần == 2 && mình.dài() % 8 == 0, "con trỏ lệch hàng");
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.con trỏ chờ, [mình.dài(), tên]);
+        bỏ kết quả = mình.dữ liệu dài(0);
+    };
+    hàm riêng tư tạo veneer(tên, bảng, địa chỉ) {
+        id = lấy từ điển(bảng, tên, -1);
+        ảnh cần(id >= 0, "symbol runtime ngoài ABI: " + tên);
+        ảnh cần(máy JIT thô(8, id, địa chỉ) == 0, "không lấy được địa chỉ runtime");
+        bỏ kết quả = mình.căn dữ liệu();
+        bỏ kết quả = mình.định nghĩa(tên);
+        // ldr x16, #8; br x16; .quad target
+        nếu (mình.hệ == 1) { bỏ kết quả = mình.ghi dãy([80, 0, 0, 88, 0, 2, 31, 214]); }
+        hoặc { bỏ kết quả = mình.ghi dãy([73, 187]); };
+        lặp(k = 0; k < 8; k++) { bỏ kết quả = mình.ghi byte(byte lấy(địa chỉ, k)); };
+        nếu (mình.hệ != 1) { bỏ kết quả = mình.ghi dãy([65, 255, 227]); };
+    };
+    hàm riêng tư sửa word(packet, tại, word) {
+        ảnh cần(byte ghi số nguyên ba mươi hai bit(packet, 0, tại) == 0, "offset relocation sai");
+        ảnh cần(byte ghi số nguyên ba mươi hai bit(packet, 4, word) == 0, "word relocation sai");
+        ảnh cần(máy JIT thô(15, mình.đệm, packet) == 0, "relocation thất bại");
+    };
+    hàm công khai hoàn tất() {
+        ảnh cần(mình.phần == 2 && mình.mã == 0, "ảnh đã hoàn tất");
+        bảng = {};
+        tên runtime = ảnh runtime();
+        lặp(i = 0; i < máy ảo lấy độ dài(tên runtime); i++) { bảng["_" + tên runtime[i]] = i; };
+        địa chỉ = byte mới();
+        ảnh cần(địa chỉ > 0, "không cấp được địa chỉ");
+        thử {
+            byte đẩy số nguyên ba mươi hai bit(địa chỉ, 0);
+            byte đẩy số nguyên ba mươi hai bit(địa chỉ, 0);
+            lặp(i = 0; i < máy ảo lấy độ dài(mình.gọi); i++) {
+                tên = mình.gọi[i][1];
+                nếu (lấy từ điển(mình.ký hiệu, tên, -1) < 0) {
+                    bỏ kết quả = mình.tạo veneer(tên, bảng, địa chỉ);
+                };
+                tại = mình.gọi[i][0];
+                chênh = mình.ký hiệu[tên] - tại;
+                nếu (mình.hệ == 1) {
+                    ảnh cần(chênh % 4 == 0 && chênh >= -134217728 && chênh < 134217728, "CALL ngoài phạm vi");
+                    chênh = -1811939328 | ((chênh / 4) & 67108863);
+                } hoặc { chênh -= 4; };
+                bỏ kết quả = mình.sửa word(địa chỉ, tại, chênh);
+            };
+            mình.spec = lấy từ điển(mình.ký hiệu, "_vpp_aot_spec", -1);
+            ảnh cần(mình.spec >= 0, "thiếu metadata");
+            n = mình.dài();
+            lặp(i = 0; i < máy ảo lấy độ dài(mình.con trỏ chờ); i++) {
+                tại = mình.con trỏ chờ[i][0];
+                đích = lấy từ điển(mình.ký hiệu, mình.con trỏ chờ[i][1], -1);
+                ảnh cần(đích >= 0 && đích < n, "thiếu ký hiệu dữ liệu");
+                bỏ kết quả = mình.sửa word(địa chỉ, tại, đích);
+                bỏ kết quả = mình.ghi word(tại);
+            };
+            mình.mã = máy JIT thô(16, mình.đệm, n);
+            ảnh cần(mình.mã > 0, "không công bố được ảnh RX");
+            mình.đệm = 0;
+        } bắt lỗi(e) { byte hủy(địa chỉ); ném e; };
+        byte hủy(địa chỉ);
+        mình.phần = 3;
+        trả về mình.mã;
+    };
+    hàm công khai chạy(bỏ đối số = 0) {
+        ảnh cần(mình.mã > 0, "ảnh chưa hoàn tất hoặc đã đóng");
+        ảnh cần(bỏ đối số >= 0 && bỏ đối số <= 127 && mình.spec < 16777216, "phạm vi argv/spec sai");
+        trả về máy JIT thô(9, mình.mã, mình.spec | (bỏ đối số << 24));
+    };
+    hàm công khai đóng() {
+        nếu (mình.mã > 0) { máy JIT thô(3, mình.mã, 0); mình.mã = 0; };
+        nếu (mình.đệm > 0) { máy JIT thô(3, mình.đệm, 0); mình.đệm = 0; };
+    };
+};
+
+hàm riêng tư jit động từ dây(dây, nguồn lỗi) {
+    ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
+    ảnh = Bộ Ghi Ảnh JIT();
+    thử {
+        đích = "aarch64-apple-darwin";
+        nếu (ảnh.hệ == 2) { đích = "x86_64-unknown-linux-gnu"; };
+        nếu (ảnh.hệ == 3) { đích = "x86_64-pc-windows-msvc"; };
+        bỏ kết quả = biên dịch asm chương trình(dây, đích, sai, rỗng, đúng, rỗng, ảnh, đúng, nguồn lỗi);
+        bỏ kết quả = ảnh.hoàn tất();
+        trả về ảnh;
+    } bắt lỗi(e) { ảnh.đóng(); ném e; };
+};
+hàm công khai jit động tệp(đường, thư viện) {
+    ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
+    sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, 0, rỗng, đúng);
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(sản phẩm), sản phẩm);
+};
+hàm công khai jit động nguồn(nguồn, gốc, thư viện) {
+    ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
+    sản phẩm = biên dịch nguồn nhúng tự chủ(nguồn, gốc, thư viện, 0, đúng);
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(sản phẩm), sản phẩm);
+};

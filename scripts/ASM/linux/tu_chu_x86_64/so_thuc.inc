@@ -15,7 +15,7 @@ vpp_native_f64_from_i32:
     jz Lvm_so_thuc_sai_x86
     testl %ebx, %ebx
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %ebx
+    cmpl $(135271424 - 512), %ebx
     ja Lvm_so_thuc_sai_x86
     cvtsi2sdl %r12d, %xmm0
     movsd %xmm0, 8(%r9,%rbx)
@@ -38,15 +38,15 @@ vpp_native_f64_binary:
     jz Lvm_so_thuc_sai_x86
     testl %ebx, %ebx
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %ebx
+    cmpl $(135271424 - 512), %ebx
     ja Lvm_so_thuc_sai_x86
     testl %r12d, %r12d
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %r12d
+    cmpl $(135271424 - 512), %r12d
     ja Lvm_so_thuc_sai_x86
     testl %r13d, %r13d
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %r13d
+    cmpl $(135271424 - 512), %r13d
     ja Lvm_so_thuc_sai_x86
     movsd 8(%r9,%r12), %xmm0
     movsd 8(%r9,%r13), %xmm1
@@ -88,11 +88,11 @@ vpp_native_f64_compare:
     jz Lvm_so_thuc_sai_x86
     testl %ebx, %ebx
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %ebx
+    cmpl $(135271424 - 512), %ebx
     ja Lvm_so_thuc_sai_x86
     testl %r12d, %r12d
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %r12d
+    cmpl $(135271424 - 512), %r12d
     ja Lvm_so_thuc_sai_x86
     movsd 8(%r9,%rbx), %xmm0
     ucomisd 8(%r9,%r12), %xmm0
@@ -122,7 +122,7 @@ vpp_native_f64_to_i32:
     jz Lvm_so_thuc_sai_x86
     testl %ebx, %ebx
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, %ebx
+    cmpl $(135271424 - 512), %ebx
     ja Lvm_so_thuc_sai_x86
     cvttsd2sil 8(%r9,%rbx), %eax
     popq %r13

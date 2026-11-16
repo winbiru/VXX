@@ -1,0 +1,230 @@
+// Native i32 JIT. Parsing, lowering, code generation and relocation are V++.
+// The OS boundary publishes immutable executable memory and invokes its ABI.
+// No assembler, object file, executable file, subprocess or VM fallback.
+nhập gói.biên dịch.mã máy từ cây.Bộ Hạ Cây;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.loại của;
+
+hàm riêng tư jit yêu cầu(điều kiện, thông báo) {
+    nếu (!điều kiện) { ném "V++ JIT: " + thông báo; };
+};
+hàm riêng tư jit ghi i32(mã, tại, số) {
+    jit yêu cầu(tại >= 0 && tại + 4 <= máy ảo lấy độ dài(mã), "relocation ngoài vùng mã");
+    lặp(i = 0; i < 4; i++) { mã[tại + i] = (số >> (i * 8)) & 255; };
+};
+hàm riêng tư jit nối(đích, nguồn) {
+    lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) { máy ảo thêm cuối danh sách(đích, nguồn[i]); };
+};
+
+lớp công khai Bộ Biên Dịch JIT {
+    hàm công khai khởi tạo(nguồn, phạm vi khối = sai) {
+        mình.mã = 0;
+        mình.gói = 0;
+        mình.hàm = {};
+        hệ = máy JIT thô(0, 0, 0);
+        jit yêu cầu(hệ >= 1 && hệ <= 3, "host chưa hỗ trợ");
+        kiến trúc = "x86_64";
+        hệ điều hành = "linux";
+        nếu (hệ == 1) { kiến trúc = "aarch64"; hệ điều hành = "macos"; };
+        nếu (hệ == 3) { hệ điều hành = "windows"; };
+        bộ hạ = Bộ Hạ Cây();
+        các hàm = bộ hạ.sinh mã chương trình(nguồn, kiến trúc, hệ điều hành, đúng, phạm vi khối);
+        jit yêu cầu(máy ảo lấy độ dài(các hàm) > 0, "chương trình không có hàm");
+        mã = [];
+        ký hiệu = {};
+        lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            mục = các hàm[i];
+            khi (máy ảo lấy độ dài(mã) % 16 != 0) { máy ảo thêm cuối danh sách(mã, 0); };
+            tại = máy ảo lấy độ dài(mã);
+            ký hiệu[mục["name"]] = tại;
+            mục["offset"] = tại;
+            mình.hàm[mục["sourceName"]] = {"offset": tại,
+                "arity": mục["machine"]["parameterCount"]};
+            nếu (mục["name"] == "main") { mình.hàm["main"] = mình.hàm[mục["sourceName"]]; mình.hàm["chính"] = mình.hàm[mục["sourceName"]]; };
+            jit nối(mã, mục["bytes"]);
+            jit yêu cầu(máy ảo lấy độ dài(mã) <= 1048576, "vùng mã vượt 1 MiB");
+        };
+        // Runtime calls use tiny tail-call veneers within the same mapping.
+        // V++ emits their instructions; ASM only returns full-width addresses.
+        địa chỉ = byte mới();
+        jit yêu cầu(địa chỉ > 0, "không cấp được bộ đệm địa chỉ");
+        thử {
+            byte đẩy số nguyên ba mươi hai bit(địa chỉ, 0);
+            byte đẩy số nguyên ba mươi hai bit(địa chỉ, 0);
+            lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+                tái định vị = các hàm[i]["relocations"];
+                lặp(j = 0; j < máy ảo lấy độ dài(tái định vị); j++) {
+                    tên = tái định vị[j]["symbol"];
+                    nếu (lấy từ điển(ký hiệu, tên, -1) < 0) {
+                        id = 0;
+                        nếu (tên == "vpp_native_print_i32") { id = 1; };
+                        nếu (tên == "vpp_native_i32_div") { id = 2; };
+                        // ABI lõi bộ đệm/tệp/nhập số; không phân giải FFI tùy ý.
+                        nếu (tên == "vpp_native_bytes_new") { id = 3; };
+                        nếu (tên == "vpp_native_bytes_length") { id = 4; };
+                        nếu (tên == "vpp_native_bytes_get") { id = 5; };
+                        nếu (tên == "vpp_native_bytes_append") { id = 6; };
+                        nếu (tên == "vpp_native_bytes_push_i32") { id = 7; };
+                        nếu (tên == "vpp_native_bytes_load_i32") { id = 8; };
+                        nếu (tên == "vpp_native_bytes_store_i32") { id = 9; };
+                        nếu (tên == "vpp_native_bytes_clear") { id = 10; };
+                        nếu (tên == "vpp_native_bytes_concat") { id = 11; };
+                        nếu (tên == "vpp_native_bytes_equal") { id = 12; };
+                        nếu (tên == "vpp_native_bytes_free") { id = 13; };
+                        nếu (tên == "vpp_native_file_open_read") { id = 16; };
+                        nếu (tên == "vpp_native_file_read_block") { id = 17; };
+                        nếu (tên == "vpp_native_file_close") { id = 18; };
+                        nếu (tên == "vpp_native_bytes_slice") { id = 23; };
+                        nếu (tên == "vpp_native_bytes_find") { id = 24; };
+                        nếu (tên == "vpp_native_bytes_print") { id = 25; };
+                        nếu (tên == "vpp_native_file_open_write") { id = 26; };
+                        nếu (tên == "vpp_native_file_write_block") { id = 27; };
+                        nếu (tên == "vpp_native_read_i32") { id = 43; };
+                        nếu (tên == "vpp_native_read_status") { id = 44; };
+                        nếu (tên == "vpp_native_file_read_byte") { id = 45; };
+                        nếu (tên == "vpp_native_file_write_byte") { id = 46; };
+                        nếu (tên == "vpp_native_os_clock") { id = 71; };
+                        nếu (tên == "vpp_native_os_sleep") { id = 72; };
+                        nếu (tên == "vpp_native_os_entropy") { id = 73; };
+                        nếu (tên == "vpp_native_os_process") { id = 76; };
+                        nếu (tên == "vpp_native_argc") { id = 14; };
+                        nếu (tên == "vpp_native_argv") { id = 15; };
+                        nếu (tên == "vpp_native_memory_read_byte") { id = 28; };
+                        nếu (tên == "vpp_native_memory_write_byte") { id = 29; };
+                        nếu (tên == "vpp_native_memory_read_i32") { id = 30; };
+                        nếu (tên == "vpp_native_memory_write_i32") { id = 31; };
+                        nếu (tên == "vpp_native_memory_bind") { id = 32; };
+                        nếu (tên == "vpp_native_os_argument_length") { id = 38; };
+                        nếu (tên == "vpp_native_os_argument_byte") { id = 39; };
+                        nếu (tên == "vpp_native_os_write") { id = 35; };
+                        nếu (tên == "vpp_native_os_socket") { id = 77; };
+                        nếu (tên == "vpp_native_os_open") { id = 33; };
+                        nếu (tên == "vpp_native_os_read") { id = 34; };
+                        nếu (tên == "vpp_native_os_close") { id = 36; };
+                        nếu (tên == "vpp_native_os_errno") { id = 37; };
+                        nếu (tên == "vpp_native_os_home") { id = 47; };
+                        nếu (tên == "vpp_native_os_cwd") { id = 48; };
+                        nếu (tên == "vpp_native_os_mkstemp") { id = 49; };
+                        nếu (tên == "vpp_native_os_rename") { id = 50; };
+                        nếu (tên == "vpp_native_os_stat") { id = 53; };
+                        nếu (tên == "vpp_native_os_lstat") { id = 54; };
+                        nếu (tên == "vpp_native_os_access_exec") { id = 55; };
+                        nếu (tên == "vpp_native_os_unlink") { id = 56; };
+                        nếu (tên == "vpp_native_os_env_copy") { id = 57; };
+                        nếu (tên == "vpp_native_os_executable_path") { id = 58; };
+                        nếu (tên == "vpp_native_os_mkdir") { id = 59; };
+                        nếu (tên == "vpp_native_os_fstat") { id = 60; };
+                        nếu (tên == "vpp_native_f64_from_i32") { id = 65; };
+                        nếu (tên == "vpp_native_f64_binary") { id = 66; };
+                        nếu (tên == "vpp_native_f64_compare") { id = 67; };
+                        nếu (tên == "vpp_native_f64_to_i32") { id = 68; };
+                        nếu (tên == "vpp_native_f64_parse") { id = 69; };
+                        nếu (tên == "vpp_native_f64_text") { id = 70; };
+                        nếu (tên == "vpp_native_os_identity") { id = 74; };
+                        nếu (tên == "vpp_native_os_directory") { id = 75; };
+                        nếu (tên == "vpp_native_os_thread_cpu_clock") { id = 78; };
+                        nếu (tên == "vpp_native_os_fchmod") { id = 81; };
+                        nếu (tên == "vpp_native_memory_zero") { id = 82; };
+                        nếu (tên == "vpp_native_memory_copy") { id = 85; };
+                        nếu (tên == "vpp_native_memory_ascii_prefix") { id = 86; };
+                        nếu (tên == "vpp_native_os_seek") { id = 87; };
+                        jit yêu cầu(id != 0, "symbol ngoài tập i32: " + tên);
+                        jit yêu cầu(máy JIT thô(4, id, địa chỉ) == 0, "không lấy được địa chỉ runtime");
+                        khi (máy ảo lấy độ dài(mã) % 16 != 0) { máy ảo thêm cuối danh sách(mã, 0); };
+                        ký hiệu[tên] = máy ảo lấy độ dài(mã);
+                        nếu (hệ == 1) {
+                            // ldr x16, #8; br x16; .quad target
+                            jit nối(mã, [80, 0, 0, 88, 0, 2, 31, 214]);
+                        } hoặc {
+                            // movabs r11, target; jmp r11
+                            jit nối(mã, [73, 187]);
+                        };
+                        lặp(k = 0; k < 8; k++) { máy ảo thêm cuối danh sách(mã, byte lấy(địa chỉ, k)); };
+                        nếu (hệ != 1) { jit nối(mã, [65, 255, 227]); };
+                    };
+                };
+            };
+        } bắt lỗi(e) { byte hủy(địa chỉ); ném e; };
+        byte hủy(địa chỉ);
+        lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            mục = các hàm[i];
+            tái định vị = mục["relocations"];
+            lặp(j = 0; j < máy ảo lấy độ dài(tái định vị); j++) {
+                vị trí = tái định vị[j];
+                tại = mục["offset"] + vị trí["offset"];
+                đích = ký hiệu[vị trí["symbol"]];
+                nếu (hệ == 1) {
+                    chênh = đích - tại;
+                    jit yêu cầu(chênh % 4 == 0 && chênh >= -134217728 && chênh < 134217728,
+                        "CALL AArch64 vượt phạm vi");
+                    jit ghi i32(mã, tại, -1811939328 | ((chênh / 4) & 67108863));
+                } hoặc {
+                    jit ghi i32(mã, tại, đích - tại - 4);
+                };
+            };
+        };
+        jit yêu cầu(máy ảo lấy độ dài(mã) <= 1048576, "vùng mã vượt 1 MiB");
+        bộ đệm = byte mới();
+        jit yêu cầu(bộ đệm > 0, "không cấp được bộ đệm mã");
+        thử {
+            lặp(i = 0; i < máy ảo lấy độ dài(mã); i++) {
+                jit yêu cầu(byte thêm(bộ đệm, mã[i]) == 0, "không ghi được mã");
+            };
+            mình.mã = máy JIT thô(1, bộ đệm, 0);
+        } bắt lỗi(e) { byte hủy(bộ đệm); ném e; };
+        byte hủy(bộ đệm);
+        jit yêu cầu(mình.mã > 0, "không tạo được vùng nhớ thực thi");
+        mình.gói = byte mới();
+        nếu (mình.gói <= 0) { máy JIT thô(3, mình.mã, 0); mình.mã = 0; ném "V++ JIT: không cấp được gói gọi"; };
+        lặp(i = 0; i < 12; i++) { byte đẩy số nguyên ba mươi hai bit(mình.gói, 0); };
+    };
+
+    hàm công khai chạy(tên = "chính", đối số = rỗng) {
+        jit yêu cầu(mình.mã > 0, "phiên đã đóng");
+        nếu (đối số == rỗng) { đối số = []; };
+        mục = lấy từ điển(mình.hàm, tên, rỗng);
+        jit yêu cầu(mục != rỗng, "không tìm thấy hàm: " + tên);
+        n = máy ảo lấy độ dài(đối số);
+        jit yêu cầu(n == mục["arity"] && n <= 8, "sai số đối số hoặc vượt 8 đối số");
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 0, mục["offset"]);
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 4, n);
+        lặp(i = 0; i < 8; i++) {
+            giá trị = 0;
+            nếu (i < n) {
+                giá trị = đối số[i];
+                jit yêu cầu(loại của(giá trị) == "số nguyên" && giá trị >= -2147483648 && giá trị <= 2147483647,
+                    "đối số phải là i32");
+            };
+            byte ghi số nguyên ba mươi hai bit(mình.gói, 8 + i * 4, giá trị);
+        };
+        jit yêu cầu(máy JIT thô(2, mình.mã, mình.gói) == 0, "gọi mã máy thất bại");
+        trả về byte đọc số nguyên ba mươi hai bit(mình.gói, 40);
+    };
+
+    // A standalone raw program has its own arena and string argv. The
+    // ordinary call API above continues to accept caller-owned byte handles.
+    hàm công khai chạy chương trình(vị trí đối số) {
+        jit yêu cầu(mình.mã > 0, "phiên đã đóng");
+        mục = lấy từ điển(mình.hàm, "chính", rỗng);
+        jit yêu cầu(mục != rỗng && mục["arity"] == 0, "chương trình cần hàm chính không đối số");
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 0, mục["offset"]);
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 4, 0);
+        byte ghi số nguyên ba mươi hai bit(mình.gói, 44, vị trí đối số);
+        jit yêu cầu(máy JIT thô(7, mình.mã, mình.gói) == 0, "gọi chương trình i32 thất bại");
+        trả về byte đọc số nguyên ba mươi hai bit(mình.gói, 40);
+    };
+
+    hàm công khai đóng() {
+        nếu (mình.mã <= 0) { trả về sai; };
+        jit yêu cầu(máy JIT thô(3, mình.mã, 0) == 0, "không giải phóng được mã");
+        mình.mã = 0;
+        byte hủy(mình.gói); mình.gói = 0;
+        trả về đúng;
+    };
+};
+
+hàm công khai jit chạy(nguồn, tên = "chính", đối số = rỗng) {
+    bộ = Bộ Biên Dịch JIT(nguồn);
+    thử { kết quả = bộ.chạy(tên, đối số); bộ.đóng(); trả về kết quả; }
+    bắt lỗi(e) { bộ.đóng(); ném e; };
+};

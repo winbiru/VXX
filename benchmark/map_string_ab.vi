@@ -1,0 +1,33 @@
+nhập gói.chuẩn.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+hàm chính() {
+    tên = đọc biến môi trường("BENCH_CASE", "insert");
+    n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "8"));
+    keys = []; m = {};
+    lặp(i = 0; i < 512; i++) { thêm(keys, "common-prefix-long-key-" + thành chuỗi(i)); };
+    nếu (tên != "insert") { lặp(i = 511; i >= 0; i--) { m[keys[i]] = i; }; };
+    kiểm = 0;
+    bắt đầu = thời gian đơn điệu mili giây();
+    lặp(j = 0; j < n; j++) {
+        nếu (tên == "insert") {
+            m = {};
+            lặp(i = 511; i >= 0; i--) { m[keys[i]] = i; };
+            kiểm += độ dài(m);
+        } hoặc nếu (tên == "lookup") {
+            lặp(i = 0; i < 512; i++) { kiểm += m[keys[i]]; };
+        } hoặc nếu (tên == "update") {
+            lặp(i = 0; i < 512; i++) { m[keys[i]] = i + j; kiểm += m[keys[i]]; };
+        } hoặc {
+            lặp(i = 0; i < 512; i++) { xóa khóa(m, keys[i]); m[keys[i]] = i; kiểm += m[keys[i]]; };
+        };
+    };
+    in thời gian đơn điệu mili giây() - bắt đầu;
+    in kiểm;
+    in độ dài(m);
+    lặp(i = 0; i < 512; i++) {
+        dự kiến = i; nếu (tên == "update") { dự kiến = i + n - 1; };
+        nếu (m[keys[i]] != dự kiến) { ném "map mismatch"; };
+    };
+};

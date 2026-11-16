@@ -18,10 +18,13 @@ PUBLIC(vpp_native_argc):
 #endif
     movl (%rax), %eax
 #endif
+    subl PUBLIC(vpp_jit_argv_offset)(%rip), %eax
     ret
 Ldoi_so_con_tro:
     cmpl $0, %edi
     jl 3f
+    addl PUBLIC(vpp_jit_argv_offset)(%rip), %edi
+    jo 3f
     movl %edi, %r10d
 #ifdef __APPLE__
     subq $24, %rsp
@@ -98,3 +101,9 @@ PUBLIC(vpp_native_os_argument_byte):
     popq %rbp
     ret
 
+
+.bss
+.p2align 2
+.globl PUBLIC(vpp_jit_argv_offset)
+PUBLIC(vpp_jit_argv_offset): .zero 4
+.text

@@ -1,0 +1,15 @@
+nhập gói.biên dịch.đối tượng macho động.Bộ Ghi MachO Động;
+
+hàm chính() {
+    h = đối số lấy(1); a = [];
+    lặp(i = 0; i < byte dài(h); i++) { máy ảo thêm cuối danh sách(a, byte lấy(h, i)); };
+    byte hủy(h);
+    o = Bộ Ghi MachO Động(chuỗi từ byte máy ảo(a));
+    o.ghi hàm("caller", {"bytes": [0,0,0,148,192,3,95,214], "relocations": [{"offset":0,"symbol":"callee"}]});
+    o.ghi hàm("callee", {"bytes": [64,5,128,82,192,3,95,214], "relocations": []});
+    o.bắt đầu dữ liệu();
+    o.nhãn(".local"); o.dữ liệu byte([42,0]);
+    o.căn dữ liệu(); o.nhãn("_table", đúng);
+    o.con trỏ(".local"); o.con trỏ("_callee");
+    o.hoàn tất();
+};

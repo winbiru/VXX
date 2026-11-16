@@ -23,14 +23,14 @@ function(check_closure name source expected)
     endif()
 endfunction()
 
-check_closure(capture src/tests/kiem_tra_closure_capture.vi
-    src/tests/expected/kiem_tra_closure_capture.expected)
-check_closure(scopes src/tests/fixtures/anonymous_functions/entry.vi
-    src/tests/expected/kiem_tra_ham_an_danh.expected)
-check_closure(modules src/tests/fixtures/anonymous_modules/entry.vi
-    src/tests/expected/kiem_tra_ham_an_danh_module.expected)
-check_closure(oop src/tests/kiem_tra_native_oop.vi
-    src/tests/expected/kiem_tra_native_oop.expected)
+check_closure(capture scripts/test/kiem_tra_closure_capture.vi
+    scripts/test/expected/kiem_tra_closure_capture.expected)
+check_closure(scopes scripts/test/fixtures/anonymous_functions/entry.vi
+    scripts/test/expected/kiem_tra_ham_an_danh.expected)
+check_closure(modules scripts/test/fixtures/anonymous_modules/entry.vi
+    scripts/test/expected/kiem_tra_ham_an_danh_module.expected)
+check_closure(oop scripts/test/kiem_tra_native_oop.vi
+    scripts/test/expected/kiem_tra_native_oop.expected)
 
 # Closure không được dùng vòng lặp ngoài làm đích cho thoát hoặc bỏ qua.
 set(invalid "${VPP_OUTPUT_DIR}/invalid.vi")

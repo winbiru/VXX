@@ -12,6 +12,7 @@ vpp_native_argc:
     movq %rax, %rcx
     call LocalFree
     movl 40(%rsp), %eax
+    subl vpp_jit_argv_offset(%rip), %eax
     addq $56, %rsp
     ret
 1:  movl $-1, %eax
@@ -23,9 +24,11 @@ Ldoi_so_con_tro:
     pushq %rbp
     movq %rsp, %rbp
     subq $128, %rsp
-    movl %ecx, -4(%rbp)
     cmpl $0, %ecx
     jl Ldoi_so_loi
+    addl vpp_jit_argv_offset(%rip), %ecx
+    jo Ldoi_so_loi
+    movl %ecx, -4(%rbp)
     movq vpp_native_argument_buffer(%rip), %rax
     testq %rax, %rax
     je Ldoi_so_phan_giai
@@ -135,3 +138,12 @@ vpp_native_os_argument_byte:
 2:  movl $-1, %eax
 4:  leave
     ret
+
+// The pinned i32 PE linker only supports empty COFF .bss sections.
+// Keep this zero-initialized state in file-backed writable data so that
+// the same boundary remains usable by the seed and subsequent stages.
+.data
+.p2align 2
+.globl vpp_jit_argv_offset
+vpp_jit_argv_offset: .zero 4
+.text

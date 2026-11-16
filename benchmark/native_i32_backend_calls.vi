@@ -1,0 +1,9 @@
+// Toàn bộ vòng lặp và lời gọi thuần được hạ sang ABI i32.
+// Đo executable riêng; thời gian dựng compiler/chương trình nằm ngoài vùng đo.
+hàm trộn(a, b) { trả về (a * 33) ^ b; };
+hàm tích lũy(n, hạt) {
+    tổng = hạt;
+    lặp(i = 0; i < n; i++) { tổng = trộn(tổng, i); };
+    trả về tổng;
+};
+hàm chính() { in tích lũy(2000000, 17); };

@@ -22,3 +22,12 @@
 #include "aot_arm64/doi_so.inc"
 #include "aot_arm64/xuat_ham.inc"
 #include "aot_arm64/du_lieu.inc"
+
+// Worker service unavailable on this platform until native threads are integrated.
+
+.text
+.globl vpp_native_worker_service
+vpp_native_worker_service:
+    cmp w0, #0
+    csetm w0, ne
+    ret

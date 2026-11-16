@@ -1,0 +1,260 @@
+// Dynamic Darwin ARM64 MH_OBJECT reader. Keep file payload on disk; only
+// section descriptors and two 4 KiB pages are resident. This is deliberately
+// separate from the restricted i32 byte arena and does not link objects yet.
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+nhập gói.lõi.toán học.làm tròn xuống;
+
+hàm riêng tư macho yêu cầu(điều kiện) {
+    nếu (!điều kiện) { ném "Mach-O: đối tượng không hợp lệ hoặc vượt giới hạn"; };
+};
+
+// Return a signed word, preserving all 32 bits without overflowing i32.
+hàm riêng tư macho word(b, p) {
+    cao = b[p + 3];
+    nếu (cao >= 128) { cao -= 256; };
+    trả về b[p] + b[p + 1] * 256 + b[p + 2] * 65536 + cao * 16777216;
+};
+
+hàm riêng tư macho lượng(b, p) {
+    n = macho word(b, p);
+    bỏ kết quả = macho yêu cầu(n >= 0);
+    trả về n;
+};
+
+hàm riêng tư macho lượng dài(b, p) {
+    // File offsets/section extents in this implementation are <= INT32_MAX.
+    bỏ kết quả = macho yêu cầu(macho word(b, p + 4) == 0);
+    trả về macho lượng(b, p);
+};
+
+hàm riêng tư macho tên cố định(b, p) {
+    tên = [];
+    lặp (i = 0; i < 16; i += 1) {
+        nếu (b[p + i] == 0) { thoát; };
+        bỏ kết quả = máy ảo thêm cuối danh sách(tên, b[p + i]);
+    };
+    trả về chuỗi từ byte máy ảo(tên);
+};
+
+lớp công khai Đối Tượng MachO {
+    hàm công khai khởi tạo(đường) {
+        mình.tệp = Bộ Đệm Tệp(đường, "đọc", 4096, "đọc Mach-O");
+        mình.trang = [];
+        mình.gốc trang = -1;
+        mình.trang phụ = [];
+        mình.gốc phụ = -1;
+        mình.phần = [];
+        mình.bảng = rỗng;
+        thử {
+            bỏ kết quả = mình.tệp.dịch(0, 2);
+            mình.dài = mình.tệp.vị trí();
+            bỏ kết quả = macho yêu cầu(mình.dài >= 32 && mình.dài <= 2147483647);
+            bỏ kết quả = mình.đọc đầu();
+        } bắt lỗi(e) {
+            thử { bỏ kết quả = mình.tệp.đóng(); } bắt lỗi(lỗi đóng) {};
+            ném e;
+        };
+    };
+
+    hàm công khai đóng() { trả về mình.tệp.đóng(); };
+
+    hàm riêng tư kiểm vùng(p, n) {
+        bỏ kết quả = macho yêu cầu(p >= 0 && n >= 0 && p <= mình.dài && n <= mình.dài - p);
+    };
+
+    // Check nonempty file-backed payloads against load commands and one
+    // another. Zero-length tables may legally carry offset zero.
+    hàm riêng tư đăng ký vùng(p, n) {
+        bỏ kết quả = mình.kiểm vùng(p, n);
+        nếu (n == 0) { trả về; };
+        bỏ kết quả = macho yêu cầu(p >= mình.hết lệnh);
+        lặp (i = 0; i < máy ảo lấy độ dài(mình.vùng); i += 1) {
+            v = mình.vùng[i];
+            bỏ kết quả = macho yêu cầu(p + n <= v[0] || v[1] <= p);
+        };
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.vùng, [p, p + n]);
+    };
+
+    hàm riêng tư nạp trang(địa) {
+        nếu (mình.gốc trang >= 0 && địa >= mình.gốc trang && địa - mình.gốc trang < máy ảo lấy độ dài(mình.trang)) { trả về; };
+        nếu (mình.gốc phụ >= 0 && địa >= mình.gốc phụ && địa - mình.gốc phụ < máy ảo lấy độ dài(mình.trang phụ)) {
+            cũ = mình.trang;
+            gốc cũ = mình.gốc trang;
+            mình.trang = mình.trang phụ;
+            mình.gốc trang = mình.gốc phụ;
+            mình.trang phụ = cũ;
+            mình.gốc phụ = gốc cũ;
+            trả về;
+        };
+        gốc = địa - địa % 4096;
+        đếm = 4096;
+        nếu (mình.dài - gốc < đếm) { đếm = mình.dài - gốc; };
+        bỏ kết quả = mình.tệp.dịch(gốc);
+        trang = mình.tệp.đọc các byte(đếm);
+        bỏ kết quả = macho yêu cầu(máy ảo lấy độ dài(trang) == đếm);
+        mình.trang phụ = mình.trang;
+        mình.gốc phụ = mình.gốc trang;
+        mình.trang = trang;
+        mình.gốc trang = gốc;
+    };
+
+    // Read each contiguous part of a cached page once, including requests
+    // spanning the page boundary.
+    hàm công khai đọc vùng(p, n) {
+        bỏ kết quả = mình.kiểm vùng(p, n);
+        bỏ kết quả = macho yêu cầu(n <= 4096);
+        ra = [];
+        địa = p;
+        khi (địa < p + n) {
+            bỏ kết quả = mình.nạp trang(địa);
+            trang = mình.trang;
+            bắt đầu = địa - mình.gốc trang;
+            đếm = máy ảo lấy độ dài(trang) - bắt đầu;
+            nếu (đếm > p + n - địa) { đếm = p + n - địa; };
+            lặp (i = 0; i < đếm; i += 1) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(ra, trang[bắt đầu + i]);
+            };
+            địa += đếm;
+        };
+        trả về ra;
+    };
+
+    // The writer needs a mutable, independently owned copy of each payload
+    // block. Bypass the metadata page cache to avoid copying the bytes twice.
+    hàm công khai đọc khối riêng(p, n) {
+        bỏ kết quả = mình.kiểm vùng(p, n);
+        bỏ kết quả = macho yêu cầu(n <= 4096);
+        bỏ kết quả = mình.tệp.dịch(p);
+        ra = mình.tệp.đọc các byte(n);
+        bỏ kết quả = macho yêu cầu(máy ảo lấy độ dài(ra) == n);
+        trả về ra;
+    };
+
+    hàm riêng tư đọc đầu() {
+        h = mình.đọc vùng(0, 32);
+        bỏ kết quả = macho yêu cầu(macho word(h, 0) == -17958193 && macho word(h, 4) == 16777228 && macho word(h, 8) == 0 && macho word(h, 12) == 1);
+        số = macho lượng(h, 16);
+        dài lệnh = macho lượng(h, 20);
+        bỏ kết quả = mình.kiểm vùng(32, dài lệnh);
+        bỏ kết quả = macho yêu cầu(số <= 4096 && số <= làm tròn xuống(dài lệnh / 8));
+        hết = 32 + dài lệnh;
+        mình.hết lệnh = hết;
+        mình.vùng = [];
+        p = 32;
+        lặp (i = 0; i < số; i += 1) {
+            bỏ kết quả = macho yêu cầu(hết - p >= 8);
+            lệnh = mình.đọc vùng(p, 8);
+            loại = macho word(lệnh, 0);
+            dài = macho lượng(lệnh, 4);
+            bỏ kết quả = macho yêu cầu(dài >= 8 && dài % 8 == 0 && dài <= hết - p);
+            nếu (loại == 25) { bỏ kết quả = mình.đọc đoạn(p, dài); };
+            nếu (loại == 2) {
+                bỏ kết quả = macho yêu cầu(dài == 24 && mình.bảng == rỗng);
+                b = mình.đọc vùng(p, 24);
+                vị = macho lượng(b, 8);
+                đếm = macho lượng(b, 12);
+                chuỗi = macho lượng(b, 16);
+                dài chuỗi = macho lượng(b, 20);
+                bỏ kết quả = macho yêu cầu(đếm <= 134217727);
+                bỏ kết quả = mình.đăng ký vùng(vị, đếm * 16);
+                bỏ kết quả = mình.đăng ký vùng(chuỗi, dài chuỗi);
+                mình.bảng = [vị, đếm, chuỗi, dài chuỗi];
+            };
+            p += dài;
+        };
+        bỏ kết quả = macho yêu cầu(p == hết && mình.bảng != rỗng && máy ảo lấy độ dài(mình.phần) > 0);
+    };
+
+    hàm riêng tư đọc đoạn(p, dài) {
+        bỏ kết quả = macho yêu cầu(dài >= 72);
+        b = mình.đọc vùng(p, 72);
+        đếm = macho lượng(b, 64);
+        bỏ kết quả = macho yêu cầu(đếm <= 255 - máy ảo lấy độ dài(mình.phần) && đếm <= làm tròn xuống((dài - 72) / 80) && dài == 72 + đếm * 80);
+        lặp (i = 0; i < đếm; i += 1) {
+            s = mình.đọc vùng(p + 72 + i * 80, 80);
+            địa = macho lượng dài(s, 32);
+            n = macho lượng dài(s, 40);
+            vị = macho lượng(s, 48);
+            căn = macho lượng(s, 52);
+            rel = macho lượng(s, 56);
+            số rel = macho lượng(s, 60);
+            loại = s[64];
+            không dữ liệu = loại == 1 || loại == 12 || loại == 18;
+            bỏ kết quả = macho yêu cầu(căn <= 30 && số rel <= 268435455 && n <= 2147483647 - địa);
+            nếu (!không dữ liệu) { bỏ kết quả = mình.đăng ký vùng(vị, n); }
+            hoặc { bỏ kết quả = macho yêu cầu(vị == 0 && số rel == 0); };
+            bỏ kết quả = mình.đăng ký vùng(rel, số rel * 8);
+            bỏ kết quả = máy ảo thêm cuối danh sách(mình.phần, {"segment": macho tên cố định(s, 16), "name": macho tên cố định(s, 0), "address": địa, "size": n, "offset": vị, "align": căn, "relocationOffset": rel, "relocationCount": số rel, "flags": macho word(s, 64), "zeroFill": không dữ liệu});
+        };
+    };
+
+    hàm công khai số phần() { trả về máy ảo lấy độ dài(mình.phần); };
+    hàm công khai lấy phần(i) {
+        bỏ kết quả = macho yêu cầu(i >= 0 && i < mình.số phần());
+        trả về mình.phần[i];
+    };
+    hàm công khai số ký hiệu() { trả về mình.bảng[1]; };
+
+    hàm công khai lấy ký hiệu(i) {
+        bỏ kết quả = macho yêu cầu(i >= 0 && i < mình.số ký hiệu());
+        b = mình.đọc vùng(mình.bảng[0] + i * 16, 16);
+        tên = macho lượng(b, 0);
+        bỏ kết quả = macho yêu cầu(tên < mình.bảng[3]);
+        // N_STAB uses the top three bits; N_TYPE excludes N_EXT/N_PEXT.
+        loại = b[4] & 14;
+        nếu (b[4] < 32 && loại == 14) {
+            bỏ kết quả = macho yêu cầu(b[5] > 0 && b[5] <= mình.số phần());
+            s = mình.lấy phần(b[5] - 1);
+            giá trị = macho lượng dài(b, 8);
+            bỏ kết quả = macho yêu cầu(giá trị >= s["address"] && giá trị - s["address"] <= s["size"]);
+        };
+        // Keep value as two words: absolute symbols may use all 64 bits.
+        trả về {"nameOffset": tên, "type": b[4], "section": b[5], "description": b[6] + b[7] * 256, "valueLow": macho word(b, 8), "valueHigh": macho word(b, 12)};
+    };
+
+    hàm công khai tên ký hiệu(lệch) {
+        bỏ kết quả = macho yêu cầu(lệch >= 0 && lệch < mình.bảng[3]);
+        tên = [];
+        // Scan contiguous cached bytes without allocating a list per byte.
+        còn = mình.bảng[3] - lệch;
+        nếu (còn > 4096) { còn = 4096; };
+        địa = mình.bảng[2] + lệch;
+        khi (còn > 0) {
+            bỏ kết quả = mình.nạp trang(địa);
+            trang = mình.trang;
+            bắt đầu = địa - mình.gốc trang;
+            đếm = máy ảo lấy độ dài(trang) - bắt đầu;
+            nếu (đếm > còn) { đếm = còn; };
+            lặp (i = 0; i < đếm; i += 1) {
+                b = trang[bắt đầu + i];
+                nếu (b == 0) { trả về chuỗi từ byte máy ảo(tên); };
+                bỏ kết quả = máy ảo thêm cuối danh sách(tên, b);
+            };
+            địa += đếm;
+            còn -= đếm;
+        };
+        ném "Mach-O: tên ký hiệu không kết thúc trong giới hạn";
+    };
+
+    hàm công khai lấy tái định vị(phần, i) {
+        s = mình.lấy phần(phần);
+        bỏ kết quả = macho yêu cầu(i >= 0 && i < s["relocationCount"]);
+        b = mình.đọc vùng(s["relocationOffset"] + i * 8, 8);
+        địa = macho lượng(b, 0); // scattered records are unsupported
+        đích = b[4] + b[5] * 256 + b[6] * 65536;
+        cờ = b[7];
+        tương đối = cờ % 2;
+        rộng = làm tròn xuống(cờ / 2) % 4;
+        ngoài = làm tròn xuống(cờ / 8) % 2;
+        loại = làm tròn xuống(cờ / 16);
+        // Limit the first reader to the relocation shapes actually emitted
+        // by the current full compiler, runtime and platform objects.
+        bỏ kết quả = macho yêu cầu(ngoài == 1 && đích < mình.số ký hiệu());
+        bỏ kết quả = macho yêu cầu((loại == 0 && rộng == 3 && tương đối == 0) || (loại == 2 && rộng == 2 && tương đối == 1) || (loại == 3 && rộng == 2 && tương đối == 1) || (loại == 4 && rộng == 2 && tương đối == 0));
+        byte rộng = 4;
+        nếu (rộng == 3) { byte rộng = 8; }
+        hoặc { bỏ kết quả = macho yêu cầu(địa % 4 == 0); };
+        bỏ kết quả = macho yêu cầu(địa <= s["size"] && byte rộng <= s["size"] - địa);
+        trả về {"address": địa, "symbol": đích, "pcrel": tương đối, "length": rộng, "type": loại};
+    };
+};

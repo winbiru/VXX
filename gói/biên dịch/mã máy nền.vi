@@ -1,3 +1,4 @@
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
@@ -45,15 +46,15 @@ lớp công khai Tiện Ích Mã Máy {
         b2 = (từ máy >> 16) & 255;
         b3 = (từ máy >> 24) & 255;
         nếu (ít trước) {
-            máy ảo thêm cuối danh sách(ra, b0);
-            máy ảo thêm cuối danh sách(ra, b1);
-            máy ảo thêm cuối danh sách(ra, b2);
-            máy ảo thêm cuối danh sách(ra, b3);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
         } hoặc {
-            máy ảo thêm cuối danh sách(ra, b3);
-            máy ảo thêm cuối danh sách(ra, b2);
-            máy ảo thêm cuối danh sách(ra, b1);
-            máy ảo thêm cuối danh sách(ra, b0);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+            bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
         };
         trả về ra;
     };
@@ -98,72 +99,77 @@ lớp công khai Tiện Ích Mã Máy {
     };
 
     // Validate stack transfer từng opcode, kể cả lệnh không thể tới được.
-    hàm riêng tư biên dịch mã máy stack sau(mã phép toán, ô nhớ, sâu nhất, tổng lệnh) {
-        mã = mã phép toán["opcode"];
-        trước = mã phép toán["depthBefore"];
-        toán hạng = mã phép toán["operand"];
+    hàm riêng tư biên dịch mã máy stack sau(mã, trước, toán hạng, tên, ô nhớ, sâu nhất, tổng lệnh, ký hiệu đã kiểm tra) {
         nếu (trước < 0 || trước > sâu nhất) { ném "machine IR stack vượt frame"; };
-        nếu (mã == "Jump" || mã == "BranchZero") {
+        nếu (mã == 16 || mã == 15) {
             nếu (toán hạng < 0 || toán hạng >= tổng lệnh) {
                 ném "machine IR branch ngoài phạm vi";
             };
         };
         chọn (mã) {
-            ca "PushConstant": {
+            ca 0: {
                 nếu (trước >= sâu nhất) { ném "machine IR stack overflow"; };
                 trả về trước + 1;
             }
-            ca "LoadSlot": {
+            ca 1: {
                 nếu (toán hạng < 0 || toán hạng >= ô nhớ || trước >= sâu nhất) {
                     ném "machine IR load slot ngoài frame";
                 };
                 trả về trước + 1;
             }
-            ca "StoreSlot": {
+            ca 2: {
                 nếu (toán hạng < 0 || toán hạng >= ô nhớ || trước == 0) {
                     ném "machine IR store slot ngoài frame";
                 };
                 trả về trước;
             }
-            ca "Drop": {
+            ca 3: {
                 nếu (trước == 0) { ném "machine IR stack underflow"; };
                 trả về trước - 1;
             }
-            ca "BranchZero": {
+            ca 15: {
                 nếu (trước == 0) { ném "machine IR stack underflow"; };
                 trả về trước - 1;
             }
-            ca "Return": {
+            ca 18: {
                 nếu (trước != 1) { ném "machine IR return phải tiêu thụ đúng một giá trị"; };
                 trả về 0;
             }
-            ca "Add": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Sub": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Mul": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Div": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "BitAnd": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "BitOr": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "BitXor": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "ShiftLeft": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "ShiftRight": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Mod": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Equal": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "NotEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Less": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "LessEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Greater": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "GreaterEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
-            ca "Call": {
+            ca 4: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 5: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 6: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 7: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 20: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 21: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 22: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 23: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 24: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 8: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 9: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 10: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 11: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 12: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 13: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 14: { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca 17: {
                 nếu (toán hạng < 0 || trước < toán hạng ||
-                    trước - toán hạng >= sâu nhất ||
-                    !mình.biên dịch mã máy ký hiệu hợp lệ(mã phép toán["symbol"])) {
+                    trước - toán hạng >= sâu nhất) {
                     ném "machine IR call/stack/symbol không hợp lệ";
+                };
+                // Cache only validated strings, scoped to this CFG. Runtime
+                // helper symbols repeat thousands of times in dynamic IR.
+                nếu (loại của(tên) != "chuỗi") { ném "machine IR call/stack/symbol không hợp lệ"; };
+                nếu (!máy ảo có khóa từ điển(ký hiệu đã kiểm tra, tên)) {
+                    nếu (!mình.biên dịch mã máy ký hiệu hợp lệ(tên)) {
+                        ném "machine IR call/stack/symbol không hợp lệ";
+                    };
+                    ký hiệu đã kiểm tra[tên] = đúng;
                 };
                 trả về trước - toán hạng + 1;
             }
-            ca "Jump": { trả về trước; }
-            ca "Trap": { trả về trước; }
-            mặc định: { ném "MachineOpcode C++ chưa định nghĩa: " + mã; }
+            ca 16: { trả về trước; }
+            ca 19: { trả về trước; }
+            mặc định: { ném "MachineOpcode C++ chưa định nghĩa"; }
         };
     };
 
@@ -174,47 +180,101 @@ lớp công khai Tiện Ích Mã Máy {
 
     // Bản V++ của validateMachineStack C++: kiểm tra các đường CFG, nhảy lùi,
     // độ sâu tại điểm hợp nhánh, return và fallthrough.
+    // Bỏ kết quả phụ và dùng phép gán cập nhật để stack không tăng theo IR.
     hàm riêng tư biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, đích, sâu) {
-        nếu (độ sâu đến[đích] == -1) {
-            độ sâu đến[đích] = sâu;
-            máy ảo thêm cuối danh sách(hàng đợi, đích);
+        nếu (độ sâu đến[đích >> 11][đích & 2047] == -1) {
+            độ sâu đến[đích >> 11][đích & 2047] = sâu;
+            bỏ kết quả = máy ảo thêm cuối danh sách(hàng đợi, đích);
         };
-        nếu (độ sâu đến[đích] != sâu) {
+        nếu (độ sâu đến[đích >> 11][đích & 2047] != sâu) {
             ném "machine IR stack không khớp tại CFG join/branch";
         };
     };
 
     hàm công khai biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian) {
+        bỏ kết quả = mình.biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian, sai);
+        trả về đúng;
+    };
+
+    // Keep validated opcode/depth/operand columns for the encoder. All
+    // instructions, including unreachable instructions, still pass stack transfer.
+    hàm công khai biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian, giữ dữ liệu phát mã = đúng) {
         lệnh = danh sách hàm biểu diễn trung gian["instructions"];
         n = máy ảo lấy độ dài(lệnh);
         nếu (n == 0) { ném "machine IR không có lệnh"; };
         ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
         sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
         sau = [];
+        mã lệnh = []; hằng lệnh = []; toán hạng lệnh = []; độ sâu lệnh = []; ký hiệu lệnh = [];
+        có lời gọi = sai;
+        bảng opcode = {"PushConstant": 0, "LoadSlot": 1, "StoreSlot": 2, "Drop": 3, "Add": 4, "Sub": 5, "Mul": 6, "Div": 7, "Mod": 8, "Equal": 9, "NotEqual": 10, "Less": 11, "LessEqual": 12, "Greater": 13, "GreaterEqual": 14, "BranchZero": 15, "Jump": 16, "Call": 17, "Return": 18, "Trap": 19, "BitAnd": 20, "BitOr": 21, "BitXor": 22, "ShiftLeft": 23, "ShiftRight": 24};
         độ sâu đến = [];
-        lặp (i = 0; i < n; i++) {
-            máy ảo thêm cuối danh sách(sau, mình.biên dịch mã máy stack sau(lệnh[i], ô nhớ, sâu nhất, n));
-            máy ảo thêm cuối danh sách(độ sâu đến, -1);
+        ký hiệu đã kiểm tra = {};
+        lặp (i = 0; i < n; i += 1) {
+            trang = i >> 11;
+            nếu ((i & 2047) == 0) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(mã lệnh, []);
+                nếu (giữ dữ liệu phát mã) {
+                    bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh, []);
+                };
+                bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh, []);
+                bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu lệnh, []);
+                bỏ kết quả = máy ảo thêm cuối danh sách(sau, []);
+                bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu đến, []);
+            };
+            nguồn = lệnh[i];
+            chữ = nguồn["opcode"];
+            mã = lấy từ điển(bảng opcode, chữ, -1);
+            nếu (mã < 0) { ném "MachineOpcode C++ chưa định nghĩa: " + chữ; };
+            trước = nguồn["depthBefore"];
+            toán hạng = nguồn["operand"];
+            ký hiệu = nguồn["symbol"];
+            nếu (mã == 17) { có lời gọi = đúng; };
+            bỏ kết quả = máy ảo thêm cuối danh sách(sau[trang], mình.biên dịch mã máy stack sau(mã, trước, toán hạng, ký hiệu, ô nhớ, sâu nhất, n, ký hiệu đã kiểm tra));
+            bỏ kết quả = máy ảo thêm cuối danh sách(mã lệnh[trang], mã);
+            // Validation-only callers still read every required field, but
+            // do not allocate columns used exclusively by the encoder.
+            hằng = nguồn["immediate"];
+            nếu (giữ dữ liệu phát mã) {
+                bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh[trang], hằng);
+                bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh[trang], ký hiệu);
+            };
+            bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh[trang], toán hạng);
+            bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu lệnh[trang], trước);
+            bỏ kết quả = máy ảo thêm cuối danh sách(độ sâu đến[trang], -1);
         };
-        độ sâu đến[0] = 0;
+        độ sâu đến[0][0] = 0;
         hàng đợi = [0];
-        lặp (head = 0; head < máy ảo lấy độ dài(hàng đợi); head++) {
+        lặp (head = 0; head < máy ảo lấy độ dài(hàng đợi); head += 1) {
             i = hàng đợi[head];
-            mã phép toán = lệnh[i];
-            nếu (độ sâu đến[i] != mã phép toán["depthBefore"]) {
-                ném "machine IR stack depth sai tại CFG join/branch";
-            };
-            mã = mã phép toán["opcode"];
-            nếu (mã == "Return" || mã == "Trap") { bỏ qua; };
-            nếu (mã == "Jump" || mã == "BranchZero") {
-                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, mã phép toán["operand"], sau[i]);
-            };
-            nếu (mã != "Jump") {
+            // Walk the straight-line suffix in place. Only branch targets
+            // enter the worklist, and every merge still checks its depth.
+            khi (đúng) {
+                trang = i >> 11; vị trí = i & 2047;
+                nếu (độ sâu đến[i >> 11][i & 2047] != độ sâu lệnh[trang][vị trí]) {
+                    ném "machine IR stack depth sai tại CFG join/branch";
+                };
+                mã = mã lệnh[trang][vị trí];
+                nếu (mã == 18 || mã == 19) { thoát; };
+                sâu = sau[trang][vị trí];
+                nếu (mã == 16 || mã == 15) {
+                    bỏ kết quả = mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, toán hạng lệnh[trang][vị trí], sâu);
+                };
+                nếu (mã == 16) { thoát; };
                 nếu (i + 1 >= n) { ném "machine IR fallthrough vượt cuối hàm"; };
-                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, i + 1, sau[i]);
+                i += 1;
+                nếu (độ sâu đến[i >> 11][i & 2047] != -1) {
+                    nếu (độ sâu đến[i >> 11][i & 2047] != sâu) {
+                        ném "machine IR stack không khớp tại CFG join/branch";
+                    };
+                    thoát;
+                };
+                độ sâu đến[i >> 11][i & 2047] = sâu;
             };
         };
-        trả về đúng;
+        trả về {"opcodes": mã lệnh, "immediates": hằng lệnh, "operands": toán hạng lệnh,
+                "depths": độ sâu lệnh, "symbols": ký hiệu lệnh, "calls": có lời gọi};
     };
 };
 
@@ -242,15 +302,15 @@ hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trướ
     b2 = (từ máy >> 16) & 255;
     b3 = (từ máy >> 24) & 255;
     nếu (ít trước) {
-        máy ảo thêm cuối danh sách(ra, b0);
-        máy ảo thêm cuối danh sách(ra, b1);
-        máy ảo thêm cuối danh sách(ra, b2);
-        máy ảo thêm cuối danh sách(ra, b3);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
     } hoặc {
-        máy ảo thêm cuối danh sách(ra, b3);
-        máy ảo thêm cuối danh sách(ra, b2);
-        máy ảo thêm cuối danh sách(ra, b1);
-        máy ảo thêm cuối danh sách(ra, b0);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b3);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b2);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b1);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, b0);
     };
     trả về ra;
 };
@@ -297,3 +357,8 @@ hàm công khai biên dịch mã máy kiểm tra CFG(danh sách hàm biểu di�
     trả về bộ chuyển tiếp.biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian);
 };
 
+
+hàm công khai biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian);
+};

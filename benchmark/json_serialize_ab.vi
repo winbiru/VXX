@@ -20,6 +20,21 @@ hàm thực hiện(tên, nguồn, dữ liệu) {
     ném "unknown JSON benchmark";
 };
 
+// Dựng cùng một mảng JSON chuẩn trước vùng đo, nhưng tránh tạo O(n²)
+// byte trung gian do nối dồn chuỗi dài trong heap hữu hạn của AOT V++.
+hàm dựng đoạn mảng(bắt đầu, kết thúc) {
+    nếu (kết thúc - bắt đầu <= 32) {
+        đoạn = "";
+        lặp(i = bắt đầu; i < kết thúc; i++) {
+            nếu (i > bắt đầu) { đoạn += ","; };
+            đoạn += thành chuỗi(i);
+        };
+        trả về đoạn;
+    };
+    giữa = bắt đầu + thành số nguyên((kết thúc - bắt đầu) / 2);
+    trả về dựng đoạn mảng(bắt đầu, giữa) + "," + dựng đoạn mảng(giữa, kết thúc);
+};
+
 hàm chính() {
     tên = đọc biến môi trường("BENCH_CASE", "serialize_nested");
     n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "16"));
@@ -32,12 +47,7 @@ hàm chính() {
         nếu (tên == "serialize_huge" || tên == "parse_huge") { số phần tử = 16384; };
         số phần tử = thành số nguyên(đọc biến môi trường("BENCH_ARRAY_SIZE", thành chuỗi(số phần tử)));
         nếu (số phần tử < 1 || số phần tử > 65536) { ném "invalid array size"; };
-        nguồn = "[";
-        lặp(i = 0; i < số phần tử; i++) {
-            nếu (i > 0) { nguồn += ","; };
-            nguồn += thành chuỗi(i);
-        };
-        nguồn += "]";
+        nguồn = "[" + dựng đoạn mảng(0, số phần tử) + "]";
     } hoặc {
         nguồn = "{\"rows\":[";
         lặp(i = 0; i < 64; i++) {

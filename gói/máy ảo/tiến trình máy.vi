@@ -1,4 +1,4 @@
-// POSIX subprocess policy for the standalone V++ VM. The ASM primitive owns
+// Subprocess policy for the standalone V++ VM. The ASM primitive owns
 // file descriptors, posix_spawn objects and waitpid; V++ owns token lifetime,
 // argv validation, pipe draining and typed guest values.
 hàm vm_process_string(value) {
@@ -31,7 +31,7 @@ hàm vm_process_new(state, program) {
     nếu (token == 0) { token = 805306368; };
     nếu (token >= 2147483000) { trả về vm_error(3); };
     token = token + 1;
-    biến resource = vm_alloc(32, 1); nếu (resource == 0) { trả về 0; };
+    biến resource = vm_alloc(36, 1); nếu (resource == 0) { trả về 0; };
     vm_set(resource, 0, token); vm_set(resource, 1, program);
     biến args = vm_vector(4); biến env = vm_vector(5);
     nếu (args == 0 || env == 0) { trả về 0; };
@@ -95,6 +95,11 @@ hàm vm_process_start(resource) {
             vm_set(env_offsets, i, raw);
         };
     };
+    nếu (vm_get(resource, 8) != 0) {
+        biến command = vm_process_c_string(vm_get(resource, 8));
+        nếu (command == 0) { trả về 0; };
+        vm_set(control, 15, command);
+    };
     biến status = máy tiến trình thô(0, control);
     nếu (status != 1) {
         vm_set(resource, 7, vm_concat(vm_literal("errno="), vm_integer_text(vm_get(control, 12))));
@@ -109,7 +114,11 @@ hàm vm_process_host(state, op, a, b, c, d) {
         nếu (vm_get(resource, 6) != 0 || vm_process_string(b) == 0) { trả về vm_error(2); };
         vm_append(vm_get(resource, 2), b); trả về vm_int(1);
     };
-    nếu (op == 195) { trả về vm_error(22); }; // Windows command-line only.
+    nếu (op == 195) {
+        nếu (vm_get(4198464, 8) != 2) { trả về vm_error(22); };
+        nếu (vm_get(resource, 6) != 0 || vm_process_string(b) == 0 || vm_get(b, 1) == 0) { trả về vm_error(2); };
+        vm_set(resource, 8, b); trả về vm_int(1);
+    };
     nếu (op == 196) {
         nếu (vm_get(resource, 6) != 0 || vm_process_string(b) == 0 || vm_process_string(c) == 0) { trả về vm_error(2); };
         nếu (vm_get(b, 1) == 0) { trả về vm_error(2); };

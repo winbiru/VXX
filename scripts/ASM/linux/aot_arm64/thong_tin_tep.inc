@@ -20,6 +20,8 @@
     bl \dich
     cbnz w0, 2f
     ldr x11, [sp, #24]
+    ldr w10, [x11, #4]
+    str w10, [x11, #200]
     ldr w10, [x11, #16]
     str w10, [x11, #4]
 2:  TRA_BO_NHO

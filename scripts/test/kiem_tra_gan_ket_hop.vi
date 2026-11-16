@@ -1,0 +1,39 @@
+lớp Hộp {
+    hàm khởi tạo(n) { mình.n = n; mình.chuỗi = "V"; };
+    hàm công khai tăng() { mình.n += 2; mình.chuỗi += "++"; };
+};
+lớp Nguồn {
+    hàm khởi tạo() { mình.hộp = Hộp(10); mình.ds = [20]; mình.lượt = 0; };
+    hàm công khai lấy hộp() { mình.lượt += 1; trả về mình.hộp; };
+    hàm công khai lấy danh sách() { mình.lượt += 1; trả về mình.ds; };
+    hàm công khai chỉ số() { mình.lượt += 1; trả về 0; };
+    hàm công khai vế phải() { mình.lượt += 1; trả về 5; };
+};
+hàm chính() {
+    n = 1; n += 2; in n;
+    h = Hộp(3); h.tăng(); h.n += 4; in h.n; in h.chuỗi;
+    h.n *= 2; h.n -= 3; in h.n;
+    g = Nguồn();
+    g.lấy hộp().n += g.vế phải();
+    hộp = g.hộp; in hộp.n; in g.lượt;
+    g.lấy danh sách()[g.chỉ số()] += g.vế phải();
+    ds = g.ds; in ds[0]; in g.lượt;
+    d = {"a": "Việt"}; d["a"] += " Nam"; in d["a"];
+    ds = [1, 2]; ds[0] += ds[1]; in ds[0];
+    lặp(i = 0; i < 3; i++) { ds[0] += 1; }; in ds[0];
+    // The left receiver and key must be evaluated before the RHS and once only.
+    c = [4]; trước = c;
+    đổi = hàm() { c = [99]; trả về 6; };
+    c[0] += đổi(); in trước[0]; in c[0];
+    h = Hộp(4); hộp cũ = h;
+    đổi hộp = hàm() { h = Hộp(99); trả về 6; };
+    h.n += đổi hộp(); in hộp cũ.n; in h.n;
+    h.n = 13; h.n &= 7; h.n |= 8; h.n ^= 3;
+    h.n <<= 2; h.n >>= 1; in h.n;
+    ds = [13]; ds[0] &= 7; ds[0] |= 8; ds[0] ^= 3;
+    ds[0] <<= 2; ds[0] >>= 1; in ds[0];
+    h.n = 12; h.n /= 3; in h.n == 4;
+    h.n %= 3; in h.n == 1;
+    ds[0] = 12; ds[0] /= 3; in ds[0] == 4;
+    ds[0] %= 3; in ds[0] == 1;
+};

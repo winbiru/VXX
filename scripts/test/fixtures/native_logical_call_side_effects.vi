@@ -1,0 +1,34 @@
+// Preserve the historical short-circuit oracle using supported calls instead
+// of assignment expressions (which remain separately tracked as pending).
+hàm logic_test_change(handle, delta) {
+    biến n = byte đọc số nguyên ba mươi hai bit(handle, 0) + delta;
+    byte ghi số nguyên ba mươi hai bit(handle, 0, n);
+    trả về n;
+};
+hàm logic_vet(a, b) {
+    biến handle = byte mới();
+    byte đẩy số nguyên ba mươi hai bit(handle, 0);
+    biến x = a && logic_test_change(handle, 1);
+    biến y = b || logic_test_change(handle, 2);
+    biến dem = byte đọc số nguyên ba mươi hai bit(handle, 0);
+    byte hủy(handle);
+    trả về x * 100 + y * 10 + dem;
+};
+
+hàm logic_test_value(i) {
+    nếu (i == 0) { trả về -13; };
+    nếu (i == 1) { trả về -1; };
+    nếu (i == 2) { trả về 0; };
+    nếu (i == 3) { trả về 1; };
+    nếu (i == 4) { trả về 2; };
+    trả về 13;
+};
+
+hàm chính() {
+    lặp (i = 0; i < 6; i = i + 1) {
+        lặp (j = 0; j < 6; j = j + 1) {
+            in logic_vet(logic_test_value(i), logic_test_value(j));
+        };
+    };
+    trả về 0;
+};

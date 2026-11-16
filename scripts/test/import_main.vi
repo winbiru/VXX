@@ -1,0 +1,7 @@
+// Test import
+nhập scripts.test.modules.math.*;
+
+hàm chính() {
+    in tong(2,3);
+    in mul(4,5);
+};

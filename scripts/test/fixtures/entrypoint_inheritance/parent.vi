@@ -1,0 +1,3 @@
+lớp công khai Cha {
+    hàm công khai chạy(x = 17) { in x; };
+};

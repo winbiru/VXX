@@ -242,6 +242,8 @@ vpp_native_os_process:
     movl $-1, 68(%r12)
     movl $-1, 72(%r12)
     movl $-1, 76(%r12)
+    movl $-1, 80(%r12)
+    movl $-1, 84(%r12)
     leaq 64(%r12), %rdi
     movl $524288, %esi         // O_CLOEXEC
     call vpp_sys_pipe2
@@ -253,9 +255,15 @@ vpp_native_os_process:
     testq %rax, %rax
     js .Ltien_trinh_tao_errno
 // Dời mô tả ống khỏi 0/1/2 để giữ đúng đích dup2.
+    // Ống báo lỗi exec: EOF chỉ khi exec thành công đóng đầu ghi CLOEXEC.
+    leaq 80(%r12), %rdi
+    movl $524288, %esi
+    call vpp_sys_pipe2
+    testq %rax, %rax
+    js .Ltien_trinh_tao_errno
     xorl %r14d, %r14d
 .Ltien_trinh_doi_mo_ta:
-    cmpl $4, %r14d
+    cmpl $6, %r14d
     jae .Ltien_trinh_tach
     movl 64(%r12,%r14,4), %edi
     cmpl $3, %edi
@@ -287,6 +295,43 @@ vpp_native_os_process:
     call vpp_sys_close
     movl $-1, 68(%r12)
     movl $-1, 76(%r12)
+    movl 84(%r12), %edi
+    call vpp_sys_close
+    movl $-1, 84(%r12)
+.Ltien_trinh_exec_doc:
+    movl 80(%r12), %edi
+    leaq 88(%r12), %rsi
+    movl $4, %edx
+    call vpp_sys_read
+    cmpq $-4, %rax
+    je .Ltien_trinh_exec_doc
+    testq %rax, %rax
+    je .Ltien_trinh_exec_xong
+    cmpq $4, %rax
+    je .Ltien_trinh_exec_loi_con
+    // Lỗi giao thức: không để lại tiến trình hoặc mô tả mở.
+    movl $5, 48(%r12)
+    movl (%r12), %edi
+    movl $9, %esi
+    call vpp_sys_kill
+    jmp .Ltien_trinh_exec_doi
+.Ltien_trinh_exec_loi_con:
+    movl 88(%r12), %eax
+    movl %eax, 48(%r12)
+.Ltien_trinh_exec_doi:
+    movl (%r12), %edi
+    leaq 100(%r12), %rsi
+    xorl %edx, %edx
+    xorl %ecx, %ecx
+    call vpp_sys_wait4
+    cmpq $-4, %rax
+    je .Ltien_trinh_exec_doi
+    movl $0, (%r12)
+    jmp .Ltien_trinh_tao_don_dep
+.Ltien_trinh_exec_xong:
+    movl 80(%r12), %edi
+    call vpp_sys_close
+    movl $-1, 80(%r12)
     movl 64(%r12), %eax
     movl %eax, 4(%r12)
     movl 72(%r12), %eax
@@ -294,6 +339,11 @@ vpp_native_os_process:
     movl $1, %eax
     jmp .Ltien_trinh_tra_ve
 .Ltien_trinh_con:
+    // Giữ fd báo lỗi trên stack vì r12 được dùng lại khi duyệt PATH.
+    movl 84(%r12), %eax
+    movl %eax, -48(%rbp)
+    movl 80(%r12), %edi
+    call vpp_sys_close
     xorl %edi, %edi
     xorl %esi, %esi
     call vpp_sys_setpgid
@@ -318,6 +368,7 @@ vpp_native_os_process:
     movq 144(%r12), %r14
     movq 152(%r12), %r15
     movq (%r14), %r13          // Chương trình
+    movq $-22, %rax
     cmpb $0, (%r13)
     je .Ltien_trinh_con_that_bai
     xorl %ecx, %ecx
@@ -354,6 +405,7 @@ vpp_native_os_process:
 .Ltien_trinh_mac_dinh_duong:
     leaq .Ltien_trinh_mac_dinh_duong_chuoi(%rip), %r12
 .Ltien_trinh_duong_khoi_dong:
+    movl $2, -44(%rbp)
     subq $4096, %rsp
     movq %rsp, %rbx
 .Ltien_trinh_duong_doan:
@@ -410,16 +462,30 @@ vpp_native_os_process:
     call vpp_sys_execve
     cmpq $-2, %rax            // ENOENT
     je .Ltien_trinh_duong_tiep
-    cmpq $-13, %rax           // EACCES
-    je .Ltien_trinh_duong_tiep
+    cmpq $-13, %rax
+    jne .Ltien_trinh_duong_kiem_tra_thu_muc
+    movl $13, -44(%rbp)
+    jmp .Ltien_trinh_duong_tiep
+.Ltien_trinh_duong_kiem_tra_thu_muc:
     cmpq $-20, %rax           // ENOTDIR
     jne .Ltien_trinh_con_that_bai
 .Ltien_trinh_duong_tiep:
     cmpb $0, (%r12)
-    je .Ltien_trinh_con_that_bai
+    jne .Ltien_trinh_duong_ke_tiep
+    jmp .Ltien_trinh_exec_ghi_loi
+.Ltien_trinh_duong_ke_tiep:
     incq %r12
     jmp .Ltien_trinh_duong_doan
 .Ltien_trinh_con_that_bai:
+    negl %eax
+    movl %eax, -44(%rbp)
+.Ltien_trinh_exec_ghi_loi:
+    movl -48(%rbp), %edi
+    leaq -44(%rbp), %rsi
+    movl $4, %edx
+    call vpp_sys_write
+    cmpq $-4, %rax
+    je .Ltien_trinh_exec_ghi_loi
     movl $127, %edi
     call vpp_sys_exit_group
     ud2
@@ -437,7 +503,7 @@ vpp_native_os_process:
 .Ltien_trinh_tao_don_dep:
     xorl %r14d, %r14d
 .Ltien_trinh_don_dep_lap:
-    cmpl $4, %r14d
+    cmpl $6, %r14d
     jae .Ltien_trinh_tao_da_loi
     movl 64(%r12,%r14,4), %edi
     testl %edi, %edi

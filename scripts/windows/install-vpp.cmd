@@ -1,5 +1,3 @@
 @echo off
-setlocal
-set SCRIPT_DIR=%~dp0
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%install-vpp.ps1" %*
-exit /b %ERRORLEVEL%
+echo V++: Full autonomous bootstrap currently requires macOS ARM64.
+exit /b 2

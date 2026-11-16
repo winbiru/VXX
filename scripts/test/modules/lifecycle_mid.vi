@@ -1,0 +1,9 @@
+// Import resolution hiện dùng base của compilation context (entry module),
+// nên fixture ghi đường dẫn từ scripts/test/ để khóa đúng contract hiện tại.
+nhập modules.lifecycle_leaf.*;
+
+in "mid-init";
+
+hàm mid value() {
+    trả về leaf value() + 1;
+};

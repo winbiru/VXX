@@ -221,6 +221,8 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     };
 
     hàm công khai biên dịch biểu thức đọc(p, tối thiểu) {
+        // SourceSpan.begin: cột byte UTF-8 của token đầu biểu thức.
+        đầu biểu thức = mình.biên dịch biểu thức nhìn(p);
         trái = mình.biên dịch biểu thức sơ cấp(p);
         cố định = lấy từ điển(p, "mã cú pháp cố định", sai);
         bảng mức = rỗng;
@@ -256,7 +258,9 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                     };
                 };
                 mình.biên dịch biểu thức chờ(p, ")");
-                trái = {"loại": "gọi", "hàm": trái, "đối số": đối số};
+                trái = {"loại": "gọi", "hàm": trái, "đối số": đối số,
+                         "dòng": biên dịch trường từ tố(đầu biểu thức, 2, "dòng", 0),
+                         "cột": biên dịch trường từ tố(đầu biểu thức, 3, "cột", 0)};
               } hoặc {
                 nếu (mã cú pháp == 202) {
                     mình.biên dịch biểu thức lấy(p);
@@ -297,7 +301,9 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                         nếu (mức == 1) { mức phải = mức; };
                         phải = mình.biên dịch biểu thức đọc(p, mức phải);
                         trái = {"loại": "hai ngôi", "toán tử": s,
-                                "trái": trái, "phải": phải};
+                                "trái": trái, "phải": phải,
+                                "dòng": biên dịch trường từ tố(đầu biểu thức, 2, "dòng", 0),
+                                "cột": biên dịch trường từ tố(đầu biểu thức, 3, "cột", 0)};
                     };
                   };
                 };

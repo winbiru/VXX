@@ -92,3 +92,165 @@ hàm vm_find_function(state, name) {
     };
     trả về -1;
 };
+
+// In-memory four-region bytecode ABI. The linked root record keeps the
+// caller, child, input and captured output alive across guest GC safepoints.
+hàm vm_wire_error(message) {
+    biến reason = vm_literal(message);
+    nếu (vm_get(4198464, 1) == 0) {
+        vm_set(4198464, 3, reason); vm_error(16);
+    };
+    trả về 0;
+};
+hàm vm_wire_opcode(op) {
+    nếu (op >= 0 && op <= 17) { trả về 1; };
+    nếu (op == 20 || op == 22 || (op >= 26 && op <= 29) ||
+        op == 32 || op == 33 || (op >= 36 && op <= 41) ||
+        op == 43 || op == 44 || (op >= 60 && op <= 71) ||
+        (op >= 77 && op <= 97) || (op >= 209 && op <= 213)) { trả về 1; };
+    trả về vm_host_arity(op) >= 0;
+};
+hàm vm_wire_code(rows) {
+    nếu (vm_tag(rows) != 4) { trả về vm_wire_error("bytecode không hợp lệ: cần danh sách"); };
+    biến count = vm_get(rows, 1);
+    nếu (count > 1000000) { trả về vm_wire_error("bytecode không hợp lệ: quá nhiều lệnh"); };
+    biến code = vm_alloc(4 + count * 16, 0);
+    nếu (code == 0) { trả về 0; };
+    vm_set(code, 0, count);
+    lặp(i = 0; i < count; i++) {
+        biến row = vm_at(rows, i);
+        nếu (vm_tag(row) != 4 || vm_get(row, 1) != 4) {
+            trả về vm_wire_error("bytecode không hợp lệ: mỗi lệnh cần 4 trường");
+        };
+        lặp(j = 0; j < 4; j++) {
+            biến word = vm_at(row, j);
+            nếu (vm_tag(word) != 1) { trả về vm_wire_error("bytecode không hợp lệ: trường phải là i32"); };
+            vm_set(code, 1 + i * 4 + j, vm_number(word));
+        };
+        biến op = vm_get(code, 1 + i * 4);
+        nếu (!vm_wire_opcode(op)) { trả về vm_wire_error("bytecode không hợp lệ: opcode"); };
+        biến a = vm_get(code, 2 + i * 4);
+        nếu (op == 62 || op == 63 || op == 81 || op == 82 || op == 67 || (op == 33 && vm_get(code, 3 + i * 4) < 0)) {
+            nếu (a < 0 || a > count) { trả về vm_wire_error("bytecode không hợp lệ: đích nhảy"); };
+        };
+        nếu (op == 36 || op == 68) {
+            biến c = vm_get(code, 4 + i * 4);
+            nếu (c < 0 || c > count) { trả về vm_wire_error("bytecode không hợp lệ: đích nhảy"); };
+        };
+    };
+    trả về code;
+};
+hàm vm_wire_state(args) {
+    biến entry = vm_at(args, 0); biến strings = vm_at(args, 1);
+    biến functions = vm_at(args, 2); biến initializers = vm_at(args, 3);
+    nếu (vm_tag(strings) != 4 || vm_tag(functions) != 4 || vm_tag(initializers) != 4) {
+        trả về vm_wire_error("bytecode không hợp lệ: cần bốn danh sách");
+    };
+    biến n = vm_get(strings, 1);
+    nếu (n > 1000000 || vm_get(functions, 1) > 100000 || vm_get(initializers, 1) > 100000) {
+        trả về vm_wire_error("bytecode không hợp lệ: quá nhiều vùng");
+    };
+    biến state = vm_alloc(68, 1); nếu (state == 0) { trả về 0; };
+    vm_set(state, 0, vm_vector(4)); vm_set(state, 1, vm_vector(4)); vm_set(state, 2, vm_vector(4));
+    vm_set(state, 4, vm_vector(5)); vm_set(state, 5, vm_vector(5));
+    vm_set(state, 6, vm_vector(4)); vm_set(state, 8, vm_vector(4));
+    vm_set(state, 10, vm_alloc((n + 1) * 4, 0));
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    lặp(i = 0; i < n; i++) {
+        biến item = vm_at(strings, i);
+        nếu (vm_tag(item) != 3) { trả về vm_wire_error("bytecode không hợp lệ: StringPool"); };
+        vm_append(vm_get(state, 0), item);
+    };
+    biến names = vm_alloc((n + 1) * 4, 0);
+    nếu (names == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(functions, 1); i++) {
+        biến row = vm_at(functions, i);
+        nếu (vm_tag(row) != 4 || vm_get(row, 1) != 3) { trả về vm_wire_error("bytecode không hợp lệ: function ID"); };
+        biến id = vm_at(row, 0); biến name = vm_at(row, 1);
+        nếu (vm_tag(id) != 1 || vm_number(id) != i) { trả về vm_wire_error("bytecode không hợp lệ: function ID"); };
+        nếu (vm_tag(name) != 1) { trả về vm_wire_error("bytecode không hợp lệ: function name index"); };
+        biến index = vm_number(name);
+        nếu (index < -1 || index >= n) { trả về vm_wire_error("bytecode không hợp lệ: function name index"); };
+        nếu (index >= 0) {
+            nếu (vm_get(names, index) != 0) { trả về vm_wire_error("bytecode không hợp lệ: trùng function name index"); };
+            vm_set(names, index, 1);
+        };
+        biến code = vm_wire_code(vm_at(row, 2)); nếu (code == 0) { trả về 0; };
+        biến fn = vm_alloc(16, 1); nếu (fn == 0) { trả về 0; };
+        biến required = 0; biến maximum = 0;
+        lặp(j = 0; j < vm_get(code, 0); j++) {
+            biến op = vm_get(code, 1 + j * 4);
+            nếu (op == 69 || op == 87) {
+                biến arg = vm_get(code, 4 + j * 4);
+                nếu (arg >= 0) {
+                    nếu (arg > 1000000) { trả về vm_wire_error("bytecode không hợp lệ: chỉ số tham số"); };
+                    nếu (arg + 1 > maximum) { maximum = arg + 1; };
+                    nếu (op == 69) { required = required + 1; };
+                };
+            };
+        };
+        vm_set(fn, 0, index); vm_set(fn, 1, code);
+        vm_set(fn, 2, required); vm_set(fn, 3, maximum);
+        vm_append(vm_get(state, 1), fn);
+    };
+    biến modules = vm_vector(5);
+    nếu (modules == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(initializers, 1); i++) {
+        biến row = vm_at(initializers, i);
+        nếu (vm_tag(row) != 4 || vm_get(row, 1) != 2) { trả về vm_wire_error("bytecode không hợp lệ: initializer"); };
+        biến name = vm_at(row, 0);
+        nếu (vm_tag(name) != 3 || vm_get(name, 1) == 0) { trả về vm_wire_error("bytecode không hợp lệ: định danh initializer"); };
+        nếu (vm_map_find(modules, name) >= 0) { trả về vm_wire_error("bytecode không hợp lệ: trùng định danh initializer"); };
+        vm_map_put(modules, name, vm_int(1));
+        biến code = vm_wire_code(vm_at(row, 1)); nếu (code == 0) { trả về 0; };
+        vm_append(vm_get(state, 2), code);
+    };
+    biến code = vm_wire_code(entry); nếu (code == 0) { trả về 0; };
+    vm_set(state, 3, code);
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    trả về state;
+};
+hàm vm_guest_print(state, value) {
+    biến root = vm_get(4198720, 0);
+    nếu (root == 0 || vm_get(root, 2) != state) {
+        vm_write(1, value); trả về vm_write(1, vm_literal("\n"));
+    };
+    biến n = vm_get(value, 1); biến total = vm_get(root, 5);
+    nếu (n >= 16000000 - total) { trả về vm_error(3); };
+    vm_append(vm_get(root, 4), value);
+    vm_set(root, 5, total + n + 1);
+    trả về 0;
+};
+hàm vm_embedded_run(parent, args) {
+    biến previous = vm_get(4198720, 0);
+    biến depth = 1;
+    nếu (previous != 0) { depth = vm_get(previous, 7) + 1; };
+    nếu (depth > 32) { trả về vm_wire_error("bytecode không hợp lệ: quá sâu VM lồng nhau"); };
+    biến child = vm_wire_state(args);
+    nếu (child == 0) { trả về 0; };
+    biến root = vm_alloc(32, 1);
+    nếu (root == 0) { trả về 0; };
+    vm_set(root, 0, previous); vm_set(root, 1, parent); vm_set(root, 2, child);
+    vm_set(root, 3, args); vm_set(root, 4, vm_vector(4));
+    vm_set(root, 6, vm_vector(4)); vm_set(root, 7, depth);
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(4198720, 0, root);
+    vm_run(child);
+    vm_socket_close_all(child); vm_process_close_all(child); vm_dir_close_all(child);
+    vm_embedded_file_close_all(root);
+    biến result = 0;
+    nếu (vm_get(4198464, 1) == 0) {
+        result = vm_string(vm_get(root, 5));
+        nếu (result != 0) {
+            biến chunks = vm_get(root, 4); biến offset = 0;
+            lặp(i = 0; i < vm_get(chunks, 1); i++) {
+                biến item = vm_at(chunks, i); biến n = vm_get(item, 1);
+                nếu (máy sao chép vùng nhớ(vm_get(result, 2) + offset, vm_get(item, 2), n) != 0) { vm_error(4); thoát; };
+                offset = offset + n;
+                máy ghi byte(vm_get(result, 2) + offset, 10); offset = offset + 1;
+            };
+        };
+    };
+    vm_set(4198720, 0, previous);
+    trả về result;
+};

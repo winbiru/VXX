@@ -1,0 +1,76 @@
+// ARM64 relocation encoder for the full-language Mach-O linker.
+// The plan uses image-relative addresses and a preferred base of 0x100000000.
+// UNSIGNED records produce a preferred pointer that must be rebased by dyld.
+nhập gói.lõi.toán học.làm tròn xuống;
+
+hàm riêng tư macho vá cần(ok, thông báo) {
+    nếu (!ok) { ném "Mach-O relocation: " + thông báo; };
+};
+
+hàm riêng tư macho vá word(b, p) {
+    cao = b[p + 3];
+    nếu (cao >= 128) { cao -= 256; };
+    trả về b[p] + b[p + 1] * 256 + b[p + 2] * 65536 + cao * 16777216;
+};
+
+// Returns [image-relative location, signed low word, high word]. High word
+// is zero for instruction patches and one for the 64-bit preferred pointers.
+hàm công khai macho bản vá(o, s, r, v, đích) {
+    loại = r["type"];
+    tại = v[1] + r["address"];
+    mục tiêu = đích[0];
+    nếu (loại == 0) {
+        bỏ kết quả = macho vá cần(v[0] == 2 && đích[1] == 0 && tại % 8 == 0, "UNSIGNED không hợp lệ");
+        b = o.đọc vùng(s["offset"] + r["address"], 8);
+        bỏ kết quả = macho vá cần(macho vá word(b, 0) == 0 && macho vá word(b, 4) == 0, "UNSIGNED addend chưa hỗ trợ");
+        trả về [tại, mục tiêu, 1];
+    };
+    bỏ kết quả = macho vá cần(v[0] == 0 && tại % 4 == 0 && (đích[1] == 0 || loại == 2), "relocation lệnh không hợp lệ");
+    b = o.đọc vùng(s["offset"] + r["address"], 4);
+    lệnh = macho vá word(b, 0);
+    nếu (loại == 2) {
+        bỏ kết quả = macho vá cần(lệnh == -1811939328 || lệnh == 335544320, "BRANCH26 opcode hoặc addend");
+        d = mục tiêu - tại;
+        bỏ kết quả = macho vá cần(d % 4 == 0 && d >= -134217728 && d < 134217728, "BRANCH26 ngoài phạm vi");
+        d = làm tròn xuống(d / 4);
+        nếu (d < 0) { d += 67108864; };
+        trả về [tại, lệnh + d, 0];
+    };
+    nếu (loại == 3) {
+        bỏ kết quả = macho vá cần(lệnh == -1879048192 + b[0] % 32, "PAGE21 opcode hoặc addend");
+        trang = làm tròn xuống(mục tiêu / 4096) - làm tròn xuống(tại / 4096);
+        bỏ kết quả = macho vá cần(trang >= -1048576 && trang < 1048576, "PAGE21 ngoài phạm vi");
+        nếu (trang < 0) { trang += 2097152; };
+        trả về [tại, -1879048192 + trang % 4 * 536870912 + làm tròn xuống(trang / 4) * 32 + b[0] % 32, 0];
+    };
+    nếu (loại == 4) {
+        bỏ kết quả = macho vá cần(làm tròn xuống(b[1] / 4) + b[2] % 64 * 64 == 0, "PAGEOFF12 addend chưa hỗ trợ");
+        căn = 1;
+        nếu (b[3] == 145) {
+            bỏ kết quả = macho vá cần(b[2] < 64, "PAGEOFF12 ADD shift");
+        } hoặc nếu (b[3] % 64 == 57) {
+            lặp(j = 0; j < làm tròn xuống(b[3] / 64); j += 1) { căn *= 2; };
+        } hoặc { ném "Mach-O relocation: PAGEOFF12 opcode chưa hỗ trợ"; };
+        lệch = mục tiêu % 4096;
+        bỏ kết quả = macho vá cần(lệch % căn == 0, "PAGEOFF12 căn địa chỉ");
+        trả về [tại, lệnh + làm tròn xuống(lệch / căn) * 1024, 0];
+    };
+    ném "Mach-O relocation: loại chưa hỗ trợ";
+};
+
+// Produce the patch records for one section. Keep this section-local so
+// the future executable writer can release each batch after applying it.
+hàm công khai macho bản vá phần(o, j, v, bảng) {
+    s = o.lấy phần(j);
+    ra = [];
+    đã vá = {};
+    lặp(k = 0; k < s["relocationCount"]; k += 1) {
+        r = o.lấy tái định vị(j, k);
+        nơi = r["address"];
+        bỏ kết quả = macho vá cần(!máy ảo có khóa từ điển(đã vá, nơi), "relocation trùng vị trí");
+        đã vá[nơi] = đúng;
+        bản vá = macho bản vá(o, s, r, v, bảng[r["symbol"]]);
+        bỏ kết quả = máy ảo thêm cuối danh sách(ra, bản vá);
+    };
+    trả về ra;
+};

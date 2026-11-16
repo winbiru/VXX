@@ -1,0 +1,28 @@
+// No sender: the real blocking UDP receive must honour SO_RCVTIMEO.
+hàm chính() {
+    biến ctl = 65536;
+    lặp(i = 0; i < 128; i++) { máy ghi byte(ctl + i, 0); };
+    máy ghi số nguyên ba mươi hai bit(ctl, -1);
+    máy ghi số nguyên ba mươi hai bit(ctl + 12, 200);
+    máy ghi số nguyên ba mươi hai bit(ctl + 16, 70000);
+    máy ghi số nguyên ba mươi hai bit(ctl + 20, 1);
+    máy ghi số nguyên ba mươi hai bit(ctl + 24, 4);
+    máy ghi byte(ctl + 32, 127); máy ghi byte(ctl + 35, 1);
+    nếu (máy ổ cắm thô(7, ctl) < 0) { trả về 1; };
+    nếu (máy đồng hồ thô(0, 71008) != 0) {
+        máy ổ cắm thô(5, ctl); trả về 2;
+    };
+    biến result = máy ổ cắm thô(8, ctl);
+    biến clock_status = máy đồng hồ thô(0, 71024);
+    biến closed = máy ổ cắm thô(5, ctl);
+    nếu (clock_status != 0 || closed != 0) { trả về 3; };
+    biến platform = máy thư mục thô(6, 0, 0);
+    nếu (platform == 2) {
+        nếu (result != -110) { trả về 4; };
+    } hoặc nếu (result != -11 && result != -35 && result != -110) { trả về 5; };
+    biến seconds = máy đọc số nguyên ba mươi hai bit(71024) - máy đọc số nguyên ba mươi hai bit(71008);
+    biến nanos = máy đọc số nguyên ba mươi hai bit(71032) - máy đọc số nguyên ba mươi hai bit(71016);
+    biến elapsed = seconds * 1000 + nanos / 1000000;
+    nếu (elapsed < 100 || elapsed > 5000) { trả về 6; };
+    trả về 0;
+};

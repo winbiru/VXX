@@ -17,7 +17,14 @@ hàm riêng tư đường dẫn kết quả OS(kết quả) {
 };
 
 hàm riêng tư đường dẫn đầu vào OS(đường) {
-    byte = bảng mã unicode tám bit mã hóa(đường);
+    // Kiểm tra UTF-8 trên vùng nhớ gốc, không cấp phát mảng số nguyên
+    // hoặc giải mã từng ký tự cho mỗi lần hỏi metadata của filesystem.
+    byte = rỗng;
+    nếu (loại của(đường) == "chuỗi" && máy ảo lấy độ dài(đường) <= 500000 && máy ảo kiểm tra utf8(đường)) {
+        byte = máy ảo xem byte chuỗi(đường);
+    } hoặc {
+        byte = bảng mã unicode tám bit mã hóa(đường);
+    };
     lặp(i = 0; i < độ dài(byte); i++) {
         nếu (byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
     };
@@ -63,11 +70,7 @@ lớp công khai Tiện Ích Đường Dẫn {
     hàm công khai khởi tạo() {};
 
     hàm riêng tư đường dẫn kiểm tra byte(đường) {
-        các byte = bảng mã unicode tám bit mã hóa(đường);
-        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
-            nếu (các byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
-        };
-        trả về đường;
+        trả về đường dẫn đầu vào OS(đường);
     };
 
     hàm công khai đường dẫn loại windows(đường, theo liên kết) {

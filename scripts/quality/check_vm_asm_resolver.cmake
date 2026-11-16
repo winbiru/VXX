@@ -1,7 +1,7 @@
 # Standalone VM numeric IP resolver requires no network or bind permission.
-set(resolver_fixture "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver.vi")
+set(resolver_fixture "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver.vi")
 set(resolver_image "${VPP_OUTPUT_DIR}/resolver.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${resolver_fixture}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${resolver_fixture}"
     -o "${resolver_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0")
@@ -37,7 +37,7 @@ foreach(expression IN LISTS resolver_invalid_cases)
     set(negative_source "${VPP_OUTPUT_DIR}/resolver-negative-${resolver_case_index}.vi")
     set(negative_image "${VPP_OUTPUT_DIR}/resolver-negative-${resolver_case_index}.vmb")
     file(WRITE "${negative_source}" "hàm chính() { ${expression}; };\n")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${negative_source}"
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${negative_source}"
         -o "${negative_image}"
         RESULT_VARIABLE code OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
     if(NOT code STREQUAL "0")
@@ -57,15 +57,15 @@ endforeach()
 message(STATUS "V++ resolver 203..205: numeric IPv4/IPv6, monotonic tokens, strict invalid input PASS")
 
 set(provider "${VPP_OUTPUT_DIR}/dns-provider.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_ROOT}/gói/máy ảo/nhà cung cấp DNS.vi" -o "${provider}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "V++ DNS provider compile: ${status}\n${output}\n${errors}")
 endif()
 set(dns_image "${VPP_OUTPUT_DIR}/resolver-dns.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "DNS resolver guest compile: ${status}\n${output}\n${errors}")
@@ -79,8 +79,10 @@ foreach(mode IN ITEMS explicit sibling)
     if(mode STREQUAL "sibling")
         set(configured_provider "")
         # Preserve the bare argv[0] case, independently of the working directory.
-        set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
-            vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        if(NOT WIN32)
+            set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
+                vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+        endif()
     endif()
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
         "VPP_VM_DNS_PROVIDER=${configured_provider}"
@@ -104,7 +106,7 @@ foreach(mode IN ITEMS explicit sibling)
         message(FATAL_ERROR "V++ DNS hosts returned unexpected addresses: ${output}")
     endif()
 endforeach()
-message(STATUS "V++ DNS hosts, nested provider/main GC, sibling provider and bare argv0 PASS")
-if(DEFINED VPP_STAGE1)
+message(STATUS "V++ DNS hosts, nested provider/main GC and sibling provider from foreign cwd PASS")
+if(DEFINED VPP_STAGE1 OR DEFINED VPP_JIT)
     include("${CMAKE_CURRENT_LIST_DIR}/check_vm_dns_vpp_mock.cmake")
 endif()

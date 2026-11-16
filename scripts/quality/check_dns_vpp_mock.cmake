@@ -8,12 +8,12 @@ set(ENV{VPP_HOME} "${VPP_ROOT}")
 set(server "${VPP_OUTPUT_DIR}/dns-mock")
 set(client "${VPP_OUTPUT_DIR}/dns-client")
 execute_process(COMMAND "${VPP_STAGE1}" build
-    "${VPP_ROOT}/src/tests/fixtures/native_dns_mock.vi" -o "${server}"
+    "${VPP_ROOT}/scripts/test/fixtures/native_dns_mock.vi" -o "${server}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "V++/ASM DNS mock build: ${status}\n${output}\n${errors}")
 endif()
-set(source "${VPP_ROOT}/src/tests/kiem_tra_dns_vpp_mock.vi")
+set(source "${VPP_ROOT}/scripts/test/kiem_tra_dns_vpp_mock.vi")
 execute_process(COMMAND "${VPP_NATIVE_COMPILER}" build "${source}" -o "${client}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 240)
 if(NOT status STREQUAL "0")

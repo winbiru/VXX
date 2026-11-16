@@ -8,21 +8,28 @@ Không suy diễn thời gian một lời gọi máy từ phép đo ứng dụng
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import random
 import statistics
 import subprocess
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 
 CASES = ("arithmetic", "branch_loop", "fibonacci", "list_128", "unicode_replace", "json_parse")
 NUMERIC = CASES[:3]
+EXTENDED = ("gcd_64", "float_256", "recursion", "primes_256", "matrix_4", "sort_64",
+            "binary_search_128", "map_64", "objects_32", "concat_64", "split_32",
+            "unicode_normalize", "json_encode", "json_nested", "exceptions_16")
+ALL_CASES = CASES + EXTENDED
 AOT_NAME = "vpp-aot-vpp"
 MAX_ITERATIONS = 67_108_864  # Chia hết cho 16, nằm dưới giới hạn của driver.
 
 
+@lru_cache(maxsize=None)
 def expected(case, k):
     if case == "arithmetic":
         return 27 * k + 475
@@ -38,6 +45,48 @@ def expected(case, k):
         return (k % 4 + 4) * 26 + len(str(k))
     if case == "json_parse":
         return 17 * k + 130
+    if case == "gcd_64":
+        return sum(math.gcd(k * 97 + i * 31, k * 13 + i * 17) for i in range(1, 65))
+    if case == "float_256":
+        x, total = k * 0.5, 0.0
+        for i in range(256):
+            x = x * 0.5 + (i % 8) * 0.25
+            total += x
+        return math.floor(total * 1024)
+    if case == "recursion":
+        a, b = 0, 1
+        for _ in range(10 + k % 5):
+            a, b = b, a + b
+        return a
+    if case == "primes_256":
+        return sum(all(n % d for d in range(2, math.isqrt(n) + 1))
+                   for n in range(2, 257 + k))
+    if case == "matrix_4":
+        a = [(k + i * 3) % 17 for i in range(16)]
+        b = [(k + i * 7) % 19 for i in range(16)]
+        return sum((i * 4 + j + 1) * sum(a[i * 4 + t] * b[t * 4 + j] for t in range(4))
+                   for i in range(4) for j in range(4))
+    if case == "sort_64":
+        return sum((i + 1) * (k + i) for i in range(64))
+    if case == "binary_search_128":
+        return (k + 1) * 259
+    if case == "map_64":
+        return sum((i + 1) * (k + i * 3) for i in range(64))
+    if case == "objects_32":
+        return sum((i + 1) * (k + i * 3) for i in range(32))
+    if case == "concat_64":
+        return len("".join(f"V++{k+i}" for i in range(64)))
+    if case == "split_32":
+        return sum((i + 1) * (k + i) for i in range(32)) + 32
+    if case == "unicode_normalize":
+        return len(f"Việt Nam {k}")
+    if case == "json_encode":
+        return len(json.dumps([k, "Việt", list(range(k, k + 16))],
+                              ensure_ascii=False, separators=(",", ":")))
+    if case == "json_nested":
+        return sum((i + 1) * (k + 4 * i) for i in range(8))
+    if case == "exceptions_16":
+        return sum(i * (3 if (i + k) % 4 == 0 else 1) for i in range(16))
     raise ValueError(case)
 
 
@@ -59,7 +108,10 @@ def main():
                         help="Comma-separated subset of benchmark runtimes available on this OS")
     parser.add_argument("--environment-label", default="native host",
                         help="Measurement environment (for example Docker ARM64 or emulated x86_64)")
+    parser.add_argument("--extended", action="store_true",
+                        help="Include additional V++-native workloads; other runtimes retain their declared coverage")
     args = parser.parse_args()
+    cases_to_run = ALL_CASES if args.extended else CASES
     if args.runs < 3 or args.target_ms < 10:
         parser.error("Cần ít nhất 3 mẫu và target >= 10 ms")
     requested = args.runtimes.split(",")
@@ -68,7 +120,7 @@ def main():
         parser.error("Danh sách --runtimes không hợp lệ hoặc bị trùng")
     manifest = json.loads(args.manifest.read_text())
     selected = {r["name"]: r for r in manifest["runtimes"] if r["name"] in requested}
-    for name, path, cases, option in ((AOT_NAME, args.aot, CASES, "aot"),
+    for name, path, cases, option in ((AOT_NAME, args.aot, cases_to_run, "aot"),
                                      ("vpp-i32", args.typed, NUMERIC, "typed"),
                                      ("c", args.c, NUMERIC, "c"),
                                      ("rust", args.rust, NUMERIC, "rust")):
@@ -127,7 +179,7 @@ def main():
             raise ValueError(f"Sai chuẩn hóa thời gian: {runner['name']} / {case}")
         return row
 
-    tasks = [(runner, case) for case in CASES for runner in runners if case in runner["cases"]]
+    tasks = [(runner, case) for case in cases_to_run for runner in runners if case in runner["cases"]]
     counts = {}
     for runner, case in tasks:
         key = f"{runner['name']}/{case}"
@@ -169,7 +221,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(f"ĐÃ XÁC MINH {len(report['samples'])} mẫu → {args.output}", flush=True)
-    for case in CASES:
+    for case in cases_to_run:
         print(case, " ".join(f"{name}={report['summary'][f'{name}/{case}']['median_ns']/1000:.3f} µs"
                              for name in order_names if f"{name}/{case}" in report["summary"]), flush=True)
 

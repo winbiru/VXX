@@ -3,7 +3,7 @@
 V++ 1.0 có hai lớp hỗ trợ kiểm thử: lệnh CLI `vpp kiểm thử` để discovery/chạy tệp
 test và package tùy chọn `kiểm thử` để viết assertion/lifecycle trong mã V++.
 
-Regression của chính repository dùng chương trình `.vi` trong `src/tests/`; CTest đăng ký
+Regression của chính repository dùng chương trình `.vi` trong `scripts/test/`; CTest đăng ký
 `vpp-integration` để chạy các file này và so sánh expected output. Ngoài ra còn một harness C++
 rất nhỏ `vpp-rc-internal-hardening` cho các invariant không thể tạo từ source `.vi`: AST có
 `ExprId` lỗi/chu trình, IR có operand/control-flow hỏng và metadata bytecode không hợp lệ.
@@ -77,3 +77,29 @@ hàm chính() {
 
 Package `kiểm thử` không được import tự động bởi `gói/chuẩn/chính.vi`; mã production chỉ
 kéo test API khi import tường minh.
+
+## Kiểm thử JIT và ranh giới host/guest
+
+Regression native đăng ký trong `scripts/test/regression.json`. Suite `full` với
+backend `jit` chạy các ca source `full`, `i32` và `guest` trực tiếp bằng JIT,
+không biên dịch AOT thay thế. Guest động không được tự publish vùng nhớ thực thi,
+gọi địa chỉ native tùy ý hoặc truy vấn địa chỉ host đặc quyền.
+
+Ca `kiem_tra_jit_vpp` kiểm tra API JIT đặc quyền của host, bao gồm publish, gọi,
+thu hồi vùng mã và các lỗi giới hạn/handle. Ca này thuộc suite `host`, được chạy
+bắt buộc riêng bằng compiler AOT trên macOS, Linux và Windows. Ca
+`kiem_tra_jit_guest_boundary` thuộc suite `guest` kiểm tra các thao tác bị từ chối
+khi chạy trong guest. Cả hai hợp đồng đều phải đạt.
+
+```sh
+python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit build-pure-vpp/bin/vpp-jit
+python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler build-pure-vpp/bin/vpp
+```
+
+Trên Windows dùng compiler `vpp-native.exe` với môi trường runtime của gói đã cài.
+
+Ca `standalone-vm-socket` chạy thêm một phép nhận UDP blocking trên cổng
+loopback do hệ điều hành cấp, không có bên gửi. Fixture raw kiểm tra mã lỗi
+timeout và thời gian thực tế bằng đồng hồ monotonic (timeout 200 ms, khoảng
+chấp nhận 100–5000 ms). Bài kiểm tra chạy trực tiếp bằng backend đang được
+kiểm thử và giữ nguyên các ca kiểm tra token và TLS fail-closed của VM.

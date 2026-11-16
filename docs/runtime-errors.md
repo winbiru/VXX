@@ -84,12 +84,12 @@ quan sát hoặc tạo ra từ chương trình V++ hợp lệ.
 
 ## Regression
 
-- `src/tests/kiem_tra_ngoai_le.vi`: bắt lỗi cục bộ cơ bản.
-- `src/tests/kiem_tra_ngoai_le_xuyen_ham.vi`: exception xuyên function boundary, catch gần
+- `scripts/test/kiem_tra_ngoai_le.vi`: bắt lỗi cục bộ cơ bản.
+- `scripts/test/kiem_tra_ngoai_le_xuyen_ham.vi`: exception xuyên function boundary, catch gần
   nhất, rethrow, binding catch cục bộ được closure capture đúng và tiếp tục chạy sau catch.
-- `src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi`: tự phát hiện chỉ số vượt kích thước thật.
-- `src/tests/kiem_tra_loi_kieu_chi_so.vi`: tự phát hiện giá trị dùng làm chỉ số không phải số nguyên.
-- `src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi`: tự phát hiện method lookup thất bại.
-- `src/tests/kiem_tra_stack_trace.vi`: lỗi số học kèm giá trị thật và dấu vết file/dòng/cột.
-- `src/tests/kiem_tra_de_quy_vuot_gioi_han.vi`: lỗi đệ quy quá sâu với diễn giải nguyên nhân và
+- `scripts/test/kiem_tra_loi_chi_so_vuot_pham_vi.vi`: tự phát hiện chỉ số vượt kích thước thật.
+- `scripts/test/kiem_tra_loi_kieu_chi_so.vi`: tự phát hiện giá trị dùng làm chỉ số không phải số nguyên.
+- `scripts/test/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi`: tự phát hiện method lookup thất bại.
+- `scripts/test/kiem_tra_stack_trace.vi`: lỗi số học kèm giá trị thật và dấu vết file/dòng/cột.
+- `scripts/test/kiem_tra_de_quy_vuot_gioi_han.vi`: lỗi đệ quy quá sâu với diễn giải nguyên nhân và
   hướng sửa cho người mới học.

@@ -3,6 +3,10 @@
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn nhúng tự chủ;
+nhập gói.biên dịch.bộ nạp.biên dịch chạy sản phẩm biên dịch;
 
 hàm công khai kịch bản chạy nội bộ(mã nguồn, gốc) {
     nếu (loại của(mã nguồn) != "chuỗi") {
@@ -15,7 +19,10 @@ hàm công khai kịch bản chạy nội bộ(mã nguồn, gốc) {
         gốc = ".";
     };
     thử {
-        trả về chạy kịch bản máy ảo(mã nguồn, gốc);
+        thư viện = đọc biến môi trường("VPP_HOME", ".");
+        sản phẩm = biên dịch nguồn nhúng tự chủ(mã nguồn,
+            đường dẫn tuyệt đối(gốc), đường dẫn tuyệt đối(thư viện), 0);
+        trả về biên dịch chạy sản phẩm biên dịch(sản phẩm);
     } bắt lỗi (e) {
         ném "kịch bản chạy: " + e;
     };

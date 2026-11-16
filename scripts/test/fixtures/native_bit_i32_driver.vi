@@ -1,0 +1,43 @@
+// The independent expected output is derived from native_bit_smoke.c.
+nhập native_bit_i32.*;
+
+hàm bit_test_value(i) {
+    nếu (i == 0) { trả về -2147483647 - 1; };
+    nếu (i == 1) { trả về -2147483647; };
+    nếu (i == 2) { trả về -129; };
+    nếu (i == 3) { trả về -33; };
+    nếu (i == 4) { trả về -32; };
+    nếu (i == 5) { trả về -31; };
+    nếu (i == 6) { trả về -16; };
+    nếu (i == 7) { trả về -1; };
+    nếu (i == 8) { trả về 0; };
+    nếu (i == 9) { trả về 1; };
+    nếu (i == 10) { trả về 2; };
+    nếu (i == 11) { trả về 7; };
+    nếu (i == 12) { trả về 13; };
+    nếu (i == 13) { trả về 30; };
+    nếu (i == 14) { trả về 31; };
+    nếu (i == 15) { trả về 32; };
+    nếu (i == 16) { trả về 33; };
+    nếu (i == 17) { trả về 129; };
+    trả về 2147483647;
+};
+
+hàm chính() {
+    lặp (i = 0; i < 19; i = i + 1) {
+        biến a = bit_test_value(i);
+        lặp (j = 0; j < 19; j = j + 1) {
+            biến b = bit_test_value(j);
+            in bit_va(a, b);
+            in bit_hoac(a, b);
+            in bit_xor(a, b);
+            in dao_bit(a);
+            in dich_trai(a, b);
+            in dich_phai(a, b);
+            in gan_bit(a, b);
+            in bit_khung(a, b);
+            in uu_tien_bit(a, b);
+        };
+    };
+    trả về 0;
+};

@@ -77,7 +77,14 @@ vpp_native_os_open:
     cmpl $1537, %esi
     jne 1f
     movl $577, %esi
+    jmp 2f
 1:
+    // Darwin O_WRONLY|O_CREAT|O_APPEND
+    cmpl $521, %esi
+    jne 2f
+    // Linux O_WRONLY|O_CREAT|O_APPEND
+    movl $1089, %esi
+2:
     movl $438, %edx
     call Llinux_mo
     leave
@@ -85,6 +92,20 @@ vpp_native_os_open:
 .globl vpp_native_os_close
 vpp_native_os_close:
     jmp Llinux_dong
+// Signed i32 position, checked against the full 64-bit lseek result.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    movslq %esi, %rsi
+    movl $8, %eax
+    syscall
+    cmpq $-4095, %rax
+    jae Llinux_goi_he_thong_ket_qua
+    cmpq $2147483647, %rax
+    jle 1f
+    movl $75, vpp_linux_host_errno(%rip)
+    movl $-1, %eax
+1:
+    ret
 .globl vpp_native_os_errno
 vpp_native_os_errno:
     movl vpp_linux_host_errno(%rip), %eax

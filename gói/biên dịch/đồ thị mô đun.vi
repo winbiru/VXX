@@ -19,6 +19,37 @@ hàm công khai biên dịch đồ thị chuẩn đường(đường) {
     nếu (đường[0] == "/") {
         ném "biên dịch đồ thị: cần đường dẫn tương đối không rỗng";
     };
+    // Đa số đường import đã chuẩn. Quét dấu phân cách ASCII trên view
+    // bất biến, tránh tạo chuỗi con và danh sách cho từng thành phần.
+    nếu (máy ảo lấy độ dài(đường) <= 500000 && máy ảo kiểm tra utf8(đường)) {
+        byte đường = máy ảo xem byte chuỗi(đường);
+        n byte = máy ảo lấy độ dài(byte đường);
+        đầu mục = 0;
+        cần chuẩn = sai;
+        lặp(i = 0; i <= n byte; i++) {
+            b = 47;
+            nếu (i < n byte) { b = byte đường[i]; };
+            nếu (b == 92) { ném "biên dịch đồ thị: chưa hỗ trợ dấu phân cách Windows"; };
+            nếu (b == 47) {
+                dài mục = i - đầu mục;
+                nếu (dài mục == 0) {
+                    cần chuẩn = đúng;
+                    thoát;
+                };
+                nếu (dài mục == 1) {
+                    nếu (byte đường[đầu mục] == 46) { cần chuẩn = đúng; thoát; };
+                };
+                nếu (dài mục == 2) {
+                    nếu (byte đường[đầu mục] == 46 && byte đường[đầu mục + 1] == 46) {
+                        cần chuẩn = đúng;
+                        thoát;
+                    };
+                };
+                đầu mục = i + 1;
+            };
+        };
+        nếu (!cần chuẩn) { trả về đường; };
+    };
     phần = [];
     // Tách theo vị trí thay vì nối từng ký tự. Đường import được chuẩn hóa
     // nhiều lần trong một lần biên dịch, còn phép += tăng số lần cấp phát.

@@ -1,44 +1,102 @@
-foreach(required IN ITEMS VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
+cmake_host_system_information(RESULT vpp_host_arch QUERY OS_PLATFORM)
+cmake_minimum_required(VERSION 3.20)
+foreach(required IN ITEMS VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "VM ASM test missing ${required}")
     endif()
 endforeach()
-# CMAKE_HOST_SYSTEM_PROCESSOR is empty under `cmake -P` on some CMake
-# versions. OS_PLATFORM is populated without a configured project.
-cmake_host_system_information(RESULT host_arch QUERY OS_PLATFORM)
-if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND
-    host_arch MATCHES "^(x86_64|amd64)$")
-    # Direct CTest/script invocations may bypass the default CMake build.
-    # Rebuild from source even when a stale ignored .o exists in the checkout.
-    set(host_object "${VPP_ROOT}/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o")
-    execute_process(COMMAND bash
-        "${VPP_ROOT}/scripts/quality/prepare_linux_freestanding_host.sh"
-        "${host_object}"
-        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_output
-        ERROR_VARIABLE host_errors TIMEOUT 120)
-    if (NOT host_status STREQUAL "0")
-        message(FATAL_ERROR "Linux freestanding ASM host failed (${host_status}):\n${host_output}\n${host_errors}")
+if(DEFINED VPP_JIT)
+    if(NOT DEFINED VPP_VM OR NOT EXISTS "${VPP_JIT}")
+        message(FATAL_ERROR "JIT VM gate requires packaged JIT and VM")
     endif()
-    execute_process(COMMAND nm --defined-only "${host_object}"
-        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_symbols
-        ERROR_VARIABLE host_errors TIMEOUT 15)
-    if (NOT host_status STREQUAL "0" OR
-        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_parse([\r\n]|$)" OR
-        NOT host_symbols MATCHES "[ \t]T vpp_native_f64_text([\r\n]|$)")
-        message(FATAL_ERROR "Linux ASM host missing f64 runtime bridges: ${host_object}\n${host_errors}\n${host_symbols}")
-    endif()
+    set(VPP_VM_IMAGE_COMMAND "${VPP_JIT}" --vm-image)
+else()
+    foreach(required IN ITEMS VPP_STAGE1 VPP_NATIVE_COMPILER)
+        if(NOT DEFINED ${required})
+            message(FATAL_ERROR "VM ASM test missing ${required}")
+        endif()
+    endforeach()
+    set(VPP_VM_IMAGE_COMMAND "${VPP_NATIVE_COMPILER}" vm-build)
+endif()
+# Use the installed ASM host and package root when testing artifacts.
+if(NOT DEFINED ENV{VPP_HOME})
+    set(ENV{VPP_HOME} "${VPP_ROOT}")
+endif()
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    set(ENV{VPP_NATIVE_ELF_LINK} "1")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
-set(ENV{VPP_HOME} "${VPP_ROOT}")
-set(vm "${VPP_OUTPUT_DIR}/vpp-vm")
-execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
-if (NOT status STREQUAL "0")
-    message(FATAL_ERROR "VM ASM compilation failed (${status}):\n${output}\n${errors}")
+# The small Windows i32 PE bootstrap cannot link the full Win32 boundary.
+if(WIN32 AND NOT DEFINED VPP_JIT)
+    find_program(VPP_PYTHON NAMES python python3 REQUIRED)
+    set(VPP_RAW_BUILD "${VPP_PYTHON}" "${VPP_ROOT}/scripts/quality/check_windows_full_bootstrap.py"
+        --clang "$ENV{VPP_AOT_ASSEMBLER}" raw-build "${VPP_STAGE1}")
+endif()
+if(DEFINED VPP_VM)
+    if(NOT IS_ABSOLUTE "${VPP_VM}" OR NOT EXISTS "${VPP_VM}" OR IS_DIRECTORY "${VPP_VM}")
+        message(FATAL_ERROR "Prepared VM executable missing: ${VPP_VM}")
+    endif()
+    set(vm "${VPP_VM}")
+else()
+    set(vm "${VPP_OUTPUT_DIR}/vpp-vm")
+    if(WIN32)
+        string(APPEND vm ".exe")
+        execute_process(COMMAND ${VPP_RAW_BUILD} "${VPP_ROOT}/gói/máy ảo/chính.vi" "${vm}" --vm-core
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND vpp_host_arch MATCHES "^(arm64|aarch64)$")
+        execute_process(COMMAND /bin/bash "${VPP_ROOT}/scripts/macos/build-vpp-vm.sh" "${VPP_STAGE1}" "${vm}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
+    else()
+        execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
+    endif()
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "VM ASM compilation failed (${status}):\n${output}\n${errors}")
+    endif()
+endif()
+set(VPP_VM "${vm}")
+function(vpp_raw_build source binary)
+    if(WIN32)
+        execute_process(COMMAND ${VPP_RAW_BUILD} "${source}" "${binary}" ${ARGN}
+            RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 600)
+    else()
+        execute_process(COMMAND "${VPP_STAGE1}" build "${source}" -o "${binary}"
+            RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 600)
+    endif()
+    if(NOT code STREQUAL "0")
+        message(FATAL_ERROR "Raw VM boundary build ${source}: ${code}\n${out}\n${err}")
+    endif()
+endfunction()
+
+function(vpp_raw_probe source binary command_variable)
+    if(DEFINED VPP_JIT)
+        set(prepared "${source}.jit.vi")
+        execute_process(COMMAND "${VPP_PYTHON}" "${VPP_ROOT}/scripts/quality/prepare_raw_jit.py"
+            "${source}" "${prepared}"
+            RESULT_VARIABLE code OUTPUT_VARIABLE out ERROR_VARIABLE err TIMEOUT 30)
+        if(NOT code STREQUAL "0")
+            message(FATAL_ERROR "Raw JIT source preparation: ${code}\n${out}\n${err}")
+        endif()
+        set(${command_variable} "${VPP_JIT}" --raw-program "${prepared}" PARENT_SCOPE)
+    else()
+        vpp_raw_build("${source}" "${binary}" ${ARGN})
+        set(${command_variable} "${binary}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+if(DEFINED VPP_VM_PHASE AND NOT VPP_VM_PHASE STREQUAL "core")
+    if(VPP_VM_PHASE STREQUAL "tls")
+        include("${CMAKE_CURRENT_LIST_DIR}/check_vm_tls_crypto.cmake")
+    elseif(VPP_VM_PHASE MATCHES "^(system|directory|process|resolver|socket|socket_negative)$")
+        include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_${VPP_VM_PHASE}.cmake")
+    else()
+        message(FATAL_ERROR "Unknown VM regression phase: ${VPP_VM_PHASE}")
+    endif()
+    return()
 endif()
 set(image "${VPP_OUTPUT_DIR}/runtime.vmb")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm.vi" -o "${image}"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm.vi" -o "${image}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "VM image backend failed (${status}):\n${output}\n${errors}")
@@ -51,11 +109,11 @@ set(expected "-2147483648\n-2147483648\n-1\n3.75\n3.0\ni\n[1, 9, 3]\n16\n41\n42\
 if (NOT status STREQUAL "0" OR NOT output STREQUAL expected)
     message(FATAL_ERROR "VM runtime mismatch (${status}):\n${output}\n${errors}")
 endif()
-if (APPLE)
-    execute_process(COMMAND /usr/bin/nm -u "${vm}" OUTPUT_VARIABLE symbols RESULT_VARIABLE status)
-elseif (UNIX)
-    execute_process(COMMAND nm -u "${vm}" OUTPUT_VARIABLE symbols RESULT_VARIABLE status)
+if(NOT DEFINED VPP_VM_NM)
+    find_program(VPP_VM_NM NAMES llvm-nm nm
+        PATHS /usr/bin /bin "$ENV{ProgramFiles}/LLVM/bin" "C:/msys64/clang64/bin" REQUIRED)
 endif()
+execute_process(COMMAND "${VPP_VM_NM}" -u "${vm}" OUTPUT_VARIABLE symbols RESULT_VARIABLE status)
 if (NOT status STREQUAL "0" OR symbols MATCHES "__cxa_throw|__cxa_allocate_exception|_ZSt|_ZNSt|vpp_aot_|executeVpp|linkedBytecodeRun")
     message(FATAL_ERROR "VM depends on C++ runtime/compiler symbols:\n${symbols}")
 endif()
@@ -66,7 +124,7 @@ if (status STREQUAL "0" OR NOT errors MATCHES "error=10")
     message(FATAL_ERROR "VM accepted malformed image: ${status}\n${output}\n${errors}")
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/gc.vi" "hàm chính() { giữ = [9]; longtext = \"x\"; lặp(j = 0; j < 16; j++) { longtext = longtext + longtext; }; i = 0; lặp(i = 0; i < 2000; i++) { rác = [i]; thêm(rác, rác); temp = longtext + \"\"; }; in giữ[0]; in i; };")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${VPP_OUTPUT_DIR}/gc.vi" -o "${VPP_OUTPUT_DIR}/gc.vmb"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${VPP_OUTPUT_DIR}/gc.vi" -o "${VPP_OUTPUT_DIR}/gc.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "GC fixture compilation failed: ${status}\n${output}\n${errors}")
@@ -90,7 +148,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/host-cache.vi" [=[hàm chính() {
     in máy ảo lấy độ dài("á🐱");
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/host-cache.vi" -o "${VPP_OUTPUT_DIR}/host-cache.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -103,7 +161,7 @@ if (NOT status STREQUAL "0" OR NOT output STREQUAL "3\n3\n3\ndanh sách\n[1, 2, 
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/host-cache-invalid.vi"
     "hàm chính() { thêm(12, 34); };\n")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/host-cache-invalid.vi" -o "${VPP_OUTPUT_DIR}/host-cache-invalid.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -123,7 +181,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/gc-deep.vi" [=[hàm chính() {
     in head[0];
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${VPP_OUTPUT_DIR}/gc-deep.vi" -o "${VPP_OUTPUT_DIR}/gc-deep.vmb"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${VPP_OUTPUT_DIR}/gc-deep.vi" -o "${VPP_OUTPUT_DIR}/gc-deep.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Deep GC fixture compilation failed: ${status}\n${output}\n${errors}")
@@ -154,7 +212,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/utf8-index.vi" [=[hàm chính() {
     in độ dài(""); in độ dài("a");
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/utf8-index.vi" -o "${VPP_OUTPUT_DIR}/utf8-index.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -171,7 +229,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/utf8-invalid.vi" [=[hàm chính() {
     in s[300];
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/utf8-invalid.vi" -o "${VPP_OUTPUT_DIR}/utf8-invalid.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -182,8 +240,8 @@ execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/utf8-invalid.vmb"
 if (status STREQUAL "0" OR NOT errors MATCHES "error=4")
     message(FATAL_ERROR "VM accepted out-of-bounds UTF-8 index: ${status}\n${output}\n${errors}")
 endif()
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-    "${VPP_ROOT}/src/tests/fixtures/vm_asm_host.vi" -o "${VPP_OUTPUT_DIR}/host.vmb"
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
+    "${VPP_ROOT}/scripts/test/fixtures/vm_asm_host.vi" -o "${VPP_OUTPUT_DIR}/host.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
     message(FATAL_ERROR "Host fixture compilation failed: ${status}\n${output}\n${errors}")
@@ -202,7 +260,7 @@ file(WRITE "${VPP_OUTPUT_DIR}/map-index.vi" [=[hàm chính() {
     in máy ảo băm định danh(m) == máy ảo băm định danh(m);
 };
 ]=])
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/map-index.vi" -o "${VPP_OUTPUT_DIR}/map-index.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -215,7 +273,7 @@ if (NOT status STREQUAL "0" OR NOT output STREQUAL "1\n9\n1\n")
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/identity-invalid.vi"
     "hàm chính() { in máy ảo băm định danh(3); };\n")
-execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
     "${VPP_OUTPUT_DIR}/identity-invalid.vi" -o "${VPP_OUTPUT_DIR}/identity-invalid.vmb"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
 if (NOT status STREQUAL "0")
@@ -226,11 +284,25 @@ execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/identity-invalid.vmb"
 if (status STREQUAL "0" OR NOT errors MATCHES "error=2")
     message(FATAL_ERROR "VM accepted identity hash on scalar: ${status}\n${output}\n${errors}")
 endif()
-set(VPP_VM "${vm}")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_system.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_directory.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_process.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_resolver.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_asm_socket.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/check_vm_tls_crypto.cmake")
+# The raw allocator test constructs the exact fragmented tail geometry
+# observed during the Linux full bootstrap, without running the compiler.
+set(heap_source "${VPP_OUTPUT_DIR}/native-heap-allocator.vi")
+set(heap_binary "${VPP_OUTPUT_DIR}/native-heap-allocator")
+if(WIN32)
+    string(APPEND heap_binary ".exe")
+endif()
+file(WRITE "${heap_source}" "")
+foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục máy" "tiến trình máy" "ổ cắm máy"
+        "phân giải máy" "host ABI" "truyền worker" "worker" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
+    file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
+    file(APPEND "${heap_source}" "${contents}\n")
+endforeach()
+file(READ "${VPP_ROOT}/scripts/test/fixtures/native_heap_allocator.vi" contents)
+file(APPEND "${heap_source}" "${contents}\n")
+vpp_raw_probe("${heap_source}" "${heap_binary}" VPP_HEAP_COMMAND --vm-core)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" ${VPP_HEAP_COMMAND}
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "VM heap allocator regression: ${status}\n${output}\n${errors}")
+endif()
 message(STATUS "V++/ASM VM: values, control flow, closures, OOP, exceptions, GC and no C++ symbols PASS")

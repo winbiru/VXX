@@ -1,5 +1,5 @@
 # Executed with python3 -B -c by the V++ runner; no .py file is generated.
-import json, os, time
+import json, os, time, math, unicodedata
 name = os.environ.get("BENCH_CASE", "arithmetic")
 iterations = int(os.environ.get("BENCH_ITERATIONS", "16"))
 seed = int(os.environ.get("BENCH_SEED", "17"))
@@ -11,6 +11,20 @@ for i in range(16):
         data[k % 16] = "Xin chào Việt Nam 🌿 — Việt! " * (k % 4 + 4) + str(k)
     if name == "json_parse":
         data[k % 16] = '{"n":' + str(k) + ',"tên":"Việt Nam 🌿","values":[' + ",".join(str(k+j) for j in range(16)) + "]}"
+    if name == "binary_search_128":
+        data[k % 16] = [j * 2 for j in range(128)]
+    if name == "map_64":
+        data[k % 16] = [f"key-{k+j}" for j in range(64)]
+    if name == "concat_64":
+        data[k % 16] = "".join(f"V++{k+j}" for j in range(64))
+    if name == "split_32":
+        data[k % 16] = ",".join(str(k+j) for j in range(32))
+    if name == "unicode_normalize":
+        data[k % 16] = f"Việt Nam {k}"
+    if name == "json_encode":
+        data[k % 16] = f'[{k},"Việt",[' + ",".join(str(k+j) for j in range(16)) + "]]"
+    if name == "json_nested":
+        data[k % 16] = json.dumps({"rows": [{"id": j, "v": [k+j, j*2]} for j in range(8)]}, separators=(",", ":"))
 def arithmetic(k):
     return (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11
 def branch_loop(k):
@@ -41,6 +55,100 @@ def json_parse(k):
     total = value["n"] + len(value["tên"])
     for i in range(16):
         total += value["values"][i]
+    return total
+def gcd_64(k):
+    total = 0
+    for i in range(1, 65):
+        a, b = k*97+i*31, k*13+i*17
+        while b:
+            a, b = b, a % b
+        total += a
+    return total
+def float_256(k):
+    x, total = k*0.5, 0.0
+    for i in range(256):
+        x = x*0.5 + (i%8)*0.25
+        total += x
+    return math.floor(total*1024)
+def recursive_fib(n):
+    return n if n < 2 else recursive_fib(n-1) + recursive_fib(n-2)
+def recursion(k):
+    return recursive_fib(10+k%5)
+def primes_256(k):
+    count = 0
+    for n in range(2, 257+k):
+        d = 2
+        while d*d <= n:
+            if n%d == 0:
+                break
+            d += 1
+        else:
+            count += 1
+    return count
+def matrix_4(k):
+    a, b = [(k+i*3)%17 for i in range(16)], [(k+i*7)%19 for i in range(16)]
+    total = 0
+    for i in range(4):
+        for j in range(4):
+            cell = 0
+            for t in range(4):
+                cell += a[i*4+t]*b[t*4+j]
+            total += (i*4+j+1)*cell
+    return total
+def sort_64(k):
+    values = [(i*37+k)%64+k for i in range(64)]
+    values.sort()
+    return sum((i+1)*v for i,v in enumerate(values))
+def binary_search_128(k):
+    values, target = data[k%16], k*2+1
+    low, high = 0, 128
+    while low < high:
+        mid = (low+high)//2
+        if values[mid] < target:
+            low = mid+1
+        else:
+            high = mid
+    return low*257+values[low]
+def map_64(k):
+    keys = data[k%16]
+    lookup = {}
+    for i in range(64):
+        lookup[keys[i]] = k+i*3
+    return sum((i+1)*lookup[keys[i]] for i in range(63,-1,-1))
+def objects_32(k):
+    objects = [{"id": i, "payload": [k+i,i*2]} for i in range(32)]
+    return sum((obj["id"]+1)*(obj["payload"][0]+obj["payload"][1]) for obj in objects)
+def concat_64(k):
+    text = ""
+    for i in range(64):
+        text += "V++"+str(k+i)
+    assert text == data[k%16]
+    return len(text)
+def split_32(k):
+    parts = data[k%16].split(",")
+    return sum((i+1)*int(v) for i,v in enumerate(parts))+len(parts)
+def unicode_normalize(k):
+    text = unicodedata.normalize("NFC", data[k%16])
+    assert text == f"Việt Nam {k}"
+    return len(text)
+def json_encode(k):
+    text = json.dumps([k,"Việt",list(range(k,k+16))],ensure_ascii=False,separators=(",",":"))
+    assert text == data[k%16]
+    return len(text)
+def json_nested(k):
+    rows = json.loads(data[k%16])["rows"]
+    return sum((i+1)*(row["id"]+row["v"][0]+row["v"][1]) for i,row in enumerate(rows))
+def exceptions_16(k):
+    total = 0
+    for i in range(16):
+        try:
+            if (i+k)%4 == 0:
+                raise ValueError("benchmark exception")
+            total += i
+        except ValueError as e:
+            if str(e) != "benchmark exception":
+                raise
+            total += i*3
     return total
 fn = globals()[name]
 checks = [fn(seed + i) for i in range(16)]

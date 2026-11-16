@@ -1,0 +1,17 @@
+nhập gói.chuẩn.chính.*;
+hàm chính() {
+    nguồn = "[true,0,-2147483648,2147483647,1.5,3,4,null,5,6,\"Việt\",7,8,{},9,10,[],11,12]";
+    a = json phân tích(nguồn);
+    nếu (json tạo(a) != "[1,0,-2147483648,2147483647,1.5,3,4,null,5,6,\"Việt\",7,8,{},9,10,[],11,12]") { ném "mixed run roundtrip"; };
+    nguồn = "[false";
+    lặp(i = 0; i < 1600; i++) { nguồn += "," + thành chuỗi(i); };
+    nguồn += ",1.5,-2,3]";
+    a = json phân tích(nguồn);
+    nếu (máy ảo lấy độ dài(a) != 1604 || a[0] != sai || a[1601] != 1.5 || a[1602] != -2 || a[1603] != 3) {
+        ném "mixed long length or suffix";
+    };
+    lặp(i = 0; i < 1600; i++) {
+        nếu (a[i+1] != i) { ném "mixed long item"; };
+    };
+    in "json mixed i32 run: PASS";
+};

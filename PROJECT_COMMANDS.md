@@ -1,3 +1,29 @@
+# V++ — Các lệnh phát triển bản tự chủ
+
+```sh
+make build
+make test
+./VPP phiên bản
+./VPP build hello.vi -o hello
+./VPP run hello.vi -- arg1 arg2
+./VPP jit hello.vi
+./VPP jit hello.vi --function cộng -- 19 23
+make benchmark
+cmake --install build-pure-vpp --prefix "$HOME/.local"
+```
+
+`vpp jit` sử dụng bộ JIT đã build một lần; mỗi nguồn được biên dịch thành mã máy
+ngay trong bộ nhớ. Mặc định dùng tập i32; `./VPP jit --dynamic "$PWD/hello.vi"`
+hỗ trợ runtime kiểu động và import module, không cần assembler/linker khi thực thi.
+Đặt `VPP_JIT_PROFILE=1` để xem thống kê biên dịch lại hàm nóng trong chế độ dynamic.
+Đặt `VPP_JIT_TIER=0` để chạy baseline native, không thu thập hồ sơ hoặc biên dịch lại.
+Có thể gọi trực tiếp `build-pure-vpp/bin/vpp-jit hello.vi` hoặc xem `./VPP jit --help`.
+
+Chi tiết: [Cài đặt](docs/installation.md). Build đầy đủ hiện hỗ trợ macOS ARM64.
+
+<details>
+<summary>Lệnh của kiến trúc host trước đây (tham khảo lịch sử)</summary>
+
 # V++ — Các lệnh phát triển thường dùng
 
 File này tập hợp các lệnh build, test, chạy V++, đóng gói/cài extension và các
@@ -88,7 +114,7 @@ cmake --build build --parallel
 Project có script build CLI trực tiếp bằng C++ compiler:
 
 ```bash
-./scripts/build-vpp-cli.sh
+./scripts/macos/build-vpp-cli.sh
 ```
 
 Binary được tạo tại:
@@ -174,37 +200,103 @@ Chạy regression V++ trực tiếp:
 VPP_EXEC=./build/bin/vpp-cli ./run_tests.sh
 ```
 
-Nếu build bằng `scripts/build-vpp-cli.sh`:
+Nếu build bằng `scripts/macos/build-vpp-cli.sh`:
 
 ```bash
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
 ```
 
-CTest hiện chỉ đăng ký bộ regression V++ chạy các file `.vi` qua `vpp-integration`.
+CI macOS, Linux và Windows chạy full regression bằng JIT đã đóng gói.
+Mỗi nền tảng chạy một suite duy nhất với 2 worker, gồm cả các ca i32.
+Suite full đọc nguồn `.vi` trực tiếp bằng JIT đã đóng gói, không build
+executable, không gọi assembler/linker và không fallback AOT.
+Test từ chối cú pháp dùng `--check-dynamic`; các ca i32 chuyên biệt dùng
+JIT i32. Các probe allocator/directory và ELF partial linker dùng
+`--raw-program` với chính các hàm V++ của runtime/linker. Các kiểm tra VM
+dùng `--vm-image` để tạo dữ liệu bytecode rồi chạy VM đã đóng gói.
+Self-test của runner chạy bằng JIT; compiler giả mô phỏng giao thức bằng
+process doubles, không gọi compiler thật. Toàn bộ 390 ca full/i32 được
+đăng ký cho JIT, giữ các giới hạn nền tảng và bộ kiểm tra kết quả riêng.
+CI giới hạn mỗi lệnh JIT ở 900 giây và mỗi job ở 360 phút vì thời gian
+chạy nguồn bao gồm cả phân tích, liên kết và sinh mã máy trong bộ nhớ.
+Runner tạo thư mục làm việc riêng cho từng ca. Với các nguồn thuần tính toán
+đã được duyệt trong `FIXTURE_FREE_SOURCES`, JIT bỏ bước sao chép cây fixture.
+Nếu nội dung nguồn thay đổi hoặc ca cần cấu hình riêng, runner vẫn sao chép
+fixture vào thư mục riêng. Các kiểm tra đầu ra, stderr và exit code giữ nguyên.
+
+Đo riêng chi phí kiểm tra CFG và sinh mã ARM64 của compiler bằng:
+
+```bash
+VPP_HOME="$PWD" "$PACKAGE/bin/vpp-jit" --dynamic benchmark/native_machine_cfg.vi
+```
+
+Benchmark tạo IR 4.502 lệnh, chạy ba mẫu; mỗi giá trị `cfg` là tổng thời
+gian năm lần kiểm tra CFG, mỗi `emit` là tổng thời gian ba lần sinh mã
+ARM64 (đơn vị ms). Benchmark nhập mã compiler từ checkout hiện tại và đo
+chúng trong guest JIT; không dùng kết quả này để suy ra trực tiếp thời gian
+biên dịch nguồn bằng binary JIT đã đóng gói. Muốn đo cold compilation,
+so sánh hai binary JIT được build từ hai phiên bản bằng cùng runner,
+cùng danh sách `--case`, `--jobs 1`, và lặp lại nhiều lần. Trường `run`
+trong kết quả gồm cả biên dịch và chạy guest; tổng thời gian ca còn gồm
+chuẩn bị, dọn fixture và kiểm tra kết quả.
+
+```bash
+python3 scripts/quality/benchmark_jit_cold.py "$BASELINE_JIT" "$CANDIDATE_JIT"
+```
+
+Script đổi thứ tự hai binary giữa các lần đo, dùng một worker, yêu cầu
+tất cả ca PASS và lưu `comparison.json` cùng báo cáo từng lần chạy.
+Dùng `--case` nhiều lần để chọn ca khác, hoặc `--repetitions` để đổi số mẫu.
+
+Kết quả thử nghiệm cục bộ macOS ARM64 ngày 15/11/2026: bỏ sao chép fixture
+cho các nguồn đã duyệt giảm tổng thời gian sáu ca từ 5,02 s xuống 2,66 s,
+với cùng binary JIT. Thử nghiệm inline kiểm tra stack CFG giảm median
+microbenchmark CFG từ 766,480 ms xuống 689,977 ms, nhưng binary JIT được
+build lại làm median `run` của `kiem_tra_json_escape_span` tăng từ 14,35 s
+lên 16,77 s (ba lần đo mỗi binary). Vì vậy thay đổi inline đã bị loại bỏ;
+không coi kết quả microbenchmark là cải thiện cold compilation.
+
+```bash
+python3 scripts/quality/run_native_regression.py --suite full --backend jit \
+  --jit "$PACKAGE/bin/vpp-jit" --jobs 2 --timeout 900
+```
+
+Có thể chạy chỉ với JIT đã cài đặt, không cần compiler AOT:
+
+```bash
+VPP_JIT="$PACKAGE/bin/vpp-jit" ./run_tests.sh
+```
+
+Trên Windows: `./scripts/windows/run-tests.ps1 -Jit "$package/bin/vpp-jit.exe"`.
+
+Dùng `--backend aot` để kiểm tra riêng toàn bộ đường AOT hoặc
+`--backend mixed` để dùng cách phân tuyến theo `jit: true` trước đây.
+Các tùy chọn `--phase build/run`, `--artifacts`, `--batch-size`,
+`--module-suites` phục vụ kiểm tra AOT và artifact cũ.
 
 ## 6. Chạy chương trình V++
 
 Chạy một file `.vi`:
 
 ```bash
-./build/bin/vpp-cli src/tests/program.vi
+./build/bin/vpp-cli scripts/test/program.vi
 ```
 
 Hoặc dùng wrapper của project:
 
 ```bash
-./VPP chạy src/tests/program.vi
+./VPP chạy scripts/test/program.vi
 ```
 
 Các lệnh tooling thường dùng:
 
 ```bash
-./build/bin/vpp-cli --giải-mã src/tests/program.vi
-./build/bin/vpp-cli --dump-ast src/tests/program.vi
-./build/bin/vpp-cli --dump-ir src/tests/program.vi
-./build/bin/vpp-cli --lint src/tests/program.vi
-./build/bin/vpp-cli --định-dạng src/tests/program.vi
-./build/bin/vpp-cli --định-dạng src/tests/program.vi --in-place
+./build/bin/vpp-cli --giải-mã scripts/test/program.vi
+./build/bin/vpp-cli --dump-ast scripts/test/program.vi
+./build/bin/vpp-cli --dump-ir scripts/test/program.vi
+./build/bin/vpp-cli --lint scripts/test/program.vi
+./build/bin/vpp-cli --định-dạng scripts/test/program.vi
+./build/bin/vpp-cli --định-dạng scripts/test/program.vi --in-place
 ./build/bin/vpp-cli --repl
 ./build/bin/vpp-cli --lsp
 ```
@@ -464,7 +556,7 @@ Chạy một chương trình:
 Build CLI nhanh khi không có CMake:
 
 ```bash
-./scripts/build-vpp-cli.sh
+./scripts/macos/build-vpp-cli.sh
 ```
 
 Đóng gói extension:
@@ -478,3 +570,6 @@ Cài lại extension VS Code:
 ```bash
 ./scripts/vpp-lang install --editor vscode
 ```
+
+
+</details>

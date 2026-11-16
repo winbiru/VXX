@@ -1,0 +1,31 @@
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.mã máy nền.*;
+nhập thời gian;
+
+// 4,502 instructions; jumps cross the 2,048-instruction CFG pages.
+// Each sample measures five validations and three ARM64 emissions.
+hàm chính() {
+    lệnh = [];
+    lặp (i = 0; i < 750; i++) {
+        thêm(lệnh, biên dịch mã máy lệnh("LoadSlot", 0, 0, 0));
+        thêm(lệnh, biên dịch mã máy lệnh("PushConstant", 3, 0, 1));
+        thêm(lệnh, biên dịch mã máy lệnh("Add", 0, 0, 2));
+        thêm(lệnh, biên dịch mã máy lệnh("StoreSlot", 0, 0, 1));
+        thêm(lệnh, biên dịch mã máy lệnh("Drop", 0, 0, 1));
+        thêm(lệnh, biên dịch mã máy lệnh("Jump", 0, độ dài(lệnh) + 1, 0));
+    };
+    thêm(lệnh, biên dịch mã máy lệnh("PushConstant", 42, 0, 0));
+    thêm(lệnh, biên dịch mã máy lệnh("Return", 0, 0, 1));
+    ir = {"parameterCount": 1, "slotCount": 1, "maxStackDepth": 2, "instructions": lệnh};
+    lặp (i = 0; i < 3; i++) {
+        trước = thời gian đơn điệu mili giây();
+        lặp(j = 0; j < 5; j++) { bỏ kết quả = biên dịch mã máy kiểm tra CFG(ir); };
+        in "cfg:" + (thời gian đơn điệu mili giây() - trước);
+        trước = thời gian đơn điệu mili giây();
+        lặp(j = 0; j < 3; j++) {
+            ảnh = biên dịch mã máy hàm("aarch64", ir, "macos", đúng, đúng);
+            nếu (ảnh["size"] <= 0) { ném "empty"; };
+        };
+        in "emit:" + (thời gian đơn điệu mili giây() - trước);
+    };
+};

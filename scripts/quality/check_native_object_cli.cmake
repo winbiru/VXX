@@ -107,7 +107,7 @@ endif()
 
 # The raw leaf encoder is entirely V++ and preserves the old ABI bytes.
 set(raw "${VPP_OUTPUT_DIR}/leaf-raw.bin")
-set(leaf "${VPP_ROOT}/src/tests/kiem_tra_native_leaf.vi")
+set(leaf "${VPP_ROOT}/scripts/test/kiem_tra_native_leaf.vi")
 execute_process(COMMAND ${native_command} build --target x86_64-linux-gnu
     --emit-raw cong_dao "${leaf}" "${raw}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)

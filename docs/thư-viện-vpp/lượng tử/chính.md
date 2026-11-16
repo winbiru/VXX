@@ -158,8 +158,8 @@ backend khác khi gặp lỗi. Lỗi validation không thêm chỉ dẫn hoặc 
 | AC-07 | NFR-02/03 | Validation chạy trước khi tạo tiến trình; harness protocol Python đã được gỡ. |
 
 ```bash
-./build/bin/vpp-cli chạy src/tests/kiem_tra_goi_luong_tu.vi
-./build/bin/vpp-cli chạy src/tests/kiem_tra_luong_tu_openqasm.vi
+./build/bin/vpp-cli chạy scripts/test/kiem_tra_goi_luong_tu.vi
+./build/bin/vpp-cli chạy scripts/test/kiem_tra_luong_tu_openqasm.vi
 ctest --test-dir build -R '^vpp-quantum-(validation|vpp-tool)$' --output-on-failure
 ./build/bin/vpp-cli chạy examples/luong-tu/bell.vi
 ./build/bin/vpp-cli chạy examples/luong-tu/ghz.vi

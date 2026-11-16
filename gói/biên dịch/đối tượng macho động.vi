@@ -1,0 +1,221 @@
+// Darwin ARM64 full-language object sink. Machine IR is encoded exactly once;
+// only prebuilt platform ABI objects remain in assembly.
+// Discard side-effect call results and use assignment for loop updates to
+// keep the dynamic evaluation stack bounded as the object grows.
+nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+hàm riêng tư obj cần(ok, lỗi) {
+    nếu (!ok) { ném "Mach-O object: " + lỗi; };
+};
+hàm riêng tư obj word(b, x) {
+    lặp(i = 0; i < 4; i += 1) {
+        n = x % 256; nếu (n < 0) { n += 256; };
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, n);
+        x = (x - n) / 256;
+    };
+};
+hàm riêng tư obj words(b, a) {
+    lặp(i = 0; i < máy ảo lấy độ dài(a); i += 1) { bỏ kết quả = obj word(b, a[i]); };
+};
+hàm riêng tư obj tên(b, tên) {
+    a = chuỗi thành byte máy ảo(tên);
+    bỏ kết quả = obj cần(máy ảo lấy độ dài(a) <= 16, "tên section");
+    lặp(i = 0; i < 16; i += 1) {
+        n = 0; nếu (i < máy ảo lấy độ dài(a)) { n = a[i]; };
+        bỏ kết quả = máy ảo thêm cuối danh sách(b, n);
+    };
+};
+hàm riêng tư obj section(b, tên, đoạn, địa, dài, off, căn, rel, đếm, cờ) {
+    bỏ kết quả = obj tên(b, tên); bỏ kết quả = obj tên(b, đoạn);
+    bỏ kết quả = obj words(b, [địa, 0, dài, 0, off, căn, rel, đếm, cờ, 0, 0, 0]);
+};
+
+lớp công khai Bộ Ghi MachO Động {
+    hàm công khai khởi tạo(đường) {
+        mình.tệp = Bộ Đệm Tệp(đường, "ghi", 2048, "ghi Mach-O object");
+        mình.đệm = [];
+        mình.chỉ mục = {};
+        mình.ký hiệu = [];
+        mình.rel mã = [];
+        mình.rel dữ liệu = [];
+        mình.số rel mã = 0;
+        mình.số rel dữ liệu = 0;
+        mình.độ dài mã = 0;
+        mình.độ dài dữ liệu = 0;
+        mình.đầu dữ liệu = 0;
+        mình.phần hiện tại = 1;
+        // 32-byte header, LC_SEGMENT_64 with two sections, LC_SYMTAB.
+        bỏ kết quả = mình.ghi không(288);
+    };
+    hàm công khai đóng() { trả về mình.tệp.đóng(); };
+    hàm riêng tư đẩy() {
+        nếu (máy ảo lấy độ dài(mình.đệm) > 0) {
+            bỏ kết quả = mình.tệp.ghi khối trực tiếp(mình.đệm);
+            mình.đệm = [];
+        };
+    };
+    hàm riêng tư ghi byte(b) {
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.đệm, b);
+        nếu (máy ảo lấy độ dài(mình.đệm) == 2048) { bỏ kết quả = mình.đẩy(); };
+    };
+    hàm riêng tư ghi không(n) {
+        lặp(i = 0; i < n; i += 1) { bỏ kết quả = mình.ghi byte(0); };
+    };
+    hàm riêng tư ghi dãy(b) {
+        n = máy ảo lấy độ dài(b);
+        nếu (n >= 2048 && n <= 65536) {
+            bỏ kết quả = mình.đẩy(); bỏ kết quả = mình.tệp.ghi khối trực tiếp(b);
+        } hoặc {
+            lặp(i = 0; i < n; i += 1) { bỏ kết quả = mình.ghi byte(b[i]); };
+        };
+    };
+    hàm riêng tư ghi word(x) {
+        b = []; bỏ kết quả = obj word(b, x); bỏ kết quả = mình.ghi dãy(b);
+    };
+    hàm riêng tư ghi dài(x) {
+        bỏ kết quả = mình.ghi word(x); bỏ kết quả = mình.ghi word(0);
+    };
+    hàm riêng tư mã ký hiệu(tên) {
+        i = lấy từ điển(mình.chỉ mục, tên, -1);
+        nếu (i >= 0) { trả về i; };
+        i = máy ảo lấy độ dài(mình.ký hiệu);
+        bỏ kết quả = obj cần(i < 16777216, "quá nhiều ký hiệu");
+        mình.chỉ mục[tên] = i;
+        bỏ kết quả = máy ảo thêm cuối danh sách(mình.ký hiệu, [tên, 1, 0, 0]);
+        trả về i;
+    };
+    hàm riêng tư định nghĩa(tên, loại, phần, lệch) {
+        i = mình.mã ký hiệu(tên);
+        bỏ kết quả = obj cần(mình.ký hiệu[i][1] == 1, "ký hiệu trùng: " + tên);
+        mình.ký hiệu[i] = [tên, loại, phần, lệch];
+    };
+    hàm công khai ghi hàm(tên, phát) {
+        bỏ kết quả = obj cần(mình.phần hiện tại == 1, "đã kết thúc text");
+        khối = lấy từ điển(phát, "chunks", rỗng);
+        b = rỗng;
+        n = 0;
+        nếu (khối == rỗng) {
+            b = phát["bytes"]; n = máy ảo lấy độ dài(b);
+        } hoặc {
+            n = phát["size"];
+            tổng = 0;
+            lặp(i = 0; i < máy ảo lấy độ dài(khối); i += 1) {
+                dài = máy ảo lấy độ dài(khối[i]);
+                bỏ kết quả = obj cần(dài > 0 && dài <= 2048 && dài % 4 == 0, "kích thước khối text");
+                bỏ kết quả = obj cần(i == máy ảo lấy độ dài(khối) - 1 || dài == 2048, "khối text không đầy");
+                bỏ kết quả = obj cần(dài <= n - tổng, "khối text vượt kích thước");
+                tổng += dài;
+            };
+            bỏ kết quả = obj cần(tổng == n, "tổng kích thước khối text");
+        };
+        bỏ kết quả = obj cần(n > 0 && n % 4 == 0 && n <= 2147483647 - mình.độ dài mã, "kích thước text");
+        bỏ kết quả = mình.định nghĩa("_" + tên, 15, 1, mình.độ dài mã);
+        r = phát["relocations"];
+        trước = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(r); i += 1) {
+            p = r[i]["offset"];
+            bỏ kết quả = obj cần(p > trước && p % 4 == 0 && p <= n - 4, "CALL offset");
+            lệnh byte = b; lệch = p;
+            nếu (khối != rỗng) { lệnh byte = khối[p / 2048]; lệch = p % 2048; };
+            bỏ kết quả = obj cần(lệnh byte[lệch] == 0 && lệnh byte[lệch+1] == 0 && lệnh byte[lệch+2] == 0 && lệnh byte[lệch+3] == 148, "CALL opcode");
+            s = mình.mã ký hiệu("_" + r[i]["symbol"]);
+            bỏ kết quả = mình.thêm rel(mình.rel mã, mình.số rel mã, mình.độ dài mã + p, 754974720 + s);
+            mình.số rel mã = mình.số rel mã + 1;
+            trước = p;
+        };
+        nếu (khối == rỗng) { bỏ kết quả = mình.ghi dãy(b); }
+        hoặc { lặp(i = 0; i < máy ảo lấy độ dài(khối); i += 1) { bỏ kết quả = mình.ghi dãy(khối[i]); }; };
+        mình.độ dài mã = mình.độ dài mã + n;
+    };
+    hàm công khai bắt đầu dữ liệu() {
+        bỏ kết quả = obj cần(mình.phần hiện tại == 1, "đã bắt đầu data");
+        mình.đầu dữ liệu = mình.độ dài mã;
+        nếu (mình.đầu dữ liệu % 8 != 0) {
+            bỏ kết quả = mình.ghi không(8 - mình.đầu dữ liệu % 8);
+            mình.đầu dữ liệu = mình.đầu dữ liệu + 8 - mình.đầu dữ liệu % 8;
+        };
+        mình.phần hiện tại = 2;
+    };
+    hàm công khai nhãn(tên, toàn cục = sai) {
+        bỏ kết quả = obj cần(mình.phần hiện tại == 2, "nhãn ngoài data");
+        loại = 14; nếu (toàn cục) { loại = 15; };
+        bỏ kết quả = mình.định nghĩa(tên, loại, 2, mình.độ dài dữ liệu);
+    };
+    hàm công khai dữ liệu byte(b) {
+        bỏ kết quả = obj cần(mình.phần hiện tại == 2, "ngoài data");
+        n = máy ảo lấy độ dài(b);
+        bỏ kết quả = obj cần(n <= 2147483647 - mình.độ dài dữ liệu, "kích thước data");
+        bỏ kết quả = mình.ghi dãy(b); mình.độ dài dữ liệu = mình.độ dài dữ liệu + n;
+    };
+    hàm công khai dữ liệu word(x) {
+        b = []; bỏ kết quả = obj word(b, x); bỏ kết quả = mình.dữ liệu byte(b);
+    };
+    hàm công khai dữ liệu dài(x) {
+        bỏ kết quả = mình.dữ liệu word(x); bỏ kết quả = mình.dữ liệu word(0);
+    };
+    hàm công khai con trỏ(tên) {
+        bỏ kết quả = obj cần(mình.độ dài dữ liệu % 8 == 0, "con trỏ lệch hàng");
+        s = mình.mã ký hiệu(tên);
+        bỏ kết quả = mình.thêm rel(mình.rel dữ liệu, mình.số rel dữ liệu, mình.độ dài dữ liệu, 234881024 + s);
+        mình.số rel dữ liệu = mình.số rel dữ liệu + 1;
+        bỏ kết quả = mình.dữ liệu dài(0);
+    };
+    hàm công khai căn dữ liệu() {
+        khi (mình.độ dài dữ liệu % 8 != 0) { bỏ kết quả = mình.dữ liệu byte([0]); };
+    };
+    // Preserve insertion order without growing one giant reference array.
+    hàm riêng tư thêm rel(r, đếm, địa, bits) {
+        nếu (đếm % 2048 == 0) { bỏ kết quả = máy ảo thêm cuối danh sách(r, []); };
+        bỏ kết quả = máy ảo thêm cuối danh sách(r[đếm / 2048], [địa, bits]);
+    };
+    hàm riêng tư ghi rel(r) {
+        lặp(i = 0; i < máy ảo lấy độ dài(r); i += 1) {
+            trang = r[i];
+            lặp(j = 0; j < máy ảo lấy độ dài(trang); j += 1) {
+                bỏ kết quả = mình.ghi word(trang[j][0]); bỏ kết quả = mình.ghi word(trang[j][1]);
+            };
+        };
+    };
+    hàm công khai hoàn tất() {
+        bỏ kết quả = obj cần(mình.phần hiện tại == 2, "thiếu data");
+        bỏ kết quả = mình.đẩy();
+        p = mình.tệp.vị trí();
+        rel mã = p; bỏ kết quả = mình.ghi rel(mình.rel mã);
+        rel dữ liệu = rel mã + 8 * mình.số rel mã;
+        bỏ kết quả = mình.ghi rel(mình.rel dữ liệu);
+        sym = rel dữ liệu + 8 * mình.số rel dữ liệu;
+        tên vị = 1;
+        lặp(i = 0; i < máy ảo lấy độ dài(mình.ký hiệu); i += 1) {
+            k = mình.ký hiệu[i];
+            bỏ kết quả = mình.ghi word(tên vị);
+            bỏ kết quả = mình.ghi dãy([k[1], k[2], 0, 0]);
+            v = k[3]; nếu (k[2] == 2) { v += mình.đầu dữ liệu; };
+            bỏ kết quả = mình.ghi dài(v);
+            tên vị += máy ảo lấy độ dài(chuỗi thành byte máy ảo(k[0])) + 1;
+        };
+        str = sym + 16 * máy ảo lấy độ dài(mình.ký hiệu);
+        bỏ kết quả = mình.ghi byte(0);
+        lặp(i = 0; i < máy ảo lấy độ dài(mình.ký hiệu); i += 1) {
+            bỏ kết quả = mình.ghi dãy(chuỗi thành byte máy ảo(mình.ký hiệu[i][0]));
+            bỏ kết quả = mình.ghi byte(0);
+        };
+        bỏ kết quả = mình.đẩy();
+        bỏ kết quả = obj cần(mình.tệp.vị trí() == str + tên vị, "kích thước bảng ký hiệu");
+        h = [];
+        bỏ kết quả = obj words(h, [-17958193, 16777228, 0, 1, 2, 256, 0, 0, 25, 232]);
+        bỏ kết quả = obj tên(h, "");
+        bỏ kết quả = obj words(h, [0, 0, mình.đầu dữ liệu + mình.độ dài dữ liệu, 0,
+            288, 0, p - 288, 0, 7, 7, 2, 0]);
+        bỏ kết quả = obj section(h, "__text", "__TEXT", 0, mình.độ dài mã, 288, 2,
+            rel mã, mình.số rel mã, -2147482624);
+        bỏ kết quả = obj section(h, "__const", "__DATA", mình.đầu dữ liệu, mình.độ dài dữ liệu,
+            288 + mình.đầu dữ liệu, 3, rel dữ liệu, mình.số rel dữ liệu, 0);
+        bỏ kết quả = obj words(h, [2, 24, sym, máy ảo lấy độ dài(mình.ký hiệu), str, tên vị]);
+        bỏ kết quả = obj cần(máy ảo lấy độ dài(h) == 288, "kích thước header");
+        bỏ kết quả = mình.tệp.dịch(0);
+        bỏ kết quả = mình.tệp.ghi khối trực tiếp(h);
+        mình.phần hiện tại = 3;
+        trả về mình.đóng();
+    };
+};

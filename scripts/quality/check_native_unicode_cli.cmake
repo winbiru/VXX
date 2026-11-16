@@ -9,7 +9,7 @@ endforeach()
 set(directory "${VPP_OUTPUT_DIR}/thư mục Ω 🧪")
 file(MAKE_DIRECTORY "${directory}")
 set(source "${directory}/nguồn thêm.vi")
-configure_file("${VPP_ROOT}/src/tests/kiem_tra_native_calls.vi" "${source}" COPYONLY)
+configure_file("${VPP_ROOT}/scripts/test/kiem_tra_native_calls.vi" "${source}" COPYONLY)
 set(environment "${CMAKE_COMMAND}" -E env
     --unset=VPP_HOME --unset=VPP_AOT_ROOT --unset=VPP_AOT_LIB_ROOT
     "PATH=" "VPP_NATIVE_COMPILER=${VPP_NATIVE_COMPILER}")

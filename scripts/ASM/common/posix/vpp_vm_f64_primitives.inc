@@ -20,7 +20,7 @@
 .macro VM_KIEM_TRA_SO_THUC offset
     tbnz \offset, #31, Lvm_so_thuc_sai_bat
     mov w10, #0x1200
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp \offset, w10
     b.hi Lvm_so_thuc_sai_bat
 .endm
@@ -151,9 +151,16 @@ Lvm_so_thuc_sai_bat:
     pushq %rbx
     pushq %r12
     pushq %r13
+#if defined(_WIN32)
+    subq $32, %rsp
+    movl %ecx, %ebx
+    movl %edx, %r12d
+    movl %r8d, %r13d
+#else
     movl %edi, %ebx
     movl %esi, %r12d
     movl %edx, %r13d
+#endif
     call VM_SYM(vpp_native_memory_base)
     movq %rax, %r9
     testq %r9, %r9
@@ -162,10 +169,13 @@ Lvm_so_thuc_sai_bat:
 .macro VM_KIEM_TRA_SO_THUC offset
     testl \offset, \offset
     js Lvm_so_thuc_sai_x86
-    cmpl $68162048, \offset
+    cmpl $(135271424-512), \offset
     ja Lvm_so_thuc_sai_x86
 .endm
 .macro VM_TRA_SO_THUC
+#if defined(_WIN32)
+    addq $32, %rsp
+#endif
     popq %r13
     popq %r12
     popq %rbx
@@ -268,6 +278,8 @@ Lvm_so_thuc_sai_x86:
 #endif
 #if defined(__APPLE__)
 .section __TEXT,__cstring,cstring_literals
+#elif defined(_WIN32)
+.section .rdata,"dr"
 #else
 .section .rodata
 #endif

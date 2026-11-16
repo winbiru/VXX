@@ -2,6 +2,7 @@
 
 // Dùng chung phép toán đồng hồ, nanosleep có giới hạn và getrandom trên Linux x86-64 bằng syscall
 // trực tiếp.
+#define VPP_VM_SYSTEM_FREESTANDING 1
 #include "../../common/posix/vpp_vm_system_primitives.inc"
 
 .bss

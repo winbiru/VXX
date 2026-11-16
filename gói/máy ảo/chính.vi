@@ -11,28 +11,51 @@ nhập host ABI.*;
 nhập nạp chương trình.*;
 nhập runtime.*;
 nhập thực thi.*;
+nhập truyền worker.*;
+nhập worker.*;
 // The Linux ASM f64 parse/text bridge resolves these V++ runtime functions.
 nhập số thực tự chủ.*;
 
 hàm vm_absolute(s, cwd) {
-    nếu (vm_get(s, 1) > 0) { nếu (máy đọc byte(vm_get(s, 2)) == 47) { trả về s; }; };
+    biến size = vm_get(s, 1); biến raw = vm_get(s, 2);
+    nếu (size > 0) {
+        nếu (máy đọc byte(raw) == 47) { trả về s; };
+        nếu (vm_get(4198464, 8) == 2) {
+            nếu (máy đọc byte(raw) == 92) { trả về s; };
+            nếu (size >= 3 && máy đọc byte(raw + 1) == 58 &&
+                (máy đọc byte(raw + 2) == 47 || máy đọc byte(raw + 2) == 92)) { trả về s; };
+        };
+    };
     trả về vm_concat(vm_concat(cwd, vm_literal("/")), s);
+};
+// Fixed machine callback; the guest never supplies a native address.
+hàm vm_worker_entry(packet) {
+    biến state = vm_worker_prepare(packet, 0); nếu (state == 0) { trả về -1; };
+    biến bundle = vm_get(state, 8); biến callable = vm_at(bundle, 5); biến args = vm_at(bundle, 6);
+    biến id = vm_worker_callable(state, callable); biến closure = 0;
+    nếu (vm_tag(callable) == 7) { closure = callable; };
+    vm_invoke(state, id, args, 0, 0, closure);
+    biến result = vm_execute(state);
+    trả về vm_worker_finish(state, result);
 };
 hàm chính() {
     nếu (đối số đếm() < 2) {
         biến help = "V++ VM ASM: vpp-vm <program.vmb> [compiler arguments]\n"; byte in(help); byte hủy(help); trả về 2;
     };
     vm_init();
+    nếu (máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
+    biến platform = máy thư mục thô(6, 0, 0);
+    nếu (platform < 0 || platform > 2) { trả về 1; };
+    vm_set(4198464, 8, platform);
     biến executable = vm_string(4095);
     nếu (executable == 0) { trả về 1; };
     biến executable_length = máy tệp thực thi lấy(vm_get(executable, 2));
     nếu (executable_length > 0 && executable_length <= 4095) { vm_set(executable, 1, executable_length); }
     hoặc { executable = vm_literal(đối số lấy(0)); };
     vm_set(4198464, 10, executable);
-    biến probe = "/proc/self/exe"; biến fd = tệp mở đọc(probe); byte hủy(probe);
-    nếu (fd > 0) { tệp đóng(fd); vm_set(4198464, 8, 1); };
     biến path = đối số lấy(1); biến state = vm_load(path); byte hủy(path);
     vm_set(4198464, 2, state);
+    biến worker_ready = máy worker thô(12, 0, 0) == 0;
     nếu (state != 0 && vm_get(4198464, 1) == 0) {
         // Diagnostic switch; disabled by default and independent of the guest.
         biến profile_args = vm_vector(4);
@@ -46,7 +69,7 @@ hàm chính() {
             biến compiler = vm_find_function(state, vm_literal("biên dịch dòng lệnh VM"));
             nếu (compiler >= 0) {
                 biến args = vm_vector(4);
-                biến cwd = vm_string(4095); nếu (cwd == 0) { vm_socket_close_all(state); vm_process_close_all(state); vm_dir_close_all(state); trả về 1; };
+                biến cwd = vm_string(4095); nếu (cwd == 0) { nếu (worker_ready) { máy worker thô(10, 0, 0); }; vm_socket_close_all(state); vm_process_close_all(state); vm_dir_close_all(state); trả về 1; };
                 biến count = máy thư mục hiện hành(vm_get(cwd, 2)); nếu (count < 0) { vm_error(20); };
                 vm_set(cwd, 1, count);
                 lặp(i = 2; i < đối số đếm(); i++) {
@@ -61,6 +84,7 @@ hàm chính() {
             };
         };
     };
+    nếu (worker_ready && máy worker thô(10, 0, 0) != 0) { vm_error(22); };
     vm_socket_close_all(state);
     vm_process_close_all(state);
     vm_dir_close_all(state);

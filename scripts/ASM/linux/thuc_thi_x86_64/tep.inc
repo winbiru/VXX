@@ -5,13 +5,39 @@
     cmpq $-4095, %rax
     jb .Lchuan_hoa_hop_le
     negl %eax
-    movl %eax, vpp_linux_errno(%rip)
+    subq $8, %rsp
+    movl %eax, %edi
+    call Lworker_set_errno
+    addq $8, %rsp
     movl $-1, %eax
 .Lchuan_hoa_hop_le:
     ret
 .globl vpp_native_os_errno
 vpp_native_os_errno:
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne 1f
     movl vpp_linux_errno(%rip), %eax
+    ret
+1:  subq $8, %rsp
+    call Lworker_os_context
+    testq %rax, %rax
+    jz 2f
+    movl 16(%rax), %eax
+2:  addq $8, %rsp
+    ret
+// Error state belongs to the calling worker, alongside its arena context.
+Lworker_set_errno:
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne 1f
+    movl %edi, vpp_linux_errno(%rip)
+    ret
+1:  pushq %rbx
+    movl %edi, %ebx
+    call Lworker_os_context
+    testq %rax, %rax
+    jz 2f
+    movl %ebx, 16(%rax)
+2:  popq %rbx
     ret
 
 .macro VPP_NHAP_XUAT ten, dich
@@ -39,8 +65,13 @@ vpp_native_os_open:
     leaq (%r11,%rdi), %rsi
     movl -8(%rbp), %edx         // Cờ mở tệp được yêu cầu
     cmpl $1537, %edx            // V++ Darwin O_WRONLY|O_CREAT|O_TRUNC
-    jne .Lmo_co
+    jne .Lmo_noi
     movl $577, %edx             // Linux O_WRONLY|O_CREAT|O_TRUNC
+    jmp .Lmo_co
+.Lmo_noi:
+    cmpl $521, %edx             // Darwin O_WRONLY|O_CREAT|O_APPEND
+    jne .Lmo_co
+    movl $1089, %edx            // Linux O_WRONLY|O_CREAT|O_APPEND
 .Lmo_co:
     movq $-100, %rdi            // AT_FDCWD
     movl $438, %ecx             // 0666, chịu ảnh hưởng umask
@@ -52,6 +83,24 @@ vpp_native_os_close:
     call vpp_sys_close
     call .Lchuan_hoa_goi_he_thong
     addq $8, %rsp
+    ret
+
+// Signed i32 position; retain the complete syscall result until checked.
+.globl vpp_native_os_seek
+vpp_native_os_seek:
+    movslq %esi, %rsi
+    subq $8, %rsp
+    call vpp_sys_lseek
+    cmpq $-4095, %rax
+    jb 1f
+    call .Lchuan_hoa_goi_he_thong
+    jmp 2f
+1:  cmpq $2147483647, %rax
+    jle 2f
+    movl $75, %edi
+    call Lworker_set_errno
+    movl $-1, %eax
+2:  addq $8, %rsp
     ret
 
 // struct stat nhân Linux x86-64: st_dev@0, st_ino@8, st_mode@24. V++ đọc đầu Darwin: dev 32 bit@0,

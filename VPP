@@ -1,18 +1,9 @@
 #!/usr/bin/env sh
 set -eu
-
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-
-for candidate in \
-  "$SCRIPT_DIR/build/bin/vpp-cli" \
-  "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" \
-  "$SCRIPT_DIR/bin/vpp-cli" \
-  "$SCRIPT_DIR/build/bin/vietvm-cli"; do
-  if [ -x "$candidate" ]; then
-    exec "$candidate" "$@"
-  fi
-done
-
-echo "VPP: chưa tìm thấy binary CLI. Hãy build trước:" >&2
-echo "  mkdir -p cmake-build-debug && cd cmake-build-debug && cmake .. && make -j" >&2
-exit 1
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+build=${VPP_BUILD_DIR:-$root/build-pure-vpp}
+if [ ! -x "$build/bin/vpp" ]; then
+  echo 'VPP: hãy build bằng make build hoặc cmake -S . -B build-pure-vpp && cmake --build build-pure-vpp' >&2
+  exit 1
+fi
+exec "$build/bin/vpp" "$@"

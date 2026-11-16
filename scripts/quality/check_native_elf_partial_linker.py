@@ -3,6 +3,7 @@
 
 Usage: check_native_elf_partial_linker.py --self-test <output-dir>
        check_native_elf_partial_linker.py <merge-harness> <exec-harness> <output-dir>
+       check_native_elf_partial_linker.py --jit <packaged-jit> <output-dir>
 
 The fixtures are constructed as ELF64 ET_REL bytes, so no assembler or C
 compiler is needed. The second harness performs final native ET_EXEC linking.
@@ -12,6 +13,8 @@ import os
 import struct
 import subprocess
 import sys
+from check_native_macho_layout import probe_command
+from prepare_raw_jit import prepare, ROOT
 
 SECTION_NAMES = b"\0.text\0.rela.text\0.symtab\0.strtab\0.shstrtab\0.note.GNU-stack\0"
 
@@ -119,7 +122,7 @@ def run(harness, archive, destination, mode, directory, label, success,
     source.write_bytes(archive)
     sentinel = b"original file must survive a failed merge\n"
     destination.write_bytes(sentinel)
-    result = subprocess.run([str(harness), str(source), str(destination), str(mode)],
+    result = subprocess.run(probe_command(harness, source, destination, mode),
                             env=dict(os.environ, VPP_NATIVE_ELF_LINK="1"),
                             capture_output=True, timeout=120)
     (directory / (label + ".log")).write_bytes(result.stdout + result.stderr)
@@ -148,9 +151,11 @@ def execute(executable_harness, obj, directory, label, success=True):
     host_path.write_bytes(host_object)
     sentinel = b"original executable must survive a failed link\n"
     executable.write_bytes(sentinel)
-    result = subprocess.run([str(executable_harness), str(archive), str(executable)],
+    result = subprocess.run(probe_command(executable_harness, archive, executable),
                             env=dict(os.environ, VPP_NATIVE_ELF_LINK="1",
-                                     VPP_HOME=str(host_root)),
+                                     VPP_HOME=str(host_root),
+                                     HOME=str(directory / "unrelated-user-home")),
+                            cwd=directory,
                             capture_output=True, timeout=120)
     (directory / (label + ".log")).write_bytes(result.stdout + result.stderr)
     assert result.returncode == (0 if success else 1), (
@@ -165,7 +170,15 @@ def execute(executable_harness, obj, directory, label, success=True):
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "--self-test":
+    if len(sys.argv) == 4 and sys.argv[1] == "--jit":
+        jit, directory = (Path(path).resolve() for path in sys.argv[2:])
+        directory.mkdir(parents=True, exist_ok=True)
+        probes = []
+        for name in ('native_elf_partial_linker_archive', 'native_elf_linker_archive'):
+            source = prepare(ROOT / 'scripts/test/fixtures' / (name + '.vi'), directory / (name + '.jit.vi'))
+            probes.append([jit, '--raw-program', source])
+        harness, executable_harness = probes
+    elif len(sys.argv) == 3 and sys.argv[1] == "--self-test":
         harness = executable_harness = None
         directory = Path(sys.argv[2]).resolve()
     elif len(sys.argv) == 4:

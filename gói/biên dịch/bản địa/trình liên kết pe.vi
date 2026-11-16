@@ -158,7 +158,8 @@ hàm pe tạo executable(coff, kết quả) {
         đối tượng i32(kết quả, 0);
         byte thêm(kết quả, 3); byte thêm(kết quả, 0); // subsystem console
         byte thêm(kết quả, 0); byte thêm(kết quả, 1); // NX compatible
-        đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
+        // Reserve stack for the 4096-frame VM guard; keep demand commit.
+        đối tượng u64(kết quả, 67108864); đối tượng u64(kết quả, 4096);
         đối tượng u64(kết quả, 1048576); đối tượng u64(kết quả, 4096);
         đối tượng i32(kết quả, 0); đối tượng i32(kết quả, 16);
         lặp (i = 0; i < 16; i++) { đối tượng u64(kết quả, 0); };

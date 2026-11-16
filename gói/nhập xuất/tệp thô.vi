@@ -52,6 +52,9 @@ hàm công khai tệp thô đóng(tệp) {
 };
 
 hàm công khai tệp thô dịch(tệp, lệch, mốc) {
+    nếu (loại của(lệch) != "số nguyên") {
+        ném "tệp thô: độ lệch phải là số nguyên i32";
+    };
     nếu (loại của(mốc) != "số nguyên" || mốc < 0 || mốc > 2) {
         ném "tệp thô: gốc phải là 0, 1 hoặc 2";
     };

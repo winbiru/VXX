@@ -1,0 +1,71 @@
+nhập gói.biên dịch.JIT.Bộ Biên Dịch JIT;
+nhập gói.biên dịch.JIT.jit chạy;
+nhập gói.kiểm thử.khẳng định.*;
+
+hàm chính() {
+    // Generated code, cross-function relocations, recursion, loop branches,
+    // Unicode entry names, negative values, and all eight native argument slots.
+    nguồn = "hàm cộng(a,b) { trả về a+b; }; " +
+        "hàm giai_thua(n) { nếu(n<=1){trả về 1;}; trả về n*giai_thua(n-1); }; " +
+        "hàm tổng(n) { biến s=0; lặp(i=0;i<n;i=i+1){ nếu(i==2){bỏ qua;}; s=s+i; }; trả về s; }; " +
+        "hàm tám(a,b,c,d,e,f,g,h) { trả về a+2*b+3*c+4*d+5*e+6*f+7*g+8*h; }; " +
+        "hàm chính() { in cộng(19,23); trả về giai_thua(5)+tổng(6); };";
+    bộ = Bộ Biên Dịch JIT(nguồn);
+    khẳng định bằng(bộ.chạy("cộng", [-7, 3]), -4);
+    khẳng định bằng(bộ.chạy("giai_thua", [5]), 120);
+    khẳng định bằng(bộ.chạy("tổng", [6]), 13);
+    khẳng định bằng(bộ.chạy("tám", [1,2,3,4,5,6,7,8]), 204);
+    khẳng định bằng(bộ.chạy(), 133);
+    lỗi đối số = sai;
+    thử { bộ.chạy("cộng", [1]); } bắt lỗi(e) { lỗi đối số = đúng; };
+    khẳng định đúng(lỗi đối số);
+    khẳng định đúng(bộ.đóng());
+    khẳng định sai(bộ.đóng());
+    đã đóng = sai;
+    thử { bộ.chạy(); } bắt lỗi(e) { đã đóng = đúng; };
+    khẳng định đúng(đã đóng);
+    khẳng định bằng(jit chạy("hàm chính(){trả về -2147483648;};"), -2147483648);
+    khẳng định bằng(jit chạy("hàm chính(){trả về 2147483647;};"), 2147483647);
+    khẳng định bằng(jit chạy("hàm chính(){ biến x=42; };"), 0);
+    khẳng định bằng(jit chạy("hàm chính(){ nếu(0){trả về 7;}; };"), 0);
+    khẳng định bằng(jit chạy("hàm main(){trả về 7;};"), 7);
+    từ chối = sai;
+    thử { jit chạy("hàm chính(){trả về 1.5;};"); } bắt lỗi(e) { từ chối = đúng; };
+    khẳng định đúng(từ chối);
+
+    // Test the OS boundary independently of the compiler's instruction bytes.
+    mã = byte mới();
+    bytes = [184,6,0,0,0,195]; // x86-64: mov eax,6; ret
+    nếu (máy JIT thô(0,0,0) == 1) {
+        bytes = [192,0,128,82,192,3,95,214]; // ARM64: mov w0,6; ret
+    };
+    lặp(i=0;i<máy ảo lấy độ dài(bytes);i++){ byte thêm(mã,bytes[i]); };
+    gói = byte mới();
+    lặp(i=0;i<11;i++){ byte đẩy số nguyên ba mươi hai bit(gói,0); };
+    mã đã tạo = máy JIT thô(1,mã,0);
+    khẳng định đúng(mã đã tạo > 0);
+    khẳng định bằng(máy JIT thô(2,mã đã tạo,gói),0);
+    khẳng định bằng(byte đọc số nguyên ba mươi hai bit(gói,40),6);
+    byte ghi số nguyên ba mươi hai bit(gói,4,9);
+    khẳng định bằng(máy JIT thô(2,mã đã tạo,gói),-1);
+    byte ghi số nguyên ba mươi hai bit(gói,4,0);
+    byte ghi số nguyên ba mươi hai bit(gói,0,-1);
+    khẳng định bằng(máy JIT thô(2,mã đã tạo,gói),-1);
+    byte ghi số nguyên ba mươi hai bit(gói,0,0);
+    khẳng định bằng(máy JIT thô(3,mã đã tạo,0),0);
+    khẳng định bằng(máy JIT thô(2,mã đã tạo,gói),-1);
+    mã mới = máy JIT thô(1,mã,0);
+    khẳng định đúng(mã mới > mã đã tạo);
+    khẳng định bằng(máy JIT thô(2,mã đã tạo,gói),-1);
+    khẳng định bằng(máy JIT thô(3,mã mới,0),0);
+    các vùng = [];
+    lặp(i=0;i<64;i++) {
+        h = máy JIT thô(1,mã,0);
+        khẳng định đúng(h>0);
+        máy ảo thêm cuối danh sách(các vùng,h);
+    };
+    khẳng định bằng(máy JIT thô(1,mã,0),-2);
+    lặp(i=0;i<64;i++){ khẳng định bằng(máy JIT thô(3,các vùng[i],0),0); };
+    byte hủy(mã); byte hủy(gói);
+    in "JIT V++ native: PASS";
+};

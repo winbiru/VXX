@@ -1,10 +1,13 @@
+if(CMAKE_HOST_WIN32)
+    set(VPP_TEST_EXE_SUFFIX ".exe")
+endif()
 if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_SOURCE OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR OR NOT DEFINED VPP_HOME)
     message(FATAL_ERROR "missing native byte-range test arguments")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
-set(executable "${VPP_OUTPUT_DIR}/native-byte-ranges")
+set(executable "${VPP_OUTPUT_DIR}/native-byte-ranges${VPP_TEST_EXE_SUFFIX}")
 file(REMOVE "${executable}" "${VPP_OUTPUT_DIR}/native-slice-cap.bin")
 vpp_native_compile_command("${VPP_SOURCE}" "${executable}" compile_command)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"

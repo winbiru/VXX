@@ -291,6 +291,41 @@ lớp công khai Bộ Phân Giải DNS {
 
     // HOSTS và OS không có TTL DNS; rcode=-1 phân biệt nguồn không phải DNS.
     // complete=false khi một trong hai loại A/AAAA gặp lỗi retryable.
+    hàm riêng tư phân giải tên miền là loopback(tên máy) {
+        các byte = chuỗi thành byte máy ảo(tên máy);
+        n = máy ảo lấy độ dài(các byte);
+        nếu (n > 0) { nếu (các byte[n - 1] == 46) { n -= 1; }; };
+        nếu (n < 9) { trả về sai; };
+        nếu (n > 9) { nếu (các byte[n - 10] != 46) { trả về sai; }; };
+        hậu tố = [108, 111, 99, 97, 108, 104, 111, 115, 116];
+        lặp(i = 0; i < 9; i++) {
+            k = các byte[n - 9 + i];
+            nếu (k >= 65 && k <= 90) { k += 32; };
+            nếu (k != hậu tố[i]) { trả về sai; };
+        };
+        // Validate the entire hostname, including labels before .localhost.
+        bộ = Bộ Mã DNS();
+        bỏ kết quả = bộ.phân giải tên miền tạo truy vấn(tên máy, 1, 0);
+        trả về đúng;
+    };
+
+    hàm riêng tư phân giải tên miền cấu hình windows() {
+        mã = máy bộ phân giải mở("", "", 2);
+        kết quả = [];
+        thử {
+            lặp(i = 0; i < 8; i++) {
+                địa chỉ = máy bộ phân giải tiếp(mã);
+                nếu (địa chỉ == rỗng) { thoát; };
+                máy ảo thêm cuối danh sách(kết quả, địa chỉ);
+            };
+        } bắt lỗi(e) {
+            máy bộ phân giải đóng(mã);
+            ném e;
+        };
+        máy bộ phân giải đóng(mã);
+        trả về kết quả;
+    };
+
     hàm công khai phân giải tên miền phân giải đầy đủ(tên máy, tự chủ = sai) {
         tên máy = đầu nối yêu cầu tên máy(tên máy, "dns_phan_giai");
         máy chủ = đọc biến môi trường("VPP_DNS_VI_SERVER", "");
@@ -299,16 +334,35 @@ lớp công khai Bộ Phân Giải DNS {
         đường bảng tên máy = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
         // Standalone provider: parse hosts/resolv.conf in V++ and use the
         // existing UDP/TCP wire resolver. Never recurse into Machine Resolver.
+        tự động windows = sai;
         nếu (tự chủ) {
+            cửa sổ = ten nền tảng máy ảo() == "windows";
             nếu (danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "" && đường bảng tên máy == "") {
-                đường cấu hình = "/etc/resolv.conf";
+                // RFC 6761: localhost is resolved locally, even on systems
+                // whose default hosts file contains only commented entries.
+                // Explicit hosts/DNS fixtures retain their existing behavior.
+                nếu (mình.phân giải tên miền là loopback(tên máy)) {
+                    trả về {"status": "HOSTS", "addresses": ["127.0.0.1", "::1"], "rcode": -1,
+                            "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+                };
+                nếu (!cửa sổ) { đường cấu hình = "/etc/resolv.conf"; } hoặc { tự động windows = đúng; };
             };
-            nếu (đường bảng tên máy == "") { đường bảng tên máy = "/etc/hosts"; };
+            nếu (đường bảng tên máy == "") {
+                nếu (cửa sổ) {
+                    gốc windows = đọc biến môi trường("SystemRoot", "");
+                    nếu (gốc windows == "") { gốc windows = đọc biến môi trường("WINDIR", ""); };
+                    nếu (gốc windows == "") { ném "DNS hosts: thiếu SystemRoot trên Windows"; };
+                    đường bảng tên máy = gốc windows + "/System32/drivers/etc/hosts";
+                    // The OS default file is optional; an explicit override
+                    // still reports a missing file or other read failure.
+                    nếu (máy đường loại(đường bảng tên máy, 1) == -1) { đường bảng tên máy = ""; };
+                } hoặc { đường bảng tên máy = "/etc/hosts"; };
+            };
         };
         kết quả = [];
         chi tiết = {"status": "NODATA", "addresses": [], "rcode": 0,
                     "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
-        nếu (danh sách cấu hình != "" || máy chủ != "" || đường cấu hình != "" || đường bảng tên máy != "") {
+        nếu (tự động windows || danh sách cấu hình != "" || máy chủ != "" || đường cấu hình != "" || đường bảng tên máy != "") {
             // Hosts chỉ được bật khi chỉ định tệp. Kết quả cục bộ được ưu tiên
             // trước DNS, và không khởi tạo socket/entropy nếu có tên khớp.
             nếu (đường bảng tên máy != "") {
@@ -321,7 +375,7 @@ lớp công khai Bộ Phân Giải DNS {
                             "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
                 };
             };
-            nếu (danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "") {
+            nếu (!tự động windows && danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "") {
                 ném "DNS hosts: không tìm thấy tên và chưa cấu hình DNS V++";
             };
             // Bật rõ ràng để có thể kiểm thử wire resolver trên các nền tảng.
@@ -330,7 +384,9 @@ lớp công khai Bộ Phân Giải DNS {
             danh sách = [];
             tìm kiếm = [];
             ngưỡng dấu chấm = 1;
-            nếu (danh sách cấu hình != "") {
+            nếu (tự động windows) {
+                danh sách = mình.phân giải tên miền cấu hình windows();
+            } hoặc nếu (danh sách cấu hình != "") {
                 danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(danh sách cấu hình);
             } hoặc nếu (máy chủ != "") {
                 danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(máy chủ);

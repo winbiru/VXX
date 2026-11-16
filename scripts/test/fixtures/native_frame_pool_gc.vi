@@ -1,0 +1,28 @@
+// Khung rảnh không được giữ chuỗi lớn từ các lần gọi đã kết thúc.
+hàm gọi sâu(seed, n) {
+    biến local = seed + seed;
+    nếu (n == 0) {
+        biến counter = 41;
+        trả về hàm() { counter += 1; trả về counter; };
+    };
+    biến f = gọi sâu(seed, n - 1);
+    nếu (local[0] != "a") { ném "mất giá trị cục bộ"; };
+    trả về f;
+};
+hàm lỗi từ khung() { ném ["lỗi", 42]; };
+hàm chính() {
+    biến seed = "a";
+    lặp(i = 0; i < 20; i++) { seed = seed + seed; };
+    biến f = gọi sâu(seed, 16);
+    biến block = seed + seed;
+    block = block + block;
+    // 32 MiB sống đồng thời sau khi 17 khung đã được trả vào kho.
+    biến a = block + block;
+    biến b = block + block;
+    biến c = block + block;
+    biến d = block + block;
+    in độ dài(a); in độ dài(b); in độ dài(c); in độ dài(d);
+    in f(); in f();
+    thử { lỗi từ khung(); } bắt lỗi(e) { in e; };
+    in "Frame pool GC: PASS";
+};

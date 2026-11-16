@@ -1,0 +1,289 @@
+{
+  "workload": "benchmark/native_i32_backend_calls.vi",
+  "date": "2026-11-13",
+  "provenance": {
+    "baseline": "isolated copy of current g\u00f3i tree with the four pre-task source snapshots restored; rebuilt with the same Stage 0 and current static libraries",
+    "candidate": {
+      "asm ch\u01b0\u01a1ng tr\u00ecnh.vi": "631582082a9475f2c0b6bf9a7643664226cf6122f32840f67dbd3f410e0dc3b9",
+      "asm tr\u1ef1c ti\u1ebfp.vi": "f50f6560804cd9744a4230e63323070a72b9cc543fcfbbeafe1ac13acc3b5d7f",
+      "asm v\u00f4 h\u1ed9p.vi": "daa8321ed797425ed59bb095054562e303d7cdfa8972109f89d9c2e5b82cf54e",
+      "m\u00e3 m\u00e1y t\u1eeb c\u00e2y.vi": "71e9c61f17608a843d3e74c237b7e27df1b77ee297ced1bc3a75d70c7d078743",
+      "backend i32.vi": "f24e313d5f8a0a9e79cc106bda9332d23db78c0c171941f4bf416e45bf90f825"
+    },
+    "compilers": {
+      "compiler-baseline-exact": "7502add8450c7c24f4ba039a3aea724f65b9978a7803cf1867801cd5d72b4af1",
+      "compiler-release": "fe56b5731d2a02bc379d2f82697fef92356b89a43f720fddd48016ea585c03a2"
+    },
+    "runtime_object_sha256": "9b737fdc1501235183ea86e1f2e23d9133a291b1408d0854db024e51170fa1e3",
+    "workload_sha256": "0242186526013534b9acaa93e01394098270ac5b60410a84af8fdf35fb86f1fb",
+    "git_worktree_dirty_before_task": true
+  },
+  "runtimes": {
+    "cpp": {
+      "scope": "executable wall time including process startup; compilation excluded",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "runs": 10,
+      "warmup": 3,
+      "stdout_sha256": "ce02b960f5a1acaea204bf7241415413582aaa1d6d40ce5241fd080a954b85c4",
+      "summary": {
+        "baseline": {
+          "median_ms": 171.5745625,
+          "mad_ms": 1.760937999999996,
+          "binary_sha256": "6279f9080b26b3d046630027bc59f88981cb58cf5408255d522065cfb726eea0",
+          "binary_bytes": 1403064
+        },
+        "candidate": {
+          "median_ms": 10.970917,
+          "mad_ms": 0.3875624999999996,
+          "binary_sha256": "41757f847090aafe2e981364e9e30d48ee645a316f8a6c71df6a08991890d747",
+          "binary_bytes": 1403112
+        }
+      },
+      "samples": [
+        {
+          "iteration": 0,
+          "variant": "baseline",
+          "wall_ms": 166.081583
+        },
+        {
+          "iteration": 0,
+          "variant": "candidate",
+          "wall_ms": 11.478083
+        },
+        {
+          "iteration": 1,
+          "variant": "candidate",
+          "wall_ms": 11.10875
+        },
+        {
+          "iteration": 1,
+          "variant": "baseline",
+          "wall_ms": 165.546375
+        },
+        {
+          "iteration": 2,
+          "variant": "baseline",
+          "wall_ms": 228.235083
+        },
+        {
+          "iteration": 2,
+          "variant": "candidate",
+          "wall_ms": 11.763542
+        },
+        {
+          "iteration": 3,
+          "variant": "candidate",
+          "wall_ms": 11.733458
+        },
+        {
+          "iteration": 3,
+          "variant": "baseline",
+          "wall_ms": 174.804416
+        },
+        {
+          "iteration": 4,
+          "variant": "baseline",
+          "wall_ms": 172.965292
+        },
+        {
+          "iteration": 4,
+          "variant": "candidate",
+          "wall_ms": 11.317333
+        },
+        {
+          "iteration": 5,
+          "variant": "candidate",
+          "wall_ms": 10.833084
+        },
+        {
+          "iteration": 5,
+          "variant": "baseline",
+          "wall_ms": 172.0545
+        },
+        {
+          "iteration": 6,
+          "variant": "baseline",
+          "wall_ms": 169.744833
+        },
+        {
+          "iteration": 6,
+          "variant": "candidate",
+          "wall_ms": 10.542208
+        },
+        {
+          "iteration": 7,
+          "variant": "candidate",
+          "wall_ms": 10.486625
+        },
+        {
+          "iteration": 7,
+          "variant": "baseline",
+          "wall_ms": 170.478333
+        },
+        {
+          "iteration": 8,
+          "variant": "baseline",
+          "wall_ms": 171.094625
+        },
+        {
+          "iteration": 8,
+          "variant": "candidate",
+          "wall_ms": 10.72275
+        },
+        {
+          "iteration": 9,
+          "variant": "candidate",
+          "wall_ms": 10.700042
+        },
+        {
+          "iteration": 9,
+          "variant": "baseline",
+          "wall_ms": 173.266709
+        }
+      ],
+      "speedup": 15.639035688630223,
+      "iterations": 2000000
+    },
+    "vpp": {
+      "scope": "executable wall time including process startup; compilation excluded",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "runs": 10,
+      "warmup": 3,
+      "stdout_sha256": "ec70aae016eb9d5fca191de40731983265c1753cb4b831aa3a013762fac5aa1e",
+      "summary": {
+        "baseline": {
+          "median_ms": 26.814,
+          "mad_ms": 0.28472900000000045,
+          "binary_sha256": "da38db89186af25e77bdcb0356e2be8c55d50ff8f75f0ac14ebe359834b0c616",
+          "binary_bytes": 770488
+        },
+        "candidate": {
+          "median_ms": 3.1151665,
+          "mad_ms": 0.273458,
+          "binary_sha256": "74c3c2fe9b317164c19ee5b4d4f969df87f91342e30fed409b45e94939eaed4c",
+          "binary_bytes": 770552
+        }
+      },
+      "samples": [
+        {
+          "iteration": 0,
+          "variant": "baseline",
+          "wall_ms": 27.381084
+        },
+        {
+          "iteration": 0,
+          "variant": "candidate",
+          "wall_ms": 3.488667
+        },
+        {
+          "iteration": 1,
+          "variant": "candidate",
+          "wall_ms": 3.4725
+        },
+        {
+          "iteration": 1,
+          "variant": "baseline",
+          "wall_ms": 28.83775
+        },
+        {
+          "iteration": 2,
+          "variant": "baseline",
+          "wall_ms": 26.827458
+        },
+        {
+          "iteration": 2,
+          "variant": "candidate",
+          "wall_ms": 3.276042
+        },
+        {
+          "iteration": 3,
+          "variant": "candidate",
+          "wall_ms": 2.973208
+        },
+        {
+          "iteration": 3,
+          "variant": "baseline",
+          "wall_ms": 26.597959
+        },
+        {
+          "iteration": 4,
+          "variant": "baseline",
+          "wall_ms": 26.995833
+        },
+        {
+          "iteration": 4,
+          "variant": "candidate",
+          "wall_ms": 3.535208
+        },
+        {
+          "iteration": 5,
+          "variant": "candidate",
+          "wall_ms": 2.92375
+        },
+        {
+          "iteration": 5,
+          "variant": "baseline",
+          "wall_ms": 26.460583
+        },
+        {
+          "iteration": 6,
+          "variant": "baseline",
+          "wall_ms": 26.862708
+        },
+        {
+          "iteration": 6,
+          "variant": "candidate",
+          "wall_ms": 3.136792
+        },
+        {
+          "iteration": 7,
+          "variant": "candidate",
+          "wall_ms": 2.752125
+        },
+        {
+          "iteration": 7,
+          "variant": "baseline",
+          "wall_ms": 26.001042
+        },
+        {
+          "iteration": 8,
+          "variant": "baseline",
+          "wall_ms": 26.800542
+        },
+        {
+          "iteration": 8,
+          "variant": "candidate",
+          "wall_ms": 3.093541
+        },
+        {
+          "iteration": 9,
+          "variant": "candidate",
+          "wall_ms": 2.759667
+        },
+        {
+          "iteration": 9,
+          "variant": "baseline",
+          "wall_ms": 26.118542
+        }
+      ],
+      "speedup": 8.607565598821122,
+      "iterations": 20000,
+      "generated_source_sha256": "e5e06775572cb7856fe464c3ea6b4da9524237b06e0a6f95f3efdb519b7c34f8"
+    }
+  },
+  "vpp_large_input_validation": {
+    "baseline": {
+      "status": 1,
+      "stdout": "",
+      "stderr": "V++ AOT runtime: error=1\n"
+    },
+    "candidate": {
+      "status": 0,
+      "stdout": "284333073\n",
+      "stderr": ""
+    }
+  },
+  "selfhost_stage2_stage3_sha256": "e53678fb123c6d43d80105d41e3ae50affa8e2e8b2e6febcce2c1ade3c06949c"
+}

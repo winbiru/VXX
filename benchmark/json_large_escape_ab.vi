@@ -1,0 +1,35 @@
+nhập gói.dữ liệu.json.json.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+hàm chính() {
+    tên = đọc biến môi trường("BENCH_CASE", "escape");
+    n = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "8"));
+    s = ""; obj = {};
+    lặp(i = 0; i < 512; i++) {
+        s += "Việt\"\\\n";
+        đặt từ điển(obj, "key" + thành chuỗi(i), [i,"Việt 🚀"]);
+    };
+    dự kiến = json chuỗi(s);
+    nếu (tên == "object") { dự kiến = json tạo(obj); };
+    nếu (tên == "object") {
+        đọc = json phân tích(dự kiến);
+        lặp(i = 0; i < 512; i++) {
+            nếu (đọc["key" + thành chuỗi(i)][0] != i) { ném "object mismatch"; };
+        };
+    } hoặc nếu (json phân tích(dự kiến) != s) { ném "escape mismatch"; };
+    kiểm = 0;
+    bắt đầu = thời gian đơn điệu mili giây();
+    lặp(i = 0; i < n; i++) {
+        kết quả = "";
+        nếu (tên == "object") { kết quả = json tạo(obj); } hoặc { kết quả = json chuỗi(s); };
+        nếu (kết quả != dự kiến) { ném "content mismatch"; };
+        kiểm += độ dài(kết quả);
+    };
+    in thời gian đơn điệu mili giây() - bắt đầu;
+    in kiểm;
+    in độ dài(dự kiến);
+    in dự kiến;
+};

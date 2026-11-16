@@ -130,3 +130,93 @@ Lbo_nho_loi:
     mov w0, #-1
     TRA_BO_NHO
 
+
+// CP8: checked arena memmove and ASCII prefix (NEON).
+// The caller supplies signed i32 arena offsets and lengths.
+.globl vpp_native_memory_copy
+vpp_native_memory_copy:
+    VAO_BO_NHO
+    cmp w2, #0
+    b.lt Lbo_nho_loi
+    mov w10, #0x1400
+    movk w10, #0x810, lsl #16
+    subs w10, w10, w2
+    b.lo Lbo_nho_loi
+    cmp w0, w10
+    b.hi Lbo_nho_loi
+    cmp w1, w10
+    b.hi Lbo_nho_loi
+    cbz w2, Lbulk_copy_done
+    cmp w0, w1
+    b.eq Lbulk_copy_done
+    add x11, x9, w0, uxtw
+    add x12, x9, w1, uxtw
+    b.lo Lbulk_copy_forward
+    sub w10, w0, w1
+    cmp w10, w2
+    b.hs Lbulk_copy_forward
+    add x11, x11, w2, uxtw
+    add x12, x12, w2, uxtw
+Lbulk_copy_backward:
+    cmp w2, #16
+    b.lo Lbulk_copy_backward_tail
+    ldr q0, [x12, #-16]!
+    str q0, [x11, #-16]!
+    sub w2, w2, #16
+    b Lbulk_copy_backward
+Lbulk_copy_backward_tail:
+    cbz w2, Lbulk_copy_done
+    ldrb w10, [x12, #-1]!
+    strb w10, [x11, #-1]!
+    sub w2, w2, #1
+    b Lbulk_copy_backward_tail
+Lbulk_copy_forward:
+    cmp w2, #16
+    b.lo Lbulk_copy_forward_tail
+    ldr q0, [x12], #16
+    str q0, [x11], #16
+    sub w2, w2, #16
+    b Lbulk_copy_forward
+Lbulk_copy_forward_tail:
+    cbz w2, Lbulk_copy_done
+    ldrb w10, [x12], #1
+    strb w10, [x11], #1
+    sub w2, w2, #1
+    b Lbulk_copy_forward_tail
+Lbulk_copy_done:
+    mov w0, #0
+    TRA_BO_NHO
+
+.globl vpp_native_memory_ascii_prefix
+vpp_native_memory_ascii_prefix:
+    VAO_BO_NHO
+    cmp w1, #0
+    b.lt Lbo_nho_loi
+    mov w10, #0x1400
+    movk w10, #0x810, lsl #16
+    subs w10, w10, w1
+    b.lo Lbo_nho_loi
+    cmp w0, w10
+    b.hi Lbo_nho_loi
+    add x11, x9, w0, uxtw
+    mov w0, #0
+Lbulk_ascii_vector:
+    cmp w1, #16
+    b.lo Lbulk_ascii_tail
+    ldr q0, [x11]
+    umaxv b1, v0.16b
+    umov w10, v1.b[0]
+    tbnz w10, #7, Lbulk_ascii_tail
+    add x11, x11, #16
+    add w0, w0, #16
+    sub w1, w1, #16
+    b Lbulk_ascii_vector
+Lbulk_ascii_tail:
+    cbz w1, Lbulk_ascii_done
+    ldrb w10, [x11], #1
+    tbnz w10, #7, Lbulk_ascii_done
+    add w0, w0, #1
+    sub w1, w1, #1
+    b Lbulk_ascii_tail
+Lbulk_ascii_done:
+    TRA_BO_NHO

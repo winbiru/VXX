@@ -158,6 +158,9 @@ hàm công khai biên dịch tên mã thao tác(mã) {
         ca 227: { trả về "OP_VM_MACHINE_PATH_TEMP"; }
         ca 228: { trả về "OP_VM_MACHINE_PATH_EXECUTABLE"; }
         ca 229: { trả về "OP_VM_MACHINE_FILE_LOCK"; }
+        ca 230: { trả về "OP_VM_STRING_BYTE_VIEW"; }
+        ca 231: { trả về "OP_VM_STRING_UTF8_VALID"; }
+        ca 232: { trả về "OP_VM_SCAN_I32_RUN"; }
         ca 154: { trả về "OP_VM_STRING_FROM_BYTES"; }
         ca 155: { trả về "OP_VM_FLOAT_FROM_BITS"; }
         ca 156: { trả về "OP_FFI_CALL"; }

@@ -104,7 +104,8 @@ vpp_native_os_executable_path:
     movb $0, (%rdi,%rax)
     VPP_TRA_BO_NHO
 .Lchuong_trinh_qua_dai:
-    movl $36, vpp_linux_errno(%rip)  // ENAMETOOLONG
+    movl $36, %edi
+    call Lworker_set_errno  // ENAMETOOLONG
     movl $-1, %eax
     VPP_TRA_BO_NHO
 .Lchuong_trinh_loi:

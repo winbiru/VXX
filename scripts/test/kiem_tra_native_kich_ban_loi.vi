@@ -1,0 +1,27 @@
+// The native embedded compiler must execute valid source and report parser
+// failures through V++ try/catch, preserving the embedded parser diagnostic.
+nhập gói.lõi.kịch bản.kịch bản chạy;
+
+hàm có tiền tố(văn bản, tiền tố) {
+    n = máy ảo lấy độ dài(tiền tố);
+    m = máy ảo lấy độ dài(văn bản);
+    nếu (m < n) { trả về sai; };
+    lặp(i = 0; i < n; i++) {
+        nếu (văn bản[i] != tiền tố[i]) { trả về sai; };
+    };
+    nếu (m == n) { trả về đúng; };
+    trả về văn bản[n] == "\n";
+};
+
+hàm chính() {
+    chạy_được = kịch bản chạy("in 42;") == "42\n";
+    bắt_được = sai;
+    lỗi_nhận_được = "";
+    thử { kịch bản chạy("hàm {"); }
+    bắt lỗi(e) {
+        lỗi_nhận_được = e;
+        bắt_được = có tiền tố(e, "kịch bản chạy: biên dịch biểu thức: cần tên hàm tại dòng 1, cột 6");
+    };
+    nếu (!bắt_được) { in "Unexpected native embedded error: " + lỗi_nhận_được; };
+    in chạy_được && bắt_được;
+};

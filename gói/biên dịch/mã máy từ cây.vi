@@ -5,8 +5,8 @@ nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thu�
 nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
 nhập gói.biên dịch.chương trình.*;
 nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
-nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
-nhập gói.biên dịch.asm trực tiếp.biên dịch asm động trực tiếp;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh asm;
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh byte;
 nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp đầu;
 nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
@@ -389,8 +389,12 @@ lớp công khai Bộ Hạ Cây {
     };
 
     // Đây là IR đầu vào độc lập cho bộ hạ native V++, không phải bytecode VM.
-    hàm công khai tạo IR(mã nguồn) {
-        cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn);
+    hàm công khai tạo IR(mã nguồn, phạm vi khối = sai) {
+        cây = rỗng;
+        // Bootstrap i32 sources use block-local declarations. Their names,
+        // calls and scopes are checked by the native lowerer below.
+        nếu (phạm vi khối) { cây = biên dịch phân tích chương trình thuần(mã nguồn); }
+        hoặc { cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn); };
         trạng thái = {"values": [], "nextId": 1, "functions": {}, "arity": {}, "scopes": []};
         câu lệnh = cây["câu lệnh"];
         lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
@@ -441,8 +445,7 @@ lớp công khai Bộ Hạ Cây {
         mình.chuẩn hóa ABI(biểu diễn trung gian);
         tên = mình.mã hóa tên ABI(tên hàm);
         máy = biên dịch máy hạ IR(biểu diễn trung gian, tên);
-        trả về biên dịch lắp ráp đầu(hệ điều hành, tên) +
-            biên dịch asm động trực tiếp(máy, tên, kiến trúc, hệ điều hành, sai);
+        trả về biên dịch i32 sinh asm(máy, tên, kiến trúc, hệ điều hành);
     };
 
     // Pipeline độc lập: nguồn .vi -> AST -> IR -> Machine IR -> ISA bytes.
@@ -453,7 +456,7 @@ lớp công khai Bộ Hạ Cây {
         biểu diễn trung gian = mình.tạo IR(mã nguồn);
         mình.chuẩn hóa ABI(biểu diễn trung gian);
         máy = biên dịch máy hạ IR(biểu diễn trung gian, mình.mã hóa tên ABI(tên hàm));
-        phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+        phát = biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành);
         trả về {"ir": biểu diễn trung gian, "machine": máy, "bytes": phát["bytes"],
                 "relocations": phát["relocations"]};
     };
@@ -468,18 +471,18 @@ lớp công khai Bộ Hạ Cây {
 
     // Cả chương trình dùng chung một lần parse, semantic và IR; mỗi hàm
     // giữ object/relocation riêng để host linker xử lý các lời gọi chéo.
-    hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
-                                             hệ điều hành = "linux", abi = "gnu") {
+    hàm công khai sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành = "linux", mặc định thoát = sai, phạm vi khối = sai) {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
             mình.báo lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        biểu diễn trung gian = mình.tạo IR(mã nguồn);
+        biểu diễn trung gian = mình.tạo IR(mã nguồn, phạm vi khối);
         các hàm = biểu diễn trung gian["functions"];
         // Đổi symbol sau khi semantic đã binding bằng symbolId. Nhờ vậy cả
         // hàm đích và CALL tới 'chính' cùng hạ thành ABI symbol 'main'.
         có chính = sai;
         có main = sai;
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            các hàm[i]["sourceName"] = các hàm[i]["name"];
             nếu (các hàm[i]["name"] == "main") { có main = đúng; };
             nếu (các hàm[i]["name"] == "chính") { có chính = đúng; };
         };
@@ -496,13 +499,27 @@ lớp công khai Bộ Hạ Cây {
         kết quả = [];
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             tên hàm = các hàm[i]["name"];
+            // JIT entrypoint returns zero on fallthrough, as the AOT CLI does.
+            nếu (mặc định thoát && tên hàm == "main") {
+                gốc = mình.thêm giá trị IR(biểu diễn trung gian, "ConstInt", "0");
+                máy ảo thêm cuối danh sách(các hàm[i]["children"][0]["children"], mình.tạo câu IR("Return", [gốc]));
+            };
             máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
-            phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
-            đối tượng = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
-                phát["bytes"], tên hàm, phát["relocations"]);
-            máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm, "machine": máy,
-                "bytes": phát["bytes"], "relocations": phát["relocations"],
-                "object": đối tượng});
+            phát = biên dịch i32 sinh byte(máy, kiến trúc, hệ điều hành);
+            máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm,
+                "sourceName": các hàm[i]["sourceName"], "machine": máy,
+                "bytes": phát["bytes"], "relocations": phát["relocations"]});
+        };
+        trả về kết quả;
+    };
+
+    hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
+                                             hệ điều hành = "linux", abi = "gnu") {
+        kết quả = mình.sinh mã chương trình(mã nguồn, kiến trúc, hệ điều hành);
+        lặp(i = 0; i < máy ảo lấy độ dài(kết quả); i++) {
+            mục = kết quả[i];
+            mục["object"] = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
+                mục["bytes"], mục["name"], mục["relocations"]);
         };
         trả về kết quả;
     };

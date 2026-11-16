@@ -38,6 +38,15 @@ lớp công khai Bộ Hạ IR {
         máy ảo thêm cuối danh sách(lệnh, {"mã": mã, "giá trị": giá trị});
     };
 
+    // Metadata nguồn đi cùng đúng lệnh thực hiện phép toán/lời gọi.
+    hàm riêng tư biên dịch IR lệnh có vị trí(lệnh, mã, giá trị, nút) {
+        mục = {"mã": mã, "giá trị": giá trị};
+        dòng = lấy từ điển(nút, "dòng", 0);
+        cột = lấy từ điển(nút, "cột", 0);
+        nếu (dòng > 0 && cột > 0) { mục["dòng"] = dòng; mục["cột"] = cột; };
+        máy ảo thêm cuối danh sách(lệnh, mục);
+    };
+
     // Thứ tự mã ABI phải khớp bytecode::ForeignAbiType trong foreign.h.
     hàm riêng tư biên dịch IR kiểu ngoại(kiểu) {
         loại = ["void", "i32", "u32", "i64", "u64", "f64", "c_chuỗi",
@@ -468,7 +477,7 @@ lớp công khai Bộ Hạ IR {
                 đối số = lấy từ điển(nút, "đối số", []);
                 lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) { mình.biên dịch IR biểu thức(đối số[i], lệnh); };
                 mình.biên dịch IR biểu thức(đích, lệnh);
-                mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gọi giá trị", máy ảo lấy độ dài(đối số));
+                mình.biên dịch IR lệnh có vị trí(lệnh, "gọi giá trị", máy ảo lấy độ dài(đối số), nút);
                 trả về đúng;
             };
             thành viên = mình.biên dịch IR lấy thành viên(đích);
@@ -484,13 +493,13 @@ lớp công khai Bộ Hạ IR {
             };
             nếu (thành viên != rỗng) {
                 thành viên["số đối số"] = máy ảo lấy độ dài(đối số);
-                mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gọi thành viên", thành viên);
+                mình.biên dịch IR lệnh có vị trí(lệnh, "gọi thành viên", thành viên, nút);
                 trả về đúng;
             };
             mã gọi = "gọi tên";
             nếu (lấy từ điển(nút, "tường minh", sai)) { mã gọi = "gọi tường minh"; };
-            mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, mã gọi, {"tên": đích["giá trị"],
-                                             "số đối số": máy ảo lấy độ dài(đối số)});
+            mình.biên dịch IR lệnh có vị trí(lệnh, mã gọi, {"tên": đích["giá trị"],
+                                             "số đối số": máy ảo lấy độ dài(đối số)}, nút);
             trả về đúng;
         };
         nếu (loại == "một ngôi") {
@@ -537,23 +546,29 @@ lớp công khai Bộ Hạ IR {
                 đích thành viên = mình.biên dịch IR lấy thành viên(trái);
                 nếu (đích thành viên != rỗng) {
                     nếu (toán tử != "=") {
-                        ném "biên dịch IR: gán kết hợp vào thuộc tính chưa hỗ trợ";
+                        đích thành viên["gán kết hợp"] = đúng;
                     };
                     nếu (lấy từ điển(đích thành viên, "tạm", sai)) {
                         mình.biên dịch IR biểu thức(đích thành viên["biểu thức nhận"], lệnh);
                     };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán thành viên", đích thành viên);
                     mình.biên dịch IR biểu thức(phải, lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử gán", toán tử, nút);
+                    };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán thành viên", đích thành viên);
                     trả về đúng;
                 };
                 nếu (lấy từ điển(trái, "loại", "") == "chỉ số") {
-                    nếu (toán tử != "=") {
-                        ném "biên dịch IR: gán kết hợp vào chỉ số chưa hỗ trợ";
-                    };
                     mình.biên dịch IR biểu thức(trái["đối tượng"], lệnh);
                     mình.biên dịch IR biểu thức(trái["chỉ số"], lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán kết hợp chỉ số", "");
+                    };
                     mình.biên dịch IR biểu thức(phải, lệnh);
+                    nếu (toán tử != "=") {
+                        mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử gán", toán tử, nút);
+                    };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán chỉ số", "");
                     trả về đúng;
                 };
@@ -572,7 +587,7 @@ lớp công khai Bộ Hạ IR {
                     // Theo direct IR C++, compound gán = đọc đích, tính nhị phân,
                     // rồi phát OP_TEN_BIEN_ID + OP_GAN. Opcode 72..76 dành cho
                     // ký hiệu toán tử, không dùng ở chuỗi bytecode này.
-                    mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "toán tử gán", toán tử);
+                    mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử gán", toán tử, nút);
                 };
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán tên", tên);
                 trả về đúng;
@@ -582,7 +597,7 @@ lớp công khai Bộ Hạ IR {
             };
             mình.biên dịch IR biểu thức(trái, lệnh);
             mình.biên dịch IR biểu thức(phải, lệnh);
-            mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "toán tử", toán tử);
+            mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử", toán tử, nút);
             trả về đúng;
         };
         nếu (loại == "chỉ số") {

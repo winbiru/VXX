@@ -1,0 +1,64 @@
+// Các lời gọi bên trong vòng lặp/nhánh dùng backend i32 chung với AST.
+hàm bước(a, b) { trả về a * 3 + b; };
+hàm tích lũy(n, hạt) {
+    tổng = hạt;
+    lặp(i = 0; i < n; i++) { tổng = bước(tổng, i); };
+    trả về tổng;
+};
+hàm phân nhánh(a, b) {
+    nếu (a < b) { trả về bước(a, b); };
+    trả về bước(b, a);
+};
+hàm cộng một(a) { trả về a + 1; };
+hàm bọc(a) { x = a; trả về cộng một(x); };
+hàm mặc định(a = 7) { trả về a + 1; };
+hàm bọc mặc định(a) { x = a; trả về mặc định(); };
+biến số lần = 0;
+hàm tác dụng(a) { số lần += 1; trả về a + 1; };
+hàm bọc tác dụng(a) { x = a; trả về tác dụng(x); };
+hàm có lỗi(a) { ném "giữ ngoại lệ"; };
+hàm bọc lỗi(a) { x = a; trả về có lỗi(x); };
+hàm bọc boolean(a, b) { x = 0; trả về cộng một(a < b); };
+hàm trả boolean(a, b) { x = 0; trả về a < b; };
+hàm gán boolean(a, b) { x = a < b; trả về cộng một(x); };
+hàm lồng(n) { hạt = 17; trả về tích lũy(n, hạt); };
+hàm đủ so sánh(a, b) {
+    t = 0;
+    nếu (a == b) { t = t + 1; };
+    nếu (a != b) { t = t + 2; };
+    nếu (a < b) { t = t + 4; };
+    nếu (a <= b) { t = t + 8; };
+    nếu (a > b) { t = t + 16; };
+    nếu (a >= b) { t = t + 32; };
+    trả về t;
+};
+hàm đệ quy(n) {
+    nếu (n < 2) { trả về 1; };
+    trả về n * đệ quy(n - 1);
+};
+hàm chính() {
+    in tích lũy(0, 17);
+    in tích lũy(8, 17);
+    in tích lũy(8, -2147483648);
+    in tích lũy(4, 1.5);
+    in tích lũy(3.5, 2);
+    in phân nhánh(-2147483648, 2147483647);
+    in phân nhánh(7, -3);
+    in phân nhánh(2.5, 4);
+    in bọc(2147483647);
+    in bọc("a");
+    in bọc(1.5);
+    in bọc mặc định(99);
+    in bọc tác dụng(8);
+    in số lần;
+    thử { in bọc lỗi(7); } bắt lỗi(e) { in e; };
+    in bọc boolean(1, 2);
+    in loại của(trả boolean(1, 2));
+    in gán boolean(1, 2);
+    in lồng(8);
+    in đủ so sánh(-2147483648, 2147483647);
+    in đủ so sánh(2147483647, -2147483648);
+    in đủ so sánh(-2147483648, -2147483648);
+    in đệ quy(6);
+    in "Backend i32 dùng chung: PASS";
+};

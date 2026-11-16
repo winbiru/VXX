@@ -12,10 +12,22 @@ hàm biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, ngu�
     nếu (chiều dài <= 0) { trả về -1; };
     nếu (chiều dài > byte dài(kho lưu trữ) - độ lệch - 4) { trả về -1; };
     nếu (byte làm rỗng(nguồn đầu vào) != 0) { trả về -1; };
-    lặp (i = độ lệch + 4; i < độ lệch + 4 + chiều dài; i++) {
-        nếu (byte thêm(nguồn đầu vào, byte lấy(kho lưu trữ, i)) != 0) { trả về -1; };
-    };
+    nếu (thực thi các byte nối đoạn(nguồn đầu vào, kho lưu trữ, độ lệch + 4, chiều dài) != 0) { trả về -1; };
     trả về độ lệch + 4 + chiều dài;
+};
+
+hàm biên dịch mô đun đếm(kho lưu trữ) {
+    biến độ lệch = 0;
+    biến tổng số = 0;
+    biến dài kho = byte dài(kho lưu trữ);
+    khi (độ lệch < dài kho) {
+        nếu (độ lệch > dài kho - 4) { trả về 0; };
+        biến chiều dài = byte đọc số nguyên ba mươi hai bit(kho lưu trữ, độ lệch);
+        nếu (chiều dài <= 0 || chiều dài > dài kho - độ lệch - 4) { trả về 0; };
+        độ lệch = độ lệch + 4 + chiều dài;
+        tổng số = tổng số + 1;
+    };
+    trả về tổng số;
 };
 
 // The global registry predeclares all signatures before any body is parsed.
@@ -128,6 +140,13 @@ hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các h
         nếu (byte làm rỗng(mô đun ends) != 0) { mã trạng thái = -1; };
         nếu (byte đẩy số nguyên ba mươi hai bit(điểm vào, -1) != 0) { mã trạng thái = -1; };
     };
+    biến tiến độ = thực thi tiến độ bật();
+    biến tổng mô đun = 0;
+    biến đã xong = 0;
+    nếu (tiến độ == 1) {
+        tổng mô đun = biên dịch mô đun đếm(kho lưu trữ);
+        thực thi tiến độ ghi("Thu thập khai báo", 0, tổng mô đun);
+    };
     biến độ lệch = 0;
     nếu (mã trạng thái == 0) {
         lặp (i = 0; i < byte dài(kho lưu trữ); i++) {
@@ -149,12 +168,17 @@ hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các h
                 thoát;
             };
             độ lệch = kế tiếp nguồn đầu vào;
+            nếu (tiến độ == 1) {
+                đã xong = đã xong + 1;
+                thực thi tiến độ ghi("Thu thập khai báo", đã xong, tổng mô đun);
+            };
         };
     };
     nếu (mã trạng thái == 0) {
         nếu (độ lệch != byte dài(kho lưu trữ)) { mã trạng thái = -1; };
         nếu (byte đọc số nguyên ba mươi hai bit(điểm vào, 0) < 0) { mã trạng thái = -1; };
     };
+    nếu (tiến độ == 1 && mã trạng thái == 0) { thực thi tiến độ ghi("Phân tích thân hàm và tạo IR", 0, tổng mô đun); };
     biến chương trình con mã định danh = 0;
     biến mô đun chỉ mục = 0;
     độ lệch = 0;
@@ -170,6 +194,7 @@ hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các h
             nếu (chương trình con mã định danh != cuối cùng) { mã trạng thái = -1; thoát; };
             mô đun chỉ mục = mô đun chỉ mục + 4;
             độ lệch = kế tiếp mã máy;
+            nếu (tiến độ == 1) { thực thi tiến độ ghi("Phân tích thân hàm và tạo IR", mô đun chỉ mục / 4, tổng mô đun); };
         };
     };
     nếu (mã trạng thái == 0) {

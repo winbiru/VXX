@@ -1,0 +1,44 @@
+nhập gói.chuẩn.chính.*;
+hàm tạo nguồn(n) {
+    ds = [];
+    lặp(i = 0; i < n; i++) { thêm(ds, i % 256); };
+    trả về chuỗi từ byte máy ảo(ds);
+};
+hàm tạo view(n) { trả về máy ảo xem byte chuỗi(tạo nguồn(n)); };
+hàm chính() {
+    sizes = [0,1,2,15,16,31,32,33,255,256,257,4096,65536];
+    views = [];
+    lặp(i = 0; i < độ dài(sizes); i++) { thêm(views, tạo view(sizes[i])); };
+    lặp(i = 0; i < 30000; i++) { rác = ["rác" + thành chuỗi(i), [i,i+1]]; };
+    lặp(i = 0; i < độ dài(sizes); i++) {
+        v = views[i]; in sizes[i];
+        nếu (độ dài(v) != sizes[i]) { ném "length"; };
+        lặp(j = 0; j < sizes[i]; j++) {
+            b = v[j];
+            nếu (b != j % 256 || v[j] != b || v[j] < 0 || v[j] > 255) { ném "byte"; };
+            nếu (j > 0) { nếu (v[j] == v[j-1]) { ném "pair"; }; };
+        };
+    };
+    source = tạo nguồn(256);
+    ds = chuỗi thành byte máy ảo(source);
+    alias = ds;
+    ds[0] = 99;
+    thêm(ds,42);
+    nếu (độ dài(alias) != 257 || alias[0] != 99 || máy ảo xem byte chuỗi(source)[0] != 0) { ném "public alias"; };
+    ordinary = bộ([1,2,3]);
+    nếu (độ dài(ordinary) != 3 || ordinary[1] != 2) { ném "tuple"; };
+    v = máy ảo xem byte chuỗi("A");
+    nếu (loại của(v) != "tuple" || !v || máy ảo xem byte chuỗi("") || v == máy ảo xem byte chuỗi("A")) { ném "view semantics"; };
+    alias = v;
+    nếu (alias != v) { ném "identity"; };
+    nếu (v[0] != 65) { ném "view byte"; };
+    mẫu sai = [[128],[192,175],[224,159,191],[237,160,128],[244,144,128,128],[240,159,154],[255],[226,40,161]];
+    lặp(i = 0; i < độ dài(mẫu sai); i++) {
+        nếu (máy ảo kiểm tra utf8(chuỗi từ byte máy ảo(mẫu sai[i]))) { ném "invalid utf8"; };
+    };
+    nếu (!máy ảo kiểm tra utf8("") || !máy ảo kiểm tra utf8("Tiếng Việt 🚀") ||
+        !máy ảo kiểm tra utf8(chuỗi từ byte máy ảo([0,194,128,223,191,224,160,128,237,159,191,240,144,128,128,244,143,191,191]))) {
+        ném "valid utf8";
+    };
+    in "private view GC: PASS";
+};

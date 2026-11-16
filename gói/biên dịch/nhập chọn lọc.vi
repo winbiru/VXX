@@ -16,11 +16,17 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
         mình.sổ = sổ; mình.đồ thị = đồ thị;
         mình.hàm giữ = {}; mình.kiểu giữ = {}; mình.hàng = [];
         mình.cây = {}; mình.khai hàm = {}; mình.tên hàm = {}; mình.tên kiểu = {};
+        mình.chủ phương thức = {}; mình.hàm toàn cục = {};
+        mình.lọc JIT = lấy từ điển(đồ thị, "lọc nhập rộng", sai);
     };
 
     hàm riêng tư giữ hàm(id) {
         nếu (máy ảo có khóa từ điển(mình.hàm giữ, id)) { trả về; };
         mình.hàm giữ[id] = đúng;
+        nếu (máy ảo có khóa từ điển(mình.chủ phương thức, id)) {
+            mình.giữ kiểu(mình.chủ phương thức[id]);
+            trả về;
+        };
         khai = mình.sổ["hàm"][id];
         máy ảo thêm cuối danh sách(mình.hàng, [khai["mô đun"], mình.khai hàm[id]]);
     };
@@ -39,6 +45,33 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
         nếu (máy ảo có khóa từ điển(bảng hàm thấy, tên)) { mình.giữ hàm(bảng hàm thấy[tên]); };
         kiểu thấy = mình.tên kiểu[mô đun];
         nếu (máy ảo có khóa từ điển(kiểu thấy, tên)) { mình.giữ kiểu(kiểu thấy[tên]); };
+        // The emitter can resolve an otherwise invisible global function by
+        // name. Keep all candidates, including ambiguous names, so pruning
+        // cannot change the meaning of that fallback.
+        nếu (mình.lọc JIT && máy ảo có khóa từ điển(mình.hàm toàn cục, tên)) {
+            ứng viên = mình.hàm toàn cục[tên];
+            lặp(i = 0; i < độ dài(ứng viên); i++) { mình.giữ hàm(ứng viên[i]); };
+        };
+    };
+
+    hàm riêng tư tên đủ(mô đun, tên) {
+        mình.tên(mô đun, tên);
+        lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+            nếu (tên[i] == "." && i > 0) {
+                mình.tên(mô đun, máy ảo cắt chuỗi(tên, 0, i));
+                nếu (!mình.lọc JIT) { thoát; };
+            };
+        };
+    };
+
+    hàm riêng tư tên nút(nút) {
+        dạng = lấy từ điển(nút, "loại", "");
+        nếu (dạng == "tên") { trả về nút["giá trị"]; };
+        nếu (dạng == "thành viên") {
+            gốc tên = mình.tên nút(nút["đối tượng"]);
+            nếu (gốc tên != "") { trả về gốc tên + "." + nút["tên"]; };
+        };
+        trả về "";
     };
 
     hàm riêng tư thăm(mô đun, nút) {
@@ -49,8 +82,15 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
         };
         nếu (loại != "từ điển") { trả về; };
         dạng = lấy từ điển(nút, "loại", "");
-        nếu (dạng == "tên") { mình.tên(mô đun, nút["giá trị"]); trả về; };
+        nếu (dạng == "tên") {
+            mình.tên đủ(mô đun, nút["giá trị"]);
+            trả về;
+        };
         nếu (dạng == "nhập" || dạng == "hằng") { trả về; };
+        nếu (mình.lọc JIT && dạng == "thành viên") {
+            tên = mình.tên nút(nút);
+            nếu (tên != "") { mình.tên đủ(mô đun, tên); };
+        };
         nếu (dạng == "lớp" || dạng == "giao diện") {
             mình.tên(mô đun, lấy từ điển(nút, "lớp cha", ""));
             quan hệ = lấy từ điển(nút, "triển khai", []);
@@ -72,11 +112,12 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
         };
     };
 
-    hàm công khai lọc() {
+    hàm công khai lọc(đã phân giải đầy đủ = sai) {
         đường hồ sơ = biên dịch hồ sơ đường();
         bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         cạnh = mình.đồ thị["cạnh"];
-        có chọn = sai;
+        lọc nhập rộng = lấy từ điển(mình.đồ thị, "lọc nhập rộng", sai);
+        có chọn = lọc nhập rộng;
         lặp(i = 0; i < độ dài(cạnh); i++) {
             tên chọn = lấy từ điển(cạnh[i], "tên nhập", "");
             nếu (tên chọn != "" && tên chọn != "*") { có chọn = đúng; };
@@ -105,15 +146,17 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
                 };
             };
             // Do not hide errors inside unselected function bodies.
-            bắt đầu cây kiểu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-            cây kiểu = biên dịch kiểu cây(mình.sổ, mình.đồ thị, tên mô đun);
-            nếu (đường hồ sơ != "") {
-                thời gian cây kiểu += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu cây kiểu;
-            };
-            bắt đầu ngữ nghĩa = biên dịch hồ sơ bắt đầu(đường hồ sơ);
-            biên dịch kiểm tra ngữ nghĩa thuần(cây kiểu);
-            nếu (đường hồ sơ != "") {
-                thời gian ngữ nghĩa += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu ngữ nghĩa;
+            nếu (!đã phân giải đầy đủ) {
+                bắt đầu cây kiểu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+                cây kiểu = biên dịch kiểu cây(mình.sổ, mình.đồ thị, tên mô đun);
+                nếu (đường hồ sơ != "") {
+                    thời gian cây kiểu += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu cây kiểu;
+                };
+                bắt đầu ngữ nghĩa = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+                biên dịch kiểm tra ngữ nghĩa thuần(cây kiểu);
+                nếu (đường hồ sơ != "") {
+                    thời gian ngữ nghĩa += biên dịch hồ sơ bắt đầu(đường hồ sơ) - bắt đầu ngữ nghĩa;
+                };
             };
         };
         biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.modules", bắt đầu bước);
@@ -121,6 +164,27 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
             biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.typed_ast_ms", thời gian cây kiểu);
             biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.semantic_ms", thời gian ngữ nghĩa);
             biên dịch hồ sơ ghi số(đường hồ sơ, "link.selective.module_count", độ dài(mô đun));
+        };
+        nếu (lọc nhập rộng) {
+            các hàm = mình.sổ["hàm"];
+            các kiểu = mình.sổ["kiểu"];
+            lặp(i = 0; i < độ dài(các kiểu); i++) {
+                kiểu = các kiểu[i];
+                khai kiểu = kiểu["khai"];
+                nếu (khai kiểu["loại"] != "lớp") { bỏ qua; };
+                phương thức = lấy từ điển(khai kiểu, "phương thức", []);
+                nếu (độ dài(phương thức) == 0) { bỏ qua; };
+                theo mô đun = mình.sổ["chỉ mục hàm"][kiểu["mô đun"]];
+                lặp(j = 0; j < độ dài(phương thức); j++) {
+                    tên = khai kiểu["tên"] + "." + phương thức[j]["tên"];
+                    mình.chủ phương thức[theo mô đun[tên]] = i;
+                };
+            };
+            lặp(i = 0; i < độ dài(các hàm); i++) {
+                tên = các hàm[i]["tên"];
+                nếu (!máy ảo có khóa từ điển(mình.hàm toàn cục, tên)) { mình.hàm toàn cục[tên] = []; };
+                máy ảo thêm cuối danh sách(mình.hàm toàn cục[tên], i);
+            };
         };
         // Every initializer remains a root, including assignments, I/O,
         // callbacks and registration performed by otherwise unused imports.
@@ -136,10 +200,23 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
             };
         };
         biên dịch hồ sơ ghi(đường hồ sơ, "link.selective.initializers", bắt đầu bước);
-        // Old module imports and .* keep their complete surface. A selected
-        // edge is the boundary after which references determine retention.
+        // AOT preserves the legacy function table for broad imports. JIT
+        // retains their referenced declarations instead; all initializers
+        // and semantic checks above still run. Namespace imports keep their
+        // complete surface because member lookup can select any export.
         bắt đầu bước = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         đầy = [mình.đồ thị["điểm vào"]]; đã đầy = {};
+        giữ cạnh rộng = {};
+        nếu (lọc nhập rộng) {
+            lặp(i = 0; i < độ dài(cạnh); i++) {
+                tên chọn = lấy từ điển(cạnh[i], "tên nhập", "");
+                nếu (lấy từ điển(cạnh[i], "bí danh", "") != "" &&
+                    (tên chọn == "" || tên chọn == "*")) {
+                    máy ảo thêm cuối danh sách(đầy, cạnh[i]["đích"]);
+                    giữ cạnh rộng[cạnh[i]["đích"]] = đúng;
+                };
+            };
+        };
         vị trí = 0;
         khi (vị trí < độ dài(đầy)) {
             tên mô đun = đầy[vị trí]; vị trí += 1;
@@ -148,14 +225,20 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
             mình.giữ mô đun(tên mô đun);
             lặp(i = 0; i < độ dài(cạnh); i++) {
                 e = cạnh[i]; tên chọn = lấy từ điển(e, "tên nhập", "");
-                nếu (e["nguồn"] == tên mô đun && (tên chọn == "" || tên chọn == "*")) {
+                nếu ((!lọc nhập rộng || máy ảo có khóa từ điển(giữ cạnh rộng, tên mô đun)) &&
+                     e["nguồn"] == tên mô đun && (tên chọn == "" || tên chọn == "*")) {
                     máy ảo thêm cuối danh sách(đầy, e["đích"]);
+                    giữ cạnh rộng[e["đích"]] = đúng;
                 };
             };
         };
-        lặp(i = 0; i < độ dài(cạnh); i++) {
-            e = cạnh[i]; tên chọn = lấy từ điển(e, "tên nhập", "");
-            nếu (tên chọn != "" && tên chọn != "*") { mình.tên(e["đích"], tên chọn); };
+        // A selected import is validated against the complete registry above.
+        // In JIT it is a visibility declaration, not an execution root.
+        nếu (!lọc nhập rộng) {
+            lặp(i = 0; i < độ dài(cạnh); i++) {
+                e = cạnh[i]; tên chọn = lấy từ điển(e, "tên nhập", "");
+                nếu (tên chọn != "" && tên chọn != "*") { mình.tên(e["đích"], tên chọn); };
+            };
         };
         vị trí = 0;
         khi (vị trí < độ dài(mình.hàng)) {
@@ -186,7 +269,7 @@ lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
     };
 };
 
-hàm công khai biên dịch lọc nhập chọn lọc(sổ, đồ thị) {
+hàm công khai biên dịch lọc nhập chọn lọc(sổ, đồ thị, đã phân giải đầy đủ = sai) {
     bộ = Bộ Chọn Phụ Thuộc Nhập(sổ, đồ thị);
-    trả về bộ.lọc();
+    trả về bộ.lọc(đã phân giải đầy đủ);
 };

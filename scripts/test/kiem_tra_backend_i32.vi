@@ -1,0 +1,95 @@
+nhập gói.biên dịch.backend i32.biên dịch i32 sinh asm;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy kiểm tra CFG;
+nhập gói.văn bản.chuỗi.chứa chính xác;
+
+hàm yêu cầu backend(điều kiện) { nếu (!điều kiện) { ném "backend i32"; }; };
+hàm máy so sánh(phép, nhãn giữa = sai) {
+    lệnh = [biên dịch mã máy lệnh("LoadSlot", 0, 0, 0),
+        biên dịch mã máy lệnh("LoadSlot", 0, 1, 1),
+        biên dịch mã máy lệnh(phép, 0, 0, 2),
+        biên dịch mã máy lệnh("BranchZero", 0, 6, 1),
+        biên dịch mã máy lệnh("PushConstant", 11, 0, 0),
+        biên dịch mã máy lệnh("Return", 0, 0, 1),
+        biên dịch mã máy lệnh("PushConstant", 22, 0, 0),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    nếu (nhãn giữa) {
+        // Một cạnh khác vào BranchZero phải giữ boolean đã materialize.
+        máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("PushConstant", 0, 0, 0));
+        máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Jump", 0, 3, 1));
+    };
+    trả về {"parameterCount": 2, "slotCount": 2, "maxStackDepth": 2, "instructions": lệnh};
+};
+hàm kiểm tra lời gọi CFG() {
+    lệnh = [biên dịch mã máy lệnh("Call", 0, 0, 0, "helper_1"),
+        biên dịch mã máy lệnh("Drop", 0, 0, 1),
+        biên dịch mã máy lệnh("Call", 0, 0, 0, "helper_1"),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    máy = {"parameterCount": 0, "slotCount": 0, "maxStackDepth": 1, "instructions": lệnh};
+    yêu cầu backend(biên dịch mã máy kiểm tra CFG(máy));
+    // A cached symbol must never bypass per-instruction arity validation.
+    lệnh[2] = biên dịch mã máy lệnh("Call", 0, 1, 0, "helper_1");
+    lỗi = sai;
+    thử { biên dịch mã máy kiểm tra CFG(máy); } bắt lỗi(e) { lỗi = đúng; };
+    yêu cầu backend(lỗi);
+    lệnh[2] = biên dịch mã máy lệnh("Call", 0, 0, 0, "helper_1");
+    // Unreachable instructions must still validate their symbol and type.
+    tên lỗi = ["", "1helper", "hàm", 42];
+    lặp (j = 0; j < độ dài(tên lỗi); j++) {
+        tên = tên lỗi[j];
+        máy ảo thêm cuối danh sách(lệnh, biên dịch mã máy lệnh("Call", 0, 0, 0, tên));
+        lỗi = sai;
+        thử { biên dịch mã máy kiểm tra CFG(máy); } bắt lỗi(e) { lỗi = đúng; };
+        yêu cầu backend(lỗi);
+        lệnh = [lệnh[0], lệnh[1], lệnh[2], lệnh[3]];
+        máy["instructions"] = lệnh;
+    };
+};
+hàm kiểm tra nhánh CFG() {
+    lệnh = [biên dịch mã máy lệnh("PushConstant", 1, 0, 0),
+        biên dịch mã máy lệnh("BranchZero", 0, 4, 1),
+        biên dịch mã máy lệnh("Jump", 0, 0, 0),
+        biên dịch mã máy lệnh("Trap", 0, 0, 0),
+        biên dịch mã máy lệnh("PushConstant", 0, 0, 0),
+        biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    máy = {"parameterCount": 0, "slotCount": 0, "maxStackDepth": 2, "instructions": lệnh};
+    yêu cầu backend(biên dịch mã máy kiểm tra CFG(máy));
+    // Branch and fallthrough reach the same block with different depths.
+    lệnh[2] = biên dịch mã máy lệnh("PushConstant", 5, 0, 0);
+    lệnh[3] = biên dịch mã máy lệnh("Jump", 0, 4, 1);
+    lỗi = sai;
+    thử { biên dịch mã máy kiểm tra CFG(máy); } bắt lỗi(e) { lỗi = đúng; };
+    yêu cầu backend(lỗi);
+    lệnh[3] = biên dịch mã máy lệnh("Drop", 0, 0, 1);
+    yêu cầu backend(biên dịch mã máy kiểm tra CFG(máy));
+    // Valid per-instruction transfer, but reachable fallthrough past end.
+    lệnh[5] = biên dịch mã máy lệnh("Drop", 0, 0, 1);
+    lỗi = sai;
+    thử { biên dịch mã máy kiểm tra CFG(máy); } bắt lỗi(e) { lỗi = đúng; };
+    yêu cầu backend(lỗi);
+};
+hàm chính() {
+    kiểm tra lời gọi CFG();
+    kiểm tra nhánh CFG();
+    phép = ["Equal", "NotEqual", "Less", "LessEqual", "Greater", "GreaterEqual"];
+    arm = ["ne", "eq", "ge", "gt", "le", "lt"];
+    x86 = ["ne", "e", "ge", "g", "le", "l"];
+    lặp(i = 0; i < độ dài(phép); i++) {
+        máy = máy so sánh(phép[i]);
+        biên dịch mã máy kiểm tra CFG(máy);
+        a = biên dịch i32 sinh asm(máy, "probe", "aarch64", "macos");
+        b = biên dịch i32 sinh asm(máy, "probe", "x86_64", "linux");
+        c = biên dịch i32 sinh asm(máy, "probe", "x86_64", "windows");
+        yêu cầu backend(chứa chính xác(a, "b." + arm[i] + " Lprobe_6"));
+        yêu cầu backend(!chứa chính xác(a, "cset "));
+        yêu cầu backend(chứa chính xác(b, "j" + x86[i] + " .Lprobe_6"));
+        yêu cầu backend(!chứa chính xác(b, "set"));
+        yêu cầu backend(chứa chính xác(c, "j" + x86[i] + " .Lprobe_6"));
+        máy = máy so sánh(phép[i], đúng);
+        biên dịch mã máy kiểm tra CFG(máy);
+        a = biên dịch i32 sinh asm(máy, "probe", "aarch64", "macos");
+        yêu cầu backend(chứa chính xác(a, "cset "));
+        yêu cầu backend(chứa chính xác(a, "Lprobe_3:"));
+    };
+    in "Backend i32 CFG/ASM: PASS";
+};

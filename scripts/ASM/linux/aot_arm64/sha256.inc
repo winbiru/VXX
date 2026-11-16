@@ -21,7 +21,7 @@ vpp_native_sha_update:
     uxtw x11, w1
     add x10, x10, x11
     mov x11, #0x1400
-    movk x11, #0x410, lsl #16
+    movk x11, #0x810, lsl #16
     cmp x10, x11
     b.hi Lbo_nho_loi
     mov w2, w1

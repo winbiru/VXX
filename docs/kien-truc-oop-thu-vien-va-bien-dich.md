@@ -143,16 +143,16 @@ ghi đè `đóng()` để giải phóng kết nối và xoá mật khẩu.
 
 ## Kiểm chứng
 
-Kiểm thử hồi quy `src/tests/kiem_tra_kien_truc_oop_compiler.vi` bao phủ
+Kiểm thử hồi quy `scripts/test/kiem_tra_kien_truc_oop_compiler.vi` bao phủ
 truy vấn snapshot, wrapper API, artifact ABI và kế thừa collection. Các test
 logger/DB và bộ kiểm tra pipeline OOP kiểm soát tương thích qua module.
-Kiểm thử `src/tests/kiem_tra_lop_mo_rong_compiler.vi` bao phủ các lớp mới,
+Kiểm thử `scripts/test/kiem_tra_lop_mo_rong_compiler.vi` bao phủ các lớp mới,
 wrapper cũ và kiểm tra dữ liệu artifact sai cấu trúc/phiên bản.
-Kiểm thử `src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi` kiểm tra thứ tự
+Kiểm thử `scripts/test/kiem_tra_chi_muc_ast_bo_kiem_thu.vi` kiểm tra thứ tự
 chỉ mục AST, thao tác làm mới, truy vấn lặp và báo cáo nhiều ca kiểm thử.
-Kiểm thử `src/tests/kiem_tra_bo_dang_ky_ham.vi` kiểm tra sổ theo phiên,
+Kiểm thử `scripts/test/kiem_tra_bo_dang_ky_ham.vi` kiểm tra sổ theo phiên,
 chuyển qua lại IR/đồ thị, thứ tự Function ID, hoãn StringPool và báo lỗi trùng.
-Kiểm thử `src/tests/kiem_tra_kien_truc_vi.vi` kiểm tra registry, bí danh và
+Kiểm thử `scripts/test/kiem_tra_kien_truc_vi.vi` kiểm tra registry, bí danh và
 target triple; `kiem_tra_native_machine_vi.vi`, `kiem_tra_native_leaf_vi.vi`
 và `kiểm tra object writer.vi` kiểm tra các hàm phát mã và ghi object.
 Chạy `ctest --test-dir build -R '^vpp-opcode-abi$'` để đối chiếu

@@ -10,9 +10,41 @@ nhập phân giải máy.*;
 nhập host ABI.*;
 nhập nạp chương trình.*;
 nhập runtime.*;
+nhập thực thi.*;
+nhập truyền worker.*;
+nhập worker.*;
 
 hàm aot_state() { trả về vm_get(4198464, 2); };
 hàm aot_status() { trả về vm_get(4198464, 1) != 0; };
+// Native code owns field 1 of its frame. Standalone VM frames use it as PC.
+hàm aot_source_site(frame, site) { vm_set(frame, 1, site); trả về 0; };
+// Lỗi vận chuyển socket của OS phải đi qua thử/bắt lỗi để thư viện
+// mạng đóng socket, retry hoặc chuyển máy chủ. Token nguyên đã hết hạn
+// hoặc chưa cấp cũng là lỗi có thể bắt ở API AOT. VM độc lập vẫn giữ
+// error=2 cho token không hợp lệ; lỗi kiểu/arity/provider không đổi.
+hàm aot_host_call(state, op, args) {
+    biến result = vm_host(state, op, args);
+    nếu ((op == 154 || op == 155) && vm_get(4198464, 1) == 2) {
+        vm_set(4198464, 1, 0);
+        biến reason = vm_literal("byte: cần danh sách số nguyên trong 0..255");
+        nếu (aot_status() == 0) { vm_set(4198464, 3, reason); vm_error(16); };
+    };
+    biến transport_error = op >= 186 && op <= 192 && vm_get(4198464, 1) == 20;
+    biến invalid_token = 0;
+    nếu (op >= 185 && op <= 190 && vm_get(4198464, 1) == 2) {
+        biến token = vm_at(args, 0);
+        invalid_token = vm_tag(token) == 1 && vm_socket_lookup(state, token) == 0;
+    };
+    nếu (transport_error || invalid_token) {
+        vm_set(4198464, 1, 0);
+        biến reason = vm_literal("socket: OS transport failed");
+        nếu (invalid_token) { reason = vm_literal("socket: invalid or closed token"); };
+        nếu (aot_status() == 0) {
+            vm_set(4198464, 3, reason); vm_error(16);
+        };
+    };
+    trả về result;
+};
 hàm aot_stack(frame) { trả về vm_get(frame, 2); };
 hàm aot_push(frame, value) { vm_append(aot_stack(frame), value); trả về aot_status(); };
 hàm aot_integer(frame, value) { trả về aot_push(frame, vm_int(value)); };
@@ -264,9 +296,29 @@ hàm aot_increment(frame, delta) {
     nếu (vm_tag(id) != 1) { vm_error(2); trả về 1; };
     trả về aot_increment_slot(frame, vm_number(id), delta);
 };
+// Compiler chỉ dùng khi đã chứng minh kết quả ++/-- không còn được đọc.
+// Giữ nguyên conversion của increment_slot cho kiểu động và lỗi.
+hàm aot_increment_slot_discard(frame, slot, delta) {
+    biến cell = vm_cell(aot_state(), frame, slot, 0);
+    nếu (cell != 0 && vm_get(cell, 0) == 12) {
+        vm_set(cell, 1, vm_get(cell, 1) + delta);
+        trả về aot_status();
+    };
+    nếu (aot_increment_slot(frame, slot, delta)) { trả về 1; };
+    vm_pop(aot_stack(frame));
+    trả về aot_status();
+};
 hàm aot_binary(frame, op) {
+    // Phép cộng động có thể nối chuỗi lớn. Thu gom trước khi lấy
+    // toán hạng khỏi stack, lúc toàn bộ giá trị vẫn có gốc GC.
+    nếu (op == 0) { nếu (aot_safepoint(frame)) { trả về 1; }; };
     biến stack = aot_stack(frame); biến right = vm_pop(stack); biến left = vm_pop(stack);
-    trả về aot_push(frame, vm_binary(op, left, right));
+    biến result = vm_binary(op, left, right);
+    nếu ((op == 3 || op == 64) && vm_get(4198464, 1) == 6) {
+        // Preserve the actual dividend as a rooted value until reporting.
+        vm_set(aot_state(), 21, left);
+    };
+    trả về aot_push(frame, result);
 };
 hàm aot_negate(frame) { trả về aot_push(frame, vm_int(vm_truth(vm_pop(aot_stack(frame))) == 0)); };
 hàm aot_update_integer_slot(frame, source, immediate, op, target) {
@@ -293,6 +345,7 @@ hàm aot_update_integer_slot(frame, source, immediate, op, target) {
     };
     biến chẩn đoán = vm_get(aot_state(), 19);
     nếu (chẩn đoán != 0) { vm_set(chẩn đoán, 0, vm_get(chẩn đoán, 0) + 1); };
+    nếu (op == 0) { nếu (aot_safepoint(frame)) { trả về 1; }; };
     biến result = vm_binary(op, vm_load_slot(aot_state(), frame, source), vm_int(immediate));
     vm_store(aot_state(), frame, target, result); trả về aot_status();
 };
@@ -313,6 +366,7 @@ hàm aot_update_numeric_slots(frame, left, right, op, target) {
             };
         };
     };
+    nếu (op == 0) { nếu (aot_safepoint(frame)) { trả về 1; }; };
     biến result = vm_binary(op, vm_load_slot(aot_state(), frame, left), vm_load_slot(aot_state(), frame, right));
     vm_store(aot_state(), frame, target, result); trả về aot_status();
 };
@@ -323,6 +377,37 @@ hàm aot_compare_i32(a, b, op) {
     nếu (op == 10) { trả về a < b; };
     nếu (op == 11) { trả về a >= b; };
     trả về a <= b;
+};
+// So sánh tên kiểu chuẩn với tag thật; giữ cách nạp ô chưa tồn tại.
+hàm aot_compare_type_slot(frame, slot, kind, op) {
+    nếu (aot_status()) { trả về 2; };
+    biến state = aot_state();
+    biến cell = vm_cell(state, frame, slot, 0);
+    biến tag = 1;
+    nếu (cell == 0) {
+        tag = vm_tag(vm_load_slot(state, frame, slot));
+    } hoặc nếu (vm_get(cell, 0) != 12) {
+        tag = vm_tag(vm_get(cell, 1));
+    };
+    nếu (aot_status()) { trả về 2; };
+    vm_set(4198464, 13, 145);
+    nếu (tag == 11) { tag = 1; };
+    nếu (tag == 13) { tag = 6; };
+    nếu (tag < 0 || tag > 8) { tag = 9; };
+    nếu (op == 8) { trả về tag != kind; };
+    trả về tag == kind;
+};
+// Lời gọi tĩnh đã được chứng minh chỉ chuyển tiếp TYPE_OF. Giữ giới hạn
+// khung của vm_invoke_body, kể cả việc đọc/tạo ô nguồn trước khi báo lỗi.
+hàm aot_compare_type_forward_slot(frame, slot, kind, op) {
+    nếu (aot_status()) { trả về 2; };
+    biến state = aot_state();
+    nếu (vm_get(vm_get(state, 6), 1) >= 4096) {
+        vm_load_slot(state, frame, slot);
+        nếu (!aot_status()) { vm_error(15); };
+        trả về 2;
+    };
+    trả về aot_compare_type_slot(frame, slot, kind, op);
 };
 hàm aot_compare_integer_slot(frame, slot, immediate, op) {
     nếu (op >= 7 && op <= 12) {
@@ -501,11 +586,11 @@ hàm aot_loop_counters(frame, cell, first, count, keep) {
     biến old_count = vm_get(stack, 1);
     biến required = old_count + count;
     biến capacity = vm_get(stack, 2);
-    nếu (required < old_count || required > 2000000) { vm_error(1); trả về 2; };
+    nếu (required < old_count || required > 2000000) { vm_capacity_error(4, required, 2000000); trả về 2; };
     nếu (required > capacity) {
         khi (capacity < required) {
             capacity = capacity * 2 + 8;
-            nếu (capacity > 2000000) { vm_error(1); trả về 2; };
+            nếu (capacity > 2000000) { capacity = 2000000; };
         };
         biến resized_data = vm_alloc(capacity * 4, 1);
         nếu (resized_data == 0) { trả về 2; };
@@ -532,7 +617,141 @@ hàm aot_loop_counters(frame, cell, first, count, keep) {
     nếu (aot_safepoint(frame)) { trả về 2; };
     trả về 0;
 };
+// Guard không tạo binding. Quét view sở hữu chuỗi và cursor i32 cục bộ,
+// không gọi code người dùng, không cấp phát trong vòng nóng.
+hàm aot_byte_scan_loop(frame, cursor, bound, source, range, forbidden) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
+    nếu (aot_status()) { trả về 2; };
+    nếu (vm_get(frame, 9) != 0 || vm_get(aot_stack(frame), 1) != 0) { trả về 1; };
+    biến state = aot_state();
+    biến cell = vm_cell(state, frame, cursor, 0);
+    biến limit_cell = vm_cell(state, frame, bound, 0);
+    biến source_cell = vm_cell(state, frame, source, 0);
+    nếu (cell == 0 || limit_cell == 0 || source_cell == 0 ||
+        cell == limit_cell || cell == source_cell || limit_cell == source_cell) { trả về 1; };
+    nếu (aot_o_i32(cell) == 0 || aot_o_i32(limit_cell) == 0 ||
+        vm_get(source_cell, 0) != 10) { trả về 1; };
+    biến inline_cell = cell == frame + 144 || cell == frame + 152 || cell == frame + 164 || cell == frame + 180 ||
+        cell == frame + 192 || cell == frame + 204 || cell == frame + 216 || cell == frame + 228 ||
+        cell == frame + 244 || cell == frame + 256 || cell == frame + 268 || cell == frame + 280 ||
+        cell == frame + 292 || cell == frame + 304 || cell == frame + 316 || cell == frame + 328;
+    // Ô cục bộ nằm trên heap có thể được closure chia sẻ. Không có lời gọi
+    // code người dùng trong vòng quét; vẫn giữ ô và giá trị đóng hộp khi ghi.
+    nếu (inline_cell == 0) {
+        biến scope = vm_get(frame, 3);
+        nếu (scope == 0 || vm_get(cell, 0) != 10) { trả về 1; };
+        nếu (vm_map_get_int(scope, cursor) != cell) { trả về 1; };
+    };
+    biến view = vm_get(source_cell, 1);
+    nếu (vm_tag(view) != 13) { trả về 1; };
+    biến first = aot_doc_i32(cell);
+    biến last = aot_doc_i32(limit_cell);
+    nếu (first < 0 || first > last || last > vm_get(view, 1)) { trả về 1; };
+    biến data = vm_get(view, 2);
+    biến low = range & 255;
+    biến high = (range >> 8) & 255;
+    biến x = forbidden & 511;
+    biến y = (forbidden >> 9) & 511;
+    biến pos = first;
+    nếu (range < 0) {
+        biến packed = -1 - range;
+        low = packed & 255;
+        high = (packed >> 8) & 255;
+        x = forbidden & 255;
+        y = (forbidden >> 8) & 255;
+        khi (pos < last) {
+            biến c = máy đọc byte(data + pos);
+            nếu (c != low && c != high && c != x && c != y) { thoát; };
+            pos = pos + 1;
+        };
+    } hoặc {
+        khi (pos < last) {
+            biến c = máy đọc byte(data + pos);
+            nếu (c < low || c > high || c == x || c == y) { thoát; };
+            pos = pos + 1;
+        };
+    };
+    nếu (pos != first) {
+        nếu (inline_cell) {
+            vm_set(cell, 0, 12);
+            vm_set(cell, 1, pos);
+        } hoặc nếu (aot_ghi_i32(frame, cell, pos)) { trả về 2; };
+        nếu (aot_safepoint(frame)) { trả về 2; };
+    };
+    trả về 0;
+};
+// Chỉ ghi lại ô cục bộ đã tồn tại. Ô closure trên heap giữ nguyên identity.
+hàm aot_decimal_local(frame, slot, cell) {
+    nếu (cell == 0) { trả về 0; };
+    nếu (cell == frame + 144 || cell == frame + 152 || cell == frame + 164 || cell == frame + 180 ||
+        cell == frame + 192 || cell == frame + 204 || cell == frame + 216 || cell == frame + 228 ||
+        cell == frame + 244 || cell == frame + 256 || cell == frame + 268 || cell == frame + 280 ||
+        cell == frame + 292 || cell == frame + 304 || cell == frame + 316 || cell == frame + 328) { trả về 1; };
+    biến scope = vm_get(frame, 3);
+    nếu (scope == 0 || vm_get(cell, 0) != 10) { trả về 0; };
+    trả về vm_map_get_int(scope, slot) == cell;
+};
+// Vòng tích lũy thập phân âm có kiểm tra giới hạn i32. Giữ giá trị byte
+// cuối và cờ tràn quan sát được; mọi guard hoàn tất trước lần ghi đầu.
+hàm aot_decimal_scan_loop(frame, cursor, bound, source, digit, acc, flag, last_digit) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
+    nếu (aot_status()) { trả về 2; };
+    nếu (vm_get(frame, 9) != 0 || vm_get(aot_stack(frame), 1) != 0) { trả về 1; };
+    biến state = aot_state();
+    biến pc = vm_cell(state, frame, cursor, 0);
+    biến bc = vm_cell(state, frame, bound, 0);
+    nếu (aot_o_i32(pc) == 0 || aot_o_i32(bc) == 0) { trả về 1; };
+    biến pos = aot_doc_i32(pc);
+    biến end = aot_doc_i32(bc);
+    nếu (pos >= end) { trả về 0; };
+    biến sc = vm_cell(state, frame, source, 0);
+    biến dc = vm_cell(state, frame, digit, 0);
+    biến ac = vm_cell(state, frame, acc, 0);
+    biến fc = vm_cell(state, frame, flag, 0);
+    biến lc = vm_cell(state, frame, last_digit, 0);
+    nếu (sc == 0 || vm_get(sc, 0) != 10 || aot_o_i32(dc) == 0 ||
+        aot_o_i32(ac) == 0 || aot_o_i32(fc) == 0 || aot_o_i32(lc) == 0) { trả về 1; };
+    nếu (pc == bc || pc == sc || pc == dc || pc == ac || pc == fc || pc == lc ||
+        bc == sc || bc == dc || bc == ac || bc == fc || bc == lc ||
+        sc == dc || sc == ac || sc == fc || sc == lc ||
+        dc == ac || dc == fc || dc == lc || ac == fc || ac == lc || fc == lc) { trả về 1; };
+    nếu (aot_decimal_local(frame, cursor, pc) == 0 || aot_decimal_local(frame, digit, dc) == 0 ||
+        aot_decimal_local(frame, acc, ac) == 0 || aot_decimal_local(frame, flag, fc) == 0) { trả về 1; };
+    biến view = vm_get(sc, 1);
+    nếu (vm_tag(view) != 13) { trả về 1; };
+    nếu (pos < 0 || end > vm_get(view, 1)) { trả về 1; };
+    biến number = aot_doc_i32(ac);
+    biến limit = aot_doc_i32(lc);
+    nếu (number > 0 || limit < 0 || limit > 8) { trả về 1; };
+    biến data = vm_get(view, 2);
+    biến first = pos;
+    biến d = 0;
+    biến overflow = 0;
+    biến scan_end = end;
+    nếu (end - first > 4096) { scan_end = first + 4096; };
+    khi (pos < scan_end) {
+        d = máy đọc byte(data + pos);
+        nếu (d < 48 || d > 57) { thoát; };
+        d = d - 48;
+        nếu (number < -214748364 || (number == -214748364 && d > limit)) {
+            overflow = 1; thoát;
+        };
+        number = number * 10 - d;
+        pos = pos + 1;
+    };
+    // Chưa ghi ô nào; fallback bắt đầu tại cursor gốc khi hết ngân sách.
+    nếu (pos == scan_end && scan_end < end) { trả về 1; };
+    nếu (aot_ghi_i32(frame, dc, d)) { trả về 2; };
+    nếu (pos != first) {
+        nếu (aot_ghi_i32(frame, ac, number)) { trả về 2; };
+        nếu (aot_ghi_i32(frame, pc, pos)) { trả về 2; };
+    };
+    nếu (overflow) { nếu (aot_ghi_i32(frame, fc, 0)) { trả về 2; }; };
+    nếu (aot_safepoint(frame)) { trả về 2; };
+    trả về 0;
+};
 hàm aot_counted_scalar_loop_body(frame, counter, bound, value, step, threshold, keep) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     nếu (keep == 0 && vm_get(aot_stack(frame), 1) != 0) { trả về 1; };
     nếu (counter == value) { trả về 1; };
     biến state = aot_state();
@@ -569,6 +788,7 @@ hàm aot_counted_scalar_loop_tail(frame, counter, bound, value, step, threshold)
     trả về aot_counted_scalar_loop_body(frame, counter, bound, value, step, threshold, 0);
 };
 hàm aot_simple_scalar_loop_body(frame, counter, bound, value, operand, op, keep) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     nếu (keep == 0 && vm_get(aot_stack(frame), 1) != 0) { trả về 1; };
     nếu (counter == value || (op != 0 && op != 1 && op != 2)) { trả về 1; };
     biến state = aot_state();
@@ -605,6 +825,7 @@ hàm aot_simple_scalar_loop_tail(frame, counter, bound, value, operand, op) {
     trả về aot_simple_scalar_loop_body(frame, counter, bound, value, operand, op, 0);
 };
 hàm aot_numeric_add_loop_body(frame, counter, bound, left, right, result, keep) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     nếu (keep == 0 && vm_get(aot_stack(frame), 1) != 0) { trả về 1; };
     nếu (counter == result) { trả về 1; };
     biến state = aot_state();
@@ -653,6 +874,7 @@ hàm aot_numeric_add_loop_tail(frame, counter, bound, left, right, result) {
 // Chạy trọn vòng list thêm (base + i) sau một lần kiểm tra kiểu. Grow list
 // được làm ngay tại đây theo đúng quy tắc vm_append, bỏ một lời gọi mỗi lượt.
 hàm aot_list_append_i32_loop(frame, counter, bound, list_slot, base_slot, keep) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     biến state = aot_state();
     biến counter_cell = vm_cell(state, frame, counter, 0);
     nếu (aot_o_i32(counter_cell) == 0) { trả về 1; };
@@ -698,12 +920,13 @@ hàm aot_list_append_i32_loop(frame, counter, bound, list_slot, base_slot, keep)
                 trả về 2;
             };
             nếu (n == capacity) {
-                capacity = capacity * 4;
-                nếu (capacity > 2000000) {
-                    vm_error(1);
+                nếu (n >= 2000000) {
+                    vm_capacity_error(3, n + 1, 2000000);
                     nếu (done > 0) { aot_loop_counters(frame, counter_cell, first + completed, done, keep); };
                     trả về 2;
                 };
+                capacity = capacity * 4;
+                nếu (capacity > 2000000) { capacity = 2000000; };
                 biến raw = vm_alloc(capacity * 4, 1);
                 nếu (raw == 0) {
                     nếu (done > 0) { aot_loop_counters(frame, counter_cell, first + completed, done, keep); };
@@ -730,6 +953,7 @@ hàm aot_list_append_i32_loop(frame, counter, bound, list_slot, base_slot, keep)
 // Chạy trọn vòng lọc/tổng trên vùng list i32. Quét kiểu trước khi ghi để
 // mọi trường hợp động vẫn quay lại bytecode mà chưa làm thay đổi trạng thái.
 hàm aot_list_mod_sum_loop(frame, counter, bound, source_slot, target_slot, divisor, expected, keep) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     biến state = aot_state();
     biến counter_cell = vm_cell(state, frame, counter, 0);
     nếu (aot_o_i32(counter_cell) == 0) { trả về 1; };
@@ -772,6 +996,7 @@ hàm aot_list_mod_sum_loop(frame, counter, bound, source_slot, target_slot, divi
 // Dãy i32 không thoát: tính trực tiếp (base + i), lọc theo modulo và cộng
 // vào tổng. Compiler chỉ gọi đường này khi list trung gian không còn được đọc.
 hàm aot_range_mod_sum_i32_loop(frame, base_slot, target_slot, bound, divisor, expected) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     nếu (bound < 0 || bound > 1000000 || divisor == 0) { trả về 1; };
     biến state = aot_state();
     biến base_cell = vm_cell(state, frame, base_slot, 0);
@@ -793,6 +1018,7 @@ hàm aot_range_mod_sum_i32_loop(frame, base_slot, target_slot, bound, divisor, e
 // Vòng gọi hàm i32 đã được compiler chứng minh có dạng checksum += fn(...) % n.
 // Con trỏ hàm không đi qua giá trị V++; primitive ASM chỉ nhận mã hàm và hai i32.
 hàm aot_indirect_i32_fold_loop(frame, counter, bound, checksum, callable, data, seed, packed) {
+    nếu (vm_get(4198724, 0) != 0) { trả về 1; };
     biến stack = aot_stack(frame);
     nếu (vm_get(stack, 1) != 0) { trả về 1; };
     biến cycle = (packed >> 16) & 65535;
@@ -968,6 +1194,10 @@ hàm aot_index_compare_integer(frame, container_slot, index, is_slot, immediate,
             nếu (aot_status()) { trả về 2; };
             trả về vm_truth(result);
         };
+        nếu (kind == 13) {
+            nếu (number < 0 || number >= vm_get(container, 1)) { vm_error(4); trả về 2; };
+            nếu (op >= 7 && op <= 12) { trả về aot_compare_i32(máy đọc byte(vm_get(container, 2) + number), immediate, op); };
+        };
     };
     nếu (key == 0) { key = vm_int(number); };
     biến value = vm_index(container, key);
@@ -1007,6 +1237,11 @@ hàm aot_index_compare_integer_outside_range(frame, container_slot, index, is_sl
                 biến x = vm_get(value, 1);
                 trả về x < low || x > high;
             };
+        };
+        nếu (kind == 13) {
+            nếu (number < 0 || number >= vm_get(container, 1)) { vm_error(4); trả về 2; };
+            biến x = máy đọc byte(vm_get(container, 2) + number);
+            trả về x < low || x > high;
         };
     };
     nếu (key == 0) { key = vm_int(number); };
@@ -1052,6 +1287,11 @@ hàm aot_index_compare_integer_pair(frame, container_slot, index, is_slot, a, b)
                 trả về x == a || x == b;
             };
         };
+        nếu (kind == 13) {
+            nếu (number < 0 || number >= vm_get(container, 1)) { vm_error(4); trả về 2; };
+            biến x = máy đọc byte(vm_get(container, 2) + number);
+            trả về x == a || x == b;
+        };
     };
     nếu (key == 0) { key = vm_int(number); };
     biến first_value = vm_index(container, key);
@@ -1087,6 +1327,12 @@ hàm aot_index_store_slot(frame, container_slot, index, is_slot, target_slot) {
     biến value = 0;
     nếu (has_i32) {
         biến kind = vm_tag(container);
+        nếu (kind == 13) {
+            nếu (number < 0 || number >= vm_get(container, 1)) { vm_error(4); trả về 1; };
+            biến dest = vm_cell(state, frame, target_slot, 1);
+            nếu (aot_status()) { trả về 1; };
+            trả về aot_ghi_i32(frame, dest, máy đọc byte(vm_get(container, 2) + number));
+        };
         nếu (kind == 4 || kind == 6) {
             nếu (number < 0 || number >= vm_get(container, 1)) {
                 vm_error(4);
@@ -1112,6 +1358,67 @@ hàm aot_index_store_slot(frame, container_slot, index, is_slot, target_slot) {
     };
     vm_store(state, frame, target_slot, value);
     trả về aot_status();
+};
+// Gộp đọc container[ô + hằng], gán hoặc so sánh. Chỉ số i32 và byte
+// của view giữ ở dạng thô; các kiểu động vẫn dùng vm_binary/vm_index.
+// mode: 0 = push, 1 = store, 2 = compare (0/1/2 theo ABI nhánh).
+hàm aot_index_offset(frame, container_slot, index_slot, offset, mode, argument, op) {
+    biến error = 1;
+    nếu (mode == 2) { error = 2; };
+    biến state = aot_state();
+    biến container = vm_load_slot(state, frame, container_slot);
+    nếu (aot_status()) { trả về error; };
+    biến cell = vm_cell(state, frame, index_slot, 0);
+    biến number = 0; biến key = 0;
+    biến raw = aot_o_i32(cell);
+    nếu (raw) { number = aot_doc_i32(cell) + offset; }
+    hoặc {
+        biến source = vm_load_slot(state, frame, index_slot);
+        nếu (aot_status()) { trả về error; };
+        biến right = vm_int(offset);
+        nếu (aot_status()) { trả về error; };
+        key = vm_binary(0, source, right);
+        nếu (aot_status()) { trả về error; };
+    };
+    biến value = 0;
+    nếu (raw) {
+        biến kind = vm_tag(container);
+        nếu (kind == 13) {
+            nếu (number < 0 || number >= vm_get(container, 1)) { vm_error(4); trả về error; };
+            biến byte = máy đọc byte(vm_get(container, 2) + number);
+            nếu (mode == 2) { trả về aot_compare_i32(byte, argument, op); };
+            nếu (mode == 1) {
+                biến dest = vm_cell(state, frame, argument, 1);
+                nếu (aot_status()) { trả về error; };
+                trả về aot_ghi_i32(frame, dest, byte);
+            };
+            trả về aot_push(frame, vm_int(byte));
+        };
+        nếu (kind == 5) {
+            key = vm_int(number);
+            nếu (aot_status()) { trả về error; };
+            value = vm_index(container, key);
+        } hoặc { value = vm_index_i32(container, number); };
+    } hoặc { value = vm_index(container, key); };
+    nếu (aot_status()) { trả về error; };
+    nếu (mode == 2) {
+        nếu (vm_tag(value) == 1) { trả về aot_compare_i32(vm_get(value, 1), argument, op); };
+        biến right = vm_int(argument);
+        nếu (aot_status()) { trả về error; };
+        biến result = vm_binary(op, value, right);
+        nếu (aot_status()) { trả về error; };
+        trả về vm_truth(result);
+    };
+    nếu (mode == 1) {
+        nếu (vm_tag(value) == 1) {
+            biến dest = vm_cell(state, frame, argument, 1);
+            nếu (aot_status()) { trả về error; };
+            trả về aot_ghi_i32(frame, dest, vm_get(value, 1));
+        };
+        vm_store(state, frame, argument, value);
+        trả về aot_status();
+    };
+    trả về aot_push(frame, value);
 };
 hàm aot_index_store_integer_op(frame, container_slot, index, source_slot, immediate, op) {
     biến state = aot_state();
@@ -1272,6 +1579,116 @@ hàm aot_set_index(frame) {
     hoặc nếu (vm_tag(container) == 4 && vm_tag(key) == 1) { vm_put(container, vm_number(key), value); }
     hoặc { vm_error(2); }; trả về aot_status();
 };
+// Tiered JIT, trusted runtime only. The user-visible raw intrinsic remains
+// blocked while a dynamic image is active. Each RX leaf is built on demand
+// from a proven descriptor, never copied from precompiled machine code.
+// Profile header: report flag, left/right/result i32 scratch words.
+// The ABI scratch lives in the guest arena, not a public byte-resource slot.
+// Each record contains
+// calls, eligible i32 calls, RX handle (-1=failed), fast hits.
+hàm aot_jit_emit(op) {
+    biến host = máy JIT thô(0, 0, 0);
+    nếu (op < 1 || op > 6 || host < 1 || host > 3) { trả về -1; };
+    biến code = byte mới();
+    nếu (code <= 0) { trả về -1; };
+    biến status = 0;
+    nếu (host == 1) {
+        // add/sub/mul/and/orr/eor w0,w0,w1; ret. All are leaf ABI calls.
+        biến word = 184614912;
+        nếu (op == 2) { word = 1258356736; };
+        nếu (op == 3) { word = 453082112; };
+        nếu (op == 4) { word = 167837696; };
+        nếu (op == 5) { word = 704708608; };
+        nếu (op == 6) { word = 1241579520; };
+        status = byte đẩy số nguyên ba mươi hai bit(code, word);
+        nếu (status == 0) { status = byte đẩy số nguyên ba mươi hai bit(code, -698416192); };
+    } hoặc {
+        // SysV: eax <- edi, rhs esi. Win64: eax <- ecx, rhs edx.
+        biến first = 248; biến second = 240;
+        nếu (host == 3) { first = 200; second = 208; };
+        biến opcode = 1;
+        nếu (op == 2) { opcode = 41; };
+        nếu (op == 4) { opcode = 33; };
+        nếu (op == 5) { opcode = 9; };
+        nếu (op == 6) { opcode = 49; };
+        status = byte thêm(code, 137);
+        nếu (status == 0) { status = byte thêm(code, first); };
+        nếu (op == 3) {
+            nếu (status == 0) { status = byte thêm(code, 15); };
+            nếu (status == 0) { status = byte thêm(code, 175); };
+            second = 198; nếu (host == 3) { second = 194; };
+        } hoặc nếu (status == 0) { status = byte thêm(code, opcode); };
+        nếu (status == 0) { status = byte thêm(code, second); };
+        nếu (status == 0) { status = byte thêm(code, 195); };
+    };
+    biến handle = -1;
+    nếu (status == 0) { handle = máy JIT thô(1, code, 0); };
+    byte hủy(code);
+    nếu (handle <= 0) { trả về -1; };
+    trả về handle;
+};
+hàm aot_jit_try(state, id, args, receiver, owner, closure, frame) {
+    biến profile = vm_get(state, 20);
+    nếu (profile == 0) { trả về 0; };
+    biến record = profile + 16 + id * 16;
+    biến calls = vm_get(record, 0);
+    nếu (calls < 2147483647) { vm_set(record, 0, calls + 1); };
+    nếu (receiver != 0 || owner != 0 || closure != 0 || vm_get(args, 1) != 2) { trả về 0; };
+    biến op = máy aot thông tin(23, id, 0);
+    nếu (op < 1 || op > 6) { trả về 0; };
+    // Direct calls encode raw i32 arguments in the negative capacity mask.
+    // Never treat a raw number as an arena reference (including negatives).
+    biến cap = vm_get(args, 2); biến raw = 0;
+    nếu (cap < 0) { raw = 0 - cap - 1; };
+    biến left = vm_at(args, 0); biến right = vm_at(args, 1);
+    nếu ((raw & 1) == 0) {
+        nếu (vm_tag(left) != 1) { trả về 0; };
+        left = vm_get(left, 1);
+    };
+    nếu ((raw & 2) == 0) {
+        nếu (vm_tag(right) != 1) { trả về 0; };
+        right = vm_get(right, 1);
+    };
+    biến eligible = vm_get(record, 1);
+    nếu (eligible < 2147483647) { eligible += 1; vm_set(record, 1, eligible); };
+    nếu (eligible < 32) { trả về 0; };
+    biến handle = vm_get(record, 2);
+    nếu (handle == 0) { handle = aot_jit_emit(op); vm_set(record, 2, handle); };
+    nếu (handle <= 0) { trả về 0; };
+    // A pure leaf cannot recurse or allocate. Marshal its two raw arguments
+    // through private arena scratch rather than eight public byte reads.
+    vm_set(profile, 1, left); vm_set(profile, 2, right);
+    nếu (máy JIT thô(6, handle, profile + 4) != 0) { trả về 0; };
+    biến result = vm_get(profile, 3);
+    biến hits = vm_get(record, 3);
+    nếu (hits < 2147483647) { vm_set(record, 3, hits + 1); };
+    vm_set(frame, 0, vm_int(result));
+    trả về 1;
+};
+hàm aot_jit_finish(state, functions) {
+    biến profile = vm_get(state, 20);
+    nếu (profile == 0) { trả về 0; };
+    // Always release RX mappings, including exception and failed-program paths.
+    lặp(i = 0; i < functions; i++) {
+        biến record = profile + 16 + i * 16;
+        biến handle = vm_get(record, 2);
+        nếu (handle > 0) { máy JIT thô(3, handle, 0); };
+        nếu (vm_get(profile, 0) == 1 && vm_get(record, 0) > 0 && !aot_status()) {
+            biến line = vm_concat(vm_literal("VPP_JIT_PROFILE fn="), vm_integer_text(i));
+            biến name = máy aot thông tin(20, i, 0);
+            nếu (name >= 0) {
+                line = vm_concat(line, vm_concat(vm_literal(" name="), vm_pool(state, name)));
+            };
+            line = vm_concat(line, vm_concat(vm_literal(" calls="), vm_integer_text(vm_get(record, 0))));
+            line = vm_concat(line, vm_concat(vm_literal(" i32="), vm_integer_text(vm_get(record, 1))));
+            biến compiled = 0; nếu (handle > 0) { compiled = 1; };
+            line = vm_concat(line, vm_concat(vm_literal(" compiled="), vm_integer_text(compiled)));
+            line = vm_concat(line, vm_concat(vm_literal(" hits="), vm_integer_text(vm_get(record, 3))));
+            vm_write(2, vm_concat(line, vm_literal("\n")));
+        };
+    };
+    trả về 0;
+};
 hàm aot_invoke(id, args, receiver, owner, closure) {
     biến state = aot_state();
     vm_invoke(state, id, args, receiver, owner, closure);
@@ -1279,8 +1696,13 @@ hàm aot_invoke(id, args, receiver, owner, closure) {
     // vm_invoke thành công luôn thêm khung vào cuối danh sách.
     biến frames = vm_get(state, 6);
     biến frame = vm_get(vm_get(frames, 3), vm_get(frames, 1) - 1);
-    máy aot gọi(0, id, frame);
+    nếu (aot_jit_try(state, id, args, receiver, owner, closure, frame) == 0) {
+        máy aot gọi(0, id, frame);
+    };
     biến result = vm_get(frame, 0);
+    // Khung lỗi vẫn thuộc ngăn xếp hoạt động cho đến khi caller bắt lỗi
+    // hoặc runtime báo lỗi cuối cùng. Không đưa cùng khung vào kho rảnh.
+    nếu (aot_status()) { trả về 0; };
     // Vẫn giữ khung trên ngăn xếp trong lúc kho có thể nới dung lượng.
     biến pool = vm_get(state, 16);
     biến pool_count = vm_get(pool, 1);
@@ -1290,6 +1712,10 @@ hàm aot_invoke(id, args, receiver, owner, closure) {
     } hoặc { vm_append(pool, frame); };
     // Chỉ xóa gốc GC trong danh sách khung sau khi kho đã nhận khung.
     nếu (aot_status()) { trả về 0; };
+    // Kho chỉ giữ vùng nhớ khung, không giữ scope, tham số hay lịch sử
+    // stack của lời gọi đã kết thúc. Closure chuyển ô bắt giữ lên heap.
+    // Không có safepoint từ đây tới khi caller nhận giá trị trả về.
+    máy xóa vùng nhớ(frame, 336);
     biến frame_count = vm_get(frames, 1);
     vm_set(vm_get(frames, 3), frame_count - 1, 0);
     vm_set(frames, 1, frame_count - 1);
@@ -1494,7 +1920,7 @@ hàm aot_call(frame, id, count) {
             nếu (count >= 1 && count <= 4) { aot_release_args(frame); };
             vm_error(13); trả về 1;
         };
-        result = vm_host(state, op, host_args);
+        result = aot_host_call(state, op, host_args);
         nếu (count >= 1 && count <= 4) { aot_release_args(frame); };
     };
     trả về aot_push(frame, result);
@@ -1856,10 +2282,49 @@ hàm aot_intrinsic(frame, op) {
         vm_pop(stack);
         trả về aot_push(frame, result);
     };
+    // Các intrinsic chuỗi dùng trực tiếp ô stack đã có gốc GC. Giữ kết quả
+    // và trạng thái lỗi giống vm_host rồi aot_push, kể cả khi sai kiểu.
+    nếu (n >= 1 && (op == 145 || op == 230 || op == 231)) {
+        biến data = vm_get(stack, 3);
+        biến a = vm_get(data, n - 1);
+        vm_set(4198464, 13, op);
+        biến result = 0;
+        nếu (op == 145) { result = vm_type(a); }
+        hoặc nếu (op == 230) { result = vm_private_byte_view(a); }
+        hoặc { result = vm_strict_utf8(a); };
+        vm_set(data, n - 1, result);
+        trả về aot_status();
+    };
+    nếu (n >= 3 && (op == 214 || op == 216 || op == 217)) {
+        biến data = vm_get(stack, 3);
+        biến a = vm_get(data, n - 3);
+        biến b = vm_get(data, n - 2);
+        biến c = vm_get(data, n - 1);
+        vm_set(4198464, 13, op);
+        biến result = 0;
+        nếu (op == 216) { result = vm_thay_chính_xác(a, b, c); }
+        hoặc nếu (vm_tag(b) != 1 || vm_tag(c) != 1) { result = vm_error(2); }
+        hoặc nếu (op == 214) { result = vm_cut(a, vm_number(b), vm_number(c)); }
+        hoặc { result = vm_cut_byte(a, vm_number(b), vm_number(c)); };
+        vm_set(data, n - 3, result);
+        vm_set(data, n - 2, 0); vm_set(data, n - 1, 0);
+        vm_set(stack, 1, n - 2);
+        trả về aot_status();
+    };
+    nếu (op == 232 && n >= 4) {
+        biến data = vm_get(stack, 3);
+        vm_set(4198464, 13, op);
+        biến result = vm_scan_i32_run(vm_get(data, n - 4), vm_get(data, n - 3),
+                                     vm_get(data, n - 2), vm_get(data, n - 1));
+        vm_set(data, n - 4, result);
+        vm_set(data, n - 3, 0); vm_set(data, n - 2, 0); vm_set(data, n - 1, 0);
+        vm_set(stack, 1, n - 3);
+        trả về aot_status();
+    };
     biến arity = vm_host_arity(op); nếu (arity < 0) { vm_error(22); trả về 1; };
     biến args = aot_take_args(frame, arity);
     nếu (aot_status()) { trả về 1; };
-    biến result = vm_host(aot_state(), op, args);
+    biến result = aot_host_call(aot_state(), op, args);
     nếu (arity >= 1 && arity <= 4) { aot_release_args(frame); };
     trả về aot_push(frame, result);
 };
@@ -1873,7 +2338,7 @@ hàm aot_native_core_arity(id) {
     nếu (id == 2 || id == 3 || id == 4 || id == 5 || id == 8 || id == 9 || id == 14 || id == 18 || id == 19 ||
         id == 21 || id == 24 || id == 26 || id == 28 || id == 29 || id == 30 || id == 36 || id == 37 || id == 43 ||
         id == 47 || id == 49 || id == 50 || id == 51 || id == 54 || id == 57 || id == 59 || id == 78) { trả về 2; };
-    nếu (id == 6 || id == 16 || id == 17 || id == 20 || id == 31 || id == 32) { trả về 3; };
+    nếu (id == 6 || id == 16 || id == 17 || id == 20 || id == 31 || id == 32 || id == 85) { trả về 3; };
     trả về -1;
 };
 hàm aot_native_core_call(id, a, b, c) {
@@ -1939,6 +2404,18 @@ hàm aot_native_core_call(id, a, b, c) {
     nếu (id == 60) { trả về máy sha kết(a); };
     nếu (id == 61) { trả về máy báo cáo bộ nhớ đệm(); };
     nếu (id == 78) { trả về máy đặt quyền tệp mở(a, b); };
+    nếu (id == 85) {
+        // Dynamic bridge is linked only into full AOT runtimes. On other
+        // hosts these reserved info selectors reject the request.
+        nếu (máy aot thông tin(110, 0, 0) == 1) {
+            // Guest staging is scoped by the native boundary. Publishing,
+            // invoking raw entries and querying host addresses stay disabled.
+            nếu (a == 3 || (a >= 10 && a <= 16)) { trả về máy JIT thô(a, b, c); };
+            trả về -1;
+        };
+        nếu (a == 8 || a == 9) { trả về máy aot thông tin(100 + a, b, c); };
+        trả về máy JIT thô(a, b, c);
+    };
     vm_error(22);
     trả về 0;
 };
@@ -1969,11 +2446,38 @@ hàm aot_native_core(frame, id, count) {
     nếu (aot_status()) { trả về 1; };
     trả về aot_push(frame, vm_int(result));
 };
-// Arbitrary foreign descriptors and compiler-host services have no native
-// V++ provider yet. Reject them explicitly; never load a C++ fallback.
-hàm aot_foreign(frame, descriptor, count) { vm_error(22); trả về 1; };
-hàm vm_execute(state) { vm_error(22); trả về 0; };
-hàm vm_run(state) { vm_error(22); trả về 0; };
+// Provider policy is V++; ASM only reads metadata from the active image.
+// Reject every library/symbol/capability/signature outside the explicit ABI.
+hàm aot_foreign_text_matches(descriptor, field, expected) {
+    biến size = vm_get(expected, 1);
+    nếu (size > 127) { trả về 0; };
+    lặp(i = 0; i < size; i++) {
+        nếu (máy aot thông tin(field, descriptor, i) != máy đọc byte(vm_get(expected, 2) + i)) { trả về 0; };
+    };
+    trả về máy aot thông tin(field, descriptor, size) == 0;
+};
+hàm aot_foreign_provider(descriptor) {
+    nếu (descriptor < 0 || descriptor >= máy aot thông tin(3, 0, 0)) { trả về 0; };
+    nếu (máy aot thông tin(47, descriptor, 0) != descriptor ||
+        máy aot thông tin(44, descriptor, 0) != 1 ||
+        máy aot thông tin(45, descriptor, 0) != 0 ||
+        máy aot thông tin(46, descriptor, 0) != 0) { trả về 0; };
+    nếu (!aot_foreign_text_matches(descriptor, 40, vm_literal("system.ffi")) ||
+        !aot_foreign_text_matches(descriptor, 42, vm_literal("c")) ||
+        !aot_foreign_text_matches(descriptor, 43, vm_literal("system.ffi.error"))) { trả về 0; };
+    nếu (aot_foreign_text_matches(descriptor, 41, vm_literal("last_errno"))) { trả về 1; };
+    nếu (aot_foreign_text_matches(descriptor, 41, vm_literal("eintr"))) { trả về 2; };
+    trả về 0;
+};
+hàm aot_foreign(frame, descriptor, count) {
+    vm_set(4198464, 13, 156);
+    nếu (count != 0) { vm_error(22); trả về 1; };
+    biến provider = aot_foreign_provider(descriptor);
+    nếu (provider == 1) { trả về aot_push(frame, vm_int(vm_get(aot_state(), 9))); };
+    // The normalized machine ABI defines EINTR as 4 on supported hosts.
+    nếu (provider == 2) { trả về aot_push(frame, vm_int(4)); };
+    vm_error(22); trả về 1;
+};
 hàm aot_switch_begin(frame) {
     biến switches = vm_get(frame, 8);
     nếu (switches == 0) { switches = vm_vector(4); vm_set(frame, 8, switches); };
@@ -2012,26 +2516,100 @@ hàm aot_catch_value(frame, slot) {
 hàm aot_handle_error(frame) {
     biến handlers = vm_get(frame, 7);
     nếu (vm_get(4198464, 1) != 16 || handlers == 0 || vm_get(handlers, 1) == 0) { trả về -1; };
+    // Các lời gọi con đã trả khỏi native stack, nhưng khung của chúng
+    // vẫn được giữ để chẩn đoán. Khi bắt lỗi phải gỡ đúng các khung con.
+    biến frames = vm_get(aot_state(), 6);
+    khi (vm_get(frames, 1) > 0) {
+        biến top = vm_get(vm_get(frames, 3), vm_get(frames, 1) - 1);
+        nếu (top == frame) { thoát; };
+        vm_pop(frames);
+    };
+    nếu (vm_get(frames, 1) == 0) { trả về -1; };
     biến handler = vm_pop(handlers); biến stack = aot_stack(frame); biến switches = vm_get(frame, 8);
     khi (vm_get(stack, 1) > vm_get(handler, 1)) { vm_pop(stack); };
     nếu (switches != 0) { khi (vm_get(switches, 1) > vm_get(handler, 2)) { vm_pop(switches); }; };
-    vm_append(stack, vm_get(4198464, 3)); vm_set(4198464, 3, 0); vm_set(4198464, 1, 0);
+    // Giữ giá trị ném làm gốc trong lúc thêm vào stack; xóa lỗi trước
+    // để lỗi cấp phát mới không bị che bởi mã ngoại lệ đã được bắt.
+    vm_set(4198464, 1, 0);
+    vm_append(stack, vm_get(4198464, 3));
+    nếu (aot_status()) { trả về -1; };
+    vm_set(4198464, 3, 0); vm_set(4198464, 5, 0);
     trả về vm_get(handler, 0);
 };
 hàm aot_safepoint(frame) {
+    nếu (vm_worker_cancel_point()) { trả về 1; };
     nếu (aot_status()) { trả về 1; };
-    nếu (vm_get(4198464, 9) >= 1048576) { vm_collect(aot_state()); }; trả về aot_status();
+    nếu (vm_gc_due()) { vm_collect(aot_state()); }; trả về aot_status();
 };
 hàm aot_condition(frame) { trả về vm_truth(vm_pop(aot_stack(frame))); };
 hàm aot_failed(frame) { trả về aot_status(); };
+// Report a fatal arithmetic fault only when the compiled source site is
+// available. Artifact-only and older programs retain the generic ABI error.
+hàm aot_arithmetic_diagnostic(state) {
+    nếu (vm_get(4198464, 1) != 6) { trả về 0; };
+    biến op = vm_get(4198464, 5);
+    nếu (op != 3 && op != 64) { trả về 0; };
+    biến frames = vm_get(state, 6);
+    biến count = vm_get(frames, 1);
+    nếu (count <= 0) { trả về 0; };
+    biến frame = vm_at(frames, count - 1);
+    nếu (vm_get(frame, 1) <= 0) { trả về 0; };
+    biến dividend = vm_get(state, 21);
+    nếu (dividend == 0) { trả về 0; };
+    nếu (op == 3) {
+        biến text = vm_text(dividend);
+        vm_write(2, vm_literal("Lỗi: không thể chia "));
+        vm_write(2, text);
+        vm_write(2, vm_literal(" cho 0\nĐiều đã xảy ra: Chương trình đang cố lấy "));
+        vm_write(2, text);
+        vm_write(2, vm_literal(" chia cho 0. Số chia bằng 0 nên phép chia không thể cho ra kết quả hợp lệ.\n"));
+        vm_write(2, vm_literal("Cách sửa: Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước.\n"));
+    } hoặc {
+        vm_write(2, vm_literal("Lỗi: chia dư cho 0\nĐiều đã xảy ra: Chương trình đang tìm phần dư của phép chia cho 0. Không thể tính phần dư khi số chia bằng 0.\n"));
+        vm_write(2, vm_literal("Cách sửa: Hãy kiểm tra số chia trước khi dùng phép chia lấy dư và xử lý riêng trường hợp bằng 0.\n"));
+    };
+    vm_write(2, vm_literal("Dấu vết lỗi:\n"));
+    lặp(i = count - 1; i >= 0; i--) {
+        frame = vm_at(frames, i);
+        biến site = vm_get(frame, 1);
+        nếu (site > 0) { vm_write(2, vm_pool(state, site - 1)); };
+    };
+    trả về 1;
+};
 hàm aot_region(kind, index) {
     biến frames = vm_get(aot_state(), 6); biến frame = vm_frame(0, vm_empty_args(), 0, 0, 0, 1);
-    vm_append(frames, frame); máy aot gọi(kind, index, frame); vm_pop(frames); trả về aot_status();
+    vm_append(frames, frame); máy aot gọi(kind, index, frame);
+    // Đọc mã thoát khi khung còn là gốc GC. Không giữ con trỏ giá trị
+    // qua bước dọn tài nguyên; initializer không quyết định mã thoát.
+    biến result = vm_get(frame, 0); biến exit_code = 0;
+    nếu (kind == 2 && vm_tag(result) == 1) { exit_code = vm_get(result, 1); };
+    nếu (aot_status() == 0) { vm_pop(frames); };
+    trả về exit_code;
+};
+// Native callback receives a snapshot offset, never a guest function pointer.
+hàm aot_worker_entry(packet) {
+    biến state = vm_worker_prepare(packet, 1); nếu (state == 0) { trả về -1; };
+    biến bundle = vm_get(state, 8); biến callable = vm_at(bundle, 5); biến args = vm_at(bundle, 6);
+    biến id = vm_worker_callable(state, callable); biến closure = 0;
+    nếu (vm_tag(callable) == 7) { closure = callable; };
+    biến result = aot_invoke(id, args, 0, 0, closure);
+    trả về vm_worker_finish(state, result);
 };
 hàm chính() {
     vm_init();
+    biến platform = máy thư mục thô(6, 0, 0);
+    nếu (platform < 0 || platform > 2) { trả về 1; };
+    vm_set(4198464, 8, platform);
+    biến executable = vm_string(4095);
+    nếu (executable == 0) { trả về 1; };
+    biến executable_length = máy tệp thực thi lấy(vm_get(executable, 2));
+    nếu (executable_length > 0 && executable_length <= 4095) { vm_set(executable, 1, executable_length); }
+    hoặc { executable = vm_literal(đối số lấy(0)); };
+    vm_set(4198464, 10, executable);
+    // Only a boundary advertising the expanded heap may use it (older seeds retain the legacy limit).
+    nếu (máy thư mục thô(6, 1, 0) == 120000000) { vm_set(127000000, 0, 120000000); };
     // Ô thứ 17 giữ kho khung AOT, để GC thấy tất cả khung rảnh.
-    biến state = vm_alloc(80, 1); nếu (state == 0) { trả về 1; };
+    biến state = vm_alloc(88, 1); nếu (state == 0) { trả về 1; };
     vm_set(4198464, 2, state);
     vm_set(state, 0, vm_vector(4)); vm_set(state, 1, vm_vector(4)); vm_set(state, 2, vm_vector(4));
     vm_set(state, 4, vm_vector(5)); vm_set(state, 5, vm_vector(5)); vm_set(state, 6, vm_vector(4)); vm_set(state, 8, vm_vector(4));
@@ -2051,6 +2629,23 @@ hàm chính() {
         vm_set(fn, 2, máy aot thông tin(21, i, 0)); vm_set(fn, 3, máy aot thông tin(22, i, 0));
         vm_append(vm_get(state, 1), fn);
     };
+    // The program arena owns counters, but executable mappings are OS-owned.
+    nếu (máy aot thông tin(110, 0, 0) == 1 && functions <= 65536) {
+        biến jit_args = vm_vector(4);
+        vm_append(jit_args, vm_literal("VPP_JIT_TIER"));
+        biến jit_enabled = vm_host(state, 177, jit_args);
+        nếu (!(vm_tag(jit_enabled) == 3 && vm_equal(jit_enabled, vm_literal("0")))) {
+            biến jit_profile = vm_alloc(16 + functions * 16, 0);
+            nếu (jit_profile == 0) { trả về 1; };
+            vm_set(state, 20, jit_profile);
+            biến report_args = vm_vector(4);
+            vm_append(report_args, vm_literal("VPP_JIT_PROFILE"));
+            biến jit_value = vm_host(state, 177, report_args);
+            nếu (vm_tag(jit_value) == 3 && vm_equal(jit_value, vm_literal("1"))) {
+                vm_set(jit_profile, 0, 1);
+            };
+        };
+    };
     // Chỉ đo khi được yêu cầu; không tính bước khởi tạo vào thống kê.
     biến profile_args = vm_vector(4);
     vm_append(profile_args, vm_literal("VPP_VM_PROFILE"));
@@ -2067,17 +2662,35 @@ hàm chính() {
         vm_set(state, 19, chẩn đoán helper);
         vm_set(4198464, 12, 1);
     };
+    // Register the fixed native worker entry before user initializers.
+    biến worker_ready = máy aot thông tin(111, 0, 0) == 0;
     // Reject unavailable services before running any user initializer.
-    nếu (máy aot thông tin(3, 0, 0) != 0 || máy aot thông tin(4, 0, 0) != 0) { vm_error(22); };
+    nếu (máy aot thông tin(4, 0, 0) != 0) { vm_error(22); };
+    lặp(i = 0; i < máy aot thông tin(3, 0, 0); i++) {
+        nếu (aot_foreign_provider(i) == 0) { vm_error(22); thoát; };
+    };
     lặp(i = 0; i < máy aot thông tin(2, 0, 0); i++) {
         nếu (aot_status()) { thoát; }; aot_region(1, i);
     };
-    nếu (aot_status() == 0) { aot_region(2, 0); };
+    biến exit_code = 0;
+    nếu (aot_status() == 0) { exit_code = aot_region(2, 0); };
+    nếu (worker_ready && máy worker thô(10, 0, 0) != 0) { vm_error(22); };
+    aot_jit_finish(state, functions);
     vm_socket_close_all(state); vm_process_close_all(state); vm_dir_close_all(state);
     vm_profile_report();
     nếu (aot_status()) {
+        nếu (aot_arithmetic_diagnostic(state)) { trả về 1; };
         vm_write(2, vm_concat(vm_literal("V++ AOT runtime: error="), vm_integer_text(vm_get(4198464, 1))));
-        vm_write(2, vm_literal("\n")); trả về 1;
+        vm_write(2, vm_concat(vm_literal(" opcode="), vm_integer_text(vm_get(4198464, 5))));
+        vm_write(2, vm_literal("\n"));
+        nếu (vm_get(4198464, 1) == 16) {
+            biến message = vm_text(vm_get(4198464, 3));
+            nếu (vm_tag(message) == 3) {
+                vm_write(2, vm_literal("V++ AOT exception: "));
+                vm_write(2, message); vm_write(2, vm_literal("\n"));
+            };
+        };
+        trả về 1;
     };
-    trả về 0;
+    trả về exit_code;
 };

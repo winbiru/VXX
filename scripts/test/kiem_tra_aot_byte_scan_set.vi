@@ -1,0 +1,32 @@
+nhập gói.dữ liệu.json.json.*;
+nhập gói.lõi.chuyển kiểu.*;
+hàm quét tập(a, i, n) {
+    khi (i < n) {
+        nếu (a[i] != 9 && a[i] != 10 && a[i] != 13 && a[i] != 32) { thoát; };
+        i = i + 1;
+    };
+    trả về i;
+};
+hàm quét khác(a, i, n) {
+    khi (i < n) {
+        nếu (a[i] != 65 && a[i] != 66 && a[i] != 67 && a[i] != 68) { thoát; };
+        i = i + 1;
+    };
+    trả về i;
+};
+hàm chính() {
+    a = máy ảo xem byte chuỗi(" \t\r\n \tX");
+    in quét tập(a, 0, 7) == 6;
+    in quét tập(a, 2, 4) == 4;
+    in quét tập(a, 6, 7) == 6;
+    in quét tập(a, 7, 7) == 7;
+    in quét tập([9,10,13,32,11], 0, 5) == 4;
+    in quét tập(máy ảo xem byte chuỗi("\t\n\r x"), 0, 5.0) == 4;
+    in quét khác(máy ảo xem byte chuỗi("ABCDDAz"), 0, 7) == 6;
+    in quét khác(máy ảo xem byte chuỗi("XABCD"), 0, 5) == 0;
+    in json tạo(json phân tích(" \t\r\n [ 123456 \t\r\n, -42 \r, 0 ] \n")) == "[123456,-42,0]";
+    in json tạo(json phân tích(" { \n \"a\" \t : \r [1, 2] } ")) == "{\"a\":[1,2]}";
+    lỗi = sai;
+    thử { json phân tích("[1," + chuỗi từ byte máy ảo([11]) + "2]"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

@@ -20,7 +20,7 @@ elseif (VPP_COMPILER STREQUAL "vpp")
 else()
     message(FATAL_ERROR "Unsupported DNS fixture compiler: ${VPP_COMPILER}")
 endif()
-set(fixture "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_socket_dns_vi.vi")
+set(fixture "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_socket_dns_vi.vi")
 set(hosts_file "${VPP_BINARY_ROOT}/vpp-socket-dns-vi-${VPP_COMPILER}.hosts")
 file(WRITE "${hosts_file}" "203.0.113.21 fixture.test\n::1 fixture.test\n")
 

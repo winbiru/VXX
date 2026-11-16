@@ -1,7 +1,33 @@
-// Biên dịch nhúng: V++ kiểm tra hợp đồng và dựng snapshot.
-// Boundary bootstrap bien_dich_phan_tich_vm hiện gọi compiler C++.
-nhập gói.biên dịch.cây cú pháp.biên dịch cây từ thô;
-nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
+// Snapshot dùng cùng lexer/parser/linker V++ với compiler tự chủ.
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa gọn;
+nhập gói.biên dịch.liên kết.biên dịch chương trình tự chủ;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn nhúng tự chủ;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+hàm riêng tư snapshot khai báo(mục) {
+    tham số = []; tên = lấy từ điển(mục, "tham số", []);
+    mặc định = lấy từ điển(mục, "mặc định tham số", []);
+    lặp(i = 0; i < độ dài(tên); i++) {
+        có mặc định = sai;
+        nếu (i < độ dài(mặc định)) { có mặc định = mặc định[i] != rỗng; };
+        máy ảo thêm cuối danh sách(tham số, {"tên": tên[i], "có mặc định": có mặc định});
+    };
+    con = []; phương thức = lấy từ điển(mục, "phương thức", []);
+    lặp(i = 0; i < độ dài(phương thức); i++) {
+        máy ảo thêm cuối danh sách(con, snapshot khai báo(phương thức[i]));
+    };
+    phạm vi = lấy từ điển(mục, "phạm vi", "");
+    nếu (phạm vi == "") { phạm vi = "mặc định"; };
+    trả về {"loại": lấy từ điển(mục, "loại", "khác"),
+        "tên": lấy từ điển(mục, "tên", ""), "phạm vi": phạm vi,
+        "tham số": tham số, "thành viên": con,
+        "đích": lấy từ điển(mục, "đích", ""),
+        "bí danh": lấy từ điển(mục, "bí danh", ""),
+        "công khai": lấy từ điển(mục, "công khai", sai)};
+};
 
 // Snapshot chỉ phụ thuộc tham số; không cần tạo đối tượng trung gian.
 hàm công khai biên dịch snapshot lỗi(lỗi) {
@@ -37,32 +63,53 @@ hàm công khai biên dịch snapshot nội bộ(mã nguồn, gốc = ".") {
         ném "biên dịch: mã nguồn phải là chuỗi";
     };
     gốc = biên dịch chuẩn hóa gốc(gốc);
-    thô = rỗng;
     thử {
-        thô = biên dịch phân tích máy ảo(mã nguồn, gốc);
+        // Lexer compact và parser dùng chung token; linker nhận chính AST này.
+        từ tố = biên dịch từ tố hóa gọn(mã nguồn)["token"];
+        cây = biên dịch phân tích chương trình thuần(mã nguồn, từ tố);
+        khai báo = []; có nhập mô đun = sai;
+        các mục = cây["câu lệnh"];
+        lặp(i = 0; i < độ dài(các mục); i++) {
+            mục = các mục[i];
+            nếu (mục["loại"] == "nhập") { có nhập mô đun = đúng; };
+            máy ảo thêm cuối danh sách(khai báo, snapshot khai báo(mục));
+        };
+        sản phẩm = rỗng;
+        nếu (có nhập mô đun) {
+            thư viện = đọc biến môi trường("VPP_HOME", ".");
+            sản phẩm = biên dịch nguồn nhúng tự chủ(mã nguồn,
+                đường dẫn tuyệt đối(gốc), đường dẫn tuyệt đối(thư viện), 0, sai, cây);
+        } hoặc { sản phẩm = biên dịch chương trình tự chủ(mã nguồn, cây); };
+        mã = sản phẩm["bytecode"]; root = [];
+        số lệnh gốc = độ dài(mã);
+        // The execution artifact appends an entry call (or zero) and HALT.
+        // The inspection API exposes the source's root region only.
+        nếu (số lệnh gốc >= 2) {
+            nếu (mã[số lệnh gốc - 1]["op"] == 44) {
+                số lệnh gốc -= 2;
+            };
+        };
+        lặp(i = 0; i < số lệnh gốc; i++) { máy ảo thêm cuối danh sách(root, mã[i]); };
+        các hàm = []; tổng lệnh = độ dài(root); phạm vi = 0; tham chiếu = 0;
+        danh sách hàm nguồn = sản phẩm["hàm"];
+        lặp(i = 0; i < độ dài(danh sách hàm nguồn); i++) {
+            h = danh sách hàm nguồn[i]; thân = h["bytecode"];
+            tổng lệnh += độ dài(thân);
+            máy ảo thêm cuối danh sách(các hàm, {"tên": lấy từ điển(h, "tên chạy", h["tên"]),
+                "id": h["id"], "bytecode": thân});
+            lặp(j = 0; j < độ dài(thân); j++) {
+                nếu (thân[j]["op"] == 14) { phạm vi++; };
+                nếu (thân[j]["op"] == 61) { tham chiếu++; };
+            };
+        };
+        trả về {"hợp lệ": 1, "lỗi": "", "token": độ dài(từ tố), "từ tố": độ dài(từ tố),
+            "ký hiệu": độ dài(sản phẩm["chuỗi"]), "phạm vi": phạm vi,
+            "tham chiếu": tham chiếu, "lệnh": tổng lệnh,
+            "vùng ir chưa trực tiếp": 0,
+            "mô đun": độ dài(lấy từ điển(sản phẩm, "mô đun khởi tạo", [])) + 1,
+            "bytecode": root, "hàm": các hàm, "cây cú pháp": khai báo};
     } bắt lỗi (e) {
         trả về biên dịch snapshot lỗi(e);
-    };
-    các hàm = [];
-    lặp(i = 0; i < máy ảo lấy độ dài(thô[9]); i++) {
-        h = thô[9][i];
-        máy ảo thêm cuối danh sách(các hàm, {"tên": h[0], "id": h[1],
-                        "bytecode": biên dịch mã trung gian từ thô(h[2])});
-    };
-    trả về {
-        "hợp lệ": 1,
-        "lỗi": "",
-        "token": thô[0],
-        "từ tố": thô[0],
-        "ký hiệu": thô[1],
-        "phạm vi": thô[2],
-        "tham chiếu": thô[3],
-        "lệnh": thô[4],
-        "vùng ir chưa trực tiếp": thô[5],
-        "mô đun": thô[6],
-        "bytecode": biên dịch mã trung gian từ thô(thô[7]),
-        "hàm": các hàm,
-        "cây cú pháp": biên dịch cây từ thô(thô[8])
     };
 };
 

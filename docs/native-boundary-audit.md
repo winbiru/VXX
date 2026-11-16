@@ -1,5 +1,19 @@
 # Ranh giới thư viện V++ và primitive VM
 
+## Phạm vi kiểm thử linker hiện tại (14/11/2026)
+
+V++ đã có linker ELF và PE32+ AMD64 viết bằng V++; phạm vi PE/COFF và các
+giới hạn được mô tả trong [native-linker-selfhosting.md](native-linker-selfhosting.md).
+Năm ca `linker-reader`, `linker-layout`, `linker-patch`, `linker-executable`
+và `linker-direct-object` kiểm tra Mach-O nên chỉ chạy trên Darwin.
+Các ca không áp dụng cho Linux/Windows được bỏ qua im lặng trên console;
+`results.json` vẫn ghi `UNSUPPORTED` để kiểm toán phạm vi kiểm thử.
+Đây là bỏ qua theo định dạng đối tượng, không phải thất bại của linker ELF/PE.
+CI kiểm tra ELF qua `check_linux_source_bootstrap.sh` và `linker-elf-partial`,
+PE qua `check_windows_native_pe_selfhosting.ps1` và các pha của
+`check_windows_full_bootstrap.py`. Kết quả của từng gate cần được xác nhận
+riêng trên nền tảng tương ứng; không suy ra PASS từ việc có mã nguồn.
+
 ## Windows x64: runtime COFF qua Docker/Wine (02/11/2026)
 
 Gate `scripts/quality/check_windows_file_boundary_docker.sh` hiện PASS
@@ -13,7 +27,7 @@ Kiểm thử giới hạn bộ nhớ và PID Docker, có deadline Wine và trán
 đệ quy khi argv của child sai. `check_aot_primitives.sh` cũng PASS các
 target cross-assembly. Chưa xác minh runtime trên Windows thật bằng
 MSVC/UCRT/CNG, chưa có PE/COFF linker viết bằng V++ và chưa hội tụ compiler
-self-host Windows.
+self-host Windows tại thời điểm ghi nhận mục này; xem cập nhật phía trên.
 
 ## DNS V++, mã hóa bản ghi TLS và bootstrap hội tụ (28/10/2026)
 
@@ -660,16 +674,15 @@ trường `tm_sec`, `tm_min`, `tm_hour`, `tm_mday`, `tm_mon`, `tm_year`,
 Các phép đổi Gregorian, offset giờ/phút, kiểm tra ngày và định dạng tiếp tục
 ở V++. API `thời gian địa phương từ epoch byte ffi/posix` vẫn tương thích.
 
-Trên macOS/Linux ARM64/x86-64, `scripts/ASM/common/posix/vpp_localtime_primitives.S`
-gọi `localtime_r` công khai của libSystem/libc. C++ adapter tạm thời đóng gói
-`struct tm` thành wire layout ổn định, tránh phụ thuộc vào padding của host.
-Trên Windows dùng CRT `localtime_s` qua C++ adapter, `tm_gmtoff` trả 0; V++
-tính lại chênh lệch địa phương–UTC theo epoch gốc. **Đây chưa phải timezone
-thuần V++/ASM độc lập libc/CRT**; để tự chủ hoàn toàn phải thay việc tra cứu
-timezone của host bằng TZif/IANA parsing, xử lý TZ/DST và snapshot runtime
-trong `.vi`, đồng thời bootstrap dữ liệu timezone. Windows/Linux runtime CI
-chưa được xác nhận. macOS ARM64: native hardening, fixture DST interpreter/JIT
-6/6, AOT capability isolation PASS; cross-assembly đủ 4 Unix ABI PASS.
+Runtime thuần V++ hiện xử lý Gregorian, TZ POSIX và TZif v1–4 (bao gồm
+quy tắc DST trong footer) trong `gói/máy ảo/máy hệ thống.vi`. Trên Unix,
+đọc `/etc/localtime` mặc định hoặc tệp trong `/usr/share/zoneinfo` qua
+machine ABI; từ chối TZif có leap-second records. Windows dùng Win32
+`SystemTimeToTzSpecificLocalTimeEx` và `GetTimeZoneInformationForYear`
+qua Assembly khi không cấu hình TZ, còn TZ POSIX dùng cùng parser V++.
+Không cần C++ adapter hoặc CRT localtime. Windows chưa hỗ trợ tên IANA
+trong TZ; phạm vi Win32 mặc định bắt đầu từ năm 1601. macOS đã qua probe
+DST POSIX/IANA và epoch âm; Linux/Windows runtime CI vẫn cần xác nhận.
 Migration giảm foreign functions **38 → 37**, foreign libraries **9 → 8**;
 audit có ratchet chặn quay lại `localtime_r` FFI trong `.vi`.
 

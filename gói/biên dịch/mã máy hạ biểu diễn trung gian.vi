@@ -35,11 +35,15 @@ lớp công khai Bộ Hạ Mã Máy {
         nếu (mục ký hiệu == "vpp_native_bytes_slice" ||
             mục ký hiệu == "vpp_native_bytes_store_i32" || mục ký hiệu == "vpp_native_link_macho" ||
             mục ký hiệu == "vpp_native_link_macho_modules") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_jit_service") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_worker_service") { trả về 3; };
         nếu (mục ký hiệu == "vpp_native_memory_read_byte") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_memory_write_byte") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_read_i32") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_memory_write_i32") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_zero") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_memory_copy") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_memory_ascii_prefix") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_bind") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_open") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_read") { trả về 3; };
@@ -68,6 +72,21 @@ lớp công khai Bộ Hạ Mã Máy {
         nếu (mục ký hiệu == "vpp_native_os_argument_byte") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_i32_div") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_runtime_module_path") { trả về 0; };
+        nếu (mục ký hiệu == "vpp_native_f64_from_i32") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_f64_binary") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_f64_compare") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_f64_to_i32") { trả về 1; };
+        nếu (mục ký hiệu == "vpp_native_f64_parse") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_f64_text") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_os_clock") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_os_sleep") { trả về 1; };
+        nếu (mục ký hiệu == "vpp_native_os_entropy") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_os_identity") { trả về 1; };
+        nếu (mục ký hiệu == "vpp_native_os_directory") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_os_process") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_os_socket") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_os_thread_cpu_clock") { trả về 1; };
+        nếu (mục ký hiệu == "vpp_native_os_seek") { trả về 3; };
         trả về -1;
     };
 
@@ -420,7 +439,7 @@ lớp công khai Bộ Hạ Mã Máy {
                 nếu (v["callTarget"] == "NativeRuntime") {
                     số đối số dòng lệnh = mình.biên dịch máy hạ môi trường thực thi số tham số(v["text"]);
                     nếu (số đối số dòng lệnh == -1 || v["symbolId"] != -1 || máy ảo lấy độ dài(các mã phép toán) != số đối số dòng lệnh) {
-                        mình.biên dịch máy hạ lỗi("runtime native i32/byte có ABI không hợp lệ");
+                        mình.biên dịch máy hạ lỗi("runtime native i32/byte có ABI không hợp lệ: " + v["text"]);
                     };
                     lặp (i = 0; i < số đối số dòng lệnh; i++) {
                         mình.biên dịch máy hạ biểu thức(IR, trạng thái, các mã phép toán[i], sâu + 1);

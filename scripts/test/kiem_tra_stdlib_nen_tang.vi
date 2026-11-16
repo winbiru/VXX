@@ -1,0 +1,60 @@
+nhập gói.chuẩn.chính.*;
+
+hàm chính() {
+    // Chuỗi UTF-8 phải tính/reverse theo code point, không theo byte.
+    in độ dài("Việt Nam");
+    in đảo ngược("Việt");
+    việt = "Việt";
+    unicode4 = "𠀀Việt";
+    in việt[2];
+    in unicode4[0];
+    in unicode4[3];
+    in độ dài("𠀀Việt");
+    in cắt chuỗi("𠀀Việt Nam", 1, 4);
+    in cắt chuỗi("𠀀Việt", 0, 2);
+    in cắt chuỗi("Việt", 2, 99);
+    in chuỗi thường("ĐẶNG THỊ HỒNG 𠀀中");
+    in chuỗi hoa("Việt Nam ươ 𠀀中");
+    in chuẩn hóa unicode("Việt Nam");
+    in chuẩn hóa unicode("Ắ Ớ");
+
+    in thành số nguyên("42");
+    in thành số thực("3.5");
+    in thành chuỗi(12);
+    danh sách mẫu = [1, 2];
+    in loại của(danh sách mẫu);
+    in ngẫu nhiên nguyên(5, 5);
+    r = ngẫu nhiên nguyên(-5, 5);
+    in r >= -5 && r <= 5;
+
+    in thay thế(đường dẫn nối("a", "b"), "\\", "/");
+    in đường dẫn cha("a/b/c.vi");
+    in đường dẫn tên("a/b/c.vi");
+    in đường dẫn nối("a/", "b");
+    in đường dẫn nối("", "b");
+    in thay thế(đường dẫn nối("a", ""), "\\", "/");
+    in đường dẫn nối("a", "/b");
+    in đường dẫn tên("a/b/") == "";
+    in đường dẫn cha("a/b/");
+    in thay thế(đường dẫn cha("/"), "\\", "/");
+    in đường dẫn cha("c.vi") == "";
+    in đường dẫn tồn tại("scripts/test/__vpp_stdlib_missing_path__");
+    in là tệp("scripts/test/__vpp_stdlib_missing_path__");
+    in là thư mục("scripts/test/__vpp_stdlib_missing_path__");
+    thư mục test = đường dẫn nối("scripts/test/.tmp", "stdlib_nền_tảng_𠀀");
+    xóa đường dẫn(thư mục test);
+    in đường dẫn tên(thư mục test);
+    in tạo thư mục(thư mục test);
+
+    tệp test = đường dẫn nối(thư mục test, "mẫu.txt");
+    ghi tệp(tệp test, "xin chào");
+    in đường dẫn tồn tại(tệp test);
+    in là tệp(tệp test);
+    in là thư mục(thư mục test);
+    in liệt kê thư mục(thư mục test);
+
+    in đọc biến môi trường("__VPP_TEST_BIEN_KHONG_TON_TAI__", "mặc định");
+    ngủ mili giây("0");
+    in "đã ngủ";
+    in xóa đường dẫn(thư mục test) > 0;
+};

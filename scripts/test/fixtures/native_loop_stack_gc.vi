@@ -1,0 +1,27 @@
+// Default giữ callee và vòng lặp ở đường động, không che lỗi bằng i32 fast path.
+hàm trộn động(a, b = 0) { trả về (a * 33) ^ b; };
+hàm lặp động(n) {
+    tổng = 17;
+    lặp(i = 0; i < n; i++) { tổng = trộn động(tổng, i); };
+    trả về tổng;
+};
+hàm giảm động(n) {
+    tổng = 17;
+    lặp(i = n; i > 0; i--) { tổng = trộn động(tổng, i); };
+    trả về tổng;
+};
+hàm đổi kiểu đếm(n) {
+    tổng = 17;
+    lặp(i = 0.5; i < n; i++) { tổng = trộn động(tổng, 0); };
+    trả về i;
+};
+hàm trả ngầm(n) { lặp(i = 0; i < n; i++) { }; };
+hàm chính() {
+    in lặp động(2000000);
+    in lặp động(0);
+    in giảm động(8);
+    in đổi kiểu đếm(3);
+    trả ngầm(0);
+    in trả ngầm(3);
+    in "Dynamic loop stack/GC: PASS";
+};

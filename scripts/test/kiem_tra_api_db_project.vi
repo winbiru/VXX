@@ -1,0 +1,51 @@
+nhập scripts.test.fixtures.api_project.database.*;
+nhập scripts.test.fixtures.api_project.controller.*;
+nhập scripts.test.fixtures.api_project.repository.*;
+nhập scripts.test.fixtures.api_project.mapper.*;
+nhập scripts.test.fixtures.api_project.service.*;
+nhập gói.ứng dụng.cầu nối.giao diện lập trình.*;
+
+lớp công khai ApiDbProjectTest {
+    // Nhận controller đã ghép đủ dependency để test không tự tạo tầng nghiệp vụ.
+    hàm khởi tạo(controller) {
+        mình.controller = controller;
+    };
+
+    // Chạy toàn bộ CRUD/search qua một controller instance xuyên suốt vòng đời test.
+    hàm công khai runAll() {
+        controller = mình.controller;
+        dbSession = "OPEN";
+
+        connectRes = db connect("");
+        in ứng dụng json cơ sở dữ liệu khởi động(connectRes);
+
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-001");
+        controller.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
+        controller.createUser(dbSession, "Bearer demo-token", "{\"name\":\"An\"}", "db-req-002");
+        controller.updateUser(dbSession, "Bearer demo-token", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-003a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "12", "db-req-004");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-004a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
+
+        disconnectRes = db disconnect();
+        in ứng dụng json cơ sở dữ liệu tắt(disconnectRes);
+        dbSession = "CLOSED";
+
+        // verify API behavior when DB is disconnected
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-006");
+
+        trả về 0;
+    };
+};
+
+hàm chính() {
+    // Composition root của fixture: tạo đối tượng graph một lần rồi inject từ ngoài vào.
+    repository = UserRepository();
+    mapper = UserMapper();
+    service = UserService(repository, mapper);
+    responseEntity = ResponseEntity();
+    controller = AdminRestController(service, responseEntity);
+    test = ApiDbProjectTest(controller);
+    test.runAll();
+};

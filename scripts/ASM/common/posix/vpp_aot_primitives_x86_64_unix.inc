@@ -31,6 +31,9 @@
 #define VPP_PATH_MAX 4096
 
 #include "aot_x86_64/bo_nho.inc"
+#ifdef __linux__
+#include "../vpp_jit_x86_64.inc"
+#endif
 #include "aot_x86_64/nhap_xuat.inc"
 #include "aot_x86_64/tep.inc"
 #include "aot_x86_64/tien_trinh.inc"
@@ -45,3 +48,5 @@
 #include "aot_x86_64/du_lieu.inc"
 #include "aot_x86_64/khoi_dong.inc"
 #include "aot_x86_64/may_ao.inc"
+
+#include "aot_x86_64/worker.inc"

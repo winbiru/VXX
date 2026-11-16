@@ -1,0 +1,3 @@
+lớp Chính {
+    hàm riêng tư chạy() { in 9; };
+};

@@ -29,7 +29,7 @@ và compiler AOT đầy đủ trong `build/native-compiler/vpp-native`.
 ./scripts/build-vpp-aot-runtime.sh
 VPP_AOT_RUNTIME=vpp \
   ./build/native-compiler/vpp-native build \
-  src/tests/fixtures/native_dynamic_vpp.vi -o build/dynamic-vpp
+  scripts/test/fixtures/native_dynamic_vpp.vi -o build/dynamic-vpp
 ./build/dynamic-vpp
 otool -L build/dynamic-vpp
 ```

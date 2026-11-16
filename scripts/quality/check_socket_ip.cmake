@@ -7,8 +7,8 @@ if (NOT DEFINED VPP_SOURCE_ROOT)
     message(FATAL_ERROR "VPP_SOURCE_ROOT is missing")
 endif()
 
-set(fixture "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_socket_ip.vi")
-file(READ "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_socket_ip.expected" expected)
+set(fixture "${VPP_SOURCE_ROOT}/scripts/test/kiem_tra_socket_ip.vi")
+file(READ "${VPP_SOURCE_ROOT}/scripts/test/expected/kiem_tra_socket_ip.expected" expected)
 string(REPLACE "\r\n" "\n" expected "${expected}")
 foreach(jit IN ITEMS 0 1)
     execute_process(

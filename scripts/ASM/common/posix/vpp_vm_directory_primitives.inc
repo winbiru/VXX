@@ -1,6 +1,9 @@
+// The native host maps the expanded arena on all supported targets.
+#define VM_DIR_X86_ARENA 135271424
 // ABI i32: identity(loại), directory(lệnh, điều khiển, dữ liệu). Lệnh: 0 mở(đường, ô16), 1 đọc(ô16,
 // đệm8192), 2 đóng(ô16), 3 xóa thư mục(đường), 4 tạo thư mục(đường, 0777). Con trỏ DIR giữ tại đây;
-// V++ giải mã bản ghi.
+// V++ giải mã bản ghi. Lệnh 5 đọc liên kết (đường, đệm4096); 6 trả nền tảng (0 Darwin, 1 Linux), 7 realpath Darwin.
+// Native hosts: lệnh 6 với đối số thứ hai bằng 1 trả giới hạn heap mở rộng.
 #if defined(__APPLE__)
 #define VM_DIR_SYM(x) _##x
 #define VM_DIR_LIB(x) _##x
@@ -76,8 +79,25 @@ Lvm_dinh_danh_sai_bat:
 .globl VM_DIR_SYM(vpp_native_os_directory)
 VM_DIR_SYM(vpp_native_os_directory):
     VM_VAO_THU_MUC
-    cmp w19, #4
+    cmp w19, #7
     b.hi Lvm_thu_muc_sai_bat
+    cmp w19, #6
+    b.ne 1f
+#if defined(__APPLE__) || defined(__linux__)
+    cmp w20, #1
+    b.ne 2f
+    mov w0, #(120000000 & 0xffff)
+    movk w0, #(120000000 >> 16), lsl #16
+    VM_TRA_THU_MUC
+2:
+#endif
+#if defined(__APPLE__)
+    mov w0, #0
+#else
+    mov w0, #1
+#endif
+    VM_TRA_THU_MUC
+1:
     cbz w19, Lvm_thu_muc_duong_bat
     cmp w19, #3
     b.hs Lvm_thu_muc_duong_bat
@@ -86,7 +106,7 @@ VM_DIR_SYM(vpp_native_os_directory):
     tst w20, #7
     b.ne Lvm_thu_muc_sai_bat
     mov w10, #0x13f0
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w20, w10
     b.hi Lvm_thu_muc_sai_bat
     add x23, x21, w20, uxtw
@@ -98,8 +118,8 @@ VM_DIR_SYM(vpp_native_os_directory):
     cmp w19, #2
     b.eq Lvm_thu_muc_dong_bat
     tbnz w22, #31, Lvm_thu_muc_sai_bat
-    mov w10, #0xf400           // Kích thước vùng nhớ trừ 8192 = 0x40ff400
-    movk w10, #0x40f, lsl #16
+    mov w10, #0xf400           // Kích thước vùng nhớ trừ 8192 = 0x80ff400
+    movk w10, #0x80f, lsl #16
     cmp w22, w10
     b.hi Lvm_thu_muc_sai_bat
     add x22, x21, w22, uxtw
@@ -142,10 +162,14 @@ Lvm_thu_muc_dong_bat:
 Lvm_thu_muc_duong_bat:
     tbnz w20, #31, Lvm_thu_muc_sai_bat
     mov w10, #0x400
-    movk w10, #0x410, lsl #16 // Kích thước vùng nhớ trừ 4096
+    movk w10, #0x810, lsl #16 // Kích thước vùng nhớ trừ 4096
     cmp w20, w10
     b.hi Lvm_thu_muc_sai_bat
     add x20, x21, w20, uxtw
+    cmp w19, #5
+    b.eq Lvm_thu_muc_doc_lien_ket_bat
+    cmp w19, #7
+    b.eq Lvm_thu_muc_doc_lien_ket_bat
     cmp w19, #4
     b.eq Lvm_thu_muc_tao_thu_muc_bat
     cmp w19, #3
@@ -154,7 +178,7 @@ Lvm_thu_muc_duong_bat:
     tst w22, #7
     b.ne Lvm_thu_muc_sai_bat
     mov w10, #0x13f0
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w22, w10
     b.hi Lvm_thu_muc_sai_bat
     add x23, x21, w22, uxtw
@@ -183,6 +207,49 @@ Lvm_thu_muc_duong_bat:
     str w10, [x23, #8]
     mov w0, #0
 Lvm_thu_muc_tra_ve_bat:
+    VM_TRA_THU_MUC
+Lvm_thu_muc_doc_lien_ket_bat:
+    cmp w22, w10
+    b.hi Lvm_thu_muc_sai_bat
+    mov x9, x20
+    mov w10, #4096
+1:  ldrb w11, [x9], #1
+    cbz w11, 2f
+    subs w10, w10, #1
+    b.ne 1b
+    b Lvm_thu_muc_sai_bat
+2:  add x22, x21, w22, uxtw
+#if defined(__APPLE__)
+    cmp w19, #7
+    b.ne 3f
+    mov x0, x20
+    mov x1, x22
+    bl _realpath
+    cbz x0, Lvm_thu_muc_errno_bat
+    mov w0, #0
+4:  ldrb w10, [x22, w0, uxtw]
+    cbz w10, Lvm_thu_muc_tra_ve_bat
+    add w0, w0, #1
+    cmp w0, #4096
+    b.lo 4b
+    b Lvm_thu_muc_nhap_xuat_bat
+3:  mov x0, x20
+    mov x1, x22
+    mov x2, #4096
+    mov x16, #58             // readlink
+    svc #0x80
+    b.cc Lvm_thu_muc_tra_ve_bat
+    neg w0, w0
+#else
+    cmp w19, #7
+    b.eq Lvm_thu_muc_sai_bat
+    mov x0, #-100
+    mov x1, x20
+    mov x2, x22
+    mov x3, #4096
+    mov x8, #78              // readlinkat
+    svc #0
+#endif
     VM_TRA_THU_MUC
 Lvm_thu_muc_xoa_bat:
 #if defined(__APPLE__)
@@ -312,13 +379,27 @@ Lvm_dinh_danh_sai_x86:
 .globl VM_DIR_SYM(vpp_native_os_directory)
 VM_DIR_SYM(vpp_native_os_directory):
     VM_VAO_THU_MUC
-    cmpl $4, %r15d
+    cmpl $7, %r15d
     ja Lvm_thu_muc_sai_x86
+    cmpl $6, %r15d
+    jne 1f
+    cmpl $1, %r13d
+    jne 2f
+    movl $120000000, %eax
+    VM_TRA_THU_MUC
+2:
+#if defined(__APPLE__)
+    xorl %eax, %eax
+#else
+    movl $1, %eax
+#endif
+    VM_TRA_THU_MUC
+1:
     testl %r15d, %r15d
     jz Lvm_thu_muc_duong_x86
     cmpl $3, %r15d
     jae Lvm_thu_muc_duong_x86
-    cmpl $68162544, %r13d
+    cmpl $(VM_DIR_X86_ARENA - 16), %r13d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r13d
     jnz Lvm_thu_muc_sai_x86
@@ -327,7 +408,7 @@ VM_DIR_SYM(vpp_native_os_directory):
     jne Lvm_thu_muc_da_dong_x86
     cmpl $2, %r15d
     je Lvm_thu_muc_dong_x86
-    cmpl $68154368, %r14d
+    cmpl $(VM_DIR_X86_ARENA - 8192), %r14d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r14
 #if defined(__APPLE__)
@@ -369,7 +450,7 @@ Lvm_thu_muc_dong_x86:
 #endif
     VM_TRA_THU_MUC
 Lvm_thu_muc_duong_x86:
-    cmpl $68158464, %r13d
+    cmpl $(VM_DIR_X86_ARENA - 4096), %r13d
     ja Lvm_thu_muc_sai_x86
     addq %r12, %r13
 #if !defined(__APPLE__)
@@ -385,11 +466,15 @@ Lvm_thu_muc_duong_x86:
     jmp Lvm_thu_muc_sai_x86
 2:
 #endif
+    cmpl $5, %r15d
+    je Lvm_thu_muc_doc_lien_ket_x86
+    cmpl $7, %r15d
+    je Lvm_thu_muc_doc_lien_ket_x86
     cmpl $4, %r15d
     je Lvm_thu_muc_tao_thu_muc_x86
     cmpl $3, %r15d
     je Lvm_thu_muc_xoa_x86
-    cmpl $68162544, %r14d
+    cmpl $(VM_DIR_X86_ARENA - 16), %r14d
     ja Lvm_thu_muc_sai_x86
     testl $7, %r14d
     jnz Lvm_thu_muc_sai_x86
@@ -420,6 +505,51 @@ Lvm_thu_muc_duong_x86:
     movl $0x44524944, 8(%r14)
     xorl %eax, %eax
 Lvm_thu_muc_tra_ve_x86:
+    VM_TRA_THU_MUC
+Lvm_thu_muc_doc_lien_ket_x86:
+    cmpl $(VM_DIR_X86_ARENA - 4096), %r14d
+    ja Lvm_thu_muc_sai_x86
+    movq %r13, %rax
+    movl $4096, %ecx
+1:  cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp Lvm_thu_muc_sai_x86
+2:  addq %r12, %r14
+#if defined(__APPLE__)
+    cmpl $7, %r15d
+    jne 3f
+    movq %r13, %rdi
+    movq %r14, %rsi
+    call VM_DIR_LIB(realpath)
+    testq %rax, %rax
+    jz Lvm_thu_muc_errno_x86
+    xorl %eax, %eax
+4:  cmpb $0, (%r14,%rax)
+    je Lvm_thu_muc_tra_ve_x86
+    incl %eax
+    cmpl $4096, %eax
+    jb 4b
+    jmp Lvm_thu_muc_nhap_xuat_x86
+3:  movq %r13, %rdi
+    movq %r14, %rsi
+    movl $4096, %edx
+    movl $0x200003a, %eax
+    syscall
+    jnc Lvm_thu_muc_tra_ve_x86
+    negl %eax
+#else
+    cmpl $7, %r15d
+    je Lvm_thu_muc_sai_x86
+    movl $-100, %edi
+    movq %r13, %rsi
+    movq %r14, %rdx
+    movl $4096, %r10d
+    movl $267, %eax
+    syscall
+#endif
     VM_TRA_THU_MUC
 Lvm_thu_muc_xoa_x86:
 #if defined(__APPLE__)
