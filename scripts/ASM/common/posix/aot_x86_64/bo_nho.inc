@@ -1,41 +1,68 @@
-// Cấp vùng nhớ, kiểm tra giới hạn và thao tác byte/i32/con trỏ.
-
+// Arena fast path is shared only before OS workers are enabled.
 .text
 .p2align 4
 .globl PUBLIC(vpp_native_memory_base)
 PUBLIC(vpp_native_memory_base):
     movq PUBLIC(vpp_native_arena_base)(%rip), %rax
     testq %rax, %rax
-    jne 1f
-    subq $8, %rsp                 // Căn ngăn xếp cho lời gọi SysV
-    xorl %edi, %edi
-    movl $VPP_ARENA_SIZE, %esi
-    movl $3, %edx                // PROT_READ | PROT_WRITE
-#ifdef __APPLE__
-    movl $0x1002, %ecx          // MAP_PRIVATE | MAP_ANON (Darwin)
-#else
-    movl $0x22, %ecx            // MAP_PRIVATE | MAP_ANONYMOUS (Linux)
-#endif
-    movq $-1, %r8
-    xorl %r9d, %r9d
-#ifdef __APPLE__
-    call LIB(mmap)
-#else
-    movl %ecx, %r10d             // Đối số syscall Linux thứ tư: cờ
-    movl $9, %eax                // SYS_mmap
-    syscall
-#endif
-    addq $8, %rsp
-#ifdef __APPLE__
-    cmpq $-1, %rax
-    je 2f
-#else
-    cmpq $-4095, %rax           // Linux trả mã lỗi âm -errno
-    jae 2f
-#endif
+    jnz Lmemory_base_return
+    pushq %rbx
+    cmpl $0, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    je Lmemory_base_allocate
+    call Lworker_os_arena
+    testq %rax, %rax
+    jnz Lmemory_base_pop
+Lmemory_base_allocate:
+    movl $VPP_ARENA_SIZE, %edi
+    call Lworker_os_map
+    testq %rax, %rax
+    jz Lmemory_base_pop
+    cmpl $0, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    jne Lmemory_base_tls
     movq %rax, PUBLIC(vpp_native_arena_base)(%rip)
-1:  ret
-2:  xorl %eax, %eax
+    jmp Lmemory_base_pop
+Lmemory_base_tls:
+    movq %rax, %rbx
+    movq %rax, %rdi
+    call Lworker_os_set_arena
+    testl %eax, %eax
+    jnz Lmemory_base_release
+    movq %rbx, %rax
+    jmp Lmemory_base_pop
+Lmemory_base_release:
+    movq %rbx, %rdi
+    movl $VPP_ARENA_SIZE, %esi
+    call Lworker_os_unmap
+    xorl %eax, %eax
+Lmemory_base_pop:
+    popq %rbx
+Lmemory_base_return:
+    ret
+.globl PUBLIC(vpp_native_memory_current)
+PUBLIC(vpp_native_memory_current):
+    cmpl $0, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    jne Lworker_os_arena
+    movq PUBLIC(vpp_native_arena_base)(%rip), %rax
+    ret
+.globl PUBLIC(vpp_native_arena_enable_threads)
+PUBLIC(vpp_native_arena_enable_threads):
+    cmpl $0, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    jne 1f
+    subq $8, %rsp
+    call PUBLIC(vpp_native_memory_base)
+    testq %rax, %rax
+    jz 2f
+    movq %rax, %rdi
+    call Lworker_os_enable
+    testl %eax, %eax
+    jnz 2f
+    movl $1, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    movq $0, PUBLIC(vpp_native_arena_base)(%rip)
+    addq $8, %rsp
+1:  xorl %eax, %eax
+    ret
+2:  movl $-1, %eax
+    addq $8, %rsp
     ret
 
 // Giữ ba đối số 32 bit trong lúc mmap khởi tạo vùng nhớ.
@@ -132,6 +159,10 @@ PUBLIC(vpp_native_memory_bind):
     xorl %eax, %eax
     TRA_BO_NHO
 Lbo_nho_loi:
+#ifdef VPP_MEMORY_SET_ERRNO
+    movl $22, %edi
+    call Lworker_set_errno
+#endif
     movl $-1, %eax
     TRA_BO_NHO
 
@@ -249,10 +280,36 @@ Lbulk_ascii_tail:
 Lbulk_ascii_done:
     TRA_BO_NHO
 
-// Switch native arenas at the JIT execution boundary.
-.text
+// JIT swaps only the calling thread's arena.
 .globl PUBLIC(vpp_native_jit_swap_arena)
 PUBLIC(vpp_native_jit_swap_arena):
+    cmpl $0, PUBLIC(vpp_native_arena_tls_enabled)(%rip)
+    jne Larena_swap_tls
     movq PUBLIC(vpp_native_arena_base)(%rip), %rax
     movq %rdi, PUBLIC(vpp_native_arena_base)(%rip)
     ret
+Larena_swap_tls:
+    pushq %rbx
+    pushq %r12
+    subq $8, %rsp
+    movq %rdi, %rbx
+    call Lworker_os_arena
+    movq %rax, %r12
+    movq %rbx, %rdi
+    call Lworker_os_set_arena
+    testl %eax, %eax
+    jnz 1f
+    movq %r12, %rax
+    addq $8, %rsp
+    popq %r12
+    popq %rbx
+    ret
+1:  ud2
+#ifdef __APPLE__
+.section __DATA,__bss
+#else
+.bss
+#endif
+.p2align 2
+PUBLIC(vpp_native_arena_tls_enabled): .zero 4
+.text

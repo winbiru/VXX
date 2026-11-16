@@ -1,5 +1,6 @@
 // Regression P1: list literal scalar, in và native độ dài.
 nhập gói.bộ sưu tập.chính.*;
+nhập gói.kiểm thử.khẳng định.*;
 
 ds = [1, "hai", rỗng];
 in ds;
@@ -70,3 +71,15 @@ ma trận = [[1, 2], [3, 4]];
 in ma trận[1][0];
 ma trận[0][1] = 9;
 in ma trận;
+
+// Growth must reach beyond the last power-of-four capacity below the limit.
+hàm kiểm tra tăng dung lượng danh sách() {
+    biến a = [];
+    lặp(i = 0; i < 524289; i++) {
+        máy ảo thêm cuối danh sách(a, 7);
+    };
+    khẳng định bằng(độ dài(a), 524289);
+    khẳng định bằng(a[0], 7);
+    khẳng định bằng(a[524288], 7);
+};
+kiểm tra tăng dung lượng danh sách();

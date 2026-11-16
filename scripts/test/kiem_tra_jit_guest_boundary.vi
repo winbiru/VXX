@@ -1,0 +1,16 @@
+nhập gói.kiểm thử.khẳng định.*;
+
+hàm chính() {
+    // A dynamic guest may stage compiler output, but it cannot publish raw
+    // executable memory, invoke raw entries, or query trusted host addresses.
+    mã = byte mới();
+    byte thêm(mã, 0);
+    khẳng định bằng(máy JIT thô(0, 0, 0), -1);
+    khẳng định bằng(máy JIT thô(1, mã, 0), -1);
+    khẳng định bằng(máy JIT thô(2, 0, 0), -1);
+    khẳng định bằng(máy JIT thô(4, 0, 0), -1);
+    khẳng định bằng(máy JIT thô(8, 0, 0), -1);
+    khẳng định bằng(máy JIT thô(9, 0, 0), -1);
+    byte hủy(mã);
+    in "JIT guest boundary: PASS";
+};

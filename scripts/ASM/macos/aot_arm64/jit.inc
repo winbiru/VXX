@@ -180,8 +180,8 @@ Ljit_leaf:
     movk w9, #0x810, lsl #16
     cmp w21, w9
     b.hi Ljit_invalid
-    adrp x25, _vpp_native_arena_base@PAGE
-    ldr x25, [x25, _vpp_native_arena_base@PAGEOFF]
+    bl _vpp_native_memory_current
+    mov x25, x0
     cbz x25, Ljit_invalid
     add x25, x25, w21, uxtw
     ldr x24, [x22]

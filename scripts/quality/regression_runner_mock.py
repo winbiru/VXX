@@ -29,8 +29,6 @@ def main():
 
     name = logical_self.stem
     if name == 'server':
-        mark('server-started')
-
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
                 body = b'{"ok":true}'
@@ -45,7 +43,13 @@ def main():
         class Server(http.server.HTTPServer):
             allow_reuse_address = True
 
-        with Server(('127.0.0.1', 18080), Handler) as server:
+        with Server(('127.0.0.1', 0), Handler) as server:
+            # Publish only after bind/listen. Each nested fixture owns its port.
+            port_file = Path.cwd() / 'server.port'
+            temporary = port_file.with_suffix('.tmp')
+            temporary.write_text(str(server.server_port), encoding='ascii')
+            temporary.replace(port_file)
+            mark('server-started')
             server.serve_forever()
     elif name in ('vpp', 'vpp-native', 'vpp-i32'):
         op = args[1]

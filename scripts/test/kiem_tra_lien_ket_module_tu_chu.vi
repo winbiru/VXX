@@ -1,6 +1,7 @@
 // Kiểm tra emitter/linker đồ thị: function ID, StringPool, initializer,
 // namespace và cả bốn trường opcode phải giữ đúng hợp đồng C++.
 nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch dựng đồ thị nguồn thuần;
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.văn bản.chuỗi.*;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
@@ -127,4 +128,16 @@ hàm chính() {
     thử { biên dịch liên kết đồ thị thuần({"loại": "sai"}); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "cần đồ thị"); };
     in lỗi;
+    // API trực tiếp phải kiểm tra kiểu và miền giá trị trước khi sửa đồ thị.
+    đồ thị = biên dịch dựng đồ thị nguồn thuần("main", {"main": "hàm chính() { in 42; };"});
+    // V++ biểu diễn đúng/sai bằng số nguyên 1/0; API không phân biệt chúng.
+    không hợp lệ = [-1, 9, 2.5, 2.0, "2", [], {}];
+    đạt = đúng;
+    lặp(i = 0; i < độ dài(không hợp lệ); i++) {
+        lỗi = sai;
+        thử { biên dịch liên kết đồ thị thuần(đồ thị, không hợp lệ[i]); }
+        bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "số worker phải là số nguyên trong khoảng 0..8"); };
+        đạt = đạt && lỗi;
+    };
+    in đạt;
 };

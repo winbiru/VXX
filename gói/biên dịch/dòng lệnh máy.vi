@@ -324,8 +324,10 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     bộ đệm ASM = rỗng;
     nếu (cache ASM) { bộ đệm ASM = bộ đệm; };
+    nguồn lỗi = rỗng;
+    nếu (runtime thuần && !kế hoạch[4]) { nguồn lỗi = sản phẩm; };
     asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4], bộ đệm ASM,
-        đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0", đích ghi, đối tượng);
+        đọc biến môi trường("VPP_AOT_ASM_DIRECT", "1") != "0", đích ghi, đối tượng, sai, nguồn lỗi);
     biên dịch hồ sơ ghi(đường hồ sơ, "asm.total", bắt đầu);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };
     trả về ["execute", asm];

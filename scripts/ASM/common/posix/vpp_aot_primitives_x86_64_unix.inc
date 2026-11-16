@@ -48,3 +48,5 @@
 #include "aot_x86_64/du_lieu.inc"
 #include "aot_x86_64/khoi_dong.inc"
 #include "aot_x86_64/may_ao.inc"
+
+#include "aot_x86_64/worker.inc"

@@ -15,7 +15,7 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 cp "$1" "$work/stage1.exe"
 cp "$2" "$work/vpp-runtime.obj"
 "${VPP_CLANG:-clang}" -target x86_64-pc-windows-msvc \
-    -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -c \
+    -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -DVPP_WINDOWS_I32_BOOTSTRAP=1 -c \
     "$root/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S" \
     -o "$work/windows-runtime.obj"
 printf 'hàm chính() { trả về 52; };\n' > "$work/gói thử nghiệm 𠮷.vi"

@@ -25,6 +25,7 @@ done
 IFS= read -r port <"$out/server.out"
 case "$port" in ''|*[!0-9]*) exit 1 ;; esac
 [ "$port" -gt 0 ] && [ "$port" -le 65535 ]
+export VPP_DNS_MOCK_BATCH=0 VPP_DNS_MOCK_READY=
 export VPP_DNS_MOCK_MODE="$mode" VPP_DNS_VI_PORT="$port"
 export VPP_DNS_VI_SERVER=127.0.0.1 VPP_DNS_VI_SERVERS=
 if [ "$mode" = 4 ]; then

@@ -13,7 +13,7 @@ docker image inspect "$image" >/dev/null
 mkdir -p "$2"
 out="$(cd "$2" && pwd)"
 "${VPP_CLANG:-clang}" -target x86_64-pc-windows-msvc \
-    -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -c \
+    -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -DVPP_WINDOWS_I32_BOOTSTRAP=1 -c \
     "$root/scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S" \
     -o "$out/windows-runtime.obj"
 VPP_HOME="$root" VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_TARGET=windows-x86_64 \

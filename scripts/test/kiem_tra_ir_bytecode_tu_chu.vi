@@ -263,4 +263,22 @@ hàm chính() {
                   "bắt lỗi { in i; }; };");
     in khớp opcode hàm("hàm f(n) { lặp(i = 0; i < n; i++) { nếu (i == 1) { thoát; }; }; trả về n; };");
     in khớp opcode hàm("hàm f(n) { lặp(i = 0; i < n; i++) { in f(i); }; };");
+    // Mỗi opcode lỗi có vị trí biểu thức riêng, kể cả lời gọi lồng nhau.
+    nguồn_vị_trí = "hàm f(a) { trả về a; };\nhàm chính() {\n    in f(f(21 / 0));\n    gọi f(2);\n};";
+    ir_vị_trí = biên dịch hạ IR thuần(nguồn_vị_trí)["hàm"][1]["lệnh"];
+    mã_vị_trí = biên dịch phát mã trung gian thuần(nguồn_vị_trí)["hàm"][1]["bytecode"];
+    lệnh_vị_trí = [];
+    mã_cột = [];
+    lặp(i = 0; i < độ dài(ir_vị_trí); i++) {
+        nếu (lấy từ điển(ir_vị_trí[i], "dòng", 0) > 0) { máy ảo thêm cuối danh sách(lệnh_vị_trí, [ir_vị_trí[i]["dòng"], ir_vị_trí[i]["cột"]]); };
+    };
+    lặp(i = 0; i < độ dài(mã_vị_trí); i++) {
+        nếu (lấy từ điển(mã_vị_trí[i], "dòng", 0) > 0) { máy ảo thêm cuối danh sách(mã_cột, [mã_vị_trí[i]["dòng"], mã_vị_trí[i]["cột"]]); };
+    };
+    in độ dài(lệnh_vị_trí) == 4 && lệnh_vị_trí[0][0] == 3 && lệnh_vị_trí[0][1] == 12 && lệnh_vị_trí[1][0] == 3 && lệnh_vị_trí[1][1] == 10 && lệnh_vị_trí[2][0] == 3 && lệnh_vị_trí[2][1] == 8 && lệnh_vị_trí[3][0] == 4 && lệnh_vị_trí[3][1] == 5;
+    khớp_vị_trí = độ dài(mã_cột) == độ dài(lệnh_vị_trí);
+    lặp(i = 0; i < độ dài(mã_cột) && i < độ dài(lệnh_vị_trí); i++) {
+        nếu (mã_cột[i][0] != lệnh_vị_trí[i][0] || mã_cột[i][1] != lệnh_vị_trí[i][1]) { khớp_vị_trí = sai; };
+    };
+    in khớp_vị_trí;
 };

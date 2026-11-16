@@ -117,7 +117,8 @@ hàm riêng tư ảnh runtime() {
         "vpp_native_dynamic_failed",
         "vpp_native_dynamic_handle_error",
         "vpp_native_i32_div",
-        "vpp_native_print_i32"
+        "vpp_native_print_i32",
+        "vpp_native_dynamic_source_site"
     ];
 };
 
@@ -302,23 +303,25 @@ lớp công khai Bộ Ghi Ảnh JIT {
     };
 };
 
-hàm riêng tư jit động từ dây(dây) {
+hàm riêng tư jit động từ dây(dây, nguồn lỗi) {
     ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
     ảnh = Bộ Ghi Ảnh JIT();
     thử {
         đích = "aarch64-apple-darwin";
         nếu (ảnh.hệ == 2) { đích = "x86_64-unknown-linux-gnu"; };
         nếu (ảnh.hệ == 3) { đích = "x86_64-pc-windows-msvc"; };
-        bỏ kết quả = biên dịch asm chương trình(dây, đích, sai, rỗng, đúng, rỗng, ảnh, đúng);
+        bỏ kết quả = biên dịch asm chương trình(dây, đích, sai, rỗng, đúng, rỗng, ảnh, đúng, nguồn lỗi);
         bỏ kết quả = ảnh.hoàn tất();
         trả về ảnh;
     } bắt lỗi(e) { ảnh.đóng(); ném e; };
 };
 hàm công khai jit động tệp(đường, thư viện) {
     ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
-    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn tệp tự chủ(đường, thư viện, 0, rỗng, đúng)));
+    sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện, 0, rỗng, đúng);
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(sản phẩm), sản phẩm);
 };
 hàm công khai jit động nguồn(nguồn, gốc, thư viện) {
     ảnh cần(máy JIT thô(0, 0, 0) > 0, "host chưa hỗ trợ");
-    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(biên dịch nguồn nhúng tự chủ(nguồn, gốc, thư viện, 0, đúng)));
+    sản phẩm = biên dịch nguồn nhúng tự chủ(nguồn, gốc, thư viện, 0, đúng);
+    trả về jit động từ dây(biên dịch nạp sản phẩm biên dịch(sản phẩm), sản phẩm);
 };

@@ -1,3 +1,4 @@
+cmake_host_system_information(RESULT vpp_host_arch QUERY OS_PLATFORM)
 foreach(required IN ITEMS VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "Selective imports missing ${required}")
@@ -7,7 +8,11 @@ file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(ENV{VPP_HOME} "${VPP_ROOT}")
 if (NOT DEFINED VPP_VM)
     set(VPP_VM "${VPP_OUTPUT_DIR}/vpp-vm")
-    execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${VPP_VM}"
+    set(vm_build_command "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${VPP_VM}")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND vpp_host_arch MATCHES "^(arm64|aarch64)$")
+        set(vm_build_command /bin/bash "${VPP_ROOT}/scripts/macos/build-vpp-vm.sh" "${VPP_STAGE1}" "${VPP_VM}")
+    endif()
+    execute_process(COMMAND ${vm_build_command}
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "Selective import VM build failed: ${status}\n${output}\n${errors}")

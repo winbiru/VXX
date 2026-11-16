@@ -31,9 +31,8 @@ add_custom_command(OUTPUT "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/v
 add_custom_target(vpp-cli ALL DEPENDS "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-i32"
   "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o")
 add_custom_command(OUTPUT "${VPP_BIN}/vpp-vm"
-  COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${CMAKE_SOURCE_DIR}" "VPP_NATIVE_NO_CACHE=1"
-    "${VPP_BIN}/vpp-i32" build "${CMAKE_SOURCE_DIR}/gói/máy ảo/chính.vi" -o "${VPP_BIN}/vpp-vm"
-  DEPENDS "${VPP_BIN}/vpp-i32" ${VPP_SOURCES}
+  COMMAND /bin/bash "${CMAKE_SOURCE_DIR}/scripts/macos/build-vpp-vm.sh" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm"
+  DEPENDS "${VPP_BIN}/vpp-i32" ${VPP_SOURCES} scripts/macos/build-vpp-vm.sh
   COMMENT "Biên dịch máy ảo V++ dùng chung cho các nhóm kiểm thử"
   VERBATIM)
 add_custom_target(vpp-vm ALL DEPENDS "${VPP_BIN}/vpp-vm")
@@ -61,6 +60,16 @@ if(BUILD_TESTING)
     add_test(NAME vpp-extension COMMAND "${VPP_NODE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_extension.js")
   endif()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+    add_test(NAME vpp-worker-machine COMMAND "${Python3_EXECUTABLE}"
+      "${CMAKE_SOURCE_DIR}/scripts/quality/check_worker_machine.py")
+    set_tests_properties(vpp-worker-machine PROPERTIES TIMEOUT 120 LABELS "smoke;worker")
+    add_test(NAME vpp-compiler-workers COMMAND "${CMAKE_COMMAND}"
+      "-DVPP_ROOT=${CMAKE_SOURCE_DIR}" "-DVPP_NATIVE_COMPILER=${VPP_BIN}/vpp"
+      "-DVPP_VM=${VPP_BIN}/vpp-vm" "-DVPP_OUTPUT_DIR=${CMAKE_BINARY_DIR}/compiler-workers"
+      -P "${CMAKE_SOURCE_DIR}/scripts/quality/check_compiler_workers.cmake")
+    set_tests_properties(vpp-compiler-workers PROPERTIES TIMEOUT 7200 LABELS "smoke;worker")
+  endif()
   add_test(NAME vpp-jit-cli COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_SOURCE_DIR}/scripts/quality/check_jit_cli.py" "${VPP_BIN}/vpp-jit")
   add_test(NAME vpp-jit-dynamic COMMAND "${Python3_EXECUTABLE}"
@@ -86,6 +95,10 @@ if(BUILD_TESTING)
     --suite full --backend jit --jit "${VPP_BIN}/vpp-jit" --jobs 2 --timeout 900
     --logs "${CMAKE_BINARY_DIR}/regression-logs/full")
   set_tests_properties(vpp-native-regression PROPERTIES TIMEOUT 21600 LABELS "regression;full;jit")
+  add_test(NAME vpp-trusted-host-regression COMMAND "${Python3_EXECUTABLE}" "${VPP_REGRESSION}"
+    --suite host --backend aot --compiler "${VPP_BIN}/vpp" --timeout 900
+    --logs "${CMAKE_BINARY_DIR}/regression-logs/host")
+  set_tests_properties(vpp-trusted-host-regression PROPERTIES TIMEOUT 1800 LABELS "regression;full;host")
 endif()
 install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)

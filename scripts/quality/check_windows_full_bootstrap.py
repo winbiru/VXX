@@ -117,10 +117,12 @@ def link(clang, objects, output, env, log):
     audit_pe(output)
 
 
-def fixture_cases(directory):
+def fixture_cases(directory, *, current_workers=True):
     hello = directory / 'hello.vi'
     hello.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
     yield 'hello', hello, b'42\n', 0
+    if current_workers:
+        yield 'native-worker', ROOT / 'scripts/test/kiem_tra_native_worker.vi', 'native worker: đạt\n'.encode('utf-8'), 0
     yield 'path-kind', FIXTURES / 'native_path_kind.vi', b'NATIVE PATH KIND OK\n', 0
     yield 'vm', FIXTURES / 'vm_asm.vi', ('-2147483648\n-2147483648\n-1\n3.75\n3.0\ni\n[1, 9, 3]\n16\n41\n42\n9\n25\nswitch\nngoại lệ VM\nASM VM OK\n').encode(), 0
     yield 'dynamic', FIXTURES / 'native_dynamic_vpp.vi', ('42\n43\n2147483647\n3.75\n2\n🐱\n[1, 9, 3]\n9\n41\n43\n9\n0\n1\n2\nđúng\n[ngoại lệ, 42]\n44\n10\n[1, 9, 3]\nVPP DYNAMIC AOT OK\n').encode(), 0
@@ -135,10 +137,10 @@ def fixture_cases(directory):
         yield name, FIXTURES / (stem + '.vi'), expected, status
 
 
-def check_fixtures(compiler, directory, env):
+def check_fixtures(compiler, directory, env, *, current_workers=True):
     directory.mkdir()
     command([compiler, '--version'], env, directory / 'version.log', timeout=120)
-    for name, source, expected, status in fixture_cases(directory):
+    for name, source, expected, status in fixture_cases(directory, current_workers=current_workers):
         binary = directory / (name + '.exe')
         command([compiler, 'build', source, '-o', binary], env, directory / (name + '.build.log'), timeout=600)
         audit_pe(binary)
@@ -169,7 +171,8 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         if prefix is None:
             seed_boundary = out / 'i32-boundary.obj'
             assemble(clang, ASM / 'windows/vpp_aot_primitives_windows_x86_64.S', seed_boundary,
-                     env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1', '-DVPP_JIT_DISABLED=1')
+                     env, out / 'i32-boundary.log', '-DVPP_NATIVE_RUNTIME_STACK_ABI=1', '-DVPP_JIT_DISABLED=1',
+                     '-DVPP_WINDOWS_I32_BOOTSTRAP=1')
             command(['pwsh', '-NoProfile', '-File', ROOT / 'scripts/quality/check_windows_native_pe_selfhosting.ps1',
                      '-SeedCompiler', SEEDS / 'vpp-i32.exe', '-RuntimeObject', seed_boundary,
                      '-OutputDirectory', out / 'i32-bootstrap'], env, out / 'i32-bootstrap.log')
@@ -183,6 +186,8 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         # AOT core must be regenerated from the source units, including f64.
         command([i32, 'object', runtime_source, '-o', out / 'runtime-core.o'], env, out / 'runtime-core.log')
         assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'platform.o', env, out / 'platform.log')
+        assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'vm-platform.o', env,
+                 out / 'vm-platform.log', '-DVPP_STANDALONE_VM_WORKER=1')
         assemble(clang, ASM / 'windows/vpp_windows_full_runtime_x86_64.S', out / 'raw-platform.o', env,
                  out / 'raw-platform.log', '-DVPP_WINDOWS_RAW_BOUNDARY=1')
     env = full_env(ROOT, out, boundary, clang)
@@ -193,7 +198,9 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
             shutil.copyfileobj(source, dest)
         assemble(clang, out / 'seed.S', out / 'seed.o', env, out / 'seed.log', '-DVPP_AOT_VPP_RUNTIME=1')
         link(clang, [out / 'seed.o', *objects], stage1, env, out / 'stage1-link.log')
-        check_fixtures(stage1, out / 'stage1-fixtures', env)
+        # The pinned seed predates the native worker ABI. Current-source
+        # stages 2 and 3 and the packaged standalone VM enforce worker tests.
+        check_fixtures(stage1, out / 'stage1-fixtures', env, current_workers=False)
     for stage, previous, current in ((2, stage1, stage2), (3, stage2, stage3)):
         if phase not in ('all', f'stage{stage}'):
             continue
@@ -216,7 +223,7 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         shutil.copy2(stage3, package / 'bin/vpp-native.exe')
         shutil.copy2(i32, package / 'bin/vpp-i32.exe')
         shutil.copy2(boundary, home / 'windows-runtime.obj')
-        for obj in [*objects, out / 'raw-platform.o']:
+        for obj in [*objects, out / 'raw-platform.o', out / 'vm-platform.o']:
             shutil.copy2(obj, home / 'native-vpp-runtime' / obj.name)
         shutil.copytree(ROOT / 'gói', home / 'gói')
         shutil.copytree(ASM, home / 'scripts/ASM')
@@ -225,7 +232,13 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         # The standalone VM has its own V++ main and needs the full OS boundary,
         # not the i32 compiler's narrower PE import table or AOT metadata.
         command([i32, 'object', ROOT / 'gói/máy ảo/chính.vi', '-o', out / 'vm.o'], env, out / 'vm-build.log')
-        link(clang, [out / 'vm.o', out / 'runtime.o', out / 'platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
+        link(clang, [out / 'vm.o', out / 'runtime.o', out / 'vm-platform.o'], package / 'bin/vpp-vm.exe', env, out / 'vm-link.log')
+        command(['cmake', '-DVPP_ROOT=' + ROOT.as_posix(),
+                 '-DVPP_NATIVE_COMPILER=' + stage3.as_posix(),
+                 '-DVPP_VM=' + (package / 'bin/vpp-vm.exe').as_posix(),
+                 '-DVPP_OUTPUT_DIR=' + (out / 'compiler-workers').as_posix(),
+                 '-P', ROOT / 'scripts/quality/check_compiler_workers.cmake'],
+                env, out / 'compiler-workers.log', timeout=7200)
         command([stage3, 'vm-build', ROOT / 'gói/máy ảo/nhà cung cấp DNS.vi',
                  '-o', package / 'bin/dns-provider.vmb'], env, out / 'package-dns-provider.log')
         command([stage3, 'build', ROOT / 'gói/biên dịch/dòng lệnh JIT.vi',
@@ -258,6 +271,10 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         command([sys.executable, ROOT / 'scripts/quality/check_jit_dynamic.py',
                  extracted / 'bin/vpp-jit.exe', extracted / 'share/vpp'],
                 run_env, out / 'package-jit-dynamic.log', cwd=smoke, timeout=3600)
+        command([sys.executable, ROOT / 'scripts/quality/run_native_regression.py',
+                 '--suite', 'host', '--backend', 'aot', '--compiler', compiler,
+                 '--timeout', '900', '--logs', out / 'host-regression'],
+                env, out / 'package-host-regression.log', cwd=smoke, timeout=1800)
         jit_probe = smoke / 'thử JIT.vi'
         jit_probe.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
         jit_env = dict(run_env, PATH=str(extracted / 'bin') + os.pathsep + run_env['PATH'],
@@ -306,7 +323,7 @@ def raw_build(i32, source, output, env, logs, vm_core=False, timeout=600):
     obj = logs / 'probe.obj'
     command([i32, 'object', source, '-o', obj], env, logs / 'object.log', timeout=timeout)
     runtime = Path(env['VPP_AOT_VPP_OBJECT'])
-    platform_object = runtime.with_name('platform.o' if vm_core else 'raw-platform.o')
+    platform_object = runtime.with_name('vm-platform.o' if vm_core else 'raw-platform.o')
     link(Path(env['VPP_AOT_ASSEMBLER']), [obj, runtime, platform_object], output, env, logs / 'link.log')
 
 

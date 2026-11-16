@@ -163,6 +163,7 @@
 #include "vpp_aot_vpp_exports.inc"
     .quad vpp_native_i32_div
     .quad vpp_native_print_i32
+    .quad vpp_native_dynamic_source_site
 .Ljit_x86_table_end:
 .bss
 .p2align 3

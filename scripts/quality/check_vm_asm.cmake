@@ -1,3 +1,4 @@
+cmake_host_system_information(RESULT vpp_host_arch QUERY OS_PLATFORM)
 cmake_minimum_required(VERSION 3.20)
 foreach(required IN ITEMS VPP_ROOT VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
@@ -41,6 +42,9 @@ else()
     if(WIN32)
         string(APPEND vm ".exe")
         execute_process(COMMAND ${VPP_RAW_BUILD} "${VPP_ROOT}/gói/máy ảo/chính.vi" "${vm}" --vm-core
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND vpp_host_arch MATCHES "^(arm64|aarch64)$")
+        execute_process(COMMAND /bin/bash "${VPP_ROOT}/scripts/macos/build-vpp-vm.sh" "${VPP_STAGE1}" "${vm}"
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
     else()
         execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}"
@@ -289,7 +293,7 @@ if(WIN32)
 endif()
 file(WRITE "${heap_source}" "")
 foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục máy" "tiến trình máy" "ổ cắm máy"
-        "phân giải máy" "host ABI" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
+        "phân giải máy" "host ABI" "truyền worker" "worker" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
     file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
     file(APPEND "${heap_source}" "${contents}\n")
 endforeach()

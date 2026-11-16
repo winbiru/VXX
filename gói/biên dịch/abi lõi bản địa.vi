@@ -82,5 +82,6 @@ hàm công khai biên dịch ABI lõi bản địa(tên) {
     nếu (tên == "máy đặt quyền tệp mở") { trả về {"id": 78, "symbol": "vpp_native_os_fchmod", "arity": 2}; };
     nếu (tên == "máy dịch tệp mở") { trả về {"id": 84, "symbol": "vpp_native_os_seek", "arity": 3}; };
     nếu (tên == "máy JIT thô") { trả về {"id": 85, "symbol": "vpp_native_jit_service", "arity": 3}; };
+    nếu (tên == "máy worker thô") { trả về {"id": 86, "symbol": "vpp_native_worker_service", "arity": 3}; };
     trả về rỗng;
 };

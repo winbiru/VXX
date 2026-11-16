@@ -130,9 +130,10 @@ hàm vm_append(v, item) {
         // Danh sách thường xuyên tăng qua 16/32/128 phần tử. Nới theo
         // lũy thừa bốn để giảm số lần cấp phát và sao chép vùng tham chiếu;
         // map, tuple và danh sách tham số vẫn giữ quy tắc nới cũ.
+        nếu (n >= 2000000) { trả về vm_capacity_error(3, n + 1, 2000000); };
         nếu (vm_get(v, 0) == 4) { cap = cap * 4; }
         hoặc { cap = cap * 2 + 8; };
-        nếu (cap > 2000000) { trả về vm_capacity_error(3, cap, 2000000); };
+        nếu (cap > 2000000) { cap = 2000000; };
         biến dữ liệu cũ = vm_get(v, 3);
         biến raw = vm_alloc(cap * 4, 1); nếu (raw == 0) { trả về 0; };
         // Đã biết n <= dung lượng cũ; sao chép trực tiếp, bỏ kiểm tra chỉ số.

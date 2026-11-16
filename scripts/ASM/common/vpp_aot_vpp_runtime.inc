@@ -81,6 +81,10 @@ _vpp_native_dynamic_\ten:
     bl _vpp_native_memory_base
     cbz x0, Laot_gap_khung_du_phong
     mov x19, x0
+    mov w9, #0x1144
+    movk w9, #0x40, lsl #16
+    ldr w9, [x19, w9, uxtw]
+    cbnz w9, Laot_gap_khung_du_phong
     add x21, x19, w20, uxtw
 
     // Chỉ dùng cache cục bộ. Frame toàn cục/constructor cần tra scope đầy đủ.
@@ -318,6 +322,8 @@ Laot_gap_khung_tra:
 .endm
 
 #include "vpp_aot_vpp_exports.inc"
+// Appended source-site helper; old bridge indices are unchanged.
+AOT_VPP source_site, 2
 
 // Tra một slot cục bộ theo đúng đường nhanh của vm_cell: bốn ô nội tuyến
 // rồi bốn mục cache. Không tìm thấy thì trả 0 để caller dùng đường đầy đủ.
@@ -400,6 +406,31 @@ Laot_doc_i32_nhanh_sai:
     mov w1, #0
     ret
 
+// Trusted registration: install the fixed callback only after opening the root registry.
+Lworker_aot_register:
+    stp x29, x30, [sp, #-16]!
+    mov w0, #11
+    mov w1, #0
+    mov w2, #0
+    bl _vpp_native_worker_service
+    cbnz w0, 1f
+    adrp x0, _vpp_worker_aot_entry_callback@PAGE
+    add x0, x0, _vpp_worker_aot_entry_callback@PAGEOFF
+    bl _vpp_native_worker_set_entry
+1:  ldp x29, x30, [sp], #16
+    ret
+_vpp_worker_aot_entry_callback:
+    sub sp, sp, #48
+    str x30, [sp, #32]
+    str w1, [sp]
+    str x0, [sp, #40]
+    bl _vpp_fn_aot_worker_entry
+    mov w1, w0
+    ldr x0, [sp, #40]
+    ldr x30, [sp, #32]
+    add sp, sp, #48
+    b _vpp_native_worker_compact_result
+
 // info(trường, chỉ số, byte) chỉ trả dữ liệu; giữ con trỏ máy đủ độ rộng bên trong ASM.
 .globl _vpp_native_aot_info
 _vpp_native_aot_info:
@@ -409,6 +440,8 @@ _vpp_native_aot_info:
     b.eq Ljit_dynamic_run
     cmp w0, #110
     b.eq Ljit_dynamic_active
+    cmp w0, #111
+    b.eq Lworker_aot_register
     AOT_ACTIVE_SPEC
     cmp w0, #4
     b.hi Laot_thong_tin_bang
@@ -854,6 +887,7 @@ Ljit_dynamic_table:
 #include "vpp_aot_vpp_exports.inc"
     .quad _vpp_native_i32_div
     .quad _vpp_native_print_i32
+    .quad _vpp_native_dynamic_source_site
 Ljit_dynamic_table_end:
 .zerofill __DATA,__bss,_vpp_jit_active_spec,8,3
 

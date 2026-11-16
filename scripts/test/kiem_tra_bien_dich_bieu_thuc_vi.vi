@@ -72,4 +72,11 @@ hàm chính() {
     lỗi = sai;
     thử { biên dịch phân tích biểu thức(""); } bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
+    // Cột tính theo byte UTF-8, vị trí bắt đầu từng biểu thức.
+    vị_trí = biên dịch phân tích biểu thức("  đếm +\n    gọiHàm(2 / 0)");
+    in vị_trí["dòng"] == 1 && vị_trí["cột"] == 3;
+    in vị_trí["phải"]["dòng"] == 2 && vị_trí["phải"]["cột"] == 5;
+    in vị_trí["phải"]["đối số"][0]["dòng"] == 2 && vị_trí["phải"]["đối số"][0]["cột"] == 15;
+    gọi_thành_viên = biên dịch phân tích biểu thức("  mình.tính(1)");
+    in gọi_thành_viên["dòng"] == 1 && gọi_thành_viên["cột"] == 3;
 };

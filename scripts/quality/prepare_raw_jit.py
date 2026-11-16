@@ -11,7 +11,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 VM_PARTS = ("bộ nhớ", "giá trị", "máy hệ thống", "thư mục máy", "tiến trình máy",
-            "ổ cắm máy", "phân giải máy", "host ABI", "nạp chương trình", "runtime",
+            "ổ cắm máy", "phân giải máy", "host ABI", "truyền worker", "worker", "nạp chương trình", "runtime",
             "thực thi", "số thực tự chủ")
 LEXICAL = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', re.S)
 DECLARATION = re.compile(r'(?m)^hàm\s+(?:(?:công khai|riêng tư)\s+)?([^(){};\n]+)\(([^()]*)\)\s*\{')

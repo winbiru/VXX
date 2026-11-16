@@ -114,7 +114,7 @@ hàm fixture(root, work) {
     nếu (env("VPP_TEST_JIT") != "") {
         tạo thư mục(work + "/processes");
     };
-    ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nif(NOT parent STREQUAL VPP_OUTPUT_DIR)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
+    ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nfile(TO_CMAKE_PATH \"\${VPP_OUTPUT_DIR}\" expected_dir)\ncmake_path(NORMAL_PATH parent)\ncmake_path(NORMAL_PATH expected_dir)\nif(NOT parent STREQUAL expected_dir)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
     cases = []; unregistered = {"scripts/test/http_fixture.vi": "HTTP support"};
     ghi tệp(work + "/scripts/test/http_fixture.vi", "");
     names = ["first", "second", "reject", "broken", "third", "fourth", "http1", "http2", "tooling"];

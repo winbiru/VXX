@@ -126,7 +126,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
         lặp (i = 0; i < giới hạn; i++) {
             nếu (byte đẩy số nguyên ba mươi hai bit(bảng nhập, 0) != 0) { mã trạng thái = -1; thoát; };
         };
-        lặp (i = 0; i < 86; i++) {
+        lặp (i = 0; i < 87; i++) {
             nếu (byte đẩy số nguyên ba mươi hai bit(bảng lõi, 0) != 0) { mã trạng thái = -1; thoát; };
         };
         lặp (i = 0; i < byte dài(các phần nhập); i = i + 8) {
@@ -136,7 +136,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
         };
         lặp (i = 0; i < byte dài(lời gọi lõi); i = i + 8) {
             biến mã nhập = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, i + 4);
-            nếu (i + 8 > byte dài(lời gọi lõi) || mã nhập < 0 || mã nhập >= 86) { mã trạng thái = -1; thoát; };
+            nếu (i + 8 > byte dài(lời gọi lõi) || mã nhập < 0 || mã nhập >= 87) { mã trạng thái = -1; thoát; };
             nếu (byte ghi số nguyên ba mươi hai bit(bảng lõi, mã nhập * 4, 1) != 0) { mã trạng thái = -1; thoát; };
         };
     };
@@ -183,7 +183,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
         };
     };
     nếu (mã trạng thái == 0) {
-        lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 86; môi trường thực thi mã định danh++) {
+        lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 87; môi trường thực thi mã định danh++) {
             nếu (byte đọc số nguyên ba mươi hai bit(bảng lõi, môi trường thực thi mã định danh * 4) == 1) {
                 nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên ký hiệu lõi(môi trường thực thi mã định danh), 0, 0) != 0) {
                     mã trạng thái = -1;
@@ -214,7 +214,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
             nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (mã lõi < 0) { mã trạng thái = -1; thoát; };
-            nếu (mã lõi > 85) { mã trạng thái = -1; thoát; };
+            nếu (mã lõi > 86) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, vị trí gọi lõi) != 0) { mã trạng thái = -1; thoát; };
             biến chỉ mục = byte đọc số nguyên ba mươi hai bit(bảng lõi, mã lõi * 4) - 1;
             nếu (chỉ mục < 0) { mã trạng thái = -1; thoát; };

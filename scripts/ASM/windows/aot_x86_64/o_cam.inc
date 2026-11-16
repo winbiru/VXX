@@ -97,7 +97,11 @@ vpp_native_os_socket:
 3:  xorl %r8d, %r8d
     xorl %r9d, %r9d
     movq $0, 32(%rsp)
-    movq $0x80, 40(%rsp)
+    // WSA_FLAG_NO_HANDLE_INHERIT | WSA_FLAG_OVERLAPPED.
+    // Winsock ignores SO_RCVTIMEO/SO_SNDTIMEO on WSASocket handles
+    // without OVERLAPPED, even when setsockopt succeeds. Blocking
+    // send/recv remain synchronous with this flag enabled.
+    movq $0x81, 40(%rsp)
     call WSASocketW
     cmpq $-1, %rax
     je .Lwin_socket_loi

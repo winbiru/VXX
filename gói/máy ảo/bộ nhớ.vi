@@ -189,7 +189,7 @@ hàm vm_init() {
     lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
     lặp(i = 0; i < 32; i++) { vm_set(4198592, i, 0); };
     // Linked roots for embedded bytecode calls (after the profiling scratch).
-    vm_set(4198720, 0, 0);
+    vm_set(4198720, 0, 0); vm_set(4198724, 0, 0);
     vm_set(4198464, 0, 8388608);
     vm_set(127000000, 0, 67000000);
     vm_set(127000000, 1, 1048576);

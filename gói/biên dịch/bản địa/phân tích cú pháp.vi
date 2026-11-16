@@ -332,6 +332,7 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiền tố ascii") == 1) { trả về 83; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy dịch tệp mở") == 1) { trả về 84; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy JIT thô") == 1) { trả về 85; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy worker thô") == 1) { trả về 86; };
     trả về -1;
 };
 
@@ -420,7 +421,7 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 81) { trả về 2; };
     nếu (mã định danh == 82) { trả về 3; };
     nếu (mã định danh == 83) { trả về 2; };
-    nếu (mã định danh == 84 || mã định danh == 85) { trả về 3; };
+    nếu (mã định danh == 84 || mã định danh == 85 || mã định danh == 86) { trả về 3; };
     trả về -1;
 };
 

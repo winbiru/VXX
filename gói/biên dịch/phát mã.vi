@@ -1027,9 +1027,23 @@ lớp công khai Bộ Phát Bytecode {
         ném "biên dịch phát mã: lệnh IR chưa hỗ trợ '" + mã + "'";
     };
 
+    // Bản ghi thô nội bộ có thể chứa thêm dòng/cột. Chỉ gắn vào opcode
+    // cuối cùng do IR này sinh ra (CALL/BINARY), không gắn vào receiver/args.
+    hàm riêng tư biên dịch phát mã IR có vị trí(mục, trạng thái, thô) {
+        trước = máy ảo lấy độ dài(thô);
+        mình.biên dịch phát mã IR một(mục, trạng thái, thô);
+        dòng = lấy từ điển(mục, "dòng", 0);
+        nếu (dòng > 0 && máy ảo lấy độ dài(thô) > trước) {
+            chỉ mục = máy ảo lấy độ dài(thô) - 1;
+            lệnh = thô[chỉ mục];
+            máy ảo thêm cuối danh sách(lệnh, dòng);
+            máy ảo thêm cuối danh sách(lệnh, mục["cột"]);
+        };
+    };
+
     hàm riêng tư biên dịch phát mã danh sách(các lệnh, trạng thái, thô) {
         lặp(i = 0; i < máy ảo lấy độ dài(các lệnh); i++) {
-            mình.biên dịch phát mã IR một(các lệnh[i], trạng thái, thô);
+            mình.biên dịch phát mã IR có vị trí(các lệnh[i], trạng thái, thô);
         };
     };
 
@@ -1474,7 +1488,7 @@ lớp công khai Bộ Phát Bytecode {
                 mình.biên dịch phát mã lệnh(đỉnh, biên dịch mã thao tác("OP_HAM"), tên mã định danh, mã định danh, 0);
             } hoặc {
                 lặp(j = mục["bắt đầu"]; j < mục["kết thúc"]; j++) {
-                    mình.biên dịch phát mã IR một(tất cả lệnh[j], trạng thái, đỉnh);
+                    mình.biên dịch phát mã IR có vị trí(tất cả lệnh[j], trạng thái, đỉnh);
                 };
             };
             };

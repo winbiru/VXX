@@ -7,6 +7,7 @@
 #include "../common/vpp_vietnamese_runtime_symbols.inc"
 
 #include "aot_arm64/bo_nho.inc"
+#include "aot_arm64/worker.inc"
 #include "aot_arm64/jit.inc"
 #include "aot_arm64/tep.inc"
 #include "aot_arm64/tien_trinh.inc"

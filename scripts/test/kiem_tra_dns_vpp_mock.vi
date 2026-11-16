@@ -5,7 +5,7 @@ nhập gói.bộ sưu tập.từ điển.*;
 nhập gói.kiểm thử.khẳng định.*;
 nhập gói.thời gian.đơn điệu.*;
 nhập gói.nhập xuất.tệp.ghi tệp;
-hàm kiểm tra chế độ DNS(mode, port) {
+hàm kiểm tra chế độ DNS(mode, port, dấu tiến độ = "") {
     bộ = Bộ Phân Giải DNS();
     nếu (mode >= 10 && mode != 20 && mode != 21) {
         rejected = sai; start = thời gian đơn điệu mili giây();
@@ -18,7 +18,9 @@ hàm kiểm tra chế độ DNS(mode, port) {
         khẳng định bằng(rejected, đúng, "malformed DNS accepted");
         khẳng định bằng(thời gian đơn điệu mili giây() - start < 1500, đúng, "DNS deadline reset");
     } hoặc nếu (mode == 3) {
+        nếu (dấu tiến độ != "") { bỏ kết quả = ghi tệp(dấu tiến độ, "resolver-enter"); };
         addresses = phân giải tên miền phân giải("example.com");
+        nếu (dấu tiến độ != "") { bỏ kết quả = ghi tệp(dấu tiến độ, "resolver-return"); };
         khẳng định bằng(độ dài(addresses), 1);
         khẳng định bằng(addresses[0], "203.0.113.47");
     } hoặc nếu (mode == 2 || mode == 4 || mode == 20 || mode == 21) {
@@ -62,5 +64,5 @@ hàm chính() {
     nếu (sẵn sàng != "") { bỏ kết quả = ghi tệp(sẵn sàng, "ready"); };
     mode = thành số nguyên(đọc biến môi trường("VPP_DNS_MOCK_MODE", "0"));
     port = thành số nguyên(đọc biến môi trường("VPP_DNS_VI_PORT", "53"));
-    kiểm tra chế độ DNS(mode, port);
+    kiểm tra chế độ DNS(mode, port, sẵn sàng);
 };

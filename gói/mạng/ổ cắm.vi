@@ -213,7 +213,9 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
         tên máy = mình.đầu nối yêu cầu tên máy(tên máy, "socket_tls_mo");
         cổng = mình.đầu nối yêu cầu cổng(cổng, "socket_tls_mo");
         thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_tls_mo");
-        cũ = ten nền tảng máy ảo() == "windows";
+        // TLS must use the same socket ownership domain as TCP. Only the
+        // explicit Windows legacy parity switch selects legacy primitives.
+        cũ = !mình.đầu nối mở bằng ffi();
         mã = mình.đầu nối mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo", cũ);
         // TLS chỉ bắt đầu sau khi đã chọn kết nối. Lỗi chứng chỉ/handshake được
         // trả ngay; V++ đóng socket TCP, không thử lại TLS trên địa chỉ khác.

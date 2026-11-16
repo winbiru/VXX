@@ -13,14 +13,15 @@ hàm copy(dst, src, n) {
     lặp(i = 0; i < n; i++) { put(dst + i, b(src + i)); };
     trả về 0;
 };
-hàm ready(port) {
+hàm write_number(fd, port) {
     biến p = 90000; biến n = 0;
+    nếu (port == 0) { put(p, 48); n = 1; };
     khi (port > 0) {
         put(p + n, 48 + port % 10); port = port / 10; n = n + 1;
     };
     lặp(i = 0; i < n; i++) { put(p + 32 + i, b(p + n - i - 1)); };
     put(p + 32 + n, 10);
-    trả về máy ghi(1, p + 32, n + 1);
+    trả về máy ghi(fd, p + 32, n + 1);
 };
 hàm recv_exact(c, p, n) {
     biến total = 0;
@@ -93,7 +94,7 @@ hàm chính() {
     nếu (tcp) {
         nếu (máy ổ cắm thô(1, l) < 0) { máy ổ cắm thô(5, u); trả về 5; };
     };
-    nếu (ready(port) < 1) { máy ổ cắm thô(5, u); trả về 6; };
+    nếu (write_number(1, port) < 1) { máy ổ cắm thô(5, u); trả về 6; };
     nếu (gated && đọc số() != 1) {
         máy ổ cắm thô(5, u);
         nếu (tcp) { máy ổ cắm thô(5, l); };
@@ -103,6 +104,12 @@ hàm chính() {
     lặp(index = 0; index < queries; index++) {
         m32(u + 16, q); m32(u + 20, 4096);
         biến n = máy ổ cắm thô(8, u);
+        // Mode 3 deliberately drops AAAA. Report each actual question type
+        // to stderr; stdout stays the port and final served-count protocol.
+        nếu (mode == 3) {
+            nếu (n >= 17) { write_number(2, b(q + n - 4) * 256 + b(q + n - 3)); }
+            hoặc { write_number(2, 0); };
+        };
         nếu (n < 17) { status = 7; thoát; };
         served = served + 1;
         nếu (mode == 3 && b(q + n - 3) == 28) { bỏ qua; };

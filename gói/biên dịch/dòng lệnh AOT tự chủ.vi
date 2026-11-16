@@ -108,7 +108,7 @@ hàm riêng tư AOT tự chủ xuất ASM(kế hoạch, gốc) {
     thử {
         nguồn = đường dẫn nối(tạm, "program.S");
         tệp = Bộ Đệm Tệp(nguồn, "ghi", 4096, "ghi ASM");
-        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng, tệp);
+        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, rỗng, đúng, tệp);
         nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
         bỏ kết quả = tệp.đóng();
         tệp = rỗng;
@@ -202,17 +202,17 @@ hàm riêng tư AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba, bộ đ
                 ném "Native AOT: direct ARM64 object requires VPP_AOT_NATIVE_MACHO_LINK=1";
             };
             obj = Bộ Ghi MachO Động(đường dẫn nối(tạm, "program.o"));
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, rỗng, obj, sai);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, rỗng, đúng, rỗng, obj, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected object"; };
             bỏ kết quả = obj.hoàn tất();
             obj = rỗng;
         } hoặc nếu (đọc biến môi trường("VPP_AOT_ASM_STREAM", "1") == "0") {
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, rỗng, rỗng, sai);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, rỗng, đúng, rỗng, rỗng, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
             bỏ kết quả = ghi tệp(nguồn, kết quả[1]);
         } hoặc {
             tệp = Bộ Đệm Tệp(nguồn, "ghi", 4096, "ghi ASM");
-            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, 0, đúng, tệp, rỗng, sai);
+            kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, bộ đệm, rỗng, đúng, tệp, rỗng, sai);
             nếu (kết quả[0] != "assemble") { ném "Native AOT: expected assembly"; };
             bỏ kết quả = tệp.đóng();
             tệp = rỗng;
@@ -278,11 +278,10 @@ hàm chính() {
         };
         kế hoạch = biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
         gốc = biên dịch AOT gốc gói("");
-        // The native runtime has no worker host ABI. Select serial lowering
-        // explicitly instead of changing the existing bootstrap defaults.
+        // Honor the configured worker count; bootstrap defaults to serial.
         nếu (lệnh == "emit-program-asm") { trả về AOT tự chủ xuất ASM(kế hoạch, gốc); };
         nếu (lệnh == "build") { trả về AOT tự chủ xây dựng(kế hoạch, gốc, bộ ba); };
-        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, 0, đúng);
+        kết quả = biên dịch chuẩn bị dòng lệnh máy(kế hoạch, gốc, bộ ba, rỗng, rỗng, đúng);
         nếu (kết quả[0] == "complete" || kết quả[0] == "diagnostic-error") {
             nếu (!AOT tự chủ xuất(1, kết quả[1])) { trả về 1; };
             nếu (kết quả[0] == "diagnostic-error") { trả về 1; };

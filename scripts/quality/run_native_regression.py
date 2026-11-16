@@ -53,7 +53,7 @@ JIT_I32_HARNESSES = {
 }
 # The legacy mixed backend uses this allowlist for reviewed JIT fixtures.
 JIT_VM_PHASES = {"core", "directory", "system", "process", "resolver", "socket", "socket_negative", "tls"}
-JIT_CASE_KEYS = {"id", "suite", "source", "expected", "stdout", "exit", "smoke", "jit"}
+JIT_CASE_KEYS = {"id", "suite", "source", "expected", "expected_stderr", "stdout", "exit", "smoke", "jit"}
 
 # Reviewed, self-contained programs with no imports or filesystem dependencies.
 # Pin the reviewed source contents so edited fixtures fall back to private copies.
@@ -210,6 +210,28 @@ def normalize(data):
     return data.replace(b"\r\n", b"\n")
 
 
+def normalize_stderr(data):
+    # The runner executes in an isolated temporary directory, so source
+    # diagnostics legitimately contain absolute repository paths. Normalize
+    # only the two source path fields of a stack frame, retaining the full
+    # diagnostic, function name, line, column and module identity.
+    prefixes = {str(ROOT).encode("utf-8") + os.sep.encode(),
+                ROOT.as_posix().encode("utf-8") + b"/"}
+
+    def relative(path):
+        for prefix in prefixes:
+            if path.startswith(prefix):
+                return path[len(prefix):].replace(b"\\", b"/")
+        return path
+
+    def frame(match):
+        return (match[1] + relative(match[2]) + match[3] +
+                relative(match[4]) + match[5])
+
+    pattern = r"(?m)^(  ở [^\n]+? \()([^\n]+?)(:\d+:\d+\) \[mô đun=)([^\n]+)(\])$"
+    return re.sub(pattern.encode("utf-8"), frame, normalize(data))
+
+
 def executable_name(name):
     return name + ".exe" if platform.system() == "Windows" else name
 
@@ -260,9 +282,21 @@ def load_manifest():
     ids = [case["id"] for case in cases]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate regression IDs")
+    for case in cases:
+        if case.get("suite") not in ("full", "i32", "host", "guest"):
+            raise ValueError(f"unknown regression suite: {case['id']}: {case.get('suite')}")
+        if case["suite"] in ("host", "guest") and case.get("smoke"):
+            raise ValueError(f"backend-specific regression cannot be a mixed smoke case: {case['id']}")
+        if "expected_stderr" in case:
+            if not isinstance(case["expected_stderr"], str) or not case["expected_stderr"].endswith(".expected"):
+                raise ValueError(f"invalid stderr golden path: {case['id']}")
+            if "diagnostic" in case or "run_diagnostic_regex" in case:
+                raise ValueError(f"ambiguous stderr golden contract: {case['id']}")
+            if ("expected" in case) == ("stdout" in case):
+                raise ValueError(f"stderr golden requires exactly one stdout contract: {case['id']}")
     for kind, registered in (
         (".vi", {case["source"] for case in cases} | {source for case in cases for source in case.get("sources", [])} | set(manifest["unregistered_sources"])),
-        (".expected", {case[key] for case in cases for key in ("expected", "historical_expected") if key in case}),
+        (".expected", {case[key] for case in cases for key in ("expected", "expected_stderr", "historical_expected") if key in case}),
     ):
         actual = {p.relative_to(ROOT).as_posix() for p in TESTS.rglob("*" + kind)}
         actual = {p for p in actual if not any(part.startswith(".") for part in Path(p).parts)}
@@ -422,6 +456,9 @@ def prepare_vm(compiler, logs, env, timeout):
         from check_windows_full_bootstrap import raw_build
         raw_build(i32, source, vm, vm_env, directory, vm_core=True, timeout=timeout)
         status = 0
+    elif platform.system() == "Darwin" and platform.machine() == "arm64":
+        status = execute(["/bin/bash", ROOT / "scripts/macos/build-vpp-vm.sh", i32, vm],
+                         ROOT, vm_env, directory, "build", timeout)
     else:
         status = build(i32, source, vm, ROOT, vm_env, directory, timeout)
     if status or not vm.is_file():
@@ -821,7 +858,7 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
         if jit is not None:
             if binary.exists():
                 raise RuntimeError("JIT produced a guest executable")
-            if not (case.get("run_diagnostic_regex") or case.get("diagnostic")) and (logs / "run.stderr").read_bytes():
+            if not (case.get("run_diagnostic_regex") or case.get("diagnostic") or "expected_stderr" in case) and (logs / "run.stderr").read_bytes():
                 raise RuntimeError("unexpected JIT stderr")
         if "diagnostic" in case:
             if case.get("failure_phase") == "build":
@@ -830,6 +867,12 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
             return
         if status != case.get("exit", 0):
             raise RuntimeError(f"run exit {status}, expected {case.get('exit', 0)}")
+        if "expected_stderr" in case:
+            expected_stderr = (ROOT / case["expected_stderr"]).read_bytes()
+            actual_stderr = (logs / "run.stderr").read_bytes()
+            if normalize_stderr(actual_stderr) != normalize_stderr(expected_stderr):
+                (logs / "expected.stderr").write_bytes(expected_stderr)
+                raise RuntimeError("stderr differs from golden")
         if "run_diagnostic_regex" in case:
             stderr = (logs / "run.stderr").read_text(encoding="utf-8", errors="replace")
             if not re.search(case["run_diagnostic_regex"], stderr):
@@ -857,7 +900,7 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, time
     config = logs / "config"
     config.write_bytes(f"{mode}\n{-queries if gated else queries}\n".encode("ascii"))
     hosts = logs / "empty-hosts"
-    hosts.touch()
+    hosts.write_bytes(b"")
     server_out = logs / "server.out"
     deadline = time.monotonic() + timeout
     with config.open("rb") as inp, server_out.open("wb") as out, (logs / "server.err").open("wb") as err:
@@ -879,7 +922,7 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, time
                 if time.monotonic() >= deadline:
                     raise RuntimeError("DNS server readiness timed out")
                 time.sleep(0.02)
-            client_env = dict(env, VPP_DNS_MOCK_MODE=str(mode), VPP_DNS_VI_PORT=port.decode("ascii"),
+            client_env = dict(env, VPP_DNS_MOCK_BATCH="0", VPP_DNS_MOCK_MODE=str(mode), VPP_DNS_VI_PORT=port.decode("ascii"),
                               VPP_DNS_VI_SERVER="127.0.0.1", VPP_DNS_VI_SERVERS="127.0.0.2,127.0.0.1" if mode == 4 else "",
                               VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
             if image is not None:
@@ -918,6 +961,16 @@ def run_dns_mode(server, client, cwd, env, logs, mode, queries, image=None, time
                 raise RuntimeError("DNS server query count mismatch")
             if image is None and normalize((logs / "client.stdout").read_bytes()) != b"VPP DNS MOCK OK\n":
                 raise RuntimeError("DNS client output mismatch")
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            details = [f"DNS mode {mode}: server exit={worker.poll()}; "
+                       f"guest readiness={ready_file.exists() if gated else 'not gated'}: {exc}"]
+            for name in ("client.ready", "server.out", "server.err", "client.stdout", "client.stderr"):
+                path = logs / name
+                if path.is_file():
+                    with path.open("rb") as stream:
+                        stream.seek(max(0, path.stat().st_size - 2048))
+                        details.append(f"{name}: {stream.read().decode('utf-8', errors='replace')}")
+            raise RuntimeError("\n".join(details)) from exc
         finally:
             if worker.poll() is None:
                 worker.kill()
@@ -949,7 +1002,7 @@ def dns_batch_client(client, cwd, env, logs, deadline):
     batch_logs = logs / "client-batch"
     batch_logs.mkdir(exist_ok=True)
     hosts = batch_logs / "empty-hosts"
-    hosts.touch()
+    hosts.write_bytes(b"")
     client_env = dict(env, VPP_DNS_MOCK_BATCH="1", VPP_DNS_MOCK_READY="",
                       VPP_DNS_VI_SERVER="127.0.0.1", VPP_DNS_VI_SERVERS="",
                       VPP_DNS_VI_HOSTS_FILE=str(hosts), VPP_DNS_VI_RESOLV_CONF="", VPP_SOCKET_VI_ONLY="1")
@@ -1053,19 +1106,34 @@ def prepare_http(compiler, directory, env, timeout):
 def start_prepared_http(binary, directory, env, timeout=30):
     directory.mkdir(parents=True, exist_ok=True)
     command = [str(x) for x in binary] if isinstance(binary, list) else [str(binary)]
+    original = command
     command, env = fixture_process(command, env)
-    with (directory / "server.log").open("wb") as log:
+    # Only the verified process double uses an ephemeral port. Real V++
+    # HTTP clients retain the existing fixed-port protocol.
+    mock_server = command != original
+    port_file = directory / "server.port"
+    if mock_server:
+        port_file.unlink(missing_ok=True)
+    log_path = directory / "server.log"
+    with log_path.open("wb") as log:
         process = subprocess.Popen(command, cwd=directory, env=env, stdout=log, stderr=log)
+    port = 18080
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and process.poll() is None:
             try:
-                with urllib.request.urlopen("http://127.0.0.1:18080/health", timeout=1) as response:
-                    if json.loads(response.read()) == {"ok": True}:
+                if mock_server:
+                    port = int(port_file.read_text(encoding="ascii"))
+                    if not 0 < port <= 65535:
+                        raise ValueError("invalid fixture port")
+                with opener.open(f"http://127.0.0.1:{port}/health", timeout=1) as response:
+                    if json.loads(response.read()) == {"ok": True} and process.poll() is None:
                         return process
             except (OSError, ValueError):
                 time.sleep(0.2)
-        raise RuntimeError("HTTP fixture not ready on localhost:18080")
+        detail = log_path.read_bytes()[-4096:].decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"HTTP fixture not ready on localhost:{port}; exit={process.poll()}; {detail}")
     except BaseException:
         stop_http(process)
         raise
@@ -1437,7 +1505,7 @@ def main():
     parser.add_argument("--jit", type=Path,
                         help="path to packaged JIT (default: sibling of compiler or build-pure-vpp/bin/vpp-jit)")
     parser.add_argument("--vm", type=Path, help="packaged standalone VM (default: beside JIT)")
-    parser.add_argument("--suite", choices=("full", "i32", "smoke"), default="full")
+    parser.add_argument("--suite", choices=("full", "i32", "smoke", "host", "guest"), default="full")
     parser.add_argument("--case", action="append")
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--inventory", action="store_true")
@@ -1465,11 +1533,18 @@ def main():
         if not FIXTURE_EXECUTABLE.is_file():
             parser.error("runner fixture JIT is missing")
     if args.backend is None:
-        args.backend = "jit" if args.phase == "all" else ("mixed" if args.suite != "i32" else "aot")
+        if args.suite == "host":
+            args.backend = "aot"
+        else:
+            args.backend = "jit" if args.phase == "all" else ("mixed" if args.suite != "i32" else "aot")
+    if args.suite == "host" and args.backend != "aot":
+        parser.error("trusted-host suite requires --backend aot")
+    if args.suite == "guest" and args.backend != "jit":
+        parser.error("dynamic-guest suite requires --backend jit")
     manifest = load_manifest()
     cases = [c for c in manifest["cases"] if (c["suite"] == args.suite or
              (args.suite == "smoke" and c.get("smoke")) or
-             (args.suite == "full" and args.backend == "jit" and c["suite"] == "i32"))]
+             (args.suite == "full" and args.backend == "jit" and c["suite"] in ("i32", "guest")))]
     if args.case:
         unknown = set(args.case) - {c["id"] for c in cases}
         if unknown:

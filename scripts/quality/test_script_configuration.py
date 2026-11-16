@@ -147,6 +147,54 @@ class OpcodeAbiTests(unittest.TestCase):
 
 
 class RegressionShardTests(unittest.TestCase):
+    def test_stderr_golden_requires_exact_diagnostic_and_exit(self):
+        spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        cases = runner.load_manifest()['cases']
+        case = next(c for c in cases if c['id'] == 'kiem_tra_stack_trace')
+        golden = (ROOT / case['expected_stderr']).read_bytes()
+        absolute = golden.replace(b'(scripts/', b'(' + ROOT.as_posix().encode() + b'/scripts/').replace(
+            b'[m\xc3\xb4 \xc4\x91un=scripts/',
+            b'[m\xc3\xb4 \xc4\x91un=' + ROOT.as_posix().encode() + b'/scripts/')
+        self.assertEqual(case['stdout'], '')
+        self.assertEqual(case['exit'], 1)
+        for backend in ('aot', 'jit'):
+            for stderr, stdout, status, error in (
+                (golden, b'', 1, None),
+                (golden.replace(b'\n', b'\r\n'), b'', 1, None),
+                (absolute, b'', 1, None),
+                (absolute.replace(b':5:20)', b':5:21)'), b'', 1, 'stderr differs from golden'),
+                (absolute.replace(ROOT.as_posix().encode() + b'/', b'/other/'), b'', 1, 'stderr differs from golden'),
+                (golden + b'\nunexpected', b'', 1, 'stderr differs from golden'),
+                (b'', golden, 1, 'stderr differs from golden'),
+                (golden, b'extra', 1, 'stdout differs from golden'),
+                (golden, b'', 0, 'run exit 0, expected 1'),
+            ):
+                with self.subTest(backend=backend, error=error), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    binary = root / 'program'
+                    if backend == 'aot':
+                        binary.touch()
+                    def execute(command, cwd, env, logs, name, timeout):
+                        self.assertEqual(name, 'run')
+                        (logs / 'run.stdout').write_bytes(stdout)
+                        (logs / 'run.stderr').write_bytes(stderr)
+                        return status
+                    with mock.patch.object(runner, 'execute', side_effect=execute):
+                        def run():
+                            runner.run_case(case, None, root / 'logs', os.environ, 1,
+                                            prepared_binary=binary if backend == 'aot' else None,
+                                            phase='run' if backend == 'aot' else 'both',
+                                            jit=Path(sys.executable) if backend == 'jit' else None)
+                        if error:
+                            with self.assertRaisesRegex(RuntimeError, error):
+                                run()
+                        else:
+                            run()
+                        if error == 'stderr differs from golden':
+                            self.assertEqual((root / 'logs/expected.stderr').read_bytes(), golden)
+
     def test_manual_tests_require_opt_in(self):
         spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
         runner = importlib.util.module_from_spec(spec)
@@ -260,7 +308,7 @@ class RegressionShardTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('native_regression', QUALITY / 'run_native_regression.py')
         runner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(runner)
-        expected = [c['id'] for c in runner.load_manifest()['cases'] if c['suite'] in ('full', 'i32')]
+        expected = [c['id'] for c in runner.load_manifest()['cases'] if c['suite'] in ('full', 'i32', 'guest')]
         blocked = [(c['id'], runner.toolchain_reason(c, jit_mode=True))
                    for c in runner.load_manifest()['cases'] if c['id'] in expected
                    and runner.toolchain_reason(c, jit_mode=True)]
@@ -269,6 +317,19 @@ class RegressionShardTests(unittest.TestCase):
                                  '--suite', 'full', '--backend', 'jit', '--list'],
                                 capture_output=True, encoding='utf-8', check=True)
         self.assertCountEqual([line.split(' [')[0] for line in result.stdout.splitlines()], expected)
+        self.assertIn('kiem_tra_jit_guest_boundary', expected)
+        self.assertNotIn('kiem_tra_jit_vpp', expected)
+        host = subprocess.run([sys.executable, str(QUALITY / 'run_native_regression.py'),
+                               '--suite', 'host', '--backend', 'aot', '--list'],
+                              capture_output=True, encoding='utf-8', check=True)
+        self.assertIn('kiem_tra_jit_vpp', host.stdout)
+        self.assertNotIn('kiem_tra_jit_guest_boundary', host.stdout)
+        for suite, backend in (('host', 'jit'), ('guest', 'aot')):
+            invalid = subprocess.run([sys.executable, str(QUALITY / 'run_native_regression.py'),
+                                      '--suite', suite, '--backend', backend, '--list'],
+                                     capture_output=True, encoding='utf-8')
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn('requires --backend', invalid.stderr)
 
     def test_raw_jit_keeps_production_function_bodies(self):
         spec = importlib.util.spec_from_file_location('prepare_raw_jit', QUALITY / 'prepare_raw_jit.py')

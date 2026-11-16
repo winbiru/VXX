@@ -825,6 +825,7 @@ hàm vm_host(state, op, args) {
     nếu (n != vm_host_arity(op)) { trả về vm_error(21); };
     biến a = 0; biến b = 0; biến c = 0; biến d = 0;
     nếu (n > 0) { a = vm_at(args, 0); }; nếu (n > 1) { b = vm_at(args, 1); }; nếu (n > 2) { c = vm_at(args, 2); }; nếu (n > 3) { d = vm_at(args, 3); };
+    nếu (op >= 139 && op <= 143) { trả về vm_worker_host(state, op, a, b); };
     nếu (op == 157) { trả về vm_embedded_run(state, args); };
     nếu (op == 145) { trả về vm_type(a); };
     nếu (op == 146) {

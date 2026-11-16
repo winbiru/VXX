@@ -21,6 +21,30 @@ vpp_native_dynamic_\ten:
     AOT_VPP \ten, \so_doi_so
 .endm
 #include "../common/vpp_aot_vpp_exports.inc"
+// Appended source-site helper; old bridge indices are unchanged.
+AOT_VPP source_site, 2
+
+.Lworker_aot_register:
+    subq $40, %rsp
+    movl $11, %ecx
+    xorl %edx, %edx
+    xorl %r8d, %r8d
+    call vpp_native_worker_service
+    testl %eax, %eax
+    jne 1f
+    leaq .Lworker_aot_entry(%rip), %rcx
+    call vpp_native_worker_set_entry
+1:  addq $40, %rsp
+    ret
+.Lworker_aot_entry:
+    subq $56, %rsp
+    movq %rcx, 32(%rsp)
+    movl %edx, %ecx
+    call vpp_fn_aot_worker_entry
+    movl %eax, %edx
+    movq 32(%rsp), %rcx
+    addq $56, %rsp
+    jmp vpp_native_worker_compact_result
 
 .globl vpp_native_aot_info
 vpp_native_aot_info:
@@ -30,6 +54,8 @@ vpp_native_aot_info:
     je .Ljit_x86_run
     cmpl $110, %ecx
     je .Ljit_x86_active
+    cmpl $111, %ecx
+    je .Lworker_aot_register
     AOT_ACTIVE_SPEC
     cmpl $4, %ecx
     ja .Laot_thong_tin_bang_x

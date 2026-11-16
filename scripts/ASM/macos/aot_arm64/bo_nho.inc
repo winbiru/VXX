@@ -4,26 +4,112 @@
 .p2align 2
 .globl _vpp_native_memory_base
 _vpp_native_memory_base:
+    // Single-threaded bootstrap keeps the original fast path. Once workers
+    // are enabled the shared pointer stays null; each OS thread owns a key.
     adrp x9, _vpp_native_arena_base@PAGE
     ldr x0, [x9, _vpp_native_arena_base@PAGEOFF]
-    cbnz x0, 1f
-    str x30, [sp, #-16]!
+    cbnz x0, Lmemory_base_return
+    stp x19, x30, [sp, #-16]!
+    adrp x9, _vpp_native_arena_tls_enabled@PAGE
+    ldr w19, [x9, _vpp_native_arena_tls_enabled@PAGEOFF]
+    cbz w19, Lmemory_base_allocate
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    bl _pthread_getspecific
+    cbnz x0, Lmemory_base_pop
+Lmemory_base_allocate:
     mov x0, #0
     mov x1, #0x1400
     movk x1, #0x810, lsl #16  // 135271424 byte
-    mov x2, #3               // PROT_READ | PROT_WRITE, chỉ đọc/ghi
+    mov x2, #3               // PROT_READ | PROT_WRITE
     mov x3, #0x1002          // MAP_PRIVATE | MAP_ANON
     mov x4, #-1
     mov x5, #0
     bl _mmap
     cmn x0, #1
-    b.eq 2f
+    b.eq Lmemory_base_failed
+    cbnz w19, Lmemory_base_set_tls
     adrp x9, _vpp_native_arena_base@PAGE
     str x0, [x9, _vpp_native_arena_base@PAGEOFF]
-    ldr x30, [sp], #16
-1:  ret
-2:  mov x0, #0
-    ldr x30, [sp], #16
+    b Lmemory_base_pop
+Lmemory_base_set_tls:
+    mov x19, x0
+    mov x1, x0
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    bl _pthread_setspecific
+    cbnz w0, Lmemory_base_release_failed
+    mov x0, x19
+    b Lmemory_base_pop
+Lmemory_base_release_failed:
+    mov x0, x19
+    mov x1, #0x1400
+    movk x1, #0x810, lsl #16
+    bl _munmap
+Lmemory_base_failed:
+    mov x0, #0
+Lmemory_base_pop:
+    ldp x19, x30, [sp], #16
+Lmemory_base_return:
+    ret
+
+// Observe the current arena without allocating (JIT leaf validation).
+.globl _vpp_native_memory_current
+_vpp_native_memory_current:
+    adrp x9, _vpp_native_arena_tls_enabled@PAGE
+    ldr w9, [x9, _vpp_native_arena_tls_enabled@PAGEOFF]
+    cbnz w9, Larena_current_tls
+    adrp x9, _vpp_native_arena_base@PAGE
+    ldr x0, [x9, _vpp_native_arena_base@PAGEOFF]
+    ret
+Larena_current_tls:
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    b _pthread_getspecific
+
+// Enable exactly once, on the root thread before creating any workers.
+// Transfer the existing arena into TLS without changing its address. Worker
+// entry/exit owns its arena explicitly; the key has no implicit destructor.
+.globl _vpp_native_arena_enable_threads
+_vpp_native_arena_enable_threads:
+    adrp x9, _vpp_native_arena_tls_enabled@PAGE
+    ldr w0, [x9, _vpp_native_arena_tls_enabled@PAGEOFF]
+    cbnz w0, Larena_enable_done
+    stp x19, x30, [sp, #-16]!
+    bl _vpp_native_memory_base
+    cbz x0, Larena_enable_failed
+    mov x19, x0
+    adrp x0, _vpp_native_arena_tls_key@PAGE
+    add x0, x0, _vpp_native_arena_tls_key@PAGEOFF
+    mov x1, #0
+    bl _pthread_key_create
+    cbnz w0, Larena_enable_failed
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    mov x1, x19
+    bl _pthread_setspecific
+    cbnz w0, Larena_enable_delete
+    adrp x0, _vpp_native_worker_tls_key@PAGE
+    add x0, x0, _vpp_native_worker_tls_key@PAGEOFF
+    mov x1, #0
+    bl _pthread_key_create
+    cbnz w0, Larena_enable_delete
+    adrp x9, _vpp_native_arena_tls_enabled@PAGE
+    mov w10, #1
+    str w10, [x9, _vpp_native_arena_tls_enabled@PAGEOFF]
+    adrp x9, _vpp_native_arena_base@PAGE
+    str xzr, [x9, _vpp_native_arena_base@PAGEOFF]
+    ldp x19, x30, [sp], #16
+Larena_enable_done:
+    mov w0, #0
+    ret
+Larena_enable_delete:
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    bl _pthread_key_delete
+Larena_enable_failed:
+    ldp x19, x30, [sp], #16
+    mov w0, #-1
     ret
 
 .macro VAO_BO_NHO
@@ -249,9 +335,39 @@ Lbo_nho_loi:
 // or mix allocation metadata across the compiler and generated program.
 .globl _vpp_native_jit_swap_arena
 _vpp_native_jit_swap_arena:
+    adrp x9, _vpp_native_arena_tls_enabled@PAGE
+    ldr w9, [x9, _vpp_native_arena_tls_enabled@PAGEOFF]
+    cbnz w9, Larena_swap_tls
     adrp x9, _vpp_native_arena_base@PAGE
     add x9, x9, _vpp_native_arena_base@PAGEOFF
     ldr x10, [x9]
     str x0, [x9]
     mov x0, x10
     ret
+
+Larena_swap_tls:
+    stp x19, x20, [sp, #-32]!
+    str x30, [sp, #16]
+    mov x19, x0
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    bl _pthread_getspecific
+    mov x20, x0
+    mov x1, x19
+    adrp x9, _vpp_native_arena_tls_key@PAGE
+    ldr x0, [x9, _vpp_native_arena_tls_key@PAGEOFF]
+    bl _pthread_setspecific
+    // The existing swap ABI cannot report failure. Never continue with the
+    // wrong heap if the OS cannot install the requested context.
+    cbnz w0, Larena_swap_failed
+    mov x0, x20
+    ldr x30, [sp, #16]
+    ldp x19, x20, [sp], #32
+    ret
+Larena_swap_failed:
+    brk #0
+
+.zerofill __DATA,__bss,_vpp_native_arena_tls_key,8,3
+.zerofill __DATA,__bss,_vpp_native_arena_tls_enabled,4,2
+
+.zerofill __DATA,__bss,_vpp_native_worker_tls_key,8,3

@@ -15,6 +15,7 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.biên dịch.asm vô hộp.*;
 nhập gói.biên dịch.đo hiệu năng.*;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.nhập xuất.đường dẫn.thư mục hiện tại;
 
 hàm công khai biên dịch asm tên nội tại() {
     // BEGIN native intrinsic opcodes: đối chiếu bởi vpp-opcode-abi.
@@ -230,7 +231,8 @@ hàm riêng tư biên dịch asm phép i32 thuần(tên) {
 };
 
 lớp công khai Bộ Hạ ASM Động {
-    hàm công khai khởi tạo(lệnh, bảng, bảng i32, id hàm = -1) {
+    hàm công khai khởi tạo(lệnh, bảng, bảng i32, id hàm = -1, vị trí lỗi = rỗng) {
+        mình.vị trí lỗi = vị trí lỗi;
         mình.nguồn = lệnh;
         mình.bảng = bảng;
         mình.bảng i32 = bảng i32;
@@ -318,6 +320,17 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (mình.sâu < 0) { ném "AOT V++: stack lowering không hợp lệ"; };
         nếu (mình.sâu > mình.sâu nhất) { mình.sâu nhất = mình.sâu; };
     };
+    // Field 1 of the native frame is the last source site, not a VM PC.
+    // A zero site is unknown; the pool index is stored plus one.
+    hàm riêng tư ghi vị trí lỗi(i) {
+        nếu (mình.vị trí lỗi != rỗng) {
+            vị trí = lấy từ điển(mình.vị trí lỗi, "" + i, 0);
+            nếu (vị trí != 0) {
+                mình.gọi thô("source_site", [vị trí]);
+                mình.phát("Drop");
+            };
+        };
+    };
     hàm riêng tư gọi thô(tên, đối số = rỗng) {
         nếu (đối số == rỗng) { đối số = []; };
         mình.phát("LoadSlot", 0, 0);
@@ -381,6 +394,7 @@ lớp công khai Bộ Hạ ASM Động {
         nếu (mình.bảng[lệnh gọi[0]] != "OP_GOI_GIAN_TIEP" ||
             mình.đích nhánh[từ + 1] != 0) { trả về 0; };
         số = lệnh gọi[1]; ô = mình.nguồn[từ][2];
+        mình.ghi vị trí lỗi(từ + 1);
         nếu (số >= 0 && số <= 4) {
             mình.phát("LoadSlot", 0, 0); mình.phát("PushConstant", ô);
             mình.phát("Call", 0, 2, "vpp_aot_fast_s" + số);
@@ -456,6 +470,7 @@ lớp công khai Bộ Hạ ASM Động {
                 loại = loại | (kiểu << (j * 2));
             };
             nếu (!đơn giản) { bỏ qua; };
+            mình.ghi vị trí lỗi(vị trí gọi);
             mình.gọi("method_direct_small", [đích, nhận[2], số, đối số[0], đối số[1], loại]);
             lặp(j = từ + 1; j <= vị trí gọi; j++) {
                 máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[từ]);
@@ -1135,6 +1150,7 @@ lớp công khai Bộ Hạ ASM Động {
                     đối số[j] = nguồn[từ + j][2];
                 } hoặc { đối số[j] = nguồn[từ + j][1]; };
             };
+            mình.ghi vị trí lỗi(cuối);
             nếu (số <= 2) {
                 mình.gọi("call_small", [v[2], số, đối số[0], đối số[1], mặt nạ]);
             } hoặc {
@@ -1239,9 +1255,10 @@ lớp công khai Bộ Hạ ASM Động {
             tên = mình.tên mã[j];
             nếu (tên == "OP_BIEN_SO") { mình.gọi("integer", [v[1]]); }
             hoặc nếu (tên == "OP_TEN_BIEN_GIA_TRI") { mình.gọi("load", [v[2]]); }
-            hoặc nếu (tên == "OP_GOI") { mình.gọi("call", [v[2], v[1]]); }
+            hoặc nếu (tên == "OP_GOI") { mình.ghi vị trí lỗi(j); mình.gọi("call", [v[2], v[1]]); }
             hoặc { mình.gọi("binary", [v[0]]); };
         };
+        mình.ghi vị trí lỗi(cuối);
         mình.gọi("call", [lời gọi[2], lời gọi[1]]);
         mình.lệnh[bỏ chậm]["operand"] = độ dài(mình.lệnh);
         lặp(j = từ + 1; j <= cuối; j++) {
@@ -1392,6 +1409,7 @@ lớp công khai Bộ Hạ ASM Động {
                         mình.lệnh[chậm chữ]["operand"] = độ dài(mình.lệnh);
                         // Receiver vẫn còn trên stack khi selector trả 0.
                         bỏ kết quả = mình.gọi("index_slot", [nguồn chữ[2], chỉ số chữ[2], 1]);
+                        bỏ kết quả = mình.ghi vị trí lỗi(i + 4);
                         bỏ kết quả = mình.gọi("method", [lệnh phương thức[2], 1, lệnh phương thức[3]]);
                         mình.lệnh[xong chữ]["operand"] = độ dài(mình.lệnh);
                         lặp(j = 0; j < 4; j = j + 1) { bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
@@ -1414,7 +1432,7 @@ lớp công khai Bộ Hạ ASM Động {
                     id đích = nguồn[i + 14]; gán = nguồn[i + 15]; đóng = nguồn[i + 16];
                     nếu (mình.bảng[chỉ số[0]] == "OP_TEN_BIEN_GIA_TRI" &&
                         mình.bảng[đọc[0]] == "OP_DOC_CHI_SO" &&
-                        mình.bảng[chia[0]] == "OP_BIEN_SO" &&
+                        mình.bảng[chia[0]] == "OP_BIEN_SO" && chia[1] != 0 &&
                         mình.bảng[modulo[0]] == "OP_MODULO" &&
                         mình.bảng[phải[0]] == "OP_BIEN_SO" &&
                         mình.bảng[so[0]] == "OP_SO_SANH_BANG" &&
@@ -1450,7 +1468,7 @@ lớp công khai Bộ Hạ ASM Động {
                     tên so = mình.bảng[so[0]];
                     nếu (tên đọc == "OP_DOC_CHI_SO" &&
                         (tên chỉ số == "OP_TEN_BIEN_GIA_TRI" || tên chỉ số == "OP_BIEN_SO") &&
-                        tên chia == "OP_BIEN_SO" && tên modulo == "OP_MODULO" &&
+                        tên chia == "OP_BIEN_SO" && chia[1] != 0 && tên modulo == "OP_MODULO" &&
                         tên phải == "OP_BIEN_SO" &&
                         (tên so == "OP_SO_SANH_BANG" || tên so == "OP_KHAC_BANG")) {
                         mặt nạ = 0; số = chỉ số[1];
@@ -1756,6 +1774,7 @@ lớp công khai Bộ Hạ ASM Động {
                     sau = nguồn[i + 1];
                     tên sau = mình.bảng[sau[0]];
                     nếu (mình.đích nhánh[i + 1] == 0 && tên sau == "OP_GOI" && sau[1] == 1) {
+                        bỏ kết quả = mình.ghi vị trí lỗi(i + 1);
                         bỏ kết quả = mình.gọi("call_small", [sau[2], 1, đầu, 0, mặt nạ]);
                         bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         i += 1; bỏ qua;
@@ -1770,6 +1789,7 @@ lớp công khai Bộ Hạ ASM Động {
                         tên sau == "OP_GOI" && sau[1] == 2) {
                         thứ hai = giữa[1];
                         nếu (tên giữa == "OP_TEN_BIEN_GIA_TRI") { thứ hai = giữa[2]; mặt nạ += 2; };
+                        bỏ kết quả = mình.ghi vị trí lỗi(i + 2);
                         bỏ kết quả = mình.gọi("call_small", [sau[2], 2, đầu, thứ hai, mặt nạ]);
                         bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
                         bỏ kết quả = máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
@@ -2163,6 +2183,7 @@ lớp công khai Bộ Hạ ASM Động {
                 };
               };
             };
+            bỏ kết quả = mình.ghi vị trí lỗi(i);
             chọn(tên) {
                 ca "OP_HAM": {} ca "OP_NEU": {} ca "OP_DIEU_KIEN": {} ca "OP_LAP": {}
                 ca "OP_CAP_NHAT": {} ca "OP_DONG_LENH": {} ca "OP_MO_NGOAC": {}
@@ -2311,10 +2332,10 @@ hàm riêng tư biên dịch asm nháy(văn bản) {
     trả về ra + "\"";
 };
 
-hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng, đối tượng = rỗng, đích ghi = rỗng) {
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng, bảng i32, id hàm = -1, thống kê = rỗng, bảng byte = rỗng, bảng hex = rỗng, bộ đệm = rỗng, đối tượng = rỗng, đích ghi = rỗng, vị trí lỗi = rỗng) {
     bắt đầu bước = 0;
     nếu (thống kê != rỗng) { bắt đầu bước = biên dịch hồ sơ bắt đầu("asm"); };
-    hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm);
+    hạ = Bộ Hạ ASM Động(lệnh, bảng, bảng i32, id hàm, vị trí lỗi);
     máy = hạ.hạ();
     trực tiếp = lấy từ điển(bảng i32, "ASM trực tiếp", sai);
     nếu (đối tượng != rỗng) {
@@ -2430,7 +2451,43 @@ hàm riêng tư biên dịch asm phát phần(phần, đích ghi, văn bản) {
     trả về 0;
 };
 
-hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng, đích ghi = rỗng, đối tượng = rỗng, ảnh jit = sai) {
+// Only source compilation supplies these annotations. The bytecode wire
+// format and all existing string/function indices stay unchanged.
+hàm riêng tư biên dịch asm đường lỗi(đường, cwd) {
+    n = máy ảo lấy độ dài(cwd);
+    nếu (n > 0 && máy ảo lấy độ dài(đường) > n &&
+        máy ảo cắt chuỗi(đường, 0, n) == cwd) {
+        trả về máy ảo cắt chuỗi(đường, n, máy ảo lấy độ dài(đường) - n);
+    };
+    trả về đường;
+};
+hàm riêng tư biên dịch asm vị trí lỗi(thân, tên, đường, cwd, chuỗi, đã có) {
+    bảng = {};
+    đường = biên dịch asm đường lỗi(đường, cwd);
+    lặp(i = 0; i < độ dài(thân); i++) {
+        lệnh = thân[i];
+        dòng = lấy từ điển(lệnh, "dòng", 0);
+        cột = lấy từ điển(lệnh, "cột", 0);
+        nếu (dòng <= 0 || cột <= 0) { bỏ qua; };
+        op = lệnh["op"];
+        nếu (op != biên dịch mã thao tác("OP_CHIA") && op != biên dịch mã thao tác("OP_MODULO") &&
+            op != biên dịch mã thao tác("OP_GOI") && op != biên dịch mã thao tác("OP_GOI_GIAN_TIEP") &&
+            op != biên dịch mã thao tác("OP_GOI_PHUONG_THUC") && op != biên dịch mã thao tác("OP_TAO_DOI_TUONG")) {
+            bỏ qua;
+        };
+        text = "  ở " + tên + " (" + đường + ":" + dòng + ":" + cột + ") [mô đun=" + đường + "]\n";
+        id = lấy từ điển(đã có, text, 0);
+        nếu (id == 0) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(chuỗi, text);
+            id = độ dài(chuỗi);
+            đã có[text] = id;
+        };
+        bảng["" + i] = id;
+    };
+    trả về bảng;
+};
+
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, bộ đệm = rỗng, trực tiếp = đúng, đích ghi = rỗng, đối tượng = rỗng, ảnh jit = sai, nguồn lỗi = rỗng) {
     đường hồ sơ = biên dịch hồ sơ đường();
     bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
@@ -2447,6 +2504,28 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
     các hàm = dây[2];
     khởi tạo = dây[3];
     chuỗi = dây[1];
+    vị trí hàm = []; vị trí khởi tạo = []; vị trí gốc = rỗng;
+    nếu (!compiler && nguồn lỗi != rỗng) {
+        chuỗi = [];
+        lặp(i = 0; i < độ dài(dây[1]); i++) {
+            bỏ kết quả = máy ảo thêm cuối danh sách(chuỗi, dây[1][i]);
+        };
+        cwd = máy ảo thay chuỗi chính xác(thư mục hiện tại(), "\\", "/");
+        nếu (máy ảo lấy độ dài(cwd) > 0 && cwd[máy ảo lấy độ dài(cwd) - 1] != "/") { cwd += "/"; };
+        đã có = {};
+        lặp(i = 0; i < độ dài(các hàm); i++) {
+            h = nguồn lỗi["hàm"][i];
+            bỏ kết quả = máy ảo thêm cuối danh sách(vị trí hàm,
+                biên dịch asm vị trí lỗi(h["bytecode"], h["tên"], h["mô đun"], cwd, chuỗi, đã có));
+        };
+        lặp(i = 0; i < độ dài(khởi tạo); i++) {
+            h = nguồn lỗi["mô đun khởi tạo"][i];
+            bỏ kết quả = máy ảo thêm cuối danh sách(vị trí khởi tạo,
+                biên dịch asm vị trí lỗi(h["bytecode"], "<mô đun>", h["định danh"], cwd, chuỗi, đã có));
+        };
+        vị trí gốc = biên dịch asm vị trí lỗi(nguồn lỗi["bytecode"], "<mô đun>",
+            lấy từ điển(nguồn lỗi, "đường gốc", ""), cwd, chuỗi, đã có);
+    };
     ngoại = [];
     nếu (độ dài(dây) == 5) { ngoại = dây[4]; };
     // Dùng các phần thay vì nối lại toàn bộ assembly khi thêm từng hàm.
@@ -2608,7 +2687,9 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
             máy trước = thống kê["machine_ms"];
             lắp ráp trước = thống kê["assemble_ms"];
         };
-        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
+        sites = rỗng;
+        nếu (độ dài(vị trí hàm) > i) { sites = vị trí hàm[i]; };
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng, bảng i32, i, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi, sites));
         nếu (thống kê != rỗng) {
             tên = "<anonymous>";
             nếu (các hàm[i][1] >= 0) { tên = chuỗi[các hàm[i][1]]; };
@@ -2619,9 +2700,11 @@ hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai, 
         };
     };
     lặp(i = 0; i < độ dài(khởi tạo); i = i + 1) {
-        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
+        sites = rỗng;
+        nếu (độ dài(vị trí khởi tạo) > i) { sites = vị trí khởi tạo[i]; };
+        bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi, sites));
     };
-    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi));
+    bỏ kết quả = biên dịch asm phát phần(phần, đích ghi, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng, bảng i32, -1, thống kê, bảng byte, bảng hex, bộ đệm, đối tượng, đích ghi, vị trí gốc));
     nếu (thống kê != rỗng) {
         bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.count", thống kê["count"]);
         bỏ kết quả = biên dịch hồ sơ ghi số(đường hồ sơ, "asm.body.lower_ms", thống kê["lower_ms"]);

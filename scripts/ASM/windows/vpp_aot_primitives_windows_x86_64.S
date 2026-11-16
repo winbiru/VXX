@@ -13,6 +13,23 @@
 #define VPP_ARENA_SIZE 135271424
 
 #include "aot_x86_64/bo_nho.inc"
+#ifdef VPP_WINDOWS_I32_BOOTSTRAP
+#if !VPP_NATIVE_RUNTIME_STACK_ABI || !defined(VPP_JIT_DISABLED) || defined(VPP_STANDALONE_VM_WORKER)
+#error VPP_WINDOWS_I32_BOOTSTRAP requires the restricted i32 PE boundary
+#endif
+// The pinned i32 linker has no worker imports. Report unsupported, never
+// simulate parallel execution. Full AOT/raw/standalone VM use worker.inc.
+.text
+.globl vpp_native_worker_service
+vpp_native_worker_service:
+    xorl %eax, %eax
+    testl %ecx, %ecx
+    je 1f
+    movl $-1, %eax
+1:  ret
+#else
+#include "aot_x86_64/worker.inc"
+#endif
 #ifdef VPP_JIT_DISABLED
 .text
 .globl vpp_native_jit_service

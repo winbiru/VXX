@@ -241,7 +241,12 @@ vpp_native_jit_service:
     cmpl $(VPP_ARENA_SIZE - 12), %r13d
 #endif
     ja .Lvpp_jit_invalid
+#ifdef _WIN32
+    call vpp_native_memory_current
+    movq %rax, %r15
+#else
     movq vpp_native_arena_base(%rip), %r15
+#endif
     testq %r15, %r15
     je .Lvpp_jit_invalid
     movl %r13d, %eax

@@ -149,7 +149,7 @@ hàm vm_step_body(state, frames) {
         vm_set(closure, 0, 7); vm_set(closure, 1, a); vm_set(closure, 2, vm_vector(5)); vm_set(closure, 3, vm_get(frame, 6));
         lặp(i = 0; i < b; i++) {
             biến id = vm_at(ids, i); nếu (vm_tag(id) != 1) { trả về vm_error(2); };
-            vm_map_put(vm_get(closure, 2), id, vm_cell(state, frame, vm_number(id), 1));
+            vm_map_put(vm_get(closure, 2), id, vm_capture_cell(state, frame, vm_number(id)));
         };
         vm_append(stack, closure); trả về 0;
     };
@@ -303,6 +303,7 @@ hàm vm_execute(state) {
     // Load the cells directly; vm_get is a separate V++ function call.
     khi (máy đọc số nguyên ba mươi hai bit(frames + 4) > 0 &&
          máy đọc số nguyên ba mươi hai bit(4198468) == 0) {
+        nếu (vm_worker_cancel_point()) { thoát; };
         nếu (profiling) { vm_step(state, frames); } hoặc { vm_step_body(state, frames); };
         // DNS transport failures are recoverable guest exceptions inside the
         // V++ provider, so its retry/failover policy can close the socket and

@@ -1,5 +1,7 @@
 // Cấp vùng nhớ, kiểm tra giới hạn và thao tác byte/i32/con trỏ.
 
+// Pinned i32 PE seed accepts only the original import catalog.
+#if defined(VPP_WINDOWS_I32_BOOTSTRAP)
 .text
 .p2align 4
 .globl vpp_native_memory_base
@@ -7,17 +9,120 @@ vpp_native_memory_base:
     movq vpp_native_arena_base(%rip), %rax
     testq %rax, %rax
     jne 1f
-    subq $40, %rsp          // 32 byte dự phòng đối số và phần căn lời gọi
+    subq $40, %rsp
     xorl %ecx, %ecx
     movl $VPP_ARENA_SIZE, %edx
-    movl $0x3000, %r8d      // MEM_RESERVE | MEM_COMMIT
-    movl $4, %r9d           // PAGE_READWRITE
+    movl $0x3000, %r8d
+    movl $4, %r9d
     call VirtualAlloc
     addq $40, %rsp
     testq %rax, %rax
     je 1f
     movq %rax, vpp_native_arena_base(%rip)
 1:  ret
+#else
+.text
+.p2align 4
+.globl vpp_native_memory_base
+vpp_native_memory_base:
+    movq vpp_native_arena_base(%rip), %rax
+    testq %rax, %rax
+    jne Lmemory_base_done
+    subq $56, %rsp          // shadow space, locals, 16-byte call alignment
+    call vpp_native_memory_current
+    testq %rax, %rax
+    jne Lmemory_base_pop
+    xorl %ecx, %ecx
+    movl $VPP_ARENA_SIZE, %edx
+    movl $0x3000, %r8d      // MEM_RESERVE | MEM_COMMIT
+    movl $4, %r9d           // PAGE_READWRITE
+    call VirtualAlloc
+    testq %rax, %rax
+    je Lmemory_base_pop
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne Lmemory_base_set_tls
+    movq %rax, vpp_native_arena_base(%rip)
+    jmp Lmemory_base_pop
+Lmemory_base_set_tls:
+    movq %rax, 32(%rsp)
+    movq %rax, %rdx
+    movl vpp_native_arena_tls_key(%rip), %ecx
+    call TlsSetValue
+    testl %eax, %eax
+    jz Lmemory_base_release_failed
+    movq 32(%rsp), %rax
+    jmp Lmemory_base_pop
+Lmemory_base_release_failed:
+    movq 32(%rsp), %rcx
+    xorl %edx, %edx
+    movl $0x8000, %r8d      // MEM_RELEASE
+    call VirtualFree
+    xorl %eax, %eax
+Lmemory_base_pop:
+    addq $56, %rsp
+Lmemory_base_done:
+    ret
+
+// TlsGetValue clears Win32 last-error even on success. Memory access must
+// preserve that value so the following OS error query still sees it.
+.globl vpp_native_memory_current
+vpp_native_memory_current:
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne Lmemory_current_tls
+    movq vpp_native_arena_base(%rip), %rax
+    ret
+Lmemory_current_tls:
+    subq $56, %rsp
+    call GetLastError
+    movl %eax, 32(%rsp)
+    movl vpp_native_arena_tls_key(%rip), %ecx
+    call TlsGetValue
+    movq %rax, 40(%rsp)
+    movl 32(%rsp), %ecx
+    call SetLastError
+    movq 40(%rsp), %rax
+    addq $56, %rsp
+    ret
+
+// Root-only transition, before starting any worker. The arena remains at
+// its existing address; after enabling, the shared pointer stays null.
+.globl vpp_native_arena_enable_threads
+vpp_native_arena_enable_threads:
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne Larena_enable_done
+    subq $56, %rsp
+    call vpp_native_memory_base
+    testq %rax, %rax
+    jz Larena_enable_failed
+    movq %rax, 40(%rsp)
+    call TlsAlloc
+    cmpl $-1, %eax
+    je Larena_enable_failed
+    movl %eax, vpp_native_arena_tls_key(%rip)
+    movl %eax, %ecx
+    movq 40(%rsp), %rdx
+    call TlsSetValue
+    testl %eax, %eax
+    jz Larena_enable_delete
+    call TlsAlloc
+    cmpl $-1, %eax
+    je Larena_enable_delete
+    movl %eax, vpp_native_worker_tls_key(%rip)
+    movl $1, vpp_native_arena_tls_enabled(%rip)
+    movq $0, vpp_native_arena_base(%rip)
+    addq $56, %rsp
+Larena_enable_done:
+    xorl %eax, %eax
+    ret
+Larena_enable_delete:
+    movl vpp_native_arena_tls_key(%rip), %ecx
+    call TlsFree
+Larena_enable_failed:
+    addq $56, %rsp
+    movl $-1, %eax
+    ret
+
+#endif
 
 .macro VAO_BO_NHO
     pushq %rbp
@@ -237,6 +342,33 @@ Lbulk_ascii_done:
 .text
 .globl vpp_native_jit_swap_arena
 vpp_native_jit_swap_arena:
+#ifndef VPP_WINDOWS_I32_BOOTSTRAP
+    cmpl $0, vpp_native_arena_tls_enabled(%rip)
+    jne Larena_swap_tls
+#endif
     movq vpp_native_arena_base(%rip), %rax
     movq %rcx, vpp_native_arena_base(%rip)
     ret
+
+#ifndef VPP_WINDOWS_I32_BOOTSTRAP
+Larena_swap_tls:
+    subq $56, %rsp
+    movq %rcx, 32(%rsp)
+    call vpp_native_memory_current
+    movq %rax, 40(%rsp)
+    movq 32(%rsp), %rdx
+    movl vpp_native_arena_tls_key(%rip), %ecx
+    call TlsSetValue
+    testl %eax, %eax
+    jz Larena_swap_failed
+    movq 40(%rsp), %rax
+    addq $56, %rsp
+    ret
+Larena_swap_failed:
+    ud2                     // Never continue in the wrong arena.
+
+.bss
+.p2align 2
+vpp_native_worker_tls_key: .long 0
+.text
+#endif

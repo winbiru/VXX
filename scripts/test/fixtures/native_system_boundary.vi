@@ -1,6 +1,6 @@
 // Invalid raw offsets must be rejected before forming an OS pointer.
 hàm chính() {
-    nếu (máy đồng hồ thô(2, 4096) != -22) { trả về 1; };
+    nếu (máy đồng hồ thô(3, 4096) != -22) { trả về 1; };
     nếu (máy đồng hồ thô(0, -1) != -22) { trả về 2; };
     nếu (máy đồng hồ thô(1, 135271409) != -22) { trả về 3; };
     nếu (máy entropy thô(-1, 1) != -22) { trả về 4; };
@@ -23,5 +23,13 @@ hàm chính() {
     nếu (n < 0 || closed != 0) { trả về 17; };
     nếu (máy thực từ nguyên(110040000, 42) != 0) { trả về 18; };
     nếu (máy thực sang nguyên(110040000) != 42) { trả về 19; };
+    // Selector 2 is reserved for the Windows local-calendar primitive.
+    nếu (máy thư mục thô(6, 0, 0) == 2) {
+        lặp (i = 0; i < 64; i++) { máy ghi byte(4096 + i, 0); };
+        nếu (máy đồng hồ thô(2, 4096) != 0) { trả về 20; };
+        nếu (máy đồng hồ thô(2, 135271361) != -22) { trả về 21; };
+    } hoặc {
+        nếu (máy đồng hồ thô(2, 4096) != -22) { trả về 22; };
+    };
     trả về 0;
 };

@@ -135,7 +135,7 @@ endif()
 set(native_source "${VPP_OUTPUT_DIR}/native-directory-decode.vi")
 file(WRITE "${native_source}" "")
 foreach(part IN ITEMS "bộ nhớ" "giá trị" "máy hệ thống" "thư mục máy" "tiến trình máy" "ổ cắm máy"
-        "phân giải máy" "host ABI" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
+        "phân giải máy" "host ABI" "truyền worker" "worker" "nạp chương trình" "runtime" "thực thi" "số thực tự chủ")
     file(READ "${VPP_ROOT}/gói/máy ảo/${part}.vi" contents)
     file(APPEND "${native_source}" "${contents}\n")
 endforeach()

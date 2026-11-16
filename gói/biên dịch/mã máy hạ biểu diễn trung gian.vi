@@ -36,6 +36,7 @@ lớp công khai Bộ Hạ Mã Máy {
             mục ký hiệu == "vpp_native_bytes_store_i32" || mục ký hiệu == "vpp_native_link_macho" ||
             mục ký hiệu == "vpp_native_link_macho_modules") { trả về 3; };
         nếu (mục ký hiệu == "vpp_native_jit_service") { trả về 3; };
+        nếu (mục ký hiệu == "vpp_native_worker_service") { trả về 3; };
         nếu (mục ký hiệu == "vpp_native_memory_read_byte") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_memory_write_byte") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_read_i32") { trả về 1; };

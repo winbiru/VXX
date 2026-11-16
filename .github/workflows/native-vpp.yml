@@ -15,6 +15,18 @@ env:
   PYTHONUTF8: '1'
   PYTHONIOENCODING: utf-8
 jobs:
+  posix-worker-machine:
+    name: OS worker - ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check OS threads, isolated arenas and worker lifecycle
+        run: python3 scripts/quality/check_worker_machine.py
   macos-i32:
     name: macOS ARM64 - i32 source bootstrap
     runs-on: macos-15
@@ -95,6 +107,7 @@ jobs:
           test "$("$RUNNER_TEMP/vpp-extracted/bin/vpp" jit "$RUNNER_TEMP/probe.vi")" = 42
           python3 scripts/quality/check_jit_cli.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit"
           python3 scripts/quality/check_jit_dynamic.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit" "$RUNNER_TEMP/vpp-extracted/share/vpp"
+          python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$RUNNER_TEMP/vpp-extracted/bin/vpp" --timeout 900 --logs "$RUNNER_TEMP/host-regression"
       - name: Check Linux cross emitter
         run: |
           probe="$RUNNER_TEMP/probe.vi"
@@ -127,6 +140,7 @@ jobs:
             build-pure-vpp/full-compiler-profile.log
             ${{ runner.temp }}/macos-full/**/*.log
             ${{ runner.temp }}/macos-full/convergence.sha256
+            ${{ runner.temp }}/host-regression/
           if-no-files-found: ignore
   linux-i32:
     name: Linux x86-64 - i32 source bootstrap
@@ -216,8 +230,11 @@ jobs:
           install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
           sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/macos/vpp-native-launcher.sh.in > "$package/bin/vpp"
           chmod 755 "$package/bin/vpp"
-          VPP_HOME="$package/share/vpp" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 \
-            "$package/bin/vpp-i32" build "$package/share/vpp/gói/máy ảo/chính.vi" -o "$package/bin/vpp-vm"
+          bash scripts/linux/build-vpp-vm.sh "$package/bin/vpp-i32" "$package/bin/vpp-vm"
+          VPP_HOME="$GITHUB_WORKSPACE" VPP_AOT_VPP_OBJECT="$out/runtime.o" VPP_AOT_ASSEMBLER="$(command -v clang)" \
+            cmake -DVPP_ROOT="$GITHUB_WORKSPACE" -DVPP_NATIVE_COMPILER="$out/vpp-native-stage3" \
+              -DVPP_VM="$package/bin/vpp-vm" -DVPP_OUTPUT_DIR="$out/compiler-workers" \
+              -P scripts/quality/check_compiler_workers.cmake
           VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
           "$package/bin/vpp" vm-build "$package/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$package/bin/dns-provider.vmb"
           tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
@@ -235,6 +252,7 @@ jobs:
           bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-jit"
           python3 scripts/quality/check_jit_cli.py "$out/extracted/bin/vpp-jit"
           python3 scripts/quality/check_jit_dynamic.py "$out/extracted/bin/vpp-jit" "$out/extracted/share/vpp"
+          VPP_AOT_LINUX_OBJECT_DIR="$out/extracted/share/vpp/native-vpp-runtime/linux-objects" python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$out/extracted/bin/vpp" --timeout 900 --logs "$out/host-regression"
           echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
       - name: Upload full compiler
         uses: actions/upload-artifact@v4
@@ -256,6 +274,7 @@ jobs:
             regression-build-logs/
             ${{ runner.temp }}/linux-full/**/*.log
             ${{ runner.temp }}/linux-full/convergence.sha256
+            ${{ runner.temp }}/linux-full/host-regression/
           if-no-files-found: ignore
   windows-i32:
     name: Windows x86-64 - native i32 selfhost
@@ -283,7 +302,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows seed PE audit failed' }
           $out = "$env:RUNNER_TEMP/windows-seed"
           New-Item -ItemType Directory -Path $out | Out-Null
-          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
+          clang -target x86_64-pc-windows-msvc -DVPP_NATIVE_RUNTIME_STACK_ABI=1 -DVPP_JIT_DISABLED=1 -DVPP_WINDOWS_I32_BOOTSTRAP=1 -c scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S -o "$out/windows-runtime.obj"
           if ($LASTEXITCODE -ne 0) { throw 'Windows boundary assembly failed' }
       - name: Bootstrap current Windows i32 compiler from source
         shell: pwsh
@@ -377,6 +396,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows i32 extraction failed' }
           python scripts/quality/check_windows_full_bootstrap.py --clang "$toolchain/clang.exe" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix $prefix --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase prepare
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check Windows native worker machine boundary
+        shell: pwsh
+        run: python scripts/quality/check_worker_machine.py
       - name: Bootstrap full compiler (Stage 1)
         shell: pwsh
         run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase stage1
@@ -416,6 +438,7 @@ jobs:
             regression-build-logs/
             ${{ runner.temp }}/windows-full/**/*.log
             ${{ runner.temp }}/windows-full/convergence.sha256
+            ${{ runner.temp }}/windows-full/host-regression/
           if-no-files-found: ignore
 
   macos-regression:

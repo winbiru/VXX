@@ -17,10 +17,12 @@ nhập gói.lõi.đồng thời.chờ luồng;
 nhập gói.lõi.đồng thời.hủy luồng;
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ đường;
 nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ bắt đầu;
 nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ ghi;
+nhập gói.biên dịch.đo hiệu năng.biên dịch hồ sơ ghi số;
 
 // Tổng hợp hàm vào trước khi đăng ký function ID và hạ IR, để lời gọi
 // constructor/phương thức đi qua đúng đường phát mã của chương trình thường.
@@ -121,9 +123,8 @@ hàm riêng tư biên dịch worker hạ IR(các cây, đã kiểm tra ngữ ngh
 };
 
 hàm riêng tư biên dịch worker số luồng() {
-    // Runtime V++/ASM hiện chưa có ABI worker. Hạ IR tuần tự mặc định;
-    // cấu hình worker tường minh vẫn đi qua đường song song và báo lỗi
-    // nếu host không hỗ trợ, không giả lập worker bằng lời gọi đồng bộ.
+    // Hạ IR tuần tự mặc định; cấu hình tường minh dùng OS worker
+    // và báo lỗi nếu nền tảng không hỗ trợ.
     cấu hình = đọc biến môi trường("VPP_COMPILER_WORKERS", "0");
     thử {
         số luồng = thành số nguyên(cấu hình);
@@ -155,6 +156,8 @@ hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, gi
     cache = {};
     đang chạy = [];
     đã nhận = 0;
+    đường hồ sơ = biên dịch hồ sơ đường();
+    đỉnh = 0;
     // Small graphs keep one module per worker so parallelism is not lost.
     cỡ nhóm = 4;
     nếu (máy ảo lấy độ dài(các tên) <= giới hạn * cỡ nhóm) { cỡ nhóm = 1; };
@@ -169,7 +172,9 @@ hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, gi
             };
             mã luồng = chạy luồng(biên dịch worker hạ IR, [nhóm cây, đã kiểm tra ngữ nghĩa]);
             máy ảo thêm cuối danh sách(đang chạy, {"tên": nhóm tên, "mã": mã luồng});
-            nếu (máy ảo lấy độ dài(đang chạy) - đã nhận >= giới hạn) {
+            số đang chờ = máy ảo lấy độ dài(đang chạy) - đã nhận;
+            nếu (số đang chờ > đỉnh) { đỉnh = số đang chờ; };
+            nếu (số đang chờ >= giới hạn) {
                 biên dịch worker nhận IR(cache, đang chạy[đã nhận]);
                 đã nhận += 1;
             };
@@ -185,6 +190,8 @@ hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, gi
         };
         ném "biên dịch worker hạ IR: " + thành chuỗi(e);
     };
+    biên dịch hồ sơ ghi số(đường hồ sơ, "link.worker_submitted", đã nhận);
+    biên dịch hồ sơ ghi số(đường hồ sơ, "link.worker_inflight_peak", đỉnh);
     trả về cache;
 };
 
@@ -362,6 +369,12 @@ lớp công khai Bộ Liên Kết Bytecode {
         nếu (lấy từ điển(đồ thị, "loại", "") != "đồ thị mô đun V++") {
             ném "biên dịch liên kết: cần đồ thị mô đun V++";
         };
+        nếu (số worker == rỗng) { số worker = biên dịch worker số luồng(); }
+        hoặc nếu (loại của(số worker) != "số nguyên") {
+            ném "biên dịch worker: số worker phải là số nguyên trong khoảng 0..8";
+        } hoặc nếu (số worker < 0 || số worker > 8) {
+            ném "biên dịch worker: số worker phải là số nguyên trong khoảng 0..8";
+        };
         đường hồ sơ = biên dịch hồ sơ đường();
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
@@ -424,9 +437,9 @@ lớp công khai Bộ Liên Kết Bytecode {
         biên dịch hồ sơ ghi(đường hồ sơ, "link.edge_index", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         tên gốc = đồ thị["điểm vào"];
-        nếu (số worker == rỗng) { số worker = biên dịch worker số luồng(); };
-        // Đồ thị có một phụ thuộc vẫn có hai mô-đun: root + dependency.
-        nếu (số worker > 1 && máy ảo lấy độ dài(đồ thị["mô đun"]) > 0) {
+        // Một module vẫn phải xác nhận hỗ trợ worker khi yêu cầu tường minh.
+        // Đồ thị có một phụ thuộc có hai job: root + dependency.
+        nếu (số worker > 1) {
             phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker, dùng lại ngữ nghĩa);
             nếu (!máy ảo có khóa từ điển(phiên["IR đã chuẩn bị"], tên gốc)) {
                 ném "biên dịch worker: thiếu IR của mô-đun gốc";
@@ -560,6 +573,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         trả về {"loại": "bytecode V++ đồ thị đã liên kết",
             "bytecode": mã trung gian, "hàm": bảng hàm,
             "điểm vào": điểm vào, "slots": gốc dữ liệu["slots"],
+            "đường gốc": đồ thị["điểm vào"],
             "chuỗi": sổ["chuỗi"], "mô đun khởi tạo": initializer,
             "ngoại": phiên["ngoại"]};
     };

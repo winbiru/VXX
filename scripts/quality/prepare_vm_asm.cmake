@@ -1,3 +1,4 @@
+cmake_host_system_information(RESULT vpp_host_arch QUERY OS_PLATFORM)
 foreach(required IN ITEMS VPP_EXEC VPP_ROOT VPP_TARGET VPP_OUTPUT_DIR)
     if (NOT DEFINED ${required})
         message(FATAL_ERROR "VM ASM bootstrap missing ${required}")
@@ -6,8 +7,14 @@ endforeach()
 set(VPP_PREPARE_ONLY TRUE)
 include("${CMAKE_CURRENT_LIST_DIR}/checknativedriver.cmake")
 set(vm "${VPP_OUTPUT_DIR}/vpp-vm")
+set(vm_build_command "${compiler}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}")
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND vpp_host_arch MATCHES "^(arm64|aarch64)$")
+    set(vm_build_command /bin/bash "${VPP_ROOT}/scripts/macos/build-vpp-vm.sh" "${compiler}" "${vm}")
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND vpp_host_arch STREQUAL "x86_64")
+    set(vm_build_command /bin/bash "${VPP_ROOT}/scripts/linux/build-vpp-vm.sh" "${compiler}" "${vm}")
+endif()
 execute_process(
-    COMMAND "${compiler}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${vm}"
+    COMMAND ${vm_build_command}
     WORKING_DIRECTORY "${VPP_ROOT}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
 if (NOT status STREQUAL "0" OR NOT EXISTS "${vm}")

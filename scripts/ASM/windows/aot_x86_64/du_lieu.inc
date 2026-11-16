@@ -6,6 +6,10 @@ Lsha256_thuat_toan: .short 0x53, 0x48, 0x41, 0x32, 0x35, 0x36, 0
 .data
 .p2align 3
 vpp_native_arena_base: .quad 0
+#ifndef VPP_WINDOWS_I32_BOOTSTRAP
+vpp_native_arena_tls_key: .long 0
+vpp_native_arena_tls_enabled: .long 0
+#endif
 vpp_native_spawn_handle: .quad 0
 vpp_native_argument_buffer: .quad 0
 vpp_native_argument_index: .long -1

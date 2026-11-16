@@ -1010,7 +1010,14 @@
       "id": "kiem_tra_jit_vpp",
       "source": "scripts/test/kiem_tra_jit_vpp.vi",
       "expected": "scripts/test/expected/kiem_tra_jit_vpp.expected",
-      "suite": "full",
+      "suite": "host",
+      "platforms": ["Darwin", "Linux", "Windows"]
+    },
+    {
+      "id": "kiem_tra_jit_guest_boundary",
+      "source": "scripts/test/kiem_tra_jit_guest_boundary.vi",
+      "expected": "scripts/test/expected/kiem_tra_jit_guest_boundary.expected",
+      "suite": "guest",
       "platforms": ["Darwin", "Linux", "Windows"]
     },
     {
@@ -1205,18 +1212,16 @@
       "source": "scripts/test/kiem_tra_loi_chia_cho_0.vi",
       "suite": "full",
       "exit": 1,
-      "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_cho_0.expected",
-      "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
+      "expected_stderr": "scripts/test/expected/kiem_tra_loi_chia_cho_0.expected",
+      "stdout": ""
     },
     {
       "id": "kiem_tra_loi_chia_du_cho_0",
       "source": "scripts/test/kiem_tra_loi_chia_du_cho_0.vi",
       "suite": "full",
       "exit": 1,
-      "historical_expected": "scripts/test/expected/kiem_tra_loi_chia_du_cho_0.expected",
-      "stdout": "",
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
+      "expected_stderr": "scripts/test/expected/kiem_tra_loi_chia_du_cho_0.expected",
+      "stdout": ""
     },
     {
       "id": "kiem_tra_loi_chia_du_so_thuc",
@@ -1780,13 +1785,17 @@
     {
       "id": "kiem_tra_stack_trace",
       "source": "scripts/test/kiem_tra_stack_trace.vi",
-      "expected": "scripts/test/expected/kiem_tra_stack_trace.expected",
+      "expected_stderr": "scripts/test/expected/kiem_tra_stack_trace.expected",
+      "stdout": "",
+      "exit": 1,
       "suite": "full"
     },
     {
       "id": "kiem_tra_stack_trace_module",
       "source": "scripts/test/kiem_tra_stack_trace_module.vi",
-      "expected": "scripts/test/expected/kiem_tra_stack_trace_module.expected",
+      "expected_stderr": "scripts/test/expected/kiem_tra_stack_trace_module.expected",
+      "stdout": "",
+      "exit": 1,
       "suite": "full"
     },
     {
@@ -2136,7 +2145,7 @@
       "suite": "full",
       "expected": "scripts/test/expected/native_i32_expression_error.expected",
       "exit": 1,
-      "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=6 opcode=-?\\d+\\r?\\n\\Z"
+      "expected_stderr": "scripts/test/expected/native_i32_expression_error.stderr.expected"
     },
     {
       "id": "native_i32_nested_calls",
@@ -2515,7 +2524,10 @@
         "Linux",
         "Windows"
       ],
-      "weight_ms": 180000
+      "weight_ms": 180000,
+      "sources": [
+        "scripts/test/fixtures/native_socket_timeout.vi"
+      ]
     },
     {
       "id": "standalone-vm-socket-negative",
