@@ -1,6 +1,7 @@
 // ABI giá trị động cho AOT. Hàm và nhánh chạy bằng mã máy đã sinh.
 // Dùng chung biểu diễn giá trị, bộ thu gom và ô biến của máy ảo V++.
 nhập bộ nhớ.*;
+nhập ..chẩn đoán.định dạng.*;
 nhập giá trị.*;
 nhập máy hệ thống.*;
 nhập thư mục máy.*;
@@ -2498,7 +2499,11 @@ hàm aot_default(frame) {
     nếu (aot_status() || vm_get(entry, 1) != 0) { trả về 0; }; vm_set(entry, 1, 1); trả về 1;
 };
 hàm aot_throw_value(frame) {
-    vm_set(4198464, 3, vm_pop(aot_stack(frame))); vm_error(16); trả về 1;
+    nếu (aot_status()) { trả về 1; };
+    vm_set(4198464, 13, 80); // OP_NEM, không dùng opcode host trước đó.
+    biến value = vm_pop(aot_stack(frame));
+    nếu (aot_status()) { trả về 1; };
+    vm_set(4198464, 3, value); vm_error(16); trả về 1;
 };
 hàm aot_try_begin(frame, target, unused) {
     biến handlers = vm_get(frame, 7);
@@ -2680,9 +2685,7 @@ hàm chính() {
     vm_profile_report();
     nếu (aot_status()) {
         nếu (aot_arithmetic_diagnostic(state)) { trả về 1; };
-        vm_write(2, vm_concat(vm_literal("V++ AOT runtime: error="), vm_integer_text(vm_get(4198464, 1))));
-        vm_write(2, vm_concat(vm_literal(" opcode="), vm_integer_text(vm_get(4198464, 5))));
-        vm_write(2, vm_literal("\n"));
+        chẩn đoán ghi lỗi("V++ AOT runtime: error=", vm_get(4198464, 1), vm_get(4198464, 5));
         nếu (vm_get(4198464, 1) == 16) {
             biến message = vm_text(vm_get(4198464, 3));
             nếu (vm_tag(message) == 3) {

@@ -3,6 +3,40 @@
 CLI 1.0 dùng tên lệnh tiếng Việt làm bề mặt canonical. Các alias tiếng Anh như `run`, `test`,
 `build`, `new` vẫn được giữ để tương thích script cũ.
 
+## VDK: chọn SDK và chuyển tiếp lệnh
+
+`vdk` là CLI quản lý SDK viết bằng V++, được đóng gói cùng compiler native,
+runtime, VM và JIT. Các lệnh quản lý:
+
+```text
+vdk trợ giúp
+vdk phiên bản
+vdk chẩn đoán
+vdk thư viện danh sách
+vdk thư viện danh sách --json
+vdk cài hiển thị
+vdk kiểm tra hiển thị
+vdk biên dịch hello.vi --đầu-ra hello
+vdk chạy hello.vi
+vdk chạy tức thời hello.vi
+vdk kiểm tra hello.vi
+vdk biên-dịch-máy-ảo hello.vi --đầu-ra hello.vmb
+vdk gỡ hiển thị
+```
+
+Lệnh tiếng Việt là giao diện chính; alias tiếng Anh vẫn tương thích. Cài hiển thị là tùy chọn, chỉ sửa profile người dùng. Mở terminal mới sau khi cài/gỡ. Nếu chưa gõ được dấu, dùng `vdk cai-hien-thi`. Tùy chọn `--vdk-home` tương đương `--thư-mục-vdk`.
+
+`version` in phiên bản, nền tảng, kiến trúc và thư mục SDK được chọn.
+`doctor` kiểm tra các thành phần, metadata và khả năng khởi chạy compiler;
+`library list` liệt kê nhóm và ID thư viện, `--json` xuất catalog đầy đủ.
+
+VDK tìm `vdk.json` gần nhất trong cây thư mục dự án để khóa phiên bản.
+Xem [cách cài đặt nhiều SDK](installation.md#cài-đặt-vdk-và-chọn-phiên-bản-sdk).
+Các lệnh khác được chuyển tới compiler hoặc JIT đi kèm, ví dụ
+`vdk biên dịch app.vi --đầu-ra app`, `vdk chạy tức thời app.vi`. Chỉ các lệnh được compiler
+native hiện tại hỗ trợ mới chạy được; các lệnh lịch sử dùng C++ ở bên dưới
+không đồng nghĩa với hỗ trợ trong SDK V++/ASM.
+
 ## Lệnh chung
 
 ```text
@@ -19,10 +53,14 @@ Chạy trực tiếp file hoặc dùng lệnh tường minh:
 vpp app.vi
 vpp chạy app.vi
 vpp dựng app.vi
+vpp biên dịch máy ảo app.vi --đầu-ra app.vmb
+vpp chạy --artifact app.vmb
 ```
 
 `dựng` chạy compiler pipeline và verifier nhưng chưa ghi artifact `.vbc`; format bytecode chỉ
-được public sau khi compatibility/versioning policy 1.0 được freeze.
+được public sau khi compatibility/versioning policy 1.0 được freeze. Artifact native `.vmb`
+chạy bằng VM Assembly với `vpp chạy --artifact app.vmb` (alias `vpp artifact app.vmb`).
+Artifact `.vbc` của bản C++ cũ cần biên dịch lại từ mã nguồn.
 
 ## Khởi tạo project
 
@@ -50,20 +88,18 @@ Chi tiết assertion/setup/teardown nằm trong `docs/testing.md`.
 ```text
 vpp --soát-lỗi src/
 vpp --soát-lỗi --compiler=vpp src/chính.vi
-vpp --soát-lỗi --compiler=cpp src/chính.vi
 vpp --định-dạng src/chính.vi
 vpp --định-dạng src/ --kiểm-tra
 vpp --định-dạng src/ --ghi-tệp
 ```
 
-`--soát-lỗi` ưu tiên parser/semantic và trình phân giải import V++ native
-khi có compiler đã bootstrap; `--compiler=cpp` giữ đường Stage 0 để so sánh,
-`--compiler=vpp` yêu cầu compiler native. Lỗi khai báo trùng trả vị trí
-file:dòng:cột theo byte UTF-8. Native lint chưa phát đủ warning và
-SourceSpan của mọi lỗi ngữ nghĩa. LSP ưu tiên native lint trên bộ đệm chưa lưu,
-phân giải import theo thư mục tệp thật và chuyển vị trí byte sang UTF-16;
-không có compiler native thì dùng Stage 0. Native compiler cũng hỗ trợ
-`lint <snapshot.vi> --base <directory>` để kiểm tra import của bộ đệm.
+`--soát-lỗi` dùng parser/semantic và trình phân giải import V++ native.
+`--compiler=vpp` là alias tương thích; compiler C++ đã được loại bỏ.
+Lỗi khai báo trùng trả vị trí dòng:cột theo byte UTF-8. Native lint chưa
+phát đủ warning và SourceSpan của mọi lỗi ngữ nghĩa. LSP dùng native lint
+trên bộ đệm chưa lưu, phân giải import theo thư mục tệp thật và chuyển
+vị trí byte sang UTF-16. Native compiler hỗ trợ `lint <snapshot.vi> --base
+<directory>` để kiểm tra import của bộ đệm.
 Lệnh trả exit code phù hợp CI. Formatter giữ comment và literal, hỗ trợ
 check mode và write mode; `--lint`, `--check`, `--in-place` là alias tương thích.
 
@@ -74,14 +110,25 @@ vpp --giải-mã app.vi
 vpp --dump-ast app.vi
 vpp --dump-ir app.vi
 vpp --dump-ir --compiler=vpp app.vi
-vpp --dump-ir --compiler=cpp app.vi
 ```
 
 `--dump-ast` và `--dump-ir` chỉ in dữ liệu compiler, không thực thi mã nguồn.
-Mặc định chúng dùng compiler V++ native đã bootstrap; `--compiler=vpp`
-chọn native tường minh, `--compiler=cpp` chọn Stage 0. Hai thế hệ có
-schema AST/IR khác nhau. Native `--dump-ir` hiển thị stack IR trước codegen;
-import chỉ ghi metadata `(chưa liên kết)` trong bản dump cấp tệp.
+Các lệnh dùng compiler V++ native; `--compiler=vpp` chọn native tường minh.
+Native `--dump-ir` hiển thị stack IR trước codegen; import chỉ ghi metadata
+`(chưa liên kết)` trong bản dump cấp tệp.
+
+## Gỡ cài đặt
+
+```text
+vpp gỡ cài đặt
+vdk gỡ cài đặt
+vpp uninstall
+```
+
+Trình gỡ chỉ xóa các tệp có trong danh sách cài đặt SHA-256 và chưa bị sửa đổi.
+Các dự án và tệp riêng được giữ lại. VDK gỡ phiên bản SDK đang được chọn.
+Nếu đã cài cấu hình hiển thị, chạy `vdk gỡ hiển thị` trước khi gỡ SDK;
+cấu hình shell/PATH dùng chung không bị tự động xóa.
 
 ## REPL và LSP
 
@@ -90,31 +137,47 @@ vpp --repl
 vpp --lsp
 ```
 
-LSP ưu tiên parser/semantic V++ native cho diagnostics và formatter khi có
-compiler đã bootstrap. Completion, definition, hover, rename vẫn dùng tooling
-Stage 0. Range diagnostic được đổi sang UTF-16 theo giao thức LSP; một số
-lỗi semantic V++ chưa có vị trí chi tiết và warning chưa đạt parity Stage 0.
+Máy chủ LSP viết bằng V++ hỗ trợ JSON-RPC, đồng bộ toàn bộ tài liệu,
+chẩn đoán bộ đệm chưa lưu, định dạng, `vpp/libraryRoots`, thông báo thay đổi
+catalog thư viện và shutdown/exit. Chỉ mục ngữ nghĩa lấy định danh biến
+và phạm vi từ AST/IR của compiler, chuyển vị trí byte UTF-8 sang UTF-16 của LSP.
+
+| Phương thức LSP | Phạm vi hỗ trợ |
+| --- | --- |
+| `textDocument/completion` | Gợi ý biến, tham số, hàm, kiểu trong phạm vi và hàm nhập từ mô-đun; dùng chỉ mục hợp lệ gần nhất khi mã đang gõ chưa phân tích được. |
+| `textDocument/definition` | Đi đến khai báo của biến, tham số, hàm cục bộ và hàm nhập. |
+| `textDocument/hover` | Hiện tên biến, tham số hoặc chữ ký hàm, gồm tham số có mặc định. |
+| `textDocument/rename` | Đổi tên biến/tham số và hàm riêng tư trong tệp; kiểm tra tên mới, từ chối tên trùng, dựng lại chỉ mục trên nguồn ứng viên để kiểm tra liên kết ký hiệu trước khi trả sửa đổi. |
+
+Extension VS Code có thể dùng các tính năng này khi đặt `vpp.lsp.enabled=true`.
+Nếu không cấu hình máy chủ riêng, extension tìm cặp `vpp-tools` và `vpp-native`
+trong workspace hoặc SDK. Chỉ mục được làm mới khi tài liệu mở, sửa, đóng
+hoặc tệp thay đổi trên đĩa.
+
+Nếu mã đang gõ có lỗi cú pháp, completion có thể dùng chỉ mục hợp lệ gần
+nhất của cùng tài liệu, với `isIncomplete: true`. Definition, hover và rename
+không dùng chỉ mục cũ. Nội dung tệp nhập đang mở được ưu tiên cả khi bộ đệm
+chưa lưu là chuỗi rỗng.
+
+Giới hạn hiện tại: chưa đổi tên xuyên mô-đun hoặc hàm công khai; chưa phân giải
+đầy đủ phương thức OOP và kiểu nhập. Completion dự phòng cần có chỉ mục hợp lệ
+từ trước và chưa thay thế cơ chế phục hồi cú pháp đầy đủ; extension vẫn có gợi ý
+từ khóa và cú pháp cục bộ. Kiểm tra đổi tên chỉ bao phủ các liên kết đã lập chỉ
+mục, chưa tương đương kiểm tra toàn bộ dự án. Tệp nhập mới chưa tồn tại trên đĩa
+chưa được phân giải. Một số lỗi ngữ nghĩa chưa có vị trí chi tiết.
 
 ## Xuất executable V++/ASM
 
 ```text
-vpp build --target aarch64-apple-darwin --emit-exe-vpp app.vi ./app
-vpp build --target x86_64-linux-gnu --emit-exe-vpp app.vi ./app
+vpp biên dịch app.vi -o ./app
+vpp build app.vi -o ./app
+vpp vm-build app.vi -o app.vmb
 ```
 
-`--emit-exe-vpp` yêu cầu compiler `vpp-native` đã bootstrap (có thể chỉ định
-`VPP_NATIVE_COMPILER`), và target phải là host đang chạy. CLI kiểm tra source,
-project lock, đường đầu ra rồi chuyển trực tiếp cho frontend và bộ phát ASM
-của compiler `.vi`; không đi qua bridge `executeVppSource()` của Stage 0.
-Host AOT vẫn thực hiện lắp ráp/liên kết và các primitive runtime C/C++ vẫn
-được dùng. Bản macOS kiểm chứng còn phụ thuộc `libc++`, `libffi`,
-`libSystem` và framework TLS. Hiện hỗ trợ macOS AArch64 và Linux x86-64.
-Executable mới thực thi **câu lệnh cấp tệp** theo ngữ nghĩa V++: ví dụ
-`in chính();` để gọi và in kết quả hàm `chính`. Giá trị trả về của hàm này
-không tự trở thành exit code của tiến trình như ABI `main` i32 ở Stage 0.
-`--emit-exe-selfhost` vẫn tồn tại để bootstrap Stage 0 và kiểm thử tương thích;
-nhánh này còn phụ thuộc C++/VM. Compiler chỉ thay thế đầu ra sau khi liên kết
-thành công; từ chối đường đầu ra trùng tệp nguồn, kể cả symlink.
+Compiler native phát mã máy thông qua V++/Assembly; bản macOS ARM64 có bộ
+phát object và linker native. Linux x86-64 và Windows x86-64 dùng công cụ
+lắp ráp/liên kết tương ứng với nền tảng. Không có runtime C/C++ dự phòng.
+Compiler từ chối đường đầu ra trùng tệp nguồn.
 
 ## Package
 
@@ -146,4 +209,4 @@ vpp dựng src/chính.vi
 vpp kiểm thử tests
 ```
 
-Repo V++ dùng thêm CMake/CTest cho test compiler/runtime C++ và regression ngôn ngữ.
+Repo V++ dùng thêm CMake/CTest cho test compiler/runtime V++/Assembly và regression ngôn ngữ.

@@ -51,6 +51,13 @@ else()
   add_custom_target(vpp-jit ALL DEPENDS "${VPP_BIN}/vpp-jit")
 endif()
 add_dependencies(vpp-jit vpp-cli)
+add_custom_command(OUTPUT "${VPP_BIN}/vpp-tools"
+  COMMAND "${VPP_BIN}/vpp" build "${CMAKE_SOURCE_DIR}/scripts/vdk/vpp-cli.vi" -o "${VPP_BIN}/vpp-tools"
+  DEPENDS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" ${VPP_SOURCES} scripts/vdk/vpp-cli.vi
+  COMMENT "Biên dịch công cụ dự án V++"
+  VERBATIM USES_TERMINAL)
+add_custom_target(vpp-tools ALL DEPENDS "${VPP_BIN}/vpp-tools")
+add_dependencies(vpp-tools vpp-cli)
 include(CTest)
 if(BUILD_TESTING)
   add_test(NAME vpp-source-boundary COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh")
@@ -70,6 +77,25 @@ if(BUILD_TESTING)
       -P "${CMAKE_SOURCE_DIR}/scripts/quality/check_compiler_workers.cmake")
     set_tests_properties(vpp-compiler-workers PROPERTIES TIMEOUT 7200 LABELS "smoke;worker")
   endif()
+  foreach(mode format diagnostics)
+    add_test(NAME vpp-lsp-${mode} COMMAND "${CMAKE_COMMAND}"
+      "-DVPP_CLI=${VPP_BIN}/vpp" "-DVPP_NATIVE_COMPILER=${VPP_BIN}/vpp-native"
+      "-DVPP_ROOT=${CMAKE_SOURCE_DIR}" "-DVPP_OUTPUT_DIR=${CMAKE_BINARY_DIR}/lsp-${mode}"
+      "-DVPP_LSP_MODE=${mode}" -P "${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp.cmake")
+    set_tests_properties(vpp-lsp-${mode} PROPERTIES TIMEOUT 180 LABELS "smoke;lsp")
+  endforeach()
+  add_test(NAME vpp-lsp-catalog COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_catalog.py"
+    "${VPP_BIN}/vpp-tools" "${VPP_BIN}/vpp-native" "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(vpp-lsp-catalog PROPERTIES TIMEOUT 180 LABELS "smoke;lsp")
+  add_test(NAME vpp-lsp-semantic COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_semantic.py"
+    "${VPP_BIN}/vpp-tools" "${VPP_BIN}/vpp-native" "${CMAKE_SOURCE_DIR}")
+  set_tests_properties(vpp-lsp-semantic PROPERTIES TIMEOUT 360 LABELS "smoke;lsp")
+  add_test(NAME vpp-package-manager COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_SOURCE_DIR}/scripts/quality/check_native_package_manager.py"
+    "${VPP_BIN}/vpp-tools" "${VPP_BIN}/vpp-native")
+  set_tests_properties(vpp-package-manager PROPERTIES TIMEOUT 300 LABELS "smoke;package")
   add_test(NAME vpp-jit-cli COMMAND "${Python3_EXECUTABLE}"
     "${CMAKE_SOURCE_DIR}/scripts/quality/check_jit_cli.py" "${VPP_BIN}/vpp-jit")
   add_test(NAME vpp-jit-dynamic COMMAND "${Python3_EXECUTABLE}"
@@ -100,9 +126,25 @@ if(BUILD_TESTING)
     --logs "${CMAKE_BINARY_DIR}/regression-logs/host")
   set_tests_properties(vpp-trusted-host-regression PROPERTIES TIMEOUT 1800 LABELS "regression;full;host")
 endif()
-install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" DESTINATION bin)
+install(PROGRAMS "${VPP_BIN}/vpp" "${VPP_BIN}/vpp-native" "${VPP_BIN}/vpp-i32" "${VPP_BIN}/vpp-vm" "${VPP_BIN}/vpp-jit" "${VPP_BIN}/vpp-tools" DESTINATION bin)
 install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNTIME}/dynamic-bridge.o" DESTINATION share/vpp/native-vpp-runtime)
-install(DIRECTORY "${CMAKE_SOURCE_DIR}/gói" DESTINATION share/vpp)
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/gói" "${CMAKE_SOURCE_DIR}/templates" DESTINATION share/vpp)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/scripts/ASM" DESTINATION share/vpp/scripts
   FILES_MATCHING PATTERN "*.S" PATTERN "*.inc" PATTERN "*.md")
 install(FILES "${CMAKE_SOURCE_DIR}/vpp-language.json" "${CMAKE_SOURCE_DIR}/vpp-libraries.json" DESTINATION share/vpp)
+
+# Record only files installed by CMake, never unrelated files in a shared prefix.
+install(PROGRAMS "${CMAKE_SOURCE_DIR}/scripts/vdk/uninstall-native.sh" DESTINATION bin)
+install(SCRIPT "${CMAKE_SOURCE_DIR}/scripts/vdk/install-manifest.cmake")
+
+# Explicit packaging target: keep the bootstrap graph independent of release tooling.
+find_package(Python3 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_custom_target(vpp-release-packages
+    COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}" --prefix "${CMAKE_BINARY_DIR}/release-prefix"
+    COMMAND "${CMAKE_BINARY_DIR}/release-prefix/bin/vpp" vm-build "${CMAKE_BINARY_DIR}/release-prefix/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "${CMAKE_BINARY_DIR}/release-prefix/bin/dns-provider.vmb"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/quality/package_release.py" --platform macos-arm64 --prefix "${CMAKE_BINARY_DIR}/release-prefix" --output "${CMAKE_BINARY_DIR}/release-candidates"
+    DEPENDS vpp-cli vpp-vm vpp-jit vpp-tools
+    COMMENT "Đóng gói VPP và VDK từ compiler hiện tại"
+    VERBATIM USES_TERMINAL)
+endif()

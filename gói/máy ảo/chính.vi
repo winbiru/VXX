@@ -1,6 +1,7 @@
 // Build this entry with the existing i32 native V++ compiler.
 // The binary links only V++-generated objects and platform ASM primitives.
 nhập bộ nhớ.*;
+nhập ..chẩn đoán.định dạng.*;
 nhập giá trị.*;
 nhập máy hệ thống.*;
 nhập thư mục máy.*;
@@ -95,9 +96,7 @@ hàm chính() {
     vm_profile_report();
     biến error = vm_get(4198464, 1);
     nếu (error != 0) {
-        biến message = vm_concat(vm_literal("V++ VM ASM: error="), vm_integer_text(error));
-        message = vm_concat(message, vm_concat(vm_literal(" opcode="), vm_integer_text(vm_get(4198464, 5))));
-        vm_write(2, vm_concat(message, vm_literal("\n")));
+        chẩn đoán ghi lỗi("V++ VM ASM: error=", error, vm_get(4198464, 5));
         nếu (error == 16) { vm_write(2, vm_concat(vm_text(vm_get(4198464, 3)), vm_literal("\n"))); };
         trả về 1;
     };

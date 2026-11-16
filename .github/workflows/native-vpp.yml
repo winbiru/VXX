@@ -4,6 +4,8 @@ on:
     branches: [main, developer, 'developer-stage-*']
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -129,6 +131,15 @@ jobs:
         run: |
           package="$RUNNER_TEMP/vpp-install"
           python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity
+      - name: Build VPP and VDK release candidates
+        run: python3 scripts/quality/package_release.py --platform macos-arm64 --prefix "$RUNNER_TEMP/vpp-install" --output "$RUNNER_TEMP/release-candidates"
+      - name: Upload release candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: ${{ runner.temp }}/release-candidates/*
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload build and test logs
         uses: actions/upload-artifact@v4
         if: always()
@@ -237,6 +248,14 @@ jobs:
               -P scripts/quality/check_compiler_workers.cmake
           VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
           "$package/bin/vpp" vm-build "$package/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$package/bin/dns-provider.vmb"
+          cp -R templates "$package/share/vpp/"
+          VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build scripts/vdk/vpp-cli.vi -o "$package/bin/vpp-tools"
+          for mode in format diagnostics; do
+            cmake -DVPP_CLI="$package/bin/vpp" -DVPP_NATIVE_COMPILER="$package/bin/vpp-native" -DVPP_ROOT="$package/share/vpp" -DVPP_OUTPUT_DIR="$out/lsp-$mode" -DVPP_LSP_MODE="$mode" -P scripts/quality/check_native_lsp.cmake
+          done
+          python3 scripts/quality/check_native_lsp_catalog.py "$package/bin/vpp-tools" "$package/bin/vpp-native" "$package/share/vpp"
+          python3 scripts/quality/check_native_lsp_semantic.py "$package/bin/vpp-tools" "$package/bin/vpp-native" "$package/share/vpp"
+          python3 scripts/quality/check_native_package_manager.py "$package/bin/vpp-tools" "$package/bin/vpp-native"
           tar -C "$package" -czf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz" .
           mkdir -p "$out/extracted"
           tar -C "$out/extracted" -xzf "$RUNNER_TEMP/vpp-linux-x86_64-full.tar.gz"
@@ -247,6 +266,7 @@ jobs:
           bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-vm"
           "$out/extracted/bin/vpp" vm-build "$out/package-probe.vi" -o "$out/package-probe.vmb"
           test "$(PATH= "$out/extracted/bin/vpp-vm" "$out/package-probe.vmb")" = 42
+          test "$("$out/extracted/bin/vpp" chạy --artifact "$out/package-probe.vmb")" = 42
           test "$(PATH= "$out/extracted/bin/vpp-jit" "$out/package-probe.vi")" = 42
           test "$(VPP_AOT_ASSEMBLER=/assembler-must-not-run "$out/extracted/bin/vpp" jit "$out/package-probe.vi")" = 42
           bash scripts/quality/audit_linux_static_elf.sh "$out/extracted/bin/vpp-jit"
@@ -265,6 +285,15 @@ jobs:
           package="$RUNNER_TEMP/linux-full/extracted"
           export VPP_AOT_LINUX_OBJECT_DIR="$package/share/vpp/native-vpp-runtime/linux-objects"
           python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity
+      - name: Build VPP and VDK release candidates
+        run: python3 scripts/quality/package_release.py --platform linux-x64 --prefix "$RUNNER_TEMP/linux-full/package" --output "$RUNNER_TEMP/release-candidates"
+      - name: Upload release candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x64
+          path: ${{ runner.temp }}/release-candidates/*
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload build and test logs
         uses: actions/upload-artifact@v4
         if: always()
@@ -417,6 +446,20 @@ jobs:
       - name: Package and test installed compiler
         shell: pwsh
         run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase package
+      - name: Check native LSP
+        shell: pwsh
+        run: |
+          $package = "$env:RUNNER_TEMP/windows-full/extracted"
+          foreach ($mode in @('format', 'diagnostics')) {
+            cmake "-DVPP_CLI=$package/bin/vpp.cmd" "-DVPP_NATIVE_COMPILER=$package/bin/vpp-native.exe" "-DVPP_ROOT=$package/share/vpp" "-DVPP_OUTPUT_DIR=$env:RUNNER_TEMP/lsp-$mode" "-DVPP_LSP_MODE=$mode" -P scripts/quality/check_native_lsp.cmake
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          python scripts/quality/check_native_lsp_catalog.py "$package/bin/vpp-tools.exe" "$package/bin/vpp-native.exe" "$package/share/vpp"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/quality/check_native_lsp_semantic.py "$package/bin/vpp-tools.exe" "$package/bin/vpp-native.exe" "$package/share/vpp"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/quality/check_native_package_manager.py "$package/bin/vpp-tools.exe" "$package/bin/vpp-native.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload full compiler
         uses: actions/upload-artifact@v4
         with:
@@ -429,6 +472,18 @@ jobs:
           $package = "$env:RUNNER_TEMP/windows-full/extracted"
           python scripts/quality/check_full_batch.py --compiler "$package/bin/vpp-native.exe" --clang "$env:VPP_CI_CLANG" --logs regression-build-logs/batch-parity
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build VPP and VDK release candidates
+        shell: pwsh
+        run: |
+          python scripts/quality/package_release.py --platform windows-x64 --prefix "$env:RUNNER_TEMP/windows-full/package" --output "$env:RUNNER_TEMP/release-candidates"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload release candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: ${{ runner.temp }}/release-candidates/*
+          if-no-files-found: error
+          compression-level: 0
       - name: Upload build and test logs
         uses: actions/upload-artifact@v4
         if: always()
@@ -535,3 +590,27 @@ jobs:
         with:
           name: windows-regression-logs
           path: regression-logs/
+
+  release-assets:
+    name: Attach verified VPP and VDK packages
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: [macos-regression, linux-regression, windows-regression, posix-worker-machine]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-candidates
+      - name: Verify checksums and attach packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd release-candidates
+          test "$(find . -maxdepth 1 -name '*.sha256' | wc -l)" -eq 6
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 12
+          sha256sum -c -- *.sha256
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" -- *

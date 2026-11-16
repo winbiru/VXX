@@ -209,7 +209,12 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                     s += " " + biên dịch trường từ tố(mình.biên dịch biểu thức lấy(p), 1, "giá trị", "");
                 };
             };
-            trả về mình.biên dịch biểu thức receiver(s, biên dịch trường từ tố(từ tố, 4, "vị trí", 0));
+            kết quả = mình.biên dịch biểu thức receiver(s, biên dịch trường từ tố(từ tố, 4, "vị trí", 0));
+            nếu (lấy từ điển(p, "giữ nguồn", sai)) {
+                kết quả["nguồn tên"] = [biên dịch trường từ tố(từ tố, 4, "vị trí", 0),
+                    biên dịch trường từ tố(p["token"][p["vị trí"] - 1], 5, "kết thúc", 0)];
+            };
+            trả về kết quả;
         };
         mình.biên dịch biểu thức lỗi(p, "thiếu toán hạng hoặc token không hợp lệ '" + s + "'");
         trả về rỗng;

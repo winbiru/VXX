@@ -1,0 +1,331 @@
+// Chỉ mục ngữ nghĩa dùng cùng SymbolId với compiler. Không thay đổi IR phát mã.
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.văn bản.chuỗi.chứa chuỗi;
+nhập gói.văn bản.chuỗi.bỏ khoảng trắng;
+nhập gói.biên dịch.nguồn tệp.Bộ Nạp Nguồn;
+nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tìm mô đun;
+nhập gói.nhập xuất.tệp.đọc tệp;
+
+hàm riêng tư lsp mã biến(id) { trả về "v:" + thành chuỗi(id); };
+hàm riêng tư lsp có khoảng(khoảng) {
+    nếu (máy ảo lấy độ dài(khoảng) != 2) { trả về sai; };
+    trả về khoảng[1] > khoảng[0];
+};
+
+hàm riêng tư lsp khai(sổ, id, tên, kiểu, chi tiết, khoảng, phạm vi, ưu tiên) {
+    nếu (!lsp có khoảng(khoảng) || tên == "") { trả về rỗng; };
+    bảng = sổ["ký hiệu"];
+    trước = lấy từ điển(bảng, id, rỗng);
+    nếu (trước == rỗng) {
+        bảng[id] = {"id": id, "tên": tên, "kiểu": kiểu, "chi tiết": chi tiết,
+                     "khoảng": khoảng, "phạm vi": phạm vi, "ưu tiên": ưu tiên, "an toàn": đúng};
+    } hoặc nếu (ưu tiên > trước["ưu tiên"]) {
+        trước["khoảng"] = khoảng; trước["ưu tiên"] = ưu tiên;
+    };
+    trả về rỗng;
+};
+
+hàm riêng tư lsp dùng(sổ, id, khoảng) {
+    ký hiệu = lấy từ điển(sổ["ký hiệu"], id, rỗng);
+    nếu (ký hiệu == rỗng) { trả về rỗng; };
+    nếu (!lsp có khoảng(khoảng)) { ký hiệu["an toàn"] = sai; trả về rỗng; };
+    các vị trí = sổ["vị trí"];
+    lặp(i = 0; i < máy ảo lấy độ dài(các vị trí); i++) {
+        mục = các vị trí[i];
+        nếu (mục["id"] == id && mục["khoảng"][0] == khoảng[0] && mục["khoảng"][1] == khoảng[1]) { trả về rỗng; };
+    };
+    máy ảo thêm cuối danh sách(các vị trí, {"id": id, "khoảng": khoảng});
+    trả về rỗng;
+};
+
+hàm riêng tư lsp khoảng lệnh(sổ, mục) {
+    khoảng = lấy từ điển(mục, "nguồn tên", []);
+    nếu (!lsp có khoảng(khoảng)) { trả về []; };
+    mã = mục["mã"];
+    là thành viên = mã == "đọc thành viên" || mã == "bắt đầu gọi thành viên" || mã == "chuẩn bị gán thành viên";
+    nếu (mã == "đọc tên") { là thành viên = chứa chuỗi(mục["giá trị"], "."); };
+    nếu (là thành viên) {
+        // Receiver nằm trước dấu chấm; không được thay cả tên thành viên.
+        b = sổ["byte"];
+        lặp(i = khoảng[0]; i < khoảng[1]; i++) {
+            nếu (b[i] == 46) { trả về [khoảng[0], i]; };
+        };
+        trả về [];
+    };
+    trả về khoảng;
+};
+
+hàm riêng tư lsp khai tham số(sổ, hàm mục) {
+    phạm vi = lấy từ điển(hàm mục, "nguồn phạm vi", []);
+    các tên = hàm mục["tham số"];
+    các id = hàm mục["tham số symbol"];
+    các khoảng = lấy từ điển(hàm mục, "nguồn tham số", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(các khoảng); i++) {
+        id = lsp mã biến(các id[i]);
+        lsp khai(sổ, id, các tên[i], 6, "tham số", các khoảng[i], phạm vi, 3);
+        lsp dùng(sổ, id, các khoảng[i]);
+    };
+};
+
+hàm riêng tư lsp duyệt lệnh(sổ, lệnh, phạm vi, lượt) {
+    lặp(i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+        mục = lệnh[i]; mã = mục["mã"];
+        nếu (mã == "hàm ẩn danh") { bỏ qua; };
+        id số = lấy từ điển(mục, "symbol", -1);
+        nếu (id số >= 0) {
+            id = lsp mã biến(id số);
+            khoảng = lsp khoảng lệnh(sổ, mục);
+            nếu (lượt == 0) {
+                nếu (mã == "khai báo" || mã == "chuẩn bị gán" || mã == "bắt đầu lặp" || mã == "++" || mã == "--" || mã == "bắt lỗi") {
+                    ưu tiên = 1; vùng = phạm vi;
+                    nếu (mã == "khai báo") { ưu tiên = 2; };
+                    nếu (mã == "bắt lỗi") { ưu tiên = 3; vùng = lấy từ điển(mục, "nguồn phạm vi", []); };
+                    nếu (!lấy từ điển(mục, "symbol toàn cục", sai)) {
+                        lsp khai(sổ, id, mục["giá trị"], 6, "biến", khoảng, vùng, ưu tiên);
+                    };
+                };
+            } hoặc {
+                // Khởi tạo declaration sinh gán tên tổng hợp không có vị trí riêng.
+                nếu (!(mã == "gán tên" && lấy từ điển(mục, "từ khai báo", sai))) {
+                    lsp dùng(sổ, id, khoảng);
+                };
+            };
+        } hoặc nếu (lượt == 1) {
+            tên = "";
+            nếu (mã == "gọi tên" || mã == "gọi tường minh") { tên = mục["giá trị"]["tên"]; };
+            nếu (mã == "đọc tên") { tên = mục["giá trị"]; };
+            id = lấy từ điển(sổ["hàm"], tên, "");
+            nếu (mã == "đọc thành viên" || mã == "bắt đầu gọi thành viên") {
+                thành viên = mục["giá trị"];
+                tên = lấy từ điển(thành viên, "nhận", "") + "." + lấy từ điển(thành viên, "tên", "");
+                id = lấy từ điển(sổ["hàm"], tên, "");
+            };
+            nếu (id != "") { lsp dùng(sổ, id, lấy từ điển(mục, "nguồn tên", [])); };
+        };
+    };
+    // Thu thập mọi binding ở scope cha trước khi đi xuống closure.
+    lặp(i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+        mục = lệnh[i];
+        nếu (mục["mã"] != "hàm ẩn danh") { bỏ qua; };
+        khai = mục["giá trị"];
+        vùng = lấy từ điển(khai, "nguồn phạm vi", []);
+        nếu (lượt == 0) { lsp khai tham số(sổ, khai); };
+        lsp duyệt lệnh(sổ, khai["mặc định IR"], vùng, lượt);
+        lsp duyệt lệnh(sổ, khai["lệnh"], vùng, lượt);
+    };
+};
+
+hàm riêng tư lsp chữ ký(mục) {
+    tham số = mục["tham số"]; chữ = "";
+    mặc định = mục["mặc định tham số"];
+    lặp(j = 0; j < máy ảo lấy độ dài(tham số); j++) {
+        nếu (j > 0) { chữ += ", "; };
+        chữ += tham số[j];
+        nếu (mặc định[j] != rỗng) { chữ += " = …"; };
+    };
+    trả về "hàm " + mục["tên"] + "(" + chữ + ")";
+};
+
+hàm riêng tư lsp nhập(sổ, cây, đường, thư viện, nguồn mở, toàn) {
+    bộ = Bộ Nạp Nguồn(thư viện);
+    đồ thị = bộ.đồ thị(đường, rỗng, cây, nguồn mở);
+    đăng ký = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+    entry = đồ thị["điểm vào"];
+    mô đun = biên dịch sổ tìm mô đun(đăng ký, entry);
+    thấy = mô đun["nhìn thấy"];
+    nguồn theo đường = {}; cây theo đường = {};
+    lặp(i = 0; i < máy ảo lấy độ dài(thấy); i++) {
+        mục = thấy[i];
+        khai gốc = đăng ký["hàm"][mục["id"]];
+        tệp = khai gốc["mô đun"];
+        nếu (tệp == entry) { bỏ qua; };
+        nếu (!máy ảo có khóa từ điển(cây theo đường, tệp)) {
+            nguồn tệp = "";
+            nếu (máy ảo có khóa từ điển(nguồn mở, tệp)) { nguồn tệp = nguồn mở[tệp]; }
+            hoặc { nguồn tệp = đọc tệp(tệp); };
+            nguồn theo đường[tệp] = nguồn tệp;
+            cây theo đường[tệp] = biên dịch phân tích chương trình thuần(nguồn tệp, rỗng, đúng);
+        };
+        câu = cây theo đường[tệp]["câu lệnh"];
+        lặp(j = 0; j < máy ảo lấy độ dài(câu); j++) {
+            khai = câu[j];
+            nếu (khai["loại"] != "hàm") { bỏ qua; };
+            nếu (khai["tên"] != khai gốc["tên"]) { bỏ qua; };
+            tên = mục["tên"]; id = "i:" + tên;
+            khoảng = lấy từ điển(khai, "nguồn tên", []);
+            lsp khai(sổ, id, tên, 3, lsp chữ ký(khai), khoảng, toàn, 3);
+            ký hiệu = sổ["ký hiệu"][id];
+            ký hiệu["đường"] = tệp;
+            ký hiệu["nguồn"] = nguồn theo đường[tệp];
+            ký hiệu["an toàn"] = sai;
+            sổ["hàm"][tên] = id;
+            thoát;
+        };
+    };
+};
+
+hàm công khai lsp chỉ mục(nguồn, đường = "", thư viện = "", nguồn mở = rỗng) {
+    cây = biên dịch phân tích chương trình thuần(nguồn, rỗng, đúng);
+    ir = biên dịch hạ IR từ cây thuần(cây, đúng);
+    bytes = chuỗi thành byte máy ảo(nguồn);
+    toàn = [0, máy ảo lấy độ dài(bytes)];
+    sổ = {"ký hiệu": {}, "vị trí": [], "hàm": {}, "byte": bytes};
+    các hàm = ir["hàm"];
+    câu = cây["câu lệnh"];
+    lặp(i = 0; i < máy ảo lấy độ dài(câu); i++) {
+        mục = câu[i]; kiểu = mục["loại"];
+        nếu (kiểu != "hàm" && kiểu != "lớp" && kiểu != "giao diện") { bỏ qua; };
+        tên = mục["tên"]; id = "h:" + tên;
+        loại = 3; chi tiết = "hàm";
+        nếu (kiểu == "hàm") {
+            chi tiết = lsp chữ ký(mục);
+        } hoặc nếu (kiểu == "lớp") { loại = 7; chi tiết = "lớp " + tên; }
+        hoặc { loại = 8; chi tiết = "giao diện " + tên; };
+        khoảng = lấy từ điển(mục, "nguồn tên", []);
+        lsp khai(sổ, id, tên, loại, chi tiết, khoảng, toàn, 3);
+        lsp dùng(sổ, id, khoảng);
+        sổ["hàm"][tên] = id;
+        // Kiểu, overload và export có thể có reference ở module khác.
+        ký hiệu = lấy từ điển(sổ["ký hiệu"], id, rỗng);
+        nếu (ký hiệu != rỗng) {
+            nếu (kiểu != "hàm" || lấy từ điển(mục, "phạm vi", "") != "riêng tư") { ký hiệu["an toàn"] = sai; };
+        };
+    };
+    có nhập = sai;
+    lặp(i = 0; i < máy ảo lấy độ dài(câu); i++) {
+        nếu (câu[i]["loại"] == "nhập") { có nhập = đúng; thoát; };
+    };
+    nếu (đường != "" && có nhập) {
+        nếu (nguồn mở == rỗng) { nguồn mở = {}; };
+        thử { lsp nhập(sổ, cây, đường, thư viện, nguồn mở, toàn); }
+        bắt lỗi(e) { /* Giữ ký hiệu cục bộ nếu đồ thị import chưa hợp lệ. */ };
+    };
+    lặp(lượt = 0; lượt < 2; lượt++) {
+        lsp duyệt lệnh(sổ, ir["lệnh"], toàn, lượt);
+        lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            mục = các hàm[i]; vùng = lấy từ điển(mục, "nguồn phạm vi", []);
+            nếu (lượt == 0) { lsp khai tham số(sổ, mục); };
+            lsp duyệt lệnh(sổ, lấy từ điển(mục, "mặc định IR", []), vùng, lượt);
+            lsp duyệt lệnh(sổ, mục["lệnh"], vùng, lượt);
+        };
+    };
+    trả về sổ;
+};
+
+hàm công khai lsp tại(sổ, byte vị trí) {
+    các vị trí = sổ["vị trí"];
+    lặp(i = 0; i < máy ảo lấy độ dài(các vị trí); i++) {
+        mục = các vị trí[i]; khoảng = mục["khoảng"];
+        nếu (byte vị trí >= khoảng[0] && byte vị trí < khoảng[1]) { trả về mục; };
+    };
+    trả về rỗng;
+};
+
+hàm công khai lsp gợi ý(sổ, byte vị trí) {
+    bảng = sổ["ký hiệu"]; các id = khóa từ điển(bảng); theo tên = {};
+    lặp(i = 0; i < máy ảo lấy độ dài(các id); i++) {
+        mục = bảng[các id[i]]; vùng = mục["phạm vi"];
+        nếu (!lsp có khoảng(vùng)) { bỏ qua; };
+        nếu (byte vị trí < vùng[0] || byte vị trí > vùng[1]) { bỏ qua; };
+        tên = mục["tên"]; trước = lấy từ điển(theo tên, tên, rỗng);
+        nếu (trước == rỗng) { theo tên[tên] = mục; }
+        hoặc {
+            cũ = trước["phạm vi"];
+            nếu (vùng[1] - vùng[0] < cũ[1] - cũ[0]) { theo tên[tên] = mục; };
+        };
+    };
+    kết quả = []; các tên = khóa từ điển(theo tên);
+    lặp(i = 0; i < máy ảo lấy độ dài(các tên); i++) {
+        mục = theo tên[các tên[i]];
+        máy ảo thêm cuối danh sách(kết quả, {"label": mục["tên"], "kind": mục["kiểu"], "detail": mục["chi tiết"]});
+    };
+    trả về kết quả;
+};
+
+hàm công khai lsp tên mới hợp lệ(tên) {
+    nếu (tên == "" || bỏ khoảng trắng(tên) != tên || chứa chuỗi(tên, ".") ||
+        chứa chuỗi(tên, "\n") || chứa chuỗi(tên, "\r") || chứa chuỗi(tên, "/")) { trả về sai; };
+    thử {
+        cây = biên dịch phân tích chương trình thuần("biến " + tên + " = 0;");
+        câu = cây["câu lệnh"];
+        nếu (máy ảo lấy độ dài(câu) != 1) { trả về sai; };
+        trả về câu[0]["loại"] == "biến" && câu[0]["tên"] == tên;
+    } bắt lỗi(e) { trả về sai; };
+};
+
+// Chỉ dùng snapshot cũ cho completion khi parser chưa nhận mã đang gõ.
+// Ánh xạ vị trí qua vùng sửa bằng tiền tố/hậu tố byte chung.
+hàm công khai lsp vị trí dự phòng(sổ, nguồn, vị trí) {
+    cũ = sổ["byte"]; mới = chuỗi thành byte máy ảo(nguồn);
+    dài cũ = máy ảo lấy độ dài(cũ); dài mới = máy ảo lấy độ dài(mới);
+    đầu = 0; cuối = 0;
+    khi (đầu < dài cũ && đầu < dài mới) {
+        nếu (cũ[đầu] != mới[đầu]) { thoát; };
+        đầu += 1;
+    };
+    khi (cuối < dài cũ - đầu && cuối < dài mới - đầu) {
+        nếu (cũ[dài cũ - cuối - 1] != mới[dài mới - cuối - 1]) { thoát; };
+        cuối += 1;
+    };
+    nếu (vị trí <= đầu) { trả về vị trí; };
+    nếu (vị trí >= dài mới - cuối) { trả về vị trí + dài cũ - dài mới; };
+    trả về đầu;
+};
+
+// Kiểm tra lại các binding sau khi áp dụng toàn bộ sửa đổi trên bản sao nguồn.
+// ID của biến và của mọi hàm khác phải giữ nguyên; hàm đích đổi ID theo tên.
+hàm công khai lsp xác minh đổi tên(sổ, nguồn, id, tên, đường, thư viện, nguồn mở) {
+    thử {
+        vị trí = sổ["vị trí"]; các sửa = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(vị trí); i++) {
+            mục = vị trí[i];
+            nếu (mục["id"] == id) { máy ảo thêm cuối danh sách(các sửa, mục["khoảng"]); };
+        };
+        nếu (máy ảo lấy độ dài(các sửa) == 0) { trả về sai; };
+        // Dựng nguồn mới theo thứ tự byte tăng dần; không sửa snapshot gốc.
+        ứng viên = ""; đã chép = 0;
+        lặp(i = 0; i < máy ảo lấy độ dài(các sửa); i++) {
+            khoảng sớm nhất = rỗng;
+            lặp(j = 0; j < máy ảo lấy độ dài(các sửa); j++) {
+                khoảng = các sửa[j];
+                nếu (khoảng[0] < đã chép) { bỏ qua; };
+                nếu (khoảng sớm nhất == rỗng) { khoảng sớm nhất = khoảng; }
+                hoặc nếu (khoảng[0] < khoảng sớm nhất[0]) { khoảng sớm nhất = khoảng; };
+            };
+            nếu (khoảng sớm nhất == rỗng) { trả về sai; };
+            ứng viên += máy ảo cắt chuỗi theo byte(nguồn, đã chép, khoảng sớm nhất[0] - đã chép);
+            ứng viên += tên;
+            đã chép = khoảng sớm nhất[1];
+        };
+        ứng viên += máy ảo cắt chuỗi theo byte(nguồn, đã chép, máy ảo lấy độ dài(sổ["byte"]) - đã chép);
+        mới = lsp chỉ mục(ứng viên, đường, thư viện, nguồn mở);
+        nếu (máy ảo lấy độ dài(mới["vị trí"]) != máy ảo lấy độ dài(vị trí)) { trả về sai; };
+        dài tên = máy ảo lấy độ dài(chuỗi thành byte máy ảo(tên));
+        id mới = id;
+        nếu (sổ["ký hiệu"][id]["kiểu"] == 3) { id mới = "h:" + tên; };
+        ký hiệu mới = lấy từ điển(mới["ký hiệu"], id mới, rỗng);
+        nếu (ký hiệu mới == rỗng) { trả về sai; };
+        nếu (ký hiệu mới["tên"] != tên) { trả về sai; };
+        lặp(i = 0; i < máy ảo lấy độ dài(vị trí); i++) {
+            mục = vị trí[i]; khoảng = mục["khoảng"]; lệch = 0;
+            lặp(j = 0; j < máy ảo lấy độ dài(các sửa); j++) {
+                sửa = các sửa[j];
+                nếu (sửa[1] <= khoảng[0]) { lệch += dài tên - (sửa[1] - sửa[0]); }
+                hoặc nếu (sửa[0] < khoảng[1]) {
+                    nếu (mục["id"] != id || sửa[0] != khoảng[0] || sửa[1] != khoảng[1]) { trả về sai; };
+                };
+            };
+            đầu = khoảng[0] + lệch; cuối = khoảng[1] + lệch; đích = mục["id"];
+            nếu (đích == id) { cuối = đầu + dài tên; đích = id mới; };
+            dùng mới = lsp tại(mới, đầu);
+            nếu (dùng mới == rỗng) { trả về sai; };
+            nếu (dùng mới["id"] != đích || dùng mới["khoảng"][0] != đầu || dùng mới["khoảng"][1] != cuối) { trả về sai; };
+        };
+        trả về đúng;
+    } bắt lỗi(e) { trả về sai; };
+};

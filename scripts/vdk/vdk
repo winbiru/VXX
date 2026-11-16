@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bin=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# A child can fix its locale without changing the user's shell settings.
+if [[ $(locale charmap 2>/dev/null || true) != UTF-8 ]]; then
+  utf8=$(bash "$bin/vdk-display.sh" locale)
+  if [[ -n $utf8 ]]; then export LC_ALL=$utf8; fi
+fi
+explicit=''
+if [[ ${1:-} == --vdk-home || ${1:-} == --thư-mục-vdk ]]; then
+  [[ $# -ge 2 && -n $2 ]] || { echo 'VDK: cần đường dẫn SDK sau --thư-mục-vdk' >&2; exit 2; }
+  explicit=$2; shift 2
+fi
+if ! root=$("$bin/vdk-info" --resolve-home "$bin/.." "$explicit"); then
+  printf '%s\n' "$root" >&2; exit 2
+fi
+export VDK_HOME=$root
+if ! route=$("$bin/vdk-info" --route "$@"); then printf '%s\n' "$route" >&2; exit 2; fi
+read -r kind command consumed <<< "$route"
+case $kind in
+  info) exec "$bin/vdk-info" "$@" ;;
+  uninstall) exec "$root/bin/vpp" uninstall ;;
+  display) exec bash "$root/bin/vdk-display.sh" "$command" ;;
+esac
+# The selected SDK must supply its own runtime, not a previous build tree.
+unset VPP_HOME VPP_AOT_VPP_OBJECT VPP_AOT_CORE_OBJECT VPP_AOT_PLATFORM_OBJECT VPP_AOT_DYNAMIC_BRIDGE_OBJECT VPP_AOT_LINUX_OBJECT_DIR VPP_WINDOWS_RUNTIME_OBJECT VPP_NATIVE_TARGET
+if [[ -d $root/share/vpp/native-vpp-runtime/linux-objects ]]; then
+  export VPP_AOT_LINUX_OBJECT_DIR="$root/share/vpp/native-vpp-runtime/linux-objects"
+fi
+if [[ $kind == raw ]]; then exec "$root/bin/vpp" "$@"; fi
+shift "$consumed"
+if [[ $kind == run || $kind == jit ]]; then exec "$root/bin/vpp" "$command" "$@"; fi
+# Translate only compiler options, never values or program arguments after --.
+args=()
+value=0
+options=1
+for arg in "$@"; do
+  if (( value )); then value=0
+  elif (( options )); then
+    case $arg in
+      --) options=0 ;;
+      --đầu-ra) arg=-o; value=1 ;;
+      -o|--base|--target|--function|--emit-obj|--emit-obj-selfhost|--emit-raw|--emit-asm) value=1 ;;
+    esac
+  fi
+  args+=("$arg")
+done
+exec "$root/bin/vpp" "$command" "${args[@]}"

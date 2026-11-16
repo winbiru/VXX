@@ -1,0 +1,10 @@
+nhập gói.kiểm thử.khẳng định.*;
+
+hàm chính() {
+    thử { ném "ngoại lệ đã bắt"; } bắt lỗi(e) {
+        khẳng định bằng(e, "ngoại lệ đã bắt");
+    };
+    mã = máy tiến trình tạo("unused-program");
+    khẳng định bằng(máy tiến trình đóng(mã), 1);
+    khẳng định bằng(1, 2, "kiểm tra opcode ném");
+};

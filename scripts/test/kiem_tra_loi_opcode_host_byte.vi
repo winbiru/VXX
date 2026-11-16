@@ -1,0 +1,3 @@
+hàm chính() {
+    in chuỗi từ byte máy ảo([256]);
+};

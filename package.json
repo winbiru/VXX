@@ -83,7 +83,7 @@
         "vpp.lsp.executable": {
           "type": "string",
           "default": "",
-          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Bản tự chủ chưa có LSP; cần cấu hình máy chủ tương thích một cách tường minh."
+          "description": "Đường dẫn tùy chọn tới máy chủ V++ dùng cho LSP. Nếu để trống, extension tìm cặp vpp-tools và vpp-native trong SDK hoặc workspace."
         }
       }
     },

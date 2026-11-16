@@ -199,7 +199,7 @@ function documentAt(filePath, content) {
 }
 
 const ext = loadExtension(process.platform, [root]);
-assert.equal(ext.renameRequestName('nhân đôi'), '__vpp_rename_probe');
+assert.equal(ext.renameRequestName('nhân đôi'), 'nhân đôi');
 assert.equal(ext.renameRequestName('cộng'), 'cộng');
 assert.equal(ext.renameRequestName('cộng('), 'cộng(');
 const signatureSource = 'hàm phân tích dữ liệu phức tạp(a, b) { trả về a; }\nhàm chính() {\n  in phân tích dữ liệu phức tạp(1, 2);\n}';
@@ -270,6 +270,17 @@ assert.ok(findCompletion(merged, 'phân tích tệp'));
 assert.ok(findCompletion(complete('đốiTượng.', 'đốiTượng.'.length,
   [{ label: 'xử lý', kind: 2 }]), 'xử lý'));
 assert.ok(!findCompletion(complete('đốiTượng.', 'đốiTượng.'.length), 'nếu'));
+const qualified = [{ label: 'p.tính điểm', kind: 3 }, { label: 'q.tính điểm', kind: 3 }];
+for (const typed of ['p.', 'p.tính', 'p.tính đ']) {
+  const items = complete(typed, typed.length, qualified);
+  assert.equal(findCompletion(items, 'p.tính điểm')?.range.start.character, 0);
+  assert.ok(!findCompletion(items, 'q.tính điểm'));
+}
+const scopedText = 'hàm khác() {\n biến ngoài phạm vi = 1;\n};\nngoài';
+const scopedDoc = documentAt(path.join(root, 'examples/complete.vi'), scopedText);
+assert.ok(!findCompletion(ext.vppCompletionItems(scopedDoc, new Position(3, 5), [], null, null, true),
+  'ngoài phạm vi'));
+
 assert.ok(!findCompletion(complete('nhập gói.', 'nhập gói.'.length), 'hàm'));
 const moduleDirectory = findCompletion(complete('nhập gói.mạ', 'nhập gói.mạ'.length), 'gói.mạng.');
 assert.equal(moduleDirectory?.kind, 9);
@@ -301,6 +312,13 @@ const unixExt = loadExtension('darwin', [fixtureRoot], (candidate) =>
   candidate === path.join(fixtureRoot, 'vpp-libraries.json') || candidate === expectedUnix);
 assert.equal(unixExt.languageServerExecutable({ globalStorageUri: { fsPath: '/tmp/vpp-extension' } }), '');
 const configuredLsp = path.join(fixtureRoot, 'external-lsp');
+for (const [platform, suffix] of [['darwin', ''], ['win32', '.exe'], ['linux', '']]) {
+  const bin = path.join(fixtureRoot, 'build-pure-vpp', 'bin');
+  const tools = path.join(bin, `vpp-tools${suffix}`);
+  const compiler = path.join(bin, `vpp-native${suffix}`);
+  const native = loadExtension(platform, [fixtureRoot], (candidate) => candidate === tools || candidate === compiler);
+  assert.equal(native.languageServerExecutable({}), tools);
+}
 assert.equal(loadExtension('darwin', [fixtureRoot], fs.existsSync, configuredLsp)
   .languageServerExecutable({}), configuredLsp);
 

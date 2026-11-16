@@ -52,7 +52,7 @@ endfunction()
 
 packet([=[{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}]=])
 if(VPP_LSP_MODE STREQUAL "format")
-    set(uri "file:///private/tmp/vpp-lsp-unsaved-buffer.vi")
+    file_uri("${VPP_OUTPUT_DIR}/vpp-lsp-unsaved-buffer.vi")
     packet([=[{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"@uri@","languageId":"vpp","version":1,"text":"hàm chính(){in \"chào 🌿\";};"}}}]=])
     packet([=[{"jsonrpc":"2.0","id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":"@uri@"},"options":{"tabSize":4,"insertSpaces":true}}}]=])
     packet([=[{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":"@uri@","version":2},"contentChanges":[{"text":"in \"chưa đóng;"}]}}]=])

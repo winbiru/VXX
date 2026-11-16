@@ -47,6 +47,20 @@ lớp công khai Bộ Hạ IR {
         máy ảo thêm cuối danh sách(lệnh, mục);
     };
 
+    // Chỉ AST phân tích cho editor có metadata này.
+    hàm riêng tư IR giữ nguồn(mục, nút) {
+        các khóa = ["nguồn tên", "nguồn tham số", "nguồn phạm vi"];
+        lặp(i = 0; i < máy ảo lấy độ dài(các khóa); i++) {
+            khóa = các khóa[i];
+            nếu (có khóa(nút, khóa)) { mục[khóa] = nút[khóa]; };
+        };
+    };
+
+    hàm riêng tư IR giữ tên cuối(lệnh, nút) {
+        mục = lệnh[máy ảo lấy độ dài(lệnh) - 1];
+        nếu (mình.giữ nguồn) { mình.IR giữ nguồn(mục, nút); };
+    };
+
     // Thứ tự mã ABI phải khớp bytecode::ForeignAbiType trong foreign.h.
     hàm riêng tư biên dịch IR kiểu ngoại(kiểu) {
         loại = ["void", "i32", "u32", "i64", "u64", "f64", "c_chuỗi",
@@ -359,6 +373,10 @@ lớp công khai Bộ Hạ IR {
                 máy ảo thêm cuối danh sách(các mã định danh, mình.biên dịch IR khai ràng buộc(cục bộ, tham số[j], bộ đếm));
             };
             lệnh = mục["lệnh"];
+            nếu (có khóa(mục, "mặc định IR")) {
+                mình.biên dịch IR tập hợp ràng buộc(mục["mặc định IR"], cục bộ, toàn cục, bộ đếm);
+                mình.biên dịch IR gắn ràng buộc(mục["mặc định IR"], cục bộ, toàn cục, bộ đếm, []);
+            };
             mình.biên dịch IR tập hợp ràng buộc(lệnh, cục bộ, toàn cục, bộ đếm);
             mình.biên dịch IR gắn ràng buộc(lệnh, cục bộ, toàn cục, bộ đếm, []);
             mục["tham số symbol"] = các mã định danh;
@@ -406,6 +424,7 @@ lớp công khai Bộ Hạ IR {
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "hàm ẩn danh",
                 {"tham số": nút["tham số"], "mặc định tham số": mặc định,
                  "mặc định IR": mặc định IR, "lệnh": thân});
+            nếu (mình.giữ nguồn) { mình.IR giữ nguồn(lệnh[máy ảo lấy độ dài(lệnh) - 1]["giá trị"], nút); };
             trả về đúng;
         };
         nếu (loại == "hằng") {
@@ -433,6 +452,7 @@ lớp công khai Bộ Hạ IR {
         };
         nếu (loại == "tên") {
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "đọc tên", lấy từ điển(nút, "giá trị", ""));
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, nút); };
             trả về đúng;
         };
         nếu (loại == "thành viên") {
@@ -441,6 +461,7 @@ lớp công khai Bộ Hạ IR {
                 mình.biên dịch IR biểu thức(thành viên["biểu thức nhận"], lệnh);
             };
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "đọc thành viên", thành viên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, nút); };
             trả về đúng;
         };
         nếu (loại == "danh sách") {
@@ -486,6 +507,7 @@ lớp công khai Bộ Hạ IR {
                     mình.biên dịch IR biểu thức(thành viên["biểu thức nhận"], lệnh);
                 };
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "bắt đầu gọi thành viên", thành viên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
             };
             đối số = lấy từ điển(nút, "đối số", []);
             lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
@@ -500,6 +522,7 @@ lớp công khai Bộ Hạ IR {
             nếu (lấy từ điển(nút, "tường minh", sai)) { mã gọi = "gọi tường minh"; };
             mình.biên dịch IR lệnh có vị trí(lệnh, mã gọi, {"tên": đích["giá trị"],
                                              "số đối số": máy ảo lấy độ dài(đối số)}, nút);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
             trả về đúng;
         };
         nếu (loại == "một ngôi") {
@@ -552,6 +575,7 @@ lớp công khai Bộ Hạ IR {
                         mình.biên dịch IR biểu thức(đích thành viên["biểu thức nhận"], lệnh);
                     };
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán thành viên", đích thành viên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, trái); };
                     mình.biên dịch IR biểu thức(phải, lệnh);
                     nếu (toán tử != "=") {
                         mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử gán", toán tử, nút);
@@ -579,8 +603,10 @@ lớp công khai Bộ Hạ IR {
                 // Backend C++ đăng ký slot của đích trước khi đi qua vế phải.
                 // IR cần giữ thứ tự này dù việc đẩy ID biến diễn ra sau RHS.
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "chuẩn bị gán", tên);
+                nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, trái); };
                 nếu (toán tử != "=") {
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "đọc tên", tên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, trái); };
                 };
                 mình.biên dịch IR biểu thức(phải, lệnh);
                 nếu (toán tử != "=") {
@@ -590,6 +616,7 @@ lớp công khai Bộ Hạ IR {
                     mình.biên dịch IR lệnh có vị trí(lệnh, "toán tử gán", toán tử, nút);
                 };
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán tên", tên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, trái); };
                 trả về đúng;
             };
             nếu (biên dịch biểu thức ưu tiên(toán tử) == 0) {
@@ -616,6 +643,7 @@ lớp công khai Bộ Hạ IR {
                 ném "biên dịch IR: toán tử cập nhật chưa hỗ trợ";
             };
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, toán tử, lấy từ điển(đích, "giá trị", ""));
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
             trả về đúng;
         };
         ném "biên dịch IR: biểu thức chưa hỗ trợ '" + loại + "'";
@@ -636,6 +664,7 @@ lớp công khai Bộ Hạ IR {
         nếu (loại == "biến") {
             tên = lấy từ điển(nút, "tên", "");
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "khai báo", tên);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, nút); };
             giá trị = lấy từ điển(nút, "giá trị", rỗng);
             nếu (giá trị != rỗng) {
                 mình.biên dịch IR biểu thức(giá trị, lệnh);
@@ -678,6 +707,7 @@ lớp công khai Bộ Hạ IR {
                     ném "biên dịch IR: lặp yêu cầu điều kiện và cập nhật";
                 };
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "bắt đầu lặp", đích["giá trị"]);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
                 mình.biên dịch IR biểu thức(bước khởi tạo, lệnh);
             };
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "vào lặp", "");
@@ -698,6 +728,7 @@ lớp công khai Bộ Hạ IR {
                 mục = nhánh[i];
                 nếu (mục["loại"] == "ca") {
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "ca", mục["nhãn"]);
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, mục["nhãn"]); };
                 } hoặc {
                     mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "mặc định", "");
                 };
@@ -718,6 +749,7 @@ lớp công khai Bộ Hạ IR {
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "bắt đầu thử", "");
             mình.biên dịch IR câu lệnh(nút["thân"], lệnh);
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "bắt lỗi", lấy từ điển(nút, "biến lỗi", ""));
+            nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, nút); };
             mình.biên dịch IR câu lệnh(nút["bắt"], lệnh);
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "kết thúc thử", "");
             trả về đúng;
@@ -760,6 +792,7 @@ lớp công khai Bộ Hạ IR {
         // Bộ chọn nhập đã kiểm tra toàn bộ AST, kể cả các khai báo sẽ bị loại.
         // Chỉ linker được truyền chứng nhận này; các lời gọi độc lập vẫn kiểm tra.
         nếu (!đã kiểm tra ngữ nghĩa) { biên dịch kiểm tra ngữ nghĩa thuần(cây); };
+        mình.giữ nguồn = lấy từ điển(cây, "giữ nguồn", sai);
         câu lệnh = lấy từ điển(cây, "câu lệnh", []);
         đỉnh = [];
         các hàm = [];
@@ -793,6 +826,15 @@ lớp công khai Bộ Hạ IR {
                                "tham số": lấy từ điển(mục, "tham số", []),
                                "mặc định tham số": lấy từ điển(mục, "mặc định tham số", []),
                                "lệnh": nội dung});
+                nếu (mình.giữ nguồn) { mình.IR giữ nguồn(các hàm[máy ảo lấy độ dài(các hàm) - 1], mục); };
+                nếu (có khóa(mục, "nguồn phạm vi")) {
+                    mặc định IR = [];
+                    mặc định = mục["mặc định tham số"];
+                    lặp(j = 0; j < máy ảo lấy độ dài(mặc định); j++) {
+                        nếu (mặc định[j] != rỗng) { mình.biên dịch IR biểu thức(mặc định[j], mặc định IR); };
+                    };
+                    các hàm[máy ảo lấy độ dài(các hàm) - 1]["mặc định IR"] = mặc định IR;
+                };
                 máy ảo thêm cuối danh sách(thứ tự, {"loại": "hàm", "chỉ số": máy ảo lấy độ dài(các hàm) - 1});
             } hoặc {
                 nếu (lấy từ điển(mục, "loại", "") == "lớp") {
@@ -840,6 +882,15 @@ lớp công khai Bộ Hạ IR {
                                "tham số": lấy từ điển(khai, "tham số", []),
                                "mặc định tham số": lấy từ điển(khai, "mặc định tham số", []),
                                "lệnh": thân});
+                nếu (mình.giữ nguồn) { mình.IR giữ nguồn(các hàm[máy ảo lấy độ dài(các hàm) - 1], khai); };
+                nếu (có khóa(khai, "nguồn phạm vi")) {
+                    mặc định IR = [];
+                    mặc định = khai["mặc định tham số"];
+                    lặp(k = 0; k < máy ảo lấy độ dài(mặc định); k++) {
+                        nếu (mặc định[k] != rỗng) { mình.biên dịch IR biểu thức(mặc định[k], mặc định IR); };
+                    };
+                    các hàm[máy ảo lấy độ dài(các hàm) - 1]["mặc định IR"] = mặc định IR;
+                };
                 máy ảo thêm cuối danh sách(kiểu lớp biểu diễn trung gian["phương thức"], máy ảo lấy độ dài(các hàm) - 1);
             };
             kiểu lớp biểu diễn trung gian["cây phương thức"] = [];

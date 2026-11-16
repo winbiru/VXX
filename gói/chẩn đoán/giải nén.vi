@@ -1,0 +1,62 @@
+// Gom bảy từ i32 vào một lời gọi để giảm mã máy khi bootstrap.
+hàm chẩn đoán nạp bảng(bảng, a, b, c, d, e, f, g) {
+    byte đẩy số nguyên ba mươi hai bit(bảng, a);
+    byte đẩy số nguyên ba mươi hai bit(bảng, b);
+    byte đẩy số nguyên ba mươi hai bit(bảng, c);
+    byte đẩy số nguyên ba mươi hai bit(bảng, d);
+    byte đẩy số nguyên ba mươi hai bit(bảng, e);
+    byte đẩy số nguyên ba mươi hai bit(bảng, f);
+    byte đẩy số nguyên ba mươi hai bit(bảng, g);
+    trả về 0;
+};
+
+// Giải mã bảng LZSS nhỏ: 8 cờ theo thứ tự bit thấp, mỗi tham chiếu
+// gồm 11 bit khoảng cách trừ 1 và 5 bit chiều dài trừ 3 (little-endian).
+// Mỗi mục kết thúc bằng byte 0; mục rỗng là mã chưa định nghĩa.
+// Hàm nhận quyền sở hữu bảng và trả tài nguyên byte của mục, hoặc -1.
+hàm chẩn đoán tra bảng(bảng, kích thước, chiều dài, mã) {
+    biến dữ liệu = byte mới();
+    nếu (dữ liệu <= 0) { byte hủy(bảng); trả về -1; };
+    biến vị trí = 0;
+    biến trạng thái = 0;
+    khi (vị trí < kích thước && byte dài(dữ liệu) < chiều dài && trạng thái == 0) {
+        biến cờ = byte lấy(bảng, vị trí);
+        vị trí = vị trí + 1;
+        lặp (bit = 0; bit < 8 && byte dài(dữ liệu) < chiều dài && trạng thái == 0; bit++) {
+            nếu (vị trí >= kích thước) { trạng thái = -1; thoát; };
+            nếu ((cờ & 1) == 0) {
+                trạng thái = byte thêm(dữ liệu, byte lấy(bảng, vị trí));
+                vị trí = vị trí + 1;
+            } hoặc {
+                nếu (vị trí + 1 >= kích thước) { trạng thái = -1; thoát; };
+                biến tham chiếu = byte lấy(bảng, vị trí) + 256 * byte lấy(bảng, vị trí + 1);
+                vị trí = vị trí + 2;
+                biến khoảng cách = (tham chiếu >> 5) + 1;
+                biến số byte = (tham chiếu & 31) + 3;
+                nếu (khoảng cách > byte dài(dữ liệu) || số byte > chiều dài - byte dài(dữ liệu)) { trạng thái = -1; thoát; };
+                lặp (j = 0; j < số byte && trạng thái == 0; j++) {
+                    trạng thái = byte thêm(dữ liệu, byte lấy(dữ liệu, byte dài(dữ liệu) - khoảng cách));
+                };
+            };
+            cờ = cờ >> 1;
+        };
+    };
+    byte hủy(bảng);
+    biến kết quả = -1;
+    nếu (trạng thái == 0 && byte dài(dữ liệu) == chiều dài && vị trí == kích thước) {
+        biến mục = 0;
+        biến đầu = 0;
+        lặp (i = 0; i < chiều dài; i++) {
+            nếu (byte lấy(dữ liệu, i) == 0) {
+                nếu (mục == mã) {
+                    nếu (i > đầu) { kết quả = byte cắt(dữ liệu, đầu, i - đầu); };
+                    thoát;
+                };
+                mục = mục + 1;
+                đầu = i + 1;
+            };
+        };
+    };
+    byte hủy(dữ liệu);
+    trả về kết quả;
+};

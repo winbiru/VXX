@@ -1117,23 +1117,30 @@ def start_prepared_http(binary, directory, env, timeout=30):
     log_path = directory / "server.log"
     with log_path.open("wb") as log:
         process = subprocess.Popen(command, cwd=directory, env=env, stdout=log, stderr=log)
-    port = 18080
+    port = None if mock_server else 18080
+    last_error = "waiting for fixture startup"
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and process.poll() is None:
             try:
                 if mock_server:
-                    port = int(port_file.read_text(encoding="ascii"))
-                    if not 0 < port <= 65535:
+                    published_port = int(port_file.read_text(encoding="ascii"))
+                    if not 0 < published_port <= 65535:
                         raise ValueError("invalid fixture port")
+                    port = published_port
                 with opener.open(f"http://127.0.0.1:{port}/health", timeout=1) as response:
                     if json.loads(response.read()) == {"ok": True} and process.poll() is None:
                         return process
-            except (OSError, ValueError):
-                time.sleep(0.2)
+                    last_error = "unexpected health response or fixture exited"
+            except (OSError, ValueError) as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+            time.sleep(0.2)
         detail = log_path.read_bytes()[-4096:].decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"HTTP fixture not ready on localhost:{port}; exit={process.poll()}; {detail}")
+        endpoint = f"localhost:{port}" if port is not None else f"unpublished port ({port_file})"
+        kind = "mock" if mock_server else "V++"
+        raise RuntimeError(f"HTTP fixture not ready on {endpoint}; exit={process.poll()}; "
+                           f"fixture={kind}; last error={last_error}; {detail}")
     except BaseException:
         stop_http(process)
         raise

@@ -1,0 +1,5 @@
+hàm chính() {
+    mã = máy tiến trình tạo("unused-program");
+    máy tiến trình đóng(mã);
+    máy tiến trình đóng(mã);
+};
