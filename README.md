@@ -3,518 +3,387 @@
 
 # V++
 
-### Ngôn ngữ lập trình tiếng Việt, có compiler, bytecode VM và toolchain riêng.
+**Ngôn ngữ lập trình tiếng Việt — bộ biên dịch tự chủ, máy ảo bytecode và JIT viết bằng V++/Assembly.**
 
-*Vietnamese-first programming language with its own compiler, bytecode VM and developer toolchain.*
-
-Viết chương trình bằng cú pháp gần gũi với tiếng Việt, nhưng vẫn có những thành phần của một
-ngôn ngữ thực tế: semantic analysis, IR, bytecode verifier, tracing GC, module/package system,
-LSP, formatter, linter và bộ thư viện chuẩn.
+*Vietnamese-first programming language with a self-hosted compiler, bytecode VM and native JIT.*
 
 [![V++ native CI](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml/badge.svg)](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml)
 [![Release](https://img.shields.io/github/v/release/winbiru/VXX?display_name=tag)](https://github.com/winbiru/VXX/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![V++/ASM](https://img.shields.io/badge/toolchain-V%2B%2B%2FASM-blue.svg)](CMakeLists.txt)
 
-[🚀 Cài đặt](#-cài-v-trong-vài-phút) · [✨ Xem cú pháp](#-v-trông-như-thế-nào) · [🧰 Tooling](#-tooling-đi-kèm) · [📊 Benchmark](#-benchmark) · [🗺️ Roadmap](plans/roadmap-1.0.md) · [🤝 Đóng góp](CONTRIBUTING.md)
+[Chạy thử](#chạy-thử) · [Cài đặt](#cài-đặt-và-build) · [Kiến trúc](#kiến-trúc) · [Worker](#thực-thi-đồng-thời) · [Benchmark](#benchmark) · [Tài liệu](#tài-liệu)
 </div>
 
 ---
 
-## Build bản tự chủ hiện tại
-
-Nhánh này chỉ build compiler và runtime viết bằng V++/Assembly. Bootstrap đầy đủ hiện hỗ trợ macOS ARM64; các nền tảng khác và dịch vụ của CLI host cũ đang chờ chuyển đổi. Seed nằm trong `bootstrap/macos-arm64/`, được kiểm tra SHA-256, chữ ký và thư viện liên kết.
-
-```sh
-cmake -S . -B build-pure-vpp
-cmake --build build-pure-vpp --parallel
-ctest --test-dir build-pure-vpp --output-on-failure
-./VPP phiên bản
-./VPP build hello.vi -o hello
-./VPP run hello.vi
-./VPP jit hello.vi
-make benchmark
-```
-
-### Chạy mã máy trong bộ nhớ (JIT thử nghiệm)
-
-V++ có ba chế độ thực thi:
-
-| Chế độ | Luồng thực thi |
-| --- | --- |
-| AOT (`vpp build`, `vpp run`) | Mã nguồn → tệp thực thi → CPU |
-| VM (`vpp vm-build`, `vpp-vm`) | Mã nguồn → bytecode → máy ảo |
-| JIT (`vpp jit`, `vpp-jit`) | Mã nguồn → AST/IR → mã máy trong bộ nhớ → CPU |
-
-JIT được viết bằng V++ và dùng Assembly cho ranh giới hệ điều hành/CPU. Khi chạy JIT,
-không sinh tệp object hay executable, không gọi assembler/linker bên ngoài và không
-chuyển sang VM. Mã được tạo trong bộ nhớ rồi chuyển sang vùng chỉ đọc/thực thi (RX).
-
-Chế độ mặc định hỗ trợ tập i32: số nguyên, toán tử, nhánh, vòng lặp, lời gọi hàm
-(kể cả đệ quy), in số nguyên và tối đa tám tham số i32. Chế độ `--dynamic` dùng
-runtime native cho kiểu động, số thực, chuỗi Unicode, danh sách, từ điển, lớp,
-closure, ngoại lệ, GC và import module. macOS ARM64 đã chạy các fixture dynamic
-và kiểm thử biên dịch lại hàm nóng; Linux/Windows x86-64 đã cross-assemble phần
-ranh giới Assembly, còn cần xác nhận thực thi bằng CI trên nền tảng đích.
-
-Runtime dynamic đếm lần gọi và số lần đủ điều kiện i32 của mỗi hàm. Sau 32 lần
-gọi đủ điều kiện, các hàm thuần dạng hai tham số với một phép `+`, `-`, `*`,
-`&`, `|` hoặc `^` được biên dịch lại thành hàm lá mã máy. Kiểm tra kiểu trước
-mỗi lần gọi giữ nguyên ngữ nghĩa dynamic khi đối số đổi kiểu. Đặt
-`VPP_JIT_PROFILE=1` để xem các bộ đếm `calls`, `i32`, `compiled`, `hits` trên
-stderr. Đặt `VPP_JIT_TIER=0` để tắt tầng thích ứng và đo baseline trên cùng
-chương trình. Chưa đo được lợi ích hiệu năng của tầng này; hàm tổng quát vẫn chạy mã
-native baseline.
-
-Giới hạn hiện tại: bộ đệm ảnh dynamic tối đa 16 MiB (kể cả bảng relocation),
-độc lập với bộ đệm byte thông thường 2 MiB. JIT hỗ trợ một luồng thực thi,
-chưa hỗ trợ descriptor FFI hoặc chọn hàm dynamic từ CLI. Import module hẹp
-vẫn giúp giảm thời gian biên dịch. JIT không phải môi trường cách ly mã không
-tin cậy.
-
-```vi
-hàm cộng(a, b) {
-    trả về a + b;
-};
-hàm chính() {
-    in cộng(19, 23);
-};
-```
-
-```sh
-./VPP jit hello.vi
-./VPP jit hello.vi --function cộng -- 19 23
-./VPP jit --dynamic "$PWD/hello.vi"
-./VPP jit --check-dynamic "$PWD/hello.vi"
-VPP_JIT_PROFILE=1 ./VPP jit --dynamic "$PWD/hello.vi"
-```
-
-Hàm được chọn trả về mã thoát tiến trình (theo quy ước hệ điều hành); hàm chính không
-có giá trị trả về sẽ thoát với mã 0. API `Bộ Biên Dịch JIT` có thể gọi lại hàm đã
-biên dịch nhiều lần trong cùng tiến trình, rồi giải phóng vùng mã bằng `đóng()`.
-API dynamic `jit động tệp(đường, thư viện)` và `jit động nguồn(nguồn, gốc, thư viện)`
-trả về ảnh có `chạy()` và `đóng()`. Dùng đường dẫn tuyệt đối; khi gọi `vpp-jit`
-trực tiếp, đặt `VPP_HOME` trỏ tới thư mục chứa `gói/`. Với `--dynamic`, các
-đối số sau đường dẫn nguồn được chuyển đến guest; argv[0] là đường dẫn nguồn.
-`--check-dynamic` biên dịch trong bộ nhớ nhưng không chạy guest.
-
-Xem [hướng dẫn cài đặt](docs/installation.md) và [nguồn gốc seed](bootstrap/README.md). Các binary build cũ trong `build/`, `bin/` không được launcher mới sử dụng.
-
-`make benchmark` hiện đo sáu workload của V++ AOT trực tiếp; chưa tự build lại các ngôn ngữ đối chứng. Tệp `benchmark/languages/workloads.c` chỉ là nguồn đối chứng độc lập, không thuộc quy trình build V++. Bộ test native hiện tập trung vào smoke test; các fixture lịch sử được giữ để chuyển đổi dần.
-
-<details>
-<summary>Tài liệu và tính năng của kiến trúc trước khi loại bỏ host C++ (tham khảo lịch sử)</summary>
-
 ## V++ là gì?
 
-V++ là một ngôn ngữ lập trình dynamic-typed được xây dựng từ đầu với **cú pháp tiếng Việt và
-Unicode là công dân hạng nhất**.
+V++ là ngôn ngữ lập trình mã nguồn mở sử dụng từ khóa và định danh tiếng Việt, với mục tiêu giúp người Việt học lập trình, xây dựng ứng dụng và tiếp cận công nghệ hệ thống bằng ngôn ngữ của mình. Phần mở rộng mã nguồn là `.vi`.
 
-Mục tiêu của dự án không chỉ là đổi keyword sang tiếng Việt. V++ đang xây dựng đầy đủ một stack:
+Bộ biên dịch, máy ảo, JIT, runtime và thư viện chuẩn hiện được phát triển bằng chính V++ và Assembly. Assembly cung cấp các primitive ở ranh giới máy và hệ điều hành. Quá trình khởi tạo sử dụng các seed đã ghim checksum trong repository để xây dựng bộ công cụ hiện tại; không cần biên dịch implementation C/C++ cũ.
 
-```text
-Mã nguồn V++
-    ↓
-Lexer → Parser → AST → Semantic Analysis
-    ↓
-Untyped IR → Optimizer → Bytecode
-    ↓
-Bytecode Verifier → V++ VM → Tracing GC
-```
+V++ hỗ trợ hàm, closure, lớp và đối tượng, danh sách, bản đồ, ngoại lệ, Unicode, import mô đun, thu gom bộ nhớ và các API hệ thống. Có ba đường thực thi: Native AOT, máy ảo bytecode và JIT. Phạm vi tính năng và mức kiểm chứng khác nhau giữa các đường thực thi và nền tảng.
 
-V++ phù hợp nếu bạn quan tâm tới compiler/VM, thiết kế ngôn ngữ, runtime, hoặc đơn giản muốn thử
-một ngôn ngữ mà code tiếng Việt trông tự nhiên hơn.
+## Chạy thử
 
-## ✨ V++ trông như thế nào?
+Tạo tệp `xin-chao.vi`:
 
-```vi
-hàm chào(tên) {
-    trả về "Xin chào, " + tên + "!";
-};
-
-hàm chính() {
-    in chào("Việt Nam");
-
-    lặp(i = 1; i <= 5; i++) {
-        nếu (i % 2 == 0) {
-            in "Số chẵn: " + i;
-        };
-    };
-};
-```
-
-Class, kế thừa và interface cũng dùng cú pháp tiếng Việt:
-
-```vi
-giao diện CóTên {
-    hàm tên();
-}
-
-lớp SảnPhẩm triển khai CóTên {
-    hàm khởi tạo(tên) {
-        mình.tênSảnPhẩm = tên;
-    };
-
-    hàm tên() {
-        trả về mình.tênSảnPhẩm;
-    };
-}
-
-hàm chính() {
-    càPhê = SảnPhẩm("Cà phê Việt Nam");
-    in càPhê.tên();
-};
-```
-
-Xem đầy đủ tại [Language Reference](docs/language-reference.md).
-
-## 🔥 Có gì đáng chú ý?
-
-| Thành phần | V++ hiện có |
-| --- | --- |
-| Ngôn ngữ | Hàm, lambda/closure, list/map, exception, class, inheritance, interface, visibility |
-| Compiler | Lexer, parser, semantic analysis, IR, optimizer, bytecode codegen |
-| Runtime | Bytecode VM, verifier, stack trace, module lifecycle, tracing GC |
-| Package | `vpp.json`, SemVer, deterministic `vpp.lock`, cache/offline, path/Git/registry package |
-| Stdlib | Text/Unicode, collection, JSON, file/path, time, HTTP, SQL và nhiều module mở rộng |
-| Tooling | Formatter, linter, AST/IR dump, REPL, LSP, VS Code integration |
-| Platforms | Windows, macOS và Linux |
-
-Một vài điểm V++ tập trung mạnh:
-
-- **Tiếng Việt thật sự trong source**: identifier có dấu, `mình`, `gốc`, `nếu`, `lặp`, `thử`, `bắt lỗi`…
-- **Không chỉ là transpiler**: V++ có bytecode format nội bộ và VM riêng.
-- **Runtime có verifier + tracing GC**: bytecode được kiểm tra trước khi thực thi và object graph có cycle collection.
-- **Compiler có IR thật**: frontend, semantic, IR và codegen được tách thành các tầng rõ ràng.
-- **Package reproducible**: dependency được khóa bằng version + fingerprint trong `vpp.lock`.
-- **Developer tooling đi cùng ngôn ngữ**: formatter, linter, REPL và LSP dùng chung semantic model.
-
-## 🚀 Cài V++ trong vài phút
-
-> V++ đang tiến tới mốc 1.0. Build metadata trên nhánh phát triển có thể đi trước release final;
-> xem [Roadmap 1.0](plans/roadmap-1.0.md) để biết trạng thái release gate hiện tại.
-
-### macOS
-
-```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
-tar -xzf vpp-macos.tar.gz
-./install-vpp.sh
-```
-
-### Linux x64
-
-```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
-tar -xzf vpp-linux-x64.tar.gz
-./install-vpp.sh
-```
-
-### Windows PowerShell
-
-```powershell
-Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
-Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
-.\vpp-bin\install-vpp.cmd
-```
-
-**Chỉ cần chạy installer một lần.** Installer tự cài binary, stdlib, templates/examples, cấu hình
-`PATH`, `VPP_HOME` và UTF-8/locale cho shell phù hợp. Cài lại dùng cùng installer để cập nhật và
-không nhân đôi block cấu hình. Sau khi cài, mở terminal mới và chạy:
-
-```text
-vpp phiên bản
-vpp chẩn đoán
-```
-
-Trên Windows, installer ghi block có marker vào PowerShell `CurrentUserAllHosts` profile để các
-PowerShell mở sau đó tự dùng code page 65001, UTF-8 input/output và `LANG=vi_VN.UTF-8`. Trên
-macOS/Linux, installer ưu tiên `vi_VN.UTF-8`; nếu hệ thống chưa có locale này thì chọn một locale
-UTF-8 đang tồn tại. Uninstaller chỉ xóa cấu hình do V++ quản lý.
-
-Chi tiết cài đặt, cập nhật, gỡ cài đặt và troubleshooting nằm trong
-[docs/installation.md](docs/installation.md).
-
-## ⚡ Chạy chương trình đầu tiên
-
-Tạo `xin-chao.vi`:
-
-```vi
+```vpp
 hàm chính() {
     in "Xin chào V++!";
-    in "2 + 3 = " + (2 + 3);
 };
 ```
 
-Sau đó:
+Sau khi build trên macOS ARM64, chạy từ thư mục repository:
 
-```bash
-vpp chạy xin-chao.vi
+```sh
+./VPP run xin-chao.vi
 ```
 
-Hoặc tạo hẳn một project:
+Biên dịch thành chương trình thực thi độc lập và chạy:
 
-```bash
-vpp khởi tạo ứng dụng hello-vpp
-cd hello-vpp
-vpp dựng src/chính.vi
-vpp chạy src/chính.vi
-vpp kiểm thử tests
+```sh
+./VPP build xin-chao.vi -o xin-chao
+./xin-chao
 ```
 
-## 🧰 Tooling đi kèm
+Ví dụ về hàm và điều kiện:
 
-```bash
-vpp chạy app.vi                 # chạy source
-vpp dựng app.vi                 # chạy compiler pipeline
-vpp kiểm thử tests              # chạy test project
-vpp --soát-lỗi src/             # linter
-vpp --định-dạng src/ --kiểm-tra # formatter check
-vpp --dump-ast app.vi           # xem AST
-vpp --dump-ir app.vi            # xem IR
-vpp --giải-mã app.vi            # disassemble bytecode
-vpp --repl                      # REPL
-vpp --lsp                       # language server
-vpp chẩn đoán                   # kiểm tra môi trường
+```vpp
+hàm gấp đôi(x) {
+    trả về x * 2;
+};
+
+hàm chính() {
+    kết_quả = gấp đôi(21);
+    nếu (kết_quả == 42) {
+        in kết_quả;
+    };
+};
 ```
 
-CLI dùng tên tiếng Việt làm contract chính; các alias quen thuộc như `run`, `build`, `test`,
-`new` vẫn được giữ để tương thích.
+Xem thêm [các chương trình ví dụ](examples/) và [tham chiếu ngôn ngữ](docs/language-reference.md).
 
-### VS Code
+## Cài đặt và build
 
-Repo có extension hỗ trợ `.vi` với syntax highlighting và LSP cho:
+Có thể xem các bản phát hành tại [GitHub Releases](https://github.com/winbiru/VXX/releases). Khi xây dựng từ source, chọn đúng quy trình theo hệ điều hành và kiến trúc CPU.
 
-- diagnostic;
-- completion;
-- go-to-definition;
-- hover;
-- rename;
-- format.
+### macOS ARM64 (Apple Silicon)
 
-Cài extension local:
+Yêu cầu CMake 3.20 trở lên, Bash và Xcode Command Line Tools. CMake ở root hiện được cấu hình dành cho nền tảng này.
 
-```bash
-./scripts/vpp-lang self-install
-vpp-lang install --editor vscode
-```
-
-Sau đó reload VS Code và mở file `.vi`.
-
-## 📦 Package system
-
-Project V++ dùng `vpp.json` và `vpp.lock`:
-
-```bash
-vpp gói cài đặt ./thu-vien-cua-toi
-vpp gói cài đặt git+https://github.com/example/pkg.git#main
-vpp gói cập nhật
-vpp gói khóa
-vpp gói phục hồi --ngoại-tuyến
-```
-
-Package manager hỗ trợ SemVer range, dependency transitive, deterministic lockfile, cache offline,
-local path, Git source và filesystem registry.
-
-Đọc thêm: [Package System](docs/package-system.md).
-
-Gói thử nghiệm `lượng tử` hỗ trợ dựng mạch, mô phỏng vector trạng thái phức,
-phép đo/reset và xuất OpenQASM 3.0. Chạy ví dụ Bell bằng
-`vpp chạy examples/luong-tu/bell.vi`; xem [API và cầu nối Qiskit](docs/thư-viện-vpp/lượng%20tử/chính.md).
-
-## 🧪 Build từ source
-
-Yêu cầu chính: compiler C++17 và CMake.
-
-```bash
+```sh
 git clone https://github.com/winbiru/VXX.git
 cd VXX
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure --no-tests=error
+cmake -S . -B build-pure-vpp
+cmake --build build-pure-vpp --parallel
+./VPP phiên bản
 ```
 
-Binary nằm tại:
+Có thể dùng `make build` để build theo cấu hình mặc định. Launcher `./VPP` tìm bộ công cụ trong `build-pure-vpp`; dùng `VPP_BUILD_DIR` nếu chọn thư mục build khác.
 
-```text
-build/bin/vpp-cli
+Cài bộ công cụ vào thư mục cá nhân:
+
+```sh
+cmake --install build-pure-vpp --prefix "$HOME/.local"
+export PATH="$HOME/.local/bin:$PATH"
+vpp --help
 ```
 
-Chạy trực tiếp:
+Kết quả build gồm `vpp` (launcher), `vpp-native` (compiler đầy đủ), `vpp-i32` (compiler native i32), `vpp-vm` (VM độc lập), `vpp-jit` (JIT) trong `build-pure-vpp/bin/`, cùng các object runtime trong `build-pure-vpp/native-vpp-runtime/`.
 
-```bash
-./build/bin/vpp-cli chạy scripts/test/program.vi
+### Linux x86_64
+
+Quy trình bootstrap riêng dùng Bash, Clang, linker ELF, binutils, Python 3 và GNU coreutils. Chạy từ root repository với thư mục đầu ra mới:
+
+```sh
+bash scripts/quality/check_linux_full_bootstrap.sh /tmp/vpp-linux-full-bootstrap
 ```
 
-Windows có thể build bằng MSVC/CMake; hướng dẫn chi tiết nằm trong
-[docs/installation.md](docs/installation.md).
+Quy trình tạo và kiểm tra compiler đầy đủ, ELF tĩnh, các thế hệ tự biên dịch và gói phân phối. Không yêu cầu máy macOS để chạy trên Linux.
 
-## 📊 Benchmark
+### Windows x86_64
 
-Đo lại ngày **14/11/2026** trên **macOS 26.6.2 ARM64**, với compiler V++
-tự biên dịch từ source hiện tại (commit `e25e289`, cây làm việc có thay đổi).
-Có **120/120 mẫu hợp lệ** từ 40 tổ hợp runtime/bài đo, mỗi tổ hợp chạy 3
-tiến trình độc lập, ba batch làm nóng rồi một batch đo. Thứ tự chạy được
-xáo trộn; số vòng được hiệu chỉnh với mục tiêu 30 ms/batch. Đã kiểm tra
-16 đầu ra, checksum, SHA-256 của manifest/executable/source benchmark và
-tính lại trung vị/MAD; **MAD/trung vị cao nhất 5,27%**.
+Dùng PowerShell, Python 3, CMake và toolchain Clang/LLD (MSYS2 CLANG64) có trong PATH. Chạy từ root repository với đường dẫn đầu ra mới:
 
-**Trung vị µs/thao tác; thấp hơn là nhanh hơn.** Ứng dụng V++ được dựng lại
-bằng compiler mới, dùng **runtime V++/ASM**, sinh executable Mach-O trực tiếp
-và chỉ liên kết `libSystem`. C/C++ dùng Apple Clang 21 `-O3`, không LTO;
-Node.js 20.11.1 và Java 21.0.2 dùng JIT mặc định; Python 3.14.3 và Ruby
-2.6.10 dùng cấu hình mặc định. Tất cả chạy ARM64.
+```powershell
+python scripts/quality/check_windows_full_bootstrap.py --clang (Get-Command clang.exe).Source bootstrap "$env:TEMP/vpp-windows-full" --archive "$env:TEMP/vpp-windows-full.zip"
+```
 
-| Ngôn ngữ | Số học | Vòng lặp có nhánh | Fibonacci vòng lặp | Danh sách 128 phần tử | Thay Unicode | Phân tích JSON |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **V++ AOT + V++/ASM** | **0.001819** | **0.157942** | **0.023724** | **0.135456** | **9.028943** | **114.011029** |
-| C | 0.000891 | 0.212832 | 0.009547 | — | — | — |
-| C++ | 0.000888 | 0.216138 | 0.009672 | 0.257593 | 0.202375 | — |
-| Node.js | 0.001175 | 0.160358 | 0.012886 | 0.564026 | 1.411153 | 0.455664 |
-| Java | 0.001481 | 0.073471 | 0.004704 | 0.494766 | 0.230724 | — |
-| Python | 0.101685 | 4.596722 | 0.491839 | 5.573257 | 0.504202 | 2.124389 |
-| Ruby | 0.083673 | 6.649590 | 1.109959 | 8.044760 | 1.364958 | 2.407891 |
+Quy trình kiểm tra PE/COFF, bootstrap compiler đầy đủ và đóng gói Windows. Chi tiết seed, yêu cầu công cụ và từng giai đoạn xem tại [bootstrap/README.md](bootstrap/README.md).
 
-Dấu `—` nghĩa là bộ đo chưa có bài tương ứng: C chỉ có ba kernel số học;
-C++/Java chưa có bài JSON. Rust không có `rustc` trên máy trong lượt đo này,
-nên không đưa số liệu Rust cũ vào bảng. Các ngôn ngữ dùng cấu trúc dữ liệu
-và thư viện bản địa tương ứng; JSON so sánh cả hiệu quả của thư viện parser.
-Mã đối chứng C++ và driver C/i32 được lấy từ commit `35aa30e`, trước khi
-loại bỏ các tệp C++ khỏi cây nguồn, và dựng lại riêng cho lần đo này.
+### Trạng thái nền tảng
 
-Trong các bài đã đo, danh sách V++ nhanh hơn C++ khoảng **1,90 lần**,
-vòng lặp có nhánh nhanh hơn C khoảng **1,35 lần**;
-Fibonacci mất khoảng **2,49 lần thời gian C**.
-Unicode mất khoảng **44,61 lần thời gian C++**,
-JSON mất khoảng **250,21 lần thời gian Node.js**.
-Các tỷ lệ chỉ áp dụng cho từng workload, không phải hệ số tốc độ chung.
+| Nền tảng | Đường triển khai hiện tại | Mức kiểm chứng |
+| --- | --- | --- |
+| macOS ARM64 | CMake, full AOT Mach-O, VM, JIT, OS worker | Build và worker chạy thực tế; benchmark được đo trên nền tảng này |
+| Linux x86_64 | Bootstrap riêng, full AOT ELF tĩnh, VM, OS worker | Worker VM/AOT chạy trong container; seed stage 1 được kiểm tra, cần xác nhận full convergence và regression trên CI |
+| Windows x86_64 | Bootstrap riêng, full AOT PE/COFF, VM, OS worker | Cross-assemble và fixture stage 1 qua Wine; cần xác nhận full convergence và regression trên Windows native |
+| macOS x86_64 | Machine ABI và OS worker dùng pthread | Machine regression qua Rosetta; chưa có full bootstrap tương đương ARM64 |
+| Linux ARM64 | Có mã backend/ABI trong source | Chưa có OS worker; chưa xác nhận full bootstrap |
 
-So với bảng ngày 05/11/2026, thời gian Unicode giảm từ 82,25 xuống
-9,03 µs, JSON giảm từ 1.003,27 xuống
-114,01 µs. Hai lượt đo khác cấu hình batch và số mẫu,
-nên đây là đối chiếu tham khảo, không phải phép đo A/B cô lập tối ưu.
+Phiên bản khai báo trong CMake là `1.0.0`. Ma trận trên mô tả mức hỗ trợ của cây mã nguồn hiện tại, không đồng nghĩa mọi nền tảng đã đạt đủ tiêu chí phát hành. Các seed full Linux/Windows đã được làm mới ngày 16/11/2026; kết quả hội tụ stage 2/3 trên CI vẫn cần xác nhận.
 
-Các kernel V++ i32 riêng dùng chung bộ đo C++ và ABI bốn tham số i32 với C,
-biên dịch ở đơn vị riêng, không LTO. **Đơn vị ns/thao tác**:
+## Các chế độ thực thi
+
+| Chế độ | Cách hoạt động | Đầu ra |
+| --- | --- | --- |
+| Native AOT | Biên dịch chương trình trước khi chạy, liên kết với runtime V++/ASM | Executable native |
+| Bytecode VM | Biên dịch chương trình sang bytecode và thực thi bằng VM V++/ASM | `.vmb` |
+| JIT | Phát mã máy khi chạy, thực thi trong vùng nhớ mã của tiến trình | Mã máy trong bộ nhớ |
+| Native i32 | Biên dịch hàm i32 theo backend native chuyên biệt | Object, mã raw hoặc Assembly |
+
+Ví dụ dùng bộ công cụ local trên macOS ARM64:
+
+```sh
+# Native AOT
+./VPP run xin-chao.vi
+
+# Standalone VM
+./VPP vm-build xin-chao.vi -o xin-chao.vmb
+build-pure-vpp/bin/vpp-vm xin-chao.vmb
+
+# JIT với runtime động
+./VPP jit --dynamic xin-chao.vi
+
+# Kiểm tra compiler và mã trung gian
+./VPP dump-ast xin-chao.vi
+./VPP dump-ir xin-chao.vi
+./VPP --help
+```
+
+JIT mặc định có đường i32; `--dynamic` cung cấp runtime cho số, chuỗi, danh sách, bản đồ, đối tượng, closure, ngoại lệ, GC và import. JIT phát mã máy trực tiếp vào bộ nhớ, không cần tạo executable hoặc gọi linker ngoài trong đường này. Tier tối ưu i32 vẫn mang tính thử nghiệm. Các giới hạn hiện tại gồm thực thi JIT một luồng, chưa có FFI descriptor và không phải môi trường sandbox.
+
+CLI hiện còn có `disassemble`, `format`, `lint`, `embed`, `emit-program-asm` và các chế độ native `--emit-obj`, `--emit-obj-selfhost`, `--emit-raw`, `--emit-asm`. Dùng `vpp --help` để xem cú pháp và các tùy chọn của binary đang chạy.
+
+## Kiến trúc
+
+```mermaid
+flowchart TD
+    S[Source .vi] --> L[Lexer và parser]
+    L --> A[AST]
+    A --> M[Ngữ nghĩa và đồ thị mô đun]
+    M --> I[IR]
+    I --> N[Native AOT]
+    I --> B[Bytecode]
+    I --> J[JIT]
+    N --> E[Executable native]
+    B --> V[Standalone VM]
+    J --> X[Mã máy trong bộ nhớ]
+    E --> R[Runtime V++ / Assembly]
+    V --> R
+    X --> R
+    R --> O[Machine ABI và hệ điều hành]
+```
+
+### Cấu trúc mã nguồn
+
+| Đường dẫn | Trách nhiệm |
+| --- | --- |
+| [`gói/biên dịch/`](gói/biên%20dịch/) | Lexer, AST, semantic analysis, module graph, IR, AOT, bytecode, JIT, CLI và các backend mã máy |
+| [`gói/biên dịch/bản địa/`](gói/biên%20dịch/bản%20địa/) | Compiler i32, assembler, encoder và linker native |
+| [`gói/máy ảo/`](gói/máy%20ảo/) | Nạp/thực thi chương trình, runtime, giá trị, bộ nhớ, syscall, host ABI và worker |
+| [`gói/lõi/`](gói/lõi/) | API nền tảng của thư viện chuẩn, đồng thời, toán học, định dạng, quản lý gói |
+| [`gói/`](gói/) | Các mô đun thư viện chuẩn theo lĩnh vực |
+| [`scripts/ASM/`](scripts/ASM/) | Machine ABI, bộ nhớ, I/O, syscall, worker và các primitive theo nền tảng |
+| [`bootstrap/`](bootstrap/) | Seed binary/Assembly và checksum phục vụ tự biên dịch |
+| [`scripts/macos/`](scripts/macos/), [`scripts/linux/`](scripts/linux/), [`scripts/windows/`](scripts/windows/), [`scripts/unix/`](scripts/unix/) | Quy trình build, bootstrap và triển khai theo hệ điều hành |
+| [`scripts/quality/`](scripts/quality/) | Kiểm tra hội tụ, tương thích, tính đúng đắn và benchmark |
+| [`scripts/test/`](scripts/test/) | Fixture và regression suite bằng V++ |
+| [`benchmark/`](benchmark/) | Workload native và đối chứng đa ngôn ngữ |
+| [`examples/`](examples/), [`templates/`](templates/) | Ví dụ, ứng dụng và mẫu dự án |
+| [`docs/`](docs/) | Đặc tả, thiết kế và hướng dẫn |
+| [`extension.js`](extension.js), [`package.json`](package.json), [`syntaxes/`](syntaxes/), [`themes/`](themes/) | Extension và hỗ trợ editor |
+| [`CMakeLists.txt`](CMakeLists.txt), [`Makefile`](Makefile), [`VPP`](VPP), [`VPP.cmd`](VPP.cmd) | Điểm vào build và launcher |
+
+Các thành phần chính của compiler nằm trong `gói/biên dịch/`: `từ vựng.vi`, `cây cú pháp.vi`, `ngữ nghĩa.vi`, `biểu diễn trung gian.vi`, `đồ thị mô đun.vi`, `phát mã.vi`, `dòng lệnh AOT tự chủ.vi`, `dòng lệnh VM.vi`, `dòng lệnh JIT.vi`, `JIT.vi` và `JIT động.vi`. Runtime nằm trong `gói/máy ảo/`, với các file Assembly theo nền tảng trong `scripts/ASM/`.
+
+### Tự biên dịch và liên kết
+
+Bootstrap dùng seed đã xác minh để tạo compiler từ source V++. Trong quy trình CI hiện tại, stage 1 liên kết Assembly seed với runtime hiện tại; stage 2 và stage 3 lần lượt biên dịch full compiler từ chính mã nguồn V++. Kiểm tra hội tụ yêu cầu hai thế hệ cuối giống nhau từng byte, đồng thời chạy fixture và kiểm tra định dạng executable. Không coi việc chỉ build thành công là đủ để chứng minh hội tụ.
+
+Trên macOS ARM64, đường full AOT có linker Mach-O trực tiếp và liên kết `libSystem`. Linux x86_64 full AOT tạo ELF tĩnh; Windows x64 tạo PE/COFF. Quy trình full trên Linux và Windows hiện vẫn dùng assembler/linker của toolchain hệ thống; các đường i32 native có cơ chế sinh object và liên kết riêng. CMake không build implementation C/C++ của compiler.
+
+Chi tiết: [bootstrap](bootstrap/README.md), [Native AOT direct link](docs/native-aot-direct-link.md), [dynamic runtime](docs/native-dynamic-vpp-runtime.md), [standalone VM](docs/vm-asm.md).
+
+## Thư viện chuẩn
+
+Các mô đun `.vi` được tổ chức theo lĩnh vực trong `gói/`: `lõi`, `chuẩn`, `bộ sưu tập`, `dữ liệu`, `văn bản`, `nhập xuất`, `thời gian`, `hệ thống`, `mạng`, `bảo mật`, `kiểm thử`, `dựng`, `lượng tử` và `ứng dụng`, bên cạnh các mô đun nội bộ compiler/runtime.
+
+Thư viện cung cấp các API xử lý chuỗi và Unicode, collection, JSON, thời gian, file, tiến trình, mạng socket/DNS/TLS và worker. Các mô đun gọi xuống runtime/ASM đối với thao tác cần quyền truy cập hệ thống. Khả năng thực thi cụ thể phụ thuộc backend và nền tảng.
+
+Catalog phục vụ editor nằm trong [`vpp-libraries.json`](vpp-libraries.json) và [`vpp-language.json`](vpp-language.json). Mã quản lý gói nằm trong `gói/lõi/quản lý gói.vi`; không nên suy ra rằng mọi lệnh CLI quản lý gói cũ đã có trên compiler tự chủ.
+
+## Thực thi đồng thời
+
+Worker trong Native AOT và standalone VM chạy hàm trên OS thread riêng, có `Program`, call frames và heap riêng. Runtime sao chép đồ thị dữ liệu giữa các worker, bao gồm tham số, closure, globals và kết quả, để thay đổi dữ liệu ở worker không làm thay đổi dữ liệu của bên gọi.
+
+```vpp
+nhập gói.lõi.đồng thời.*;
+
+hàm chính() {
+    dữ_liệu = [2, 3];
+    mã = chạy luồng(hàm(x) {
+        x[0] = x[0] * 10;
+        trả về x;
+    }, [dữ_liệu]);
+
+    kết_quả = chờ luồng(mã, 1000);
+    in kết_quả[0];  // 20
+    in dữ_liệu[0];  // 2
+};
+```
+
+API gồm `chạy luồng`, `chờ luồng`, `hủy luồng`, `trạng thái luồng` và lớp `Luồng Công Việc`. Runtime hỗ trợ worker lồng nhau, phát hiện chu kỳ chờ, timeout, cancellation hợp tác tại safepoint, join và giải phóng arena. Cancellation không bảo đảm ngắt tức thì một thao tác I/O đang block.
+
+Machine ABI dùng pthread trên macOS, `clone`/`futex` trên Linux x86_64 và `_beginthreadex` trên Windows x64. Linux vẫn liên kết tĩnh mà không cần libc/pthread. Xem [hợp đồng và giới hạn worker](docs/concurrency-workers.md).
+
+Compiler cũng có chế độ song song cho bước hạ IR bằng `VPP_COMPILER_WORKERS=2` đến `8`; mặc định `0`, và `0`/`1` chạy tuần tự. Các bước cấp ID, string pool và phát mã được tuần tự hóa để giữ tính xác định. Regression so sánh đầu ra ở 0/1/2/4/8 worker; số worker lớn hơn không mặc nhiên có nghĩa thời gian build ngắn hơn.
+
+## Công cụ phát triển
+
+Extension VS Code hỗ trợ tô màu cú pháp `.vi`, gợi ý từ khóa/import, thông tin hover và điều hướng mã nguồn cục bộ. Có thể cài từ repository bằng Node.js và CLI editor tương ứng:
+
+```sh
+./scripts/vpp-lang install --editor vscode
+```
+
+Script cũng hỗ trợ Cursor và VSCodium. LSP là tùy chọn dành cho server tương thích được cấu hình riêng; mặc định extension sử dụng khả năng phân tích cục bộ (`vpp.lsp.enabled=false`). Compiler tự chủ hiện có formatter, linter, AST/IR dump và disassembler tích hợp.
+
+## Kiểm thử và chất lượng
+
+Trên macOS ARM64, sau khi build:
+
+```sh
+ctest --test-dir build-pure-vpp --output-on-failure
+# Chỉ kiểm tra machine worker và tính xác định của compiler workers
+ctest --test-dir build-pure-vpp -R '^vpp-(worker-machine|compiler-workers)$' --output-on-failure
+# Kiểm tra full bootstrap convergence (dùng thư mục đầu ra mới)
+bash scripts/quality/check_macos_full_bootstrap.sh build-pure-vpp /tmp/vpp-macos-full-bootstrap
+```
+
+`make test` chạy bộ kiểm thử theo cấu hình mặc định. [Native CI](.github/workflows/native-vpp.yml) tổ chức các gate bootstrap, kiểm tra executable, fixture, regression, parity và smoke test gói phát hành theo nền tảng. Linux và Windows dùng các script bootstrap riêng đã nêu ở phần cài đặt.
+
+## Benchmark
+
+Đo lại ngày **16/11/2026** trên **macOS 26.6.2 ARM64**, tại commit
+`c6b6f5d` (cây làm việc có thay đổi). Compiler và runtime V++/ASM được dựng
+ở commit `9929796`; các commit kế tiếp chỉ cập nhật seed, tài liệu bootstrap
+và kiểm tra bootstrap, không đổi mã compiler/runtime. Ứng dụng benchmark
+được biên dịch lại bằng compiler này, sinh Mach-O và liên kết `libSystem`.
+
+**21/21 workload ứng dụng**, 82 tổ hợp runtime/workload, **246/246 mẫu hợp lệ**.
+V++ AOT, JavaScript và Python chạy đủ 21 bài. C (3 bài), C++ (5), Java (5)
+và Ruby (6) chạy toàn bộ bài hiện có trong bộ đối chứng của chúng.
+C/C++ dùng Apple Clang 21 `-O3`, không LTO; Node.js 20.11.1 và Java 21.0.2
+dùng JIT mặc định; Python 3.14.3 và Ruby 2.6.10 dùng cấu hình mặc định.
+Mã C++ và driver C/i32 lấy từ commit `35aa30e` và dựng lại cho lần đo này.
+
+**Trung vị µs/lượt workload (1 µs = 0,000001 giây); càng thấp càng tốt.**
+Một lượt có thể gồm nhiều phép toán. Dấu `—` là chưa có bài đối chứng,
+không phải thời gian bằng 0.
+
+| Workload | **V++ AOT** | C | C++ | Node.js | Java | Python | Ruby |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Số học | **0.001742** | 0.000832 | 0.000852 | 0.001158 | 0.001416 | 0.099982 | 0.083876 |
+| Vòng lặp có nhánh | **0.158688** | 0.209154 | 0.203957 | 0.158798 | 0.071875 | 4.514197 | 6.567274 |
+| Fibonacci vòng lặp | **0.022325** | 0.009316 | 0.009326 | 0.012079 | 0.004638 | 0.479268 | 1.081490 |
+| Danh sách 128 | **0.130854** | — | 0.252464 | 0.565004 | 0.559894 | 5.167655 | 7.629337 |
+| Thay Unicode | **8.510980** | — | 0.197971 | 1.381858 | 0.233560 | 0.476637 | 1.324458 |
+| Phân tích JSON | **92.988971** | — | — | 0.436438 | — | 2.047131 | 2.323625 |
+| UCLN (64) | **452.328125** | — | — | 0.406664 | — | 12.526909 | — |
+| Số thực (256) | **1151.781250** | — | — | 0.410189 | — | 9.067869 | — |
+| Fibonacci đệ quy | **601.875000** | — | — | 1.068793 | — | 11.494727 | — |
+| Số nguyên tố | **2211.999997** | — | — | 0.940131 | — | 28.021701 | — |
+| Ma trận 4×4 | **267.895833** | — | — | 0.151369 | — | 4.809552 | — |
+| Sắp xếp 64 | **2075.499997** | — | — | 3.050260 | — | 5.542422 | — |
+| Tìm kiếm nhị phân 128 | **13.716435** | — | — | 0.011133 | — | 0.392569 | — |
+| Từ điển 64 | **263.991072** | — | — | 2.099988 | — | 4.906327 | — |
+| Đối tượng 32 | **220.364583** | — | — | 0.291518 | — | 4.073884 | — |
+| Nối chuỗi 64 | **247.914062** | — | — | 0.900388 | — | 4.486058 | — |
+| Tách chuỗi 32 | **11172.687500** | — | — | 1.128226 | — | 2.309277 | — |
+| Chuẩn hóa Unicode NFC | **474.604167** | — | — | 0.188904 | — | 0.396371 | — |
+| Mã hóa JSON | **111.742188** | — | — | 0.695402 | — | 1.844664 | — |
+| JSON lồng nhau | **443.687499** | — | — | 1.248996 | — | 2.887405 | — |
+| Ngoại lệ 16 | **42.564063** | — | — | 9.388442 | — | 0.979184 | — |
+
+Kết quả nổi bật: V++ nhanh hơn C khoảng **1.32 lần**
+trong vòng lặp có nhánh và nhanh hơn C++ khoảng **1.93 lần**
+trong bài danh sách 128 phần tử. Fibonacci vòng lặp V++ mất khoảng
+**2.40 lần** thời gian C. Unicode replace và JSON parse
+vẫn mất lần lượt khoảng **43.0 lần** thời gian C++
+và **213.1 lần** thời gian Node.js.
+Các bài mở rộng cho thấy điểm nghẽn đáng kể: số thực, đệ quy, UCLN,
+ma trận, sắp xếp, từ điển, chuẩn hóa Unicode và JSON lồng nhau.
+Tách chuỗi 32 mất **11.173 ms/lượt**,
+so với **2.309 µs** của Python. Các tỷ lệ chỉ có ý nghĩa
+trong từng workload; không suy rộng thành tốc độ chung của ngôn ngữ.
+
+### Kernel i32 (ABI chung với C)
+
+Đo riêng 3 kernel bằng object do compiler V++ native xuất trực tiếp
+(`--emit-obj-selfhost`), dùng cùng driver C++ và ABI bốn tham số i32
+với C, không LTO. 18/18 mẫu hợp lệ từ 6 tổ hợp, **đơn vị ns/lượt**.
 
 | Kernel | V++ i32 | C |
 | --- | ---: | ---: |
-| Số học | 1.302 | 0.891 |
-| Vòng lặp có nhánh | 157.469 | 212.832 |
-| Fibonacci vòng lặp | 21.975 | 9.547 |
+| Số học | 1.243 | 0.869 |
+| Vòng lặp có nhánh | 168.054 | 210.988 |
+| Fibonacci vòng lặp | 21.864 | 9.437 |
 
-Ứng dụng AOT ở bảng đầu dùng bộ đo viết bằng V++; đường kernel i32 dùng
-driver C++. Cấu trúc vòng lặp và tối ưu có thể khác nhau, nên không lấy
-hiệu hai bảng để suy ra chi phí riêng của một lời gọi hàm.
+Bảng ứng dụng dùng bộ đo viết bằng V++; bảng kernel dùng driver C++.
+Không lấy hiệu hai bảng để suy ra chi phí riêng của một lời gọi hàm.
 
-Phép đo không tính khởi động, biên dịch, chuẩn bị đầu vào hay làm nóng;
-vẫn tính vòng lặp bộ đo, gọi hàm, cấp phát và GC còn lại sau tối ưu.
-Đầu vào lặp theo chu kỳ 16 giá trị `17..32`; profiling tắt khi đo.
-Các batch đo dài 21,37–41,28 ms. Kiểm thử bootstrap compiler chạy
-đồng thời trên máy, nên kết quả có thể chịu ảnh hưởng của tải nền;
-chưa phải phép đo trên máy hoàn toàn nhàn rỗi. Chưa đo riêng RAM, I/O,
-đa luồng hay thời gian biên dịch.
+### Phương pháp và phạm vi
 
-Bộ đo native mở rộng hiện có 21 workload, bao gồm số thực, UCLN, số nguyên tố,
-ma trận, đệ quy, tìm kiếm, sắp xếp, từ điển, cấp phát đối tượng, Unicode,
-JSON và ngoại lệ. Chạy `make benchmark`; xem [hướng dẫn và phạm vi đo](benchmark/languages/README.md).
+Mỗi tổ hợp chạy 3 tiến trình độc lập, mỗi tiến trình có 3 batch làm nóng
+và một batch đo, thứ tự xáo trộn, hiệu chỉnh mục tiêu 30 ms/batch. Batch
+ứng dụng thực tế dài 21,14–181,11 ms (bài chậm có tối thiểu 16 lượt);
+MAD/trung vị cao nhất 3,95%; ở bảng kernel là 2,95%.
+Đầu vào luân phiên 16 seed `17..32`; oracle Python độc lập kiểm tra
+16 kết quả và checksum từng mẫu. Thời gian đo loại trừ biên dịch, khởi động,
+chuẩn bị fixture và làm nóng, nhưng gồm vòng lặp bộ đo, gọi hàm, cấp phát
+và GC còn lại sau tối ưu. Thư viện và cấu trúc dữ liệu bản địa khác nhau
+(các bài JSON cũng so sánh hiệu quả thư viện). Rust không được đo vì
+không có `rustc` trên máy. Chưa có phép đo riêng RSS, I/O, mạng, worker,
+JIT V++ hay thời gian biên dịch trong lần này; các công cụ A/B chuyên biệt
+không nằm trong bộ đo ứng dụng này. Kết quả chỉ đại diện cho máy và cấu hình
+đã đo, không phải phép đo Linux/Windows hay toàn bộ CI.
 
-[Mã nguồn workload](benchmark/languages/)
-· [Bộ đo, oracle và thống kê](scripts/quality/compare_languages_aot.py).
-Báo cáo gốc: `benchmark/reports/languages-2026-11-14-refresh.json`;
-manifest: `build-benchmark-2026-11-14-refresh/manifest.json` (tệp cục bộ,
-được `.gitignore` bỏ qua). SHA-256 báo cáo: `9a8db89495a73636b3afb33fdf91c970417f70415bd07d7b6c79d4576d08b0b9`.
+Chạy `make benchmark` để đo 21 bài V++ native; xem
+[hướng dẫn và phạm vi đo](benchmark/languages/README.md),
+[mã workload](benchmark/languages/) và
+[bộ đo đa ngôn ngữ](scripts/quality/compare_languages_aot.py).
 
-## 🧠 Kiến trúc
+Báo cáo thô và manifest lưu cục bộ (được `.gitignore` bỏ qua):
 
-V++ chia source C++ thành các module riêng:
+- `benchmark/reports/languages-2026-11-16-full.json` — SHA-256 `278497d16091e7c57799b883f4bd6c65cfc8ad4c604e8ad67e4191085499ec8d`.
+- `benchmark/reports/languages-2026-11-16-i32.json` — SHA-256 `400e8da322e119571a11f3dc4ac8dbcf5b90fa59aa01bf9f3d2f8a9458d6fe22`.
+- `build-benchmark-2026-11-16-full/manifest.json` và `manifest-i32.json`.
 
-```text
-vpp-core
-   ↓
-vpp-bytecode
-   ↓
-vpp-frontend
-   ↓
-vpp-compiler ──→ vpp-tooling
-   ↓
-vpp-runtime
-   ↓
-vpp-cli
-```
+## Tài liệu
 
-Các package viết bằng V++ nằm dưới `gói/`, còn native runtime chỉ giữ những primitive cần tương
-tác với hệ điều hành hoặc host runtime.
+| Tài liệu | Nội dung |
+| --- | --- |
+| [Ngữ pháp](docs/grammar.bnf) | Cú pháp chính thức dạng BNF |
+| [Tham chiếu ngôn ngữ](docs/language-reference.md) | Kiểu dữ liệu, hàm, lớp, điều khiển luồng và mô đun |
+| [Bootstrap](bootstrap/README.md) | Seed, công cụ, quy trình tự biên dịch và convergence |
+| [Native AOT direct link](docs/native-aot-direct-link.md) | Cơ chế biên dịch và liên kết native |
+| [Dynamic V++ runtime](docs/native-dynamic-vpp-runtime.md) | Runtime cho giá trị động |
+| [Standalone VM](docs/vm-asm.md) | VM bytecode và Assembly |
+| [Concurrency workers](docs/concurrency-workers.md) | OS worker, bộ nhớ độc lập, vòng đời và cancellation |
+| [Benchmark đa ngôn ngữ](benchmark/languages/README.md) | Workload, cấu hình và phương pháp đo |
+| [Đóng góp](CONTRIBUTING.md) | Hướng dẫn phát triển và gửi thay đổi |
 
-Xem chi tiết: [Architecture](docs/architecture.md) · [Bytecode](docs/bytecode.md) ·
-[Semantics](docs/semantics.md) · [Runtime Errors](docs/runtime-errors.md).
+Một số tài liệu thiết kế và hướng dẫn cũ trong repository có thể mô tả toolchain ở giai đoạn trước. Với lệnh build và bootstrap hiện tại, ưu tiên README này, tài liệu bootstrap, workflow CI và `vpp --help` của binary đang dùng.
 
-## 🗺️ Trạng thái 1.0
+## Đóng góp
 
-V++ đã có phần lớn nền tảng của 1.0: semantics, object model, compiler pipeline, VM, package system,
-toolchain và documentation. Công việc còn lại tập trung vào hardening release:
+V++ chào đón đóng góp về cú pháp tiếng Việt, compiler, runtime, thư viện chuẩn, hiệu năng, kiểm thử, tài liệu và công cụ học tập. Khi gửi thay đổi cho compiler/runtime, nên kèm fixture hoặc regression phù hợp và kiểm tra trên nền tảng liên quan. Xem [CONTRIBUTING.md](CONTRIBUTING.md) và [GitHub Issues](https://github.com/winbiru/VXX/issues).
 
-- same-machine performance baseline/candidate regression gate;
-- GC allocation/RSS/p95 telemetry;
-- Linux ASan/UBSan/LSan evidence;
-- artifact install smoke trên Windows/macOS/Linux;
-- audit bề mặt stdlib stable trước final.
-
-Theo dõi checklist đầy đủ tại [Roadmap V++ 1.0](plans/roadmap-1.0.md) và
-[Quality Gates](docs/quality.md).
-
-## 🧩 Ví dụ trong repo
-
-- `examples/hoa-don-cua-hang` — module, class/constructor và import tương đối.
-- `examples/quan-ly-kho-api` — sample backend/HTTP lớn hơn để kiểm tra package + runtime.
-- `scripts/test/` — regression corpus của compiler và VM.
-
-## 🤝 Đóng góp
-
-Compiler, runtime, stdlib, tooling và documentation đều có chỗ để đóng góp.
-
-Nếu bạn muốn bắt đầu nhanh:
-
-1. Fork repository.
-2. Chọn một issue hoặc một mục trong [Roadmap](plans/roadmap-1.0.md).
-3. Build và chạy CTest trước khi sửa.
-4. Thêm regression khi thay đổi behavior.
-5. Gửi pull request với mô tả rõ trước/sau.
-
-Đọc [CONTRIBUTING.md](CONTRIBUTING.md) để biết quy ước chi tiết.
-
-## ⭐ Nếu bạn thấy V++ thú vị
-
-Hãy **Star** repo để theo dõi quá trình đưa một ngôn ngữ lập trình tiếng Việt từ compiler/VM thử
-nghiệm tới mốc 1.0, hoặc chia sẻ V++ cho những người quan tâm tới compiler, VM và language design.
-
-Ý tưởng, bug report và pull request đều được hoan nghênh.
-
-## 📚 Tài liệu
-
-- [Language Reference](docs/language-reference.md)
-- [CLI](docs/cli.md)
-- [Package System](docs/package-system.md)
-- [Testing](docs/testing.md)
-- [Installation](docs/installation.md)
-- [Architecture](docs/architecture.md)
-- [Debugging](docs/debugging.md)
-- [Migration to 1.0](docs/migration-1.0.md)
-- [Roadmap 1.0](plans/roadmap-1.0.md)
-- [Changelog](CHANGELOG.md)
-  
-## Thông điệp
-V++ — Lập trình bằng tiếng Việt, kết nối với công nghệ thế giới.
-V++ được phát triển với mong muốn tiếng Việt có thể trở thành một phương tiện biểu đạt tư duy lập trình và xây dựng phần mềm hiện đại.
-Chúng tôi không phát triển V++ để phủ nhận Python, Java, C++ hay bất kỳ ngôn ngữ lập trình nào khác. Mỗi ngôn ngữ đều có giá trị, lịch sử và lĩnh vực ứng dụng riêng.
-V++ hướng tới việc mở rộng sự lựa chọn: để người Việt có thể học tập, nghiên cứu và sáng tạo phần mềm bằng chính tiếng mẹ đẻ, đồng thời tương tác với các tiêu chuẩn và hệ sinh thái công nghệ quốc tế.
-tôi hiểu rằng V++ còn nhiều điều cần hoàn thiện. Mọi phản biện kỹ thuật, góp ý thiết kế và đóng góp mã nguồn đều được trân trọng.
-tôi không mong mọi người đồng ý với V++. tôi mong V++ được đánh giá bằng những gì nó thực sự làm được. 
-Bản sắc V++ không có nghĩa là khép mình trước thế giới. Đó là khả năng đóng góp vào thế giới bằng bản sắc của chính mình.
+Mục tiêu lâu dài của V++ là để tiếng Việt có thể được sử dụng tự nhiên trong lập trình, từ chương trình đầu tiên trong lớp học đến các ứng dụng và hệ thống phức tạp.
 
 ## License
 
 V++ được phát hành theo giấy phép [MIT](LICENSE).
-
-
-</details>

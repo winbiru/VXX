@@ -111,9 +111,15 @@ hàm fixture(root, work) {
     files = ["run_native_regression.py", "check_windows_full_bootstrap.py", "native_golden_costs.tsv", "regression_runner_mock.py"];
     lặp(i = 0; i < độ dài(files); i++) { sao chép tệp(root + "/scripts/quality/" + files[i], work + "/scripts/quality/" + files[i]); };
     ghi tệp(work + "/gói/máy ảo/chính.vi", "");
+    // The macOS ARM64 runner invokes a standalone VM builder. Provide its
+    // process double in the isolated repository, with the same two arguments.
+    tạo thư mục(work + "/scripts/macos");
+    builder = "#!/bin/bash\nexec \"$1\" build \"$PWD/gói/máy ảo/chính.vi\" -o \"$2\"\n";
     nếu (env("VPP_TEST_JIT") != "") {
         tạo thư mục(work + "/processes");
+        builder = "#!/bin/bash\nexec \"$VPP_TEST_PYTHON\" \"$PWD/scripts/quality/regression_runner_mock.py\" \"$1\" build \"$PWD/gói/máy ảo/chính.vi\" -o \"$2\"\n";
     };
+    ghi tệp(work + "/scripts/macos/build-vpp-vm.sh", builder);
     ghi tệp(work + "/scripts/quality/check_vm_asm.cmake", "if(NOT EXISTS \"\${VPP_VM}\" OR NOT EXISTS \"\${VPP_OUTPUT_DIR}\")\n message(FATAL_ERROR \"missing staged VM\")\nendif()\nget_filename_component(parent \"\${VPP_VM}\" DIRECTORY)\nfile(TO_CMAKE_PATH \"\${VPP_OUTPUT_DIR}\" expected_dir)\ncmake_path(NORMAL_PATH parent)\ncmake_path(NORMAL_PATH expected_dir)\nif(NOT parent STREQUAL expected_dir)\n message(FATAL_ERROR \"VM not staged locally\")\nendif()\nfile(SHA256 \"\${VPP_VM}\" actual)\nfile(SHA256 \"$ENV{VPP_TEST_SELF}\" expected)\nif(NOT actual STREQUAL expected)\n message(FATAL_ERROR \"VM copy differs\")\nendif()\nfile(WRITE \"$ENV{VPP_TEST_STATE}/vm-\${VPP_VM_PHASE}\" \"ok\")\n");
     cases = []; unregistered = {"scripts/test/http_fixture.vi": "HTTP support"};
     ghi tệp(work + "/scripts/test/http_fixture.vi", "");
@@ -149,6 +155,7 @@ hàm scenario(work, mode, names, batch, module, expected_status) {
     overrides = {"VPP_TEST_FAKE": "1", "VPP_TEST_MODE": mode, "VPP_TEST_STATE": state, "VPP_TEST_SELF": env("VPP_TEST_SELF"), "VPP_TEST_CMAKE": env("VPP_TEST_CMAKE"), "VPP_COMPILER_PROFILE_FILE": state + "/profile"};
     nếu (env("VPP_TEST_JIT") != "") {
         máy ảo thêm cuối danh sách(args, "--fixture-executable"); máy ảo thêm cuối danh sách(args, env("VPP_TEST_JIT"));
+        overrides["VPP_TEST_PYTHON"] = env("VPP_TEST_PYTHON");
         overrides["TMPDIR"] = work + "/processes"; overrides["TEMP"] = work + "/processes"; overrides["TMP"] = work + "/processes";
     };
     nếu (module) { máy ảo thêm cuối danh sách(args, "--module-suites"); };
@@ -216,6 +223,7 @@ hàm chính() {
         lặp(i = 0; i < độ dài(phases); i++) { status(r, phases[i], "PASS"); khẳng định đúng(là tệp(r["state"] + "/" + phases[i])); };
     };
     r = scenario(work, "vm-fail", phases, 1, sai, 1);
+    nếu (ten nền tảng máy ảo() != "windows") { khẳng định đúng(là tệp(r["state"] + "/build-chính.vi")); };
     lặp(i = 0; i < độ dài(phases); i++) { status(r, phases[i], "FAIL"); khẳng định sai(là tệp(r["state"] + "/" + phases[i])); };
     copy_exec(env("VPP_TEST_SELF"), work + "/bin/" + exe("vpp-vm"));
     r = scenario(work, "vm-packaged", phases, 1, sai, 0);

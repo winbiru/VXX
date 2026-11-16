@@ -37,6 +37,8 @@ hàm graph_fixture(root, work, target) {
     bootstrap = "#!/bin/bash\nset -eu\nroot=$1\nmkdir -p \"$root\"\nprintf 'bootstrap\\n' >> \"$root/invocations.log\"\nprintf '%s' \"${@: -1}\" > \"$root/bootstrap-mode.log\"\nmkdir \"$root/bootstrap-active\"\ntrap 'rmdir \"$root/bootstrap-active\"' EXIT\nsleep 0.3\nmkdir -p \"$root/bin\" \"$root/native-vpp-runtime\"\nprintf 'compiler\\n' > \"$root/bin/vpp-native\"\ncp \"$(dirname \"$0\")/fake-jit.sh\" \"$root/bin/vpp\"\nchmod +x \"$root/bin/vpp\"\ncp \"$(dirname \"$0\")/fake-vm.sh\" \"$root/bin/vpp-i32\"\nchmod +x \"$root/bin/vpp-i32\"\nfor part in runtime.o platform.o dynamic-bridge.o; do printf 'object\\n' > \"$root/native-vpp-runtime/$part\"; done\n";
     vm = "#!/bin/bash\nset -eu\noutput=${@: -1}\nroot=$(dirname \"$(dirname \"$output\")\")\ntest -f \"$root/bin/vpp-native\"\ntest -f \"$root/native-vpp-runtime/runtime.o\"\nprintf 'vm\\n' >> \"$root/invocations.log\"\nprintf 'shared VM\\n' > \"$output\"\nchmod +x \"$output\"\n";
     ghi tệp(source + "/scripts/macos/build-vpp-cli.sh", bootstrap);
+    // CMake now calls a dedicated standalone VM builder with compiler and output.
+    ghi tệp(source + "/scripts/macos/build-vpp-vm.sh", vm);
     ghi tệp(source + "/scripts/macos/fake-vm.sh", vm);
     ghi tệp(source + "/scripts/macos/fake-jit.sh", "#!/bin/bash\nset -eu\noutput=${@: -1}\nroot=$(dirname \"$(dirname \"$output\")\")\nprintf 'JIT\\n' >> \"$root/invocations.log\"\nprintf 'JIT\\n' > \"$output\"\nchmod +x \"$output\"\n");
     cmake_run(["-G", "Unix Makefiles", "-S", source, "-B", build, "-DBUILD_TESTING=OFF"]);
@@ -45,6 +47,9 @@ hàm graph_fixture(root, work, target) {
     build_graph(build, target); graph_log(build, "");
     run_tool("/bin/sleep", ["1.05"]); run_tool("/usr/bin/touch", [build + "/bin/vpp-i32"]);
     build_graph(build, target); graph_log(build, "vm\n");
+    run_tool("/bin/sleep", ["1.05"]); run_tool("/usr/bin/touch", [source + "/scripts/macos/build-vpp-vm.sh"]);
+    build_graph(build, target); graph_log(build, "vm\n");
+    build_graph(build, target); graph_log(build, "");
     run_tool("/bin/sleep", ["1.05"]); ghi tệp(source + "/gói/máy ảo/chính.vi", "updated VM source\n");
     build_graph(build, target); graph_bootstrap_log(build, tất cả);
     build_graph(build, target); graph_log(build, "");
