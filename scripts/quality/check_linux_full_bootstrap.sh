@@ -104,8 +104,15 @@ fi
 if [[ "$phase" == all || "$phase" == convergence ]]; then
     progress 80 'Kiểm tra tính đồng nhất của hai thế hệ bộ biên dịch'
     bash "$ROOT_DIR/scripts/quality/audit_linux_static_elf.sh" "$out/vpp-native-stage3"
-    cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"
     (cd "$out" && sha256sum vpp-native-stage2 vpp-native-stage3 > convergence.sha256)
+    if ! cmp "$out/vpp-native-stage2" "$out/vpp-native-stage3"; then
+        cat "$out/convergence.sha256" >&2
+        for generation in stage2 stage3; do
+            echo "ELF layout: $generation" >&2
+            readelf -h -W -S "$out/vpp-native-$generation" >&2
+        done
+        exit 1
+    fi
     echo 'LINUX_FULL_BOOTSTRAP_CONVERGENCE=PASS'
 fi
 if [[ "$phase" == all || "$phase" == test ]]; then

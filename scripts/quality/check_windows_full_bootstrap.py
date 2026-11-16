@@ -72,6 +72,42 @@ def audit_pe(path, deterministic=True):
         raise RuntimeError(f'Invalid PE entry point: {path}')
 
 
+def pe_layout(data):
+    # Inputs have already passed audit_pe. Include raw section hashes to
+    # distinguish code/data divergence from header or linker metadata.
+    pe = struct.unpack_from('<I', data, 0x3c)[0]
+    _, count, stamp, _, _, optional, _ = struct.unpack_from('<HHIIIHH', data, pe + 4)
+    start = pe + 24
+    entry = struct.unpack_from('<I', data, start + 16)[0]
+    lines = [f'size={len(data)} entry=0x{entry:x} timestamp={stamp}']
+    for index in range(count):
+        off = start + optional + index * 40
+        name = data[off:off+8].rstrip(b'\0').decode('ascii', 'replace')
+        size, address, raw_size, raw = struct.unpack_from('<IIII', data, off + 8)
+        sha = hashlib.sha256(data[raw:raw+raw_size]).hexdigest()
+        lines.append(f'{name}: RVA=0x{address:x} virtual_size=0x{size:x} '
+                     f'raw=0x{raw:x} raw_size=0x{raw_size:x} sha256={sha}')
+    return '\n'.join(lines)
+
+
+def check_convergence(stage2, stage3, out):
+    data2, data3 = stage2.read_bytes(), stage3.read_bytes()
+    hashes = ''.join(f'{hashlib.sha256(data).hexdigest()}  {path.name}\n'
+                     for path, data in ((stage2, data2), (stage3, data3)))
+    (out / 'convergence.sha256').write_text(hashes, encoding='ascii')
+    if data2 != data3:
+        offset = next((i for i, (a, b) in enumerate(zip(data2, data3)) if a != b),
+                      min(len(data2), len(data3)))
+        report = (hashes + f'First differing file offset: {offset} (0x{offset:x})\n'
+                  f'{stage2.name}: {data2[offset:offset+16].hex() or "EOF"}\n'
+                  f'{stage3.name}: {data3[offset:offset+16].hex() or "EOF"}\n'
+                  f'PE layout: {stage2.name}\n{pe_layout(data2)}\n'
+                  f'PE layout: {stage3.name}\n{pe_layout(data3)}\n')
+        (out / 'convergence.log').write_text(report, encoding='utf-8')
+        print(report, file=sys.stderr, flush=True)
+        raise RuntimeError('Windows full compiler stages 2 and 3 diverged')
+
+
 def clean_env():
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith('VPP_')}
     env.update(VPP_NATIVE_TARGET='windows-x86_64', VPP_NATIVE_NO_CACHE='1',
@@ -117,12 +153,11 @@ def link(clang, objects, output, env, log):
     audit_pe(output)
 
 
-def fixture_cases(directory, *, current_workers=True):
+def fixture_cases(directory):
     hello = directory / 'hello.vi'
     hello.write_text('hàm chính() { in 42; };\n', encoding='utf-8')
     yield 'hello', hello, b'42\n', 0
-    if current_workers:
-        yield 'native-worker', ROOT / 'scripts/test/kiem_tra_native_worker.vi', 'native worker: đạt\n'.encode('utf-8'), 0
+    yield 'native-worker', ROOT / 'scripts/test/kiem_tra_native_worker.vi', 'native worker: đạt\n'.encode('utf-8'), 0
     yield 'path-kind', FIXTURES / 'native_path_kind.vi', b'NATIVE PATH KIND OK\n', 0
     yield 'vm', FIXTURES / 'vm_asm.vi', ('-2147483648\n-2147483648\n-1\n3.75\n3.0\ni\n[1, 9, 3]\n16\n41\n42\n9\n25\nswitch\nngoại lệ VM\nASM VM OK\n').encode(), 0
     yield 'dynamic', FIXTURES / 'native_dynamic_vpp.vi', ('42\n43\n2147483647\n3.75\n2\n🐱\n[1, 9, 3]\n9\n41\n43\n9\n0\n1\n2\nđúng\n[ngoại lệ, 42]\n44\n10\n[1, 9, 3]\nVPP DYNAMIC AOT OK\n').encode(), 0
@@ -137,10 +172,10 @@ def fixture_cases(directory, *, current_workers=True):
         yield name, FIXTURES / (stem + '.vi'), expected, status
 
 
-def check_fixtures(compiler, directory, env, *, current_workers=True):
+def check_fixtures(compiler, directory, env):
     directory.mkdir()
     command([compiler, '--version'], env, directory / 'version.log', timeout=120)
-    for name, source, expected, status in fixture_cases(directory, current_workers=current_workers):
+    for name, source, expected, status in fixture_cases(directory):
         binary = directory / (name + '.exe')
         command([compiler, 'build', source, '-o', binary], env, directory / (name + '.build.log'), timeout=600)
         audit_pe(binary)
@@ -198,9 +233,7 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
             shutil.copyfileobj(source, dest)
         assemble(clang, out / 'seed.S', out / 'seed.o', env, out / 'seed.log', '-DVPP_AOT_VPP_RUNTIME=1')
         link(clang, [out / 'seed.o', *objects], stage1, env, out / 'stage1-link.log')
-        # The pinned seed predates the native worker ABI. Current-source
-        # stages 2 and 3 and the packaged standalone VM enforce worker tests.
-        check_fixtures(stage1, out / 'stage1-fixtures', env, current_workers=False)
+        check_fixtures(stage1, out / 'stage1-fixtures', env)
     for stage, previous, current in ((2, stage1, stage2), (3, stage2, stage3)):
         if phase not in ('all', f'stage{stage}'):
             continue
@@ -209,9 +242,9 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         if stage == 2:
             check_fixtures(current, out / f'stage{stage}-fixtures', env)
     if phase in ('all', 'convergence'):
-        if stage2.read_bytes() != stage3.read_bytes():
-            raise RuntimeError('Windows full compiler stages 2 and 3 diverged')
-        (out / 'convergence.sha256').write_text(''.join(f'{digest(p)}  {p.name}\n' for p in (stage2, stage3)), encoding='ascii')
+        audit_pe(stage2)
+        audit_pe(stage3)
+        check_convergence(stage2, stage3, out)
         print('WINDOWS_FULL_BOOTSTRAP_CONVERGENCE=PASS', flush=True)
     if phase in ('all', 'test'):
         check_fixtures(stage3, out / 'stage3-fixtures', env)
