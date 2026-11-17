@@ -194,7 +194,9 @@ def check_uninstaller(prefix, platform, sdk=False):
             # Exercise the same Windows PowerShell as the launcher, with the
             # hash cmdlet deliberately unusable even if installed on this host.
             root, managed, changed, unrelated = fixture('no hash cmdlet')
-            powershell = Path(env['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+            # Windows os.environ normalizes keys to uppercase; its plain dict
+            # copy no longer supports case-insensitive lookups.
+            powershell = Path(env['SYSTEMROOT']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
             result = subprocess.run(
                 [str(powershell), '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
                  "function Get-FileHash { throw 'Get-FileHash must not be called' }; "
