@@ -128,7 +128,9 @@ def check_uninstaller(prefix, platform, sdk=False):
                 shutil.copy2(prefix / display_helper(platform), root / display_helper(platform))
                 shutil.copy2(prefix / 'vdk-release.json', root / 'vdk-release.json')
             managed = root / 'share/vpp/gói/tiếng Việt.vi'
-            managed.write_text('managed', encoding='utf-8')
+            managed.write_text('hàm chính() { in "chào 🌿"; }\n', encoding='utf-8')
+            (root / 'share/vpp/gói/binary.dat').write_bytes(bytes(range(256)) * 4096)
+            (root / 'share/vpp/gói/empty.dat').write_bytes(b'')
             changed = root / 'share/changed.txt'
             changed.write_text('original', encoding='utf-8')
             install_uninstaller(root, platform)
@@ -145,16 +147,36 @@ def check_uninstaller(prefix, platform, sdk=False):
             if (result.returncode == 0) != ok:
                 raise RuntimeError(f'Uninstall {args}: exit {result.returncode}\n{result.stdout!r}\n{result.stderr!r}')
 
+        def check_removed(root, managed, changed, unrelated):
+            assert not managed.exists() and not (root / 'bin' / helper).exists()
+            assert not (managed.parent / 'binary.dat').exists()
+            assert not (managed.parent / 'empty.dat').exists()
+            assert not (root / layout(platform)['vpp']).exists()
+            assert not (root / 'vpp-install-manifest.tsv').exists()
+            assert changed.read_text(encoding='utf-8') == 'user edit'
+            assert unrelated.read_text(encoding='utf-8') == 'project'
+
         for i, args in enumerate((['uninstall'], ['gỡ cài đặt'], ['gỡ-cài-đặt'], ['gỡ', 'cài', 'đặt'], ['gỡ', 'cài đặt'])):
             root, managed, changed, unrelated = fixture(f'alias {i}')
             run(root, [*args, '--invalid'], False)
             assert managed.is_file()
             run(root, args, True)
-            assert not managed.exists() and not (root / 'bin' / helper).exists()
-            assert not (root / layout(platform)['vpp']).exists()
-            assert not (root / 'vpp-install-manifest.tsv').exists()
-            assert changed.read_text(encoding='utf-8') == 'user edit'
-            assert unrelated.read_text(encoding='utf-8') == 'project'
+            check_removed(root, managed, changed, unrelated)
+
+        if windows:
+            # Exercise the same Windows PowerShell as the launcher, with the
+            # hash cmdlet deliberately unusable even if installed on this host.
+            root, managed, changed, unrelated = fixture('no hash cmdlet')
+            powershell = Path(env['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+            result = subprocess.run(
+                [str(powershell), '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+                 "function Get-FileHash { throw 'Get-FileHash must not be called' }; "
+                 "& (Join-Path $env:VPP_UNINSTALL_TEST_ROOT 'bin/uninstall-native.ps1') "
+                 "-Root $env:VPP_UNINSTALL_TEST_ROOT"],
+                cwd=work, env=dict(env, VPP_UNINSTALL_TEST_ROOT=str(root)), capture_output=True, timeout=120)
+            if result.returncode != 0:
+                raise RuntimeError(f'Uninstall without Get-FileHash: exit {result.returncode}\n{result.stdout!r}\n{result.stderr!r}')
+            check_removed(root, managed, changed, unrelated)
 
         for i, invalid in enumerate(('missing', 'traversal', 'duplicate', 'malformed', 'empty')):
             root, managed, _, _ = fixture(f'invalid {i}')
