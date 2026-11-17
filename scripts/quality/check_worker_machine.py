@@ -71,7 +71,8 @@ def check_windows_boundaries(clang, directory):
         assert all(4 <= t <= 9 for t in types), (name, types)
     assert {name for name in imports if not name.startswith('vpp_fn_')} <= legacy_imports
     assert 'vpp_fn_vm_worker_entry' not in imports
-    required = {'TlsAlloc', 'TlsGetValue', 'TlsSetValue', '_beginthreadex', 'WaitForSingleObject'}
+    required = {'TlsAlloc', 'TlsGetValue', 'TlsSetValue', '_beginthreadex', 'WaitForSingleObject',
+                'SetFileInformationByHandle'}
     for name, defines in [('native', []), ('raw', ['-DVPP_WINDOWS_RAW_BOUNDARY=1']),
                           ('vm', ['-DVPP_STANDALONE_VM_WORKER=1'])]:
         sections, imports = assemble(name, 'vpp_windows_full_runtime_x86_64.S', *defines)

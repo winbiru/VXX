@@ -2,8 +2,10 @@
 """Exercise native package commands without network or a real user project."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 
@@ -84,6 +86,12 @@ def check(tools, compiler):
                                            stderr=subprocess.STDOUT, timeout=30).decode().strip()
 
         git("init", "-b", "main")
+        # Git may run automatic maintenance in the background after a commit.
+        # Its transient objects/maintenance.lock is not part of the package
+        # manager's changes and can disappear while we inspect the source.
+        # Keep this fixture stable without weakening the object integrity check.
+        git("config", "maintenance.auto", "false")
+        git("config", "gc.auto", "0")
         git("config", "user.name", "VPP Regression")
         git("config", "user.email", "vpp-regression@example.invalid")
         write(repository / "vpp.json", dict(schema=1, name="gitlib", version="1.0.0", dependencies=[]))
@@ -97,10 +105,29 @@ def check(tools, compiler):
         revision = git("rev-parse", "HEAD")
         expected = module.read_bytes()
         git("checkout", "main")
+
+        def source_objects():
+            objects = [p for p in (repository / ".git/objects").rglob("*") if p.is_file()]
+            assert objects
+            if os.name == "nt":
+                for p in objects:
+                    p.chmod(stat.S_IREAD)
+            return {p: (p.read_bytes(), p.stat().st_mode,
+                        getattr(p.stat(), "st_file_attributes", None)) for p in objects}
+
+        def assert_clean(snapshot):
+            assert not list((gitproject / ".vpp").glob("stage-*"))
+            for p, (contents, mode, attributes) in snapshot.items():
+                assert p.read_bytes() == contents, p
+                assert p.stat().st_mode == mode, p
+                assert getattr(p.stat(), "st_file_attributes", None) == attributes, p
+
+        snapshot = source_objects()
         gitproject = root / "gitproject"
         gitproject.mkdir()
         run(gitproject, "khởi tạo", "gitproject")
         run(gitproject, "gói", "cài đặt", f"git+{repository}#stable")
+        assert_clean(snapshot)
         entry, = json.loads((gitproject / "vpp.lock").read_bytes())["packages"]
         assert entry["revision"] == revision, entry
         installed = gitproject / entry["resolved"]
@@ -108,13 +135,46 @@ def check(tools, compiler):
         git("checkout", "stable")
         module.write_text("hàm công khai giá trị() { trả về 3; };\n", encoding="utf-8")
         git("commit", "-am", "advance stable")
+        snapshot = source_objects()
         shutil.rmtree(installed)
         shutil.rmtree(gitproject / ".vpp/cache")
         run(gitproject, "gói", "phục hồi", "--offline", ok=False)
+        assert_clean(snapshot)
         run(gitproject, "gói", "phục hồi")
+        assert_clean(snapshot)
         assert (installed / "chính.vi").read_bytes() == expected
         run(gitproject, "gói", "cập nhật")
+        assert_clean(snapshot)
         assert (installed / "chính.vi").read_bytes() == module.read_bytes()
+
+        if os.name == "nt":
+            # Exercise the production AOT directory API with read-only files,
+            # including a hardlink to an external file whose attributes must
+            # survive removal of the link inside the temporary tree.
+            from check_windows_full_bootstrap import package_env
+            tree = root / "dọn cây"
+            tree.mkdir()
+            sentinel = root / "sentinel.txt"
+            sentinel.write_bytes(b"preserved")
+            os.link(sentinel, tree / "liên kết.txt")
+            sentinel.chmod(stat.S_IREAD)
+            readonly = tree / "chỉ đọc.txt"
+            readonly.write_bytes(b"remove me")
+            readonly.chmod(stat.S_IREAD)
+            attributes = sentinel.stat().st_file_attributes
+            assert attributes & stat.FILE_ATTRIBUTE_READONLY
+            source = root / "cleanup.vi"
+            source.write_text('nhập nhập xuất;\nhàm chính() { in xóa đường dẫn("dọn cây"); in xóa đường dẫn("dọn cây"); };\n', encoding="utf-8")
+            binary = root / "cleanup.exe"
+            clang = Path(os.environ.get("VPP_CI_CLANG") or shutil.which("clang") or "clang.exe")
+            env = package_env(compiler.parent.parent, clang)
+            subprocess.run([str(compiler), "build", str(source), "-o", str(binary)],
+                           cwd=root, env=env, check=True, timeout=240)
+            result = subprocess.run([str(binary)], cwd=root, capture_output=True, timeout=30)
+            assert result.returncode == 0 and result.stdout.splitlines() == [b"3", b"0"], result
+            assert not tree.exists()
+            assert sentinel.read_bytes() == b"preserved"
+            assert sentinel.stat().st_file_attributes == attributes
     print("NATIVE_PACKAGE_MANAGER=PASS")
 
 

@@ -1,6 +1,20 @@
 param([Parameter(Mandatory=$true)][string]$Root)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+function Get-VppSha256([string]$Path) {
+    # Windows PowerShell may run without the Get-FileHash cmdlet available.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '')
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha.Dispose()
+    }
+}
 $Root = (Get-Item -LiteralPath $Root).FullName.TrimEnd([char[]]'\/')
 $Manifest = Join-Path $Root 'vpp-install-manifest.tsv'
 if (-not (Test-Path -LiteralPath $Manifest -PathType Leaf) -or ((Get-Item -LiteralPath $Manifest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Missing V++ installation manifest' }
@@ -22,7 +36,7 @@ foreach ($line in [IO.File]::ReadAllLines($Manifest, [Text.Encoding]::UTF8)) {
 if (-not $Entries.Count) { throw 'Empty V++ installation manifest' }
 foreach ($entry in $Entries) {
     if (-not (Test-Path -LiteralPath $entry.Path)) { continue }
-    if (-not (Test-Path -LiteralPath $entry.Path -PathType Leaf) -or (Get-FileHash -LiteralPath $entry.Path -Algorithm SHA256).Hash -ine $entry.Hash) {
+    if (-not (Test-Path -LiteralPath $entry.Path -PathType Leaf) -or (Get-VppSha256 $entry.Path) -ine $entry.Hash) {
         Write-Output "Keep modified file: $($entry.Path)"; continue
     }
     Remove-Item -LiteralPath $entry.Path -Force

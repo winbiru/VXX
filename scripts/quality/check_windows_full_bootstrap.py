@@ -136,7 +136,9 @@ def command(args, env, log, timeout=2400, status=0, expected=None, cwd=ROOT):
                            log.read_bytes()[-4000:].decode('utf-8', 'replace') + '\n' +
                            log.with_suffix('.stderr.log').read_bytes()[-4000:].decode('utf-8', 'replace'))
     if expected is not None and log.read_bytes().replace(b'\r\n', b'\n') != expected.replace(b'\r\n', b'\n'):
-        raise RuntimeError(f'{log}: output mismatch')
+        raise RuntimeError(f'{log}: output mismatch\n'
+                           f'expected={expected!r}\nstdout={log.read_bytes()[-4000:]!r}\n'
+                           f'stderr={log.with_suffix(".stderr.log").read_bytes()[-4000:]!r}')
 
 
 def assemble(clang, source, output, env, log, *defines):
@@ -317,6 +319,30 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
                        VPP_AOT_ASSEMBLER='assembler-must-not-run.exe')
         command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', jit_probe],
                 jit_env, out / 'package-jit-launcher.log', expected=b'42\n', cwd=smoke)
+        # Vietnamese aliases go through vpp-tools, which must relay CRLF without
+        # doubling CR. Exercise CRLF and UTF-8 across 128-byte boundaries.
+        relay_probe = smoke / 'thử chuyển tiếp.vi'
+        relay_lines = ['a' * 127, 'b' * 127 + '🌿', 'c' * 128, 'd' * 129, 'Tiếng Việt']
+        relay_probe.write_text('hàm chính() { ' + ''.join(f'in "{line}"; ' for line in relay_lines) + '};\n', encoding='utf-8')
+        relay_expected = ('\n'.join(relay_lines) + '\n').encode('utf-8')
+        command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', '--dynamic', relay_probe],
+                jit_env, out / 'package-jit-launcher-dynamic.log', expected=relay_expected, cwd=smoke)
+        for name, alias in [('quoted', ['chạy tức thời']), ('hyphen', ['chạy-tức-thời']),
+                            ('split', ['chạy', 'tức', 'thời']), ('mixed', ['chạy', 'tức thời'])]:
+            command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', *alias, '--dynamic', relay_probe],
+                    jit_env, out / f'package-jit-launcher-{name}.log', expected=relay_expected, cwd=smoke)
+        command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', '--help'],
+                jit_env, out / 'package-jit-launcher-help.log', cwd=smoke)
+        command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', smoke / 'missing.vi'],
+                jit_env, out / 'package-jit-launcher-missing.log', status=1, cwd=smoke)
+        # The fast path must still reject a project with an invalid lock.
+        lock = smoke / 'vpp.lock'
+        lock.write_text('invalid lock\n', encoding='utf-8')
+        try:
+            command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', jit_probe],
+                    jit_env, out / 'package-jit-launcher-invalid-lock.log', status=1, cwd=smoke)
+        finally:
+            lock.unlink()
         command([compiler, 'vm-build', probe, '-o', bytecode], env, out / 'package-bytecode.log', cwd=smoke)
         command([extracted / 'bin/vpp-vm.exe', bytecode], run_env, out / 'package-vm.log',
                 expected=b'42\n', cwd=smoke)

@@ -107,6 +107,57 @@ vpp_native_os_unlink:
     je Lxoa_tep_chuyen_loi
     leaq 64(%rsp), %rcx
     call _wunlink
+#ifndef VPP_WINDOWS_I32_BOOTSTRAP
+    testl %eax, %eax
+    jz Lxoa_tep_xong
+    call _errno
+    cmpl $13, (%rax)          // EACCES: UCRT rejects read-only files
+    jne Lxoa_tep_that_bai
+    // Open the entry itself, never its reparse target. Delete by handle
+    // without clearing READONLY (which could affect other hardlinks).
+    leaq 64(%rsp), %rcx
+    movl $0x10080, %edx       // DELETE | FILE_READ_ATTRIBUTES
+    movl $7, %r8d             // FILE_SHARE_READ | WRITE | DELETE
+    xorl %r9d, %r9d
+    movl $3, 32(%rsp)         // OPEN_EXISTING
+    movl $0x00200000, 40(%rsp) // FILE_FLAG_OPEN_REPARSE_POINT
+    movq $0, 48(%rsp)
+    call CreateFileW
+    cmpq $-1, %rax
+    je Lxoa_tep_loi_quyen
+    movq %rax, -32(%rbp)
+    movl $0, -36(%rbp)
+    movq %rax, %rcx
+    leaq -88(%rbp), %rdx      // BY_HANDLE_FILE_INFORMATION (52 bytes)
+    call GetFileInformationByHandle
+    testl %eax, %eax
+    jz Lxoa_tep_dong
+    movl -88(%rbp), %eax
+    testl $0x410, %eax        // DIRECTORY | REPARSE_POINT
+    jnz Lxoa_tep_dong
+    testl $1, %eax            // FILE_ATTRIBUTE_READONLY
+    jz Lxoa_tep_dong
+    movl $0x13, -40(%rbp)     // DELETE | POSIX_SEMANTICS | IGNORE_READONLY_ATTRIBUTE
+    movq -32(%rbp), %rcx
+    movl $21, %edx            // FileDispositionInfoEx
+    leaq -40(%rbp), %r8
+    movl $4, %r9d
+    call SetFileInformationByHandle
+    movl %eax, -36(%rbp)
+Lxoa_tep_dong:
+    movq -32(%rbp), %rcx
+    call CloseHandle
+    cmpl $0, -36(%rbp)
+    je Lxoa_tep_loi_quyen
+    xorl %eax, %eax
+    jmp Lxoa_tep_xong
+Lxoa_tep_loi_quyen:
+    call _errno
+    movl $13, (%rax)          // Preserve the original UCRT failure
+Lxoa_tep_that_bai:
+    movl $-1, %eax
+Lxoa_tep_xong:
+#endif
     addq $8256, %rsp
     TRA_BO_NHO
 Lxoa_tep_chuyen_loi:

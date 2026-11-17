@@ -72,11 +72,10 @@ del "%VDK_TEMP%"
 exit /b %errorlevel%
 :uninstall
 if not exist "%VDK_HOME%/bin/uninstall-native.ps1" goto failed
-(
-  del "%VDK_TEMP%"
-  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%VDK_HOME%/bin/uninstall-native.ps1" -Root "%VDK_HOME%"
-  if errorlevel 1 (exit /b 1) else (exit /b 0)
-)
+del "%VDK_TEMP%"
+rem Expand the SDK path before leaving the batch context, then run the
+rem uninstaller synchronously in the caller's context.
+(goto) 2>nul & "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%VDK_HOME%/bin/uninstall-native.ps1" -Root "%VDK_HOME%"
 :failed
 type "%VDK_TEMP%" 1>&2
 del "%VDK_TEMP%"

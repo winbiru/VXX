@@ -42,7 +42,9 @@ def check(tools, compiler, root):
         workspace = Path(work) / 'dự án 🌿'
         workspace.mkdir()
         catalog = workspace / 'vpp-libraries.json'
-        entry = dict(id='vi.test', displayName='Thử nghiệm', version='1.0', stability='stable',
+        # Force a response through multiple 128-byte output chunks, including
+        # a UTF-8 sequence split across a chunk boundary.
+        entry = dict(id='vi.test', displayName='Thử nghiệm ' + '🌿a' * 130, version='1.0', stability='stable',
                      kind='library', sourceRoot='gói/thử nghiệm', entry='chính.vi')
         raw = json.dumps(dict(schema=1, sdkVersion='test', moduleGroups=[{'libraries':['vi.test']}], libraries=[entry]), ensure_ascii=False).encode('utf-8')
         catalog.write_bytes(raw)
@@ -53,6 +55,28 @@ def check(tools, compiler, root):
                          packet('shutdown', 3), packet('exit')))
         result = subprocess.run([str(tools), str(compiler), '--lsp'], input=wire, capture_output=True, env=env, timeout=120)
         assert result.returncode == 0, result.stderr.decode('utf-8', errors='replace')
+        assert not result.stderr, result.stderr
+        # CMake covers file redirection. Also exercise the packaged Windows
+        # launcher with a pipe, as used by editor language clients.
+        if os.name == 'nt':
+            launcher = tools.with_name('vpp.cmd')
+            assert launcher.is_file(), launcher
+            for alias in ('--lsp', 'lsp'):
+                launched = subprocess.run([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', alias],
+                                          cwd=launcher.parent, input=wire, capture_output=True,
+                                          env=env, timeout=120)
+                assert launched.returncode == 0, (alias, launched.returncode, launched.stderr)
+                assert not launched.stderr, (alias, launched.stderr)
+                assert launched.stdout == result.stdout, (alias, launched.stdout, result.stdout)
+            print('Native LSP Windows launcher: pipe, both aliases and raw response parity PASS')
+        # An absent or truncated stream must not fail with an empty diagnostic.
+        for incomplete, diagnostic in ((b'', 'LSP: đầu vào đã kết thúc'),
+                                       (b'Content-Length: 10\r\n', 'Tiêu đề LSP bị cắt'),
+                                       (b'Content-Length: 10\r\n\r\n{}', 'Gói LSP bị cắt')):
+            broken = subprocess.run([str(tools), str(compiler), '--lsp'], input=incomplete,
+                                    capture_output=True, env=env, timeout=120)
+            assert broken.returncode == 1 and not broken.stdout, broken
+            assert diagnostic.encode('utf-8') in broken.stderr, broken.stderr
         messages = decode(result.stdout)
         assert len(messages) == 4, messages
         assert messages[0]['result']['capabilities']['documentFormattingProvider'] is True, messages[0]

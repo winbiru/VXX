@@ -128,7 +128,9 @@ def check_uninstaller(prefix, platform, sdk=False):
                 shutil.copy2(prefix / display_helper(platform), root / display_helper(platform))
                 shutil.copy2(prefix / 'vdk-release.json', root / 'vdk-release.json')
             managed = root / 'share/vpp/gói/tiếng Việt.vi'
-            managed.write_text('managed', encoding='utf-8')
+            managed.write_text('hàm chính() { in "chào 🌿"; }\n', encoding='utf-8')
+            (root / 'share/vpp/gói/binary.dat').write_bytes(bytes(range(256)) * 4096)
+            (root / 'share/vpp/gói/empty.dat').write_bytes(b'')
             changed = root / 'share/changed.txt'
             changed.write_text('original', encoding='utf-8')
             install_uninstaller(root, platform)
@@ -137,24 +139,73 @@ def check_uninstaller(prefix, platform, sdk=False):
             unrelated.write_text('project', encoding='utf-8')
             return root, managed, changed, unrelated
 
-        def run(root, args, ok):
+        def run(root, args, ok, via_call=False):
             executable = root / layout(platform)['vdk' if sdk else 'vpp']
             local_env = dict(env, PATH=str(root / 'bin') + os.pathsep + env['PATH'])
-            command = [env['COMSPEC'], '/d', '/c', executable.name] if windows else [str(executable)]
+            entry = executable.name
+            if via_call:
+                assert windows
+                caller = work / 'uninstall-caller.cmd'
+                caller.write_text('@echo off\nsetlocal DisableDelayedExpansion\n'
+                                  f'call {entry} %*\n'
+                                  'set "VPP_TEST_RESULT=%errorlevel%"\n'
+                                  'echo VPP_UNINSTALL_CALLER_CONTINUED\n'
+                                  'exit /b %VPP_TEST_RESULT%\n', encoding='ascii', newline='\r\n')
+                entry = caller.name
+            command = [env['COMSPEC'], '/d', '/c', entry] if windows else [str(executable)]
             result = subprocess.run([*command, *args], cwd=work, env=local_env, capture_output=True, timeout=120)
             if (result.returncode == 0) != ok:
                 raise RuntimeError(f'Uninstall {args}: exit {result.returncode}\n{result.stdout!r}\n{result.stderr!r}')
+            if via_call and b'VPP_UNINSTALL_CALLER_CONTINUED' not in result.stdout:
+                raise RuntimeError(f'Uninstall did not return to caller: {result.stdout!r}\n{result.stderr!r}')
+            if windows and ok and result.stderr:
+                raise RuntimeError(f'Unexpected uninstall stderr: {result.stderr!r}')
+
+        def check_removed(root, managed, changed, unrelated):
+            assert not managed.exists() and not (root / 'bin' / helper).exists()
+            assert not (managed.parent / 'binary.dat').exists()
+            assert not (managed.parent / 'empty.dat').exists()
+            assert not (root / layout(platform)['vpp']).exists()
+            if sdk:
+                assert not (root / layout(platform)['vdk']).exists()
+                assert not (root / layout(platform)['vdkInfo']).exists()
+            assert not (root / 'vpp-install-manifest.tsv').exists()
+            assert changed.read_text(encoding='utf-8') == 'user edit'
+            assert unrelated.read_text(encoding='utf-8') == 'project'
 
         for i, args in enumerate((['uninstall'], ['gỡ cài đặt'], ['gỡ-cài-đặt'], ['gỡ', 'cài', 'đặt'], ['gỡ', 'cài đặt'])):
             root, managed, changed, unrelated = fixture(f'alias {i}')
             run(root, [*args, '--invalid'], False)
             assert managed.is_file()
             run(root, args, True)
-            assert not managed.exists() and not (root / 'bin' / helper).exists()
-            assert not (root / layout(platform)['vpp']).exists()
-            assert not (root / 'vpp-install-manifest.tsv').exists()
-            assert changed.read_text(encoding='utf-8') == 'user edit'
-            assert unrelated.read_text(encoding='utf-8') == 'project'
+            check_removed(root, managed, changed, unrelated)
+
+        if windows:
+            # An interactive shell or calling batch file must survive uninstall,
+            # including its success/failure status after the launcher is deleted.
+            root, managed, changed, unrelated = fixture('called launcher')
+            run(root, ['uninstall'], True, via_call=True)
+            check_removed(root, managed, changed, unrelated)
+            root, managed, _, _ = fixture('called invalid manifest')
+            (root / 'vpp-install-manifest.tsv').unlink()
+            run(root, ['uninstall'], False, via_call=True)
+            assert managed.is_file()
+
+            # Exercise the same Windows PowerShell as the launcher, with the
+            # hash cmdlet deliberately unusable even if installed on this host.
+            root, managed, changed, unrelated = fixture('no hash cmdlet')
+            # Windows os.environ normalizes keys to uppercase; its plain dict
+            # copy no longer supports case-insensitive lookups.
+            powershell = Path(env['SYSTEMROOT']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+            result = subprocess.run(
+                [str(powershell), '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+                 "function Get-FileHash { throw 'Get-FileHash must not be called' }; "
+                 "& (Join-Path $env:VPP_UNINSTALL_TEST_ROOT 'bin/uninstall-native.ps1') "
+                 "-Root $env:VPP_UNINSTALL_TEST_ROOT"],
+                cwd=work, env=dict(env, VPP_UNINSTALL_TEST_ROOT=str(root)), capture_output=True, timeout=120)
+            if result.returncode != 0:
+                raise RuntimeError(f'Uninstall without Get-FileHash: exit {result.returncode}\n{result.stdout!r}\n{result.stderr!r}')
+            check_removed(root, managed, changed, unrelated)
 
         for i, invalid in enumerate(('missing', 'traversal', 'duplicate', 'malformed', 'empty')):
             root, managed, _, _ = fixture(f'invalid {i}')

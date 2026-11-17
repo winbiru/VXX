@@ -37,6 +37,13 @@ hàm riêng tư cli đối số(i) {
     trả về chuỗi từ byte máy ảo(các byte);
 };
 hàm riêng tư cli xuất(kênh, văn bản) {
+    // _write trên Windows tự chuyển LF thành CRLF. Chuẩn hóa cả văn bản
+    // trước khi chia khối để không tạo CRCRLF ở ranh giới 128 byte.
+    nếu (ten nền tảng máy ảo() == "windows") {
+        cli ghi văn bản(kênh, máy ảo thay chuỗi chính xác(văn bản, "\r\n", "\n"));
+    } hoặc { cli ghi văn bản(kênh, văn bản); };
+};
+hàm riêng tư cli ghi văn bản(kênh, văn bản) {
     vị trí = 0;
     khi (đúng) {
         bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 128));
@@ -248,6 +255,15 @@ hàm riêng tư cli kiểm thử(compiler, args) {
     nếu (đạt != máy ảo lấy độ dài(tệp)) { trả về 1; };
     trả về 0;
 };
+// Formatter sinh LF; stdout của compiler Windows đi qua _write ở chế độ
+// văn bản. Đảo đúng một lần CRLF -> LF trước khi dùng kết quả làm mã nguồn
+// hoặc giá trị JSON. Không đổi các chuỗi escape hay đầu ra tiến trình khác.
+hàm riêng tư cli kết quả định dạng(văn bản) {
+    nếu (ten nền tảng máy ảo() == "windows") {
+        trả về máy ảo thay chuỗi chính xác(văn bản, "\r\n", "\n");
+    };
+    trả về văn bản;
+};
 hàm riêng tư cli định dạng(compiler, args, lệnh) {
     tệp = [];
     chế độ = "";
@@ -266,9 +282,9 @@ hàm riêng tư cli định dạng(compiler, args, lệnh) {
         nếu (r["mã thoát"] != 0) { cli xuất(2, tệp[i] + ": "); };
         cli xuất(2, r["lỗi"]);
         nếu (r["mã thoát"] != 0) { cli xuất(1, r["đầu ra"]); mã = 1; }
-        hoặc nếu (lệnh == "format" && chế độ == "write") { ghi tệp(tệp[i], r["đầu ra"]); }
+        hoặc nếu (lệnh == "format" && chế độ == "write") { ghi tệp(tệp[i], cli kết quả định dạng(r["đầu ra"])); }
         hoặc nếu (lệnh == "format" && chế độ == "check") {
-            nếu (đọc tệp(tệp[i]) != r["đầu ra"]) { in "Cần định dạng: " + tệp[i]; mã = 1; };
+            nếu (đọc tệp(tệp[i]) != cli kết quả định dạng(r["đầu ra"])) { in "Cần định dạng: " + tệp[i]; mã = 1; };
         } hoặc { cli xuất(1, r["đầu ra"]); };
     };
     trả về mã;
@@ -488,7 +504,7 @@ hàm riêng tư cli gói nguồn(mục, gốc, kho, tạm, chính xác = "") {
         nếu (bắt đầu bằng(vị trí, "-")) { ném "Địa chỉ Git không hợp lệ"; };
         nếu (đường dẫn tồn tại(cli gói đường(gốc, vị trí))) { vị trí = cli gói đường(gốc, vị trí); };
         nguồn = đường dẫn nối(tạm, "git-" + tên);
-        cli gói git(["-c", "protocol.ext.allow=never", "clone", "--no-checkout", "--", vị trí, nguồn]);
+        cli gói git(["-c", "protocol.ext.allow=never", "clone", "--no-hardlinks", "--no-checkout", "--", vị trí, nguồn]);
         ref = lấy từ điển(mục, "ref", "HEAD");
         nếu (chính xác != "") { ref = chính xác; };
         revision = cli gói git revision(nguồn, ref);
@@ -715,7 +731,8 @@ hàm riêng tư cli gói đồng bộ(bản, chế độ, offline, ghi bản) {
         } hoặc { cli gói công bố(gốc, tạm, bản, mục, cũ, ghi bản); };
     } bắt lỗi(e) {
         nếu (là thư mục(đường dẫn nối(tạm, "backup"))) { ném thành chuỗi(e) + "; staging được giữ tại " + tạm; };
-        xóa đường dẫn(tạm); ném e;
+        thử { xóa đường dẫn(tạm); } bắt lỗi(dọn) { ném thành chuỗi(e) + "; dọn staging thất bại: " + thành chuỗi(dọn); };
+        ném e;
     };
     xóa đường dẫn(tạm);
     in "Đã đồng bộ " + thành chuỗi(máy ảo lấy độ dài(mục)) + " gói";
@@ -928,10 +945,15 @@ hàm riêng tư cli thống kê(args) {
 // không ghi lại tài liệu chưa lưu và không chạy mã của người dùng.
 hàm riêng tư cli lsp đọc() {
     dài = -1;
+    có tiêu đề = sai;
     khi (đúng) {
         dòng = cli đọc dòng();
-        nếu (dòng == rỗng) { trả về rỗng; };
+        nếu (dòng == rỗng) {
+            nếu (có tiêu đề) { ném "Tiêu đề LSP bị cắt"; };
+            trả về rỗng;
+        };
         nếu (dòng == "") { thoát; };
+        có tiêu đề = đúng;
         nếu (bắt đầu bằng(chuỗi thường(dòng), "content-length:")) {
             nếu (dài != -1) { ném "Content-Length trùng"; };
             dài = thành số nguyên(bỏ khoảng trắng(cắt chuỗi(dòng, 15, máy ảo lấy độ dài(dòng) - 15)));
@@ -1215,7 +1237,7 @@ hàm riêng tư cli lsp(compiler) {
     thử {
         khi (đúng) {
             bản = cli lsp đọc();
-            nếu (bản == rỗng) { thoát; };
+            nếu (bản == rỗng) { ném "LSP: đầu vào đã kết thúc trước thông báo exit"; };
             lệnh = lấy từ điển(bản, "method", "");
             id = lấy từ điển(bản, "id", rỗng);
             tham số = lấy từ điển(bản, "params", {});
@@ -1281,7 +1303,7 @@ hàm riêng tư cli lsp(compiler) {
                 nếu (r["mã thoát"] != 0) { cli lsp lỗi(id, -32603, r["lỗi"]); }
                 hoặc {
                     z = cli lsp vị trí(nguồn, 2147483647, 2147483647);
-                    cli lsp kết quả(id, [{"range": {"start": {"line": 0, "character": 0}, "end": z}, "newText": r["đầu ra"]}]);
+                    cli lsp kết quả(id, [{"range": {"start": {"line": 0, "character": 0}, "end": z}, "newText": cli kết quả định dạng(r["đầu ra"])}]);
                 };
             } hoặc nếu (máy ảo có khóa từ điển(bản, "id")) {
                 cli lsp lỗi(id, -32601, "Phương thức chưa hỗ trợ");
@@ -1375,7 +1397,7 @@ hàm chính() {
         nếu (lệnh == "jit") {
             nếu (máy ảo lấy độ dài(args) > 0) {
                 i = 0;
-                nếu (args[0] == "--dynamic" || args[0] == "--check-dynamic") { i = 1; };
+                nếu (args[0] == "--dynamic" || args[0] == "--check-dynamic" || args[0] == "--raw-program" || args[0] == "--vm-image") { i = 1; };
                 nếu (i < máy ảo lấy độ dài(args)) { nếu (là tệp(args[i])) { cli gói kiểm nguồn(args[i]); }; };
             };
             trình = đường dẫn nối(đường dẫn cha(compiler), "vpp-jit");
@@ -1430,7 +1452,7 @@ hàm chính() {
             trả về cli thống kê(args);
         };
         nếu (lệnh == "targets" || lệnh == "--list-targets" || lệnh == "đích") { trả về cli đích(args); };
-        nếu (lệnh == "--kiểm-khóa-nguồn") {
+        nếu (lệnh == "--kiểm-khóa-nguồn" || lệnh == "--check-source-lock") {
             nếu (máy ảo lấy độ dài(args) != 1) { ném "Cần tệp nguồn"; };
             trả về cli gói kiểm nguồn(args[0]);
         };
