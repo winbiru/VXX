@@ -37,30 +37,26 @@ hàm riêng tư cli đối số(i) {
     trả về chuỗi từ byte máy ảo(các byte);
 };
 hàm riêng tư cli xuất(kênh, văn bản) {
+    // _write trên Windows tự chuyển LF thành CRLF. Chuẩn hóa cả văn bản
+    // trước khi chia khối để không tạo CRCRLF ở ranh giới 128 byte.
+    nếu (ten nền tảng máy ảo() == "windows") {
+        cli ghi văn bản(kênh, máy ảo thay chuỗi chính xác(văn bản, "\r\n", "\n"));
+    } hoặc { cli ghi văn bản(kênh, văn bản); };
+};
+hàm riêng tư cli ghi văn bản(kênh, văn bản) {
     vị trí = 0;
-    windows = ten nền tảng máy ảo() == "windows";
     khi (đúng) {
-        // _write trên Windows chuyển LF thành CRLF. Bỏ CR có sẵn trước LF
-        // để chuyển tiếp đúng dòng từ tiến trình con và khung LSP.
-        // Đọc trước một byte để xử lý cả cặp CRLF nằm giữa hai khối.
-        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 129));
+        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 128));
         n = máy ảo lấy độ dài(bytes);
         nếu (n == 0) { thoát; };
-        giới hạn = n; nếu (giới hạn > 128) { giới hạn = 128; };
-        số ghi = 0;
-        lặp(i = 0; i < giới hạn; i++) {
-            nếu (!(windows && bytes[i] == 13 && i + 1 < n && bytes[i + 1] == 10)) {
-                nếu (máy ghi byte(3376 + số ghi, bytes[i]) != 0) { ném "Không thể ghi đầu ra"; };
-                số ghi += 1;
-            };
-        };
+        lặp(i = 0; i < n; i++) { nếu (máy ghi byte(3376 + i, bytes[i]) != 0) { ném "Không thể ghi đầu ra"; }; };
         đã ghi = 0;
-        khi (đã ghi < số ghi) {
-            got = máy ghi(kênh, 3376 + đã ghi, số ghi - đã ghi);
+        khi (đã ghi < n) {
+            got = máy ghi(kênh, 3376 + đã ghi, n - đã ghi);
             nếu (got <= 0) { ném "Không thể ghi đầu ra"; };
             đã ghi += got;
         };
-        vị trí += giới hạn;
+        vị trí += n;
     };
 };
 hàm riêng tư cli đuôi(args, bắt đầu) {

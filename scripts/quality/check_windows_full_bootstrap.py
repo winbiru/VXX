@@ -320,11 +320,11 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
         command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', jit_probe],
                 jit_env, out / 'package-jit-launcher.log', expected=b'42\n', cwd=smoke)
         # Vietnamese aliases go through vpp-tools, which must relay CRLF without
-        # doubling CR. Exercise a pair straddling its 128-byte write buffer.
+        # doubling CR. Exercise CRLF and UTF-8 across 128-byte boundaries.
         relay_probe = smoke / 'thử chuyển tiếp.vi'
-        relay_text = 'a' * 127
-        relay_probe.write_text(f'hàm chính() {{ in "{relay_text}"; in "Tiếng Việt"; }};\n', encoding='utf-8')
-        relay_expected = (relay_text + '\nTiếng Việt\n').encode('utf-8')
+        relay_lines = ['a' * 127, 'b' * 127 + '🌿', 'c' * 128, 'd' * 129, 'Tiếng Việt']
+        relay_probe.write_text('hàm chính() { ' + ''.join(f'in "{line}"; ' for line in relay_lines) + '};\n', encoding='utf-8')
+        relay_expected = ('\n'.join(relay_lines) + '\n').encode('utf-8')
         command([os.environ['COMSPEC'], '/d', '/c', 'vpp.cmd', 'jit', '--dynamic', relay_probe],
                 jit_env, out / 'package-jit-launcher-dynamic.log', expected=relay_expected, cwd=smoke)
         for name, alias in [('quoted', ['chạy tức thời']), ('hyphen', ['chạy-tức-thời']),

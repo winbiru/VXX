@@ -42,7 +42,9 @@ def check(tools, compiler, root):
         workspace = Path(work) / 'dự án 🌿'
         workspace.mkdir()
         catalog = workspace / 'vpp-libraries.json'
-        entry = dict(id='vi.test', displayName='Thử nghiệm', version='1.0', stability='stable',
+        # Force a response through multiple 128-byte output chunks, including
+        # a UTF-8 sequence split across a chunk boundary.
+        entry = dict(id='vi.test', displayName='Thử nghiệm ' + '🌿a' * 130, version='1.0', stability='stable',
                      kind='library', sourceRoot='gói/thử nghiệm', entry='chính.vi')
         raw = json.dumps(dict(schema=1, sdkVersion='test', moduleGroups=[{'libraries':['vi.test']}], libraries=[entry]), ensure_ascii=False).encode('utf-8')
         catalog.write_bytes(raw)
