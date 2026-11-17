@@ -49,7 +49,7 @@ lớp công khai Thư Mục {
         nếu (kết quả[0] == 0) { trả về 1; };
         lỗi = kết quả[2];
         nếu (kết quả[1] == 2) { trả về 0; };
-        ném "xóa đường dẫn: remove thất bại, errno=" + lỗi;
+        ném "xóa đường dẫn: remove thất bại, errno=" + lỗi + ", đường dẫn=" + đường;
     };
 
     hàm riêng tư thư mục là thư mục không theo liên kết(đường) {

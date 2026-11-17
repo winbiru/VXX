@@ -504,7 +504,7 @@ hàm riêng tư cli gói nguồn(mục, gốc, kho, tạm, chính xác = "") {
         nếu (bắt đầu bằng(vị trí, "-")) { ném "Địa chỉ Git không hợp lệ"; };
         nếu (đường dẫn tồn tại(cli gói đường(gốc, vị trí))) { vị trí = cli gói đường(gốc, vị trí); };
         nguồn = đường dẫn nối(tạm, "git-" + tên);
-        cli gói git(["-c", "protocol.ext.allow=never", "clone", "--no-checkout", "--", vị trí, nguồn]);
+        cli gói git(["-c", "protocol.ext.allow=never", "clone", "--no-hardlinks", "--no-checkout", "--", vị trí, nguồn]);
         ref = lấy từ điển(mục, "ref", "HEAD");
         nếu (chính xác != "") { ref = chính xác; };
         revision = cli gói git revision(nguồn, ref);
@@ -731,7 +731,8 @@ hàm riêng tư cli gói đồng bộ(bản, chế độ, offline, ghi bản) {
         } hoặc { cli gói công bố(gốc, tạm, bản, mục, cũ, ghi bản); };
     } bắt lỗi(e) {
         nếu (là thư mục(đường dẫn nối(tạm, "backup"))) { ném thành chuỗi(e) + "; staging được giữ tại " + tạm; };
-        xóa đường dẫn(tạm); ném e;
+        thử { xóa đường dẫn(tạm); } bắt lỗi(dọn) { ném thành chuỗi(e) + "; dọn staging thất bại: " + thành chuỗi(dọn); };
+        ném e;
     };
     xóa đường dẫn(tạm);
     in "Đã đồng bộ " + thành chuỗi(máy ảo lấy độ dài(mục)) + " gói";
