@@ -139,19 +139,36 @@ def check_uninstaller(prefix, platform, sdk=False):
             unrelated.write_text('project', encoding='utf-8')
             return root, managed, changed, unrelated
 
-        def run(root, args, ok):
+        def run(root, args, ok, via_call=False):
             executable = root / layout(platform)['vdk' if sdk else 'vpp']
             local_env = dict(env, PATH=str(root / 'bin') + os.pathsep + env['PATH'])
-            command = [env['COMSPEC'], '/d', '/c', executable.name] if windows else [str(executable)]
+            entry = executable.name
+            if via_call:
+                assert windows
+                caller = work / 'uninstall-caller.cmd'
+                caller.write_text('@echo off\nsetlocal DisableDelayedExpansion\n'
+                                  f'call {entry} %*\n'
+                                  'set "VPP_TEST_RESULT=%errorlevel%"\n'
+                                  'echo VPP_UNINSTALL_CALLER_CONTINUED\n'
+                                  'exit /b %VPP_TEST_RESULT%\n', encoding='ascii', newline='\r\n')
+                entry = caller.name
+            command = [env['COMSPEC'], '/d', '/c', entry] if windows else [str(executable)]
             result = subprocess.run([*command, *args], cwd=work, env=local_env, capture_output=True, timeout=120)
             if (result.returncode == 0) != ok:
                 raise RuntimeError(f'Uninstall {args}: exit {result.returncode}\n{result.stdout!r}\n{result.stderr!r}')
+            if via_call and b'VPP_UNINSTALL_CALLER_CONTINUED' not in result.stdout:
+                raise RuntimeError(f'Uninstall did not return to caller: {result.stdout!r}\n{result.stderr!r}')
+            if windows and ok and result.stderr:
+                raise RuntimeError(f'Unexpected uninstall stderr: {result.stderr!r}')
 
         def check_removed(root, managed, changed, unrelated):
             assert not managed.exists() and not (root / 'bin' / helper).exists()
             assert not (managed.parent / 'binary.dat').exists()
             assert not (managed.parent / 'empty.dat').exists()
             assert not (root / layout(platform)['vpp']).exists()
+            if sdk:
+                assert not (root / layout(platform)['vdk']).exists()
+                assert not (root / layout(platform)['vdkInfo']).exists()
             assert not (root / 'vpp-install-manifest.tsv').exists()
             assert changed.read_text(encoding='utf-8') == 'user edit'
             assert unrelated.read_text(encoding='utf-8') == 'project'
@@ -164,6 +181,16 @@ def check_uninstaller(prefix, platform, sdk=False):
             check_removed(root, managed, changed, unrelated)
 
         if windows:
+            # An interactive shell or calling batch file must survive uninstall,
+            # including its success/failure status after the launcher is deleted.
+            root, managed, changed, unrelated = fixture('called launcher')
+            run(root, ['uninstall'], True, via_call=True)
+            check_removed(root, managed, changed, unrelated)
+            root, managed, _, _ = fixture('called invalid manifest')
+            (root / 'vpp-install-manifest.tsv').unlink()
+            run(root, ['uninstall'], False, via_call=True)
+            assert managed.is_file()
+
             # Exercise the same Windows PowerShell as the launcher, with the
             # hash cmdlet deliberately unusable even if installed on this host.
             root, managed, changed, unrelated = fixture('no hash cmdlet')

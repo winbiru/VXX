@@ -1,5 +1,7 @@
 @echo off
 setlocal DisableDelayedExpansion
+rem Match the UTF-8 Vietnamese command names, as in the VDK launcher.
+chcp 65001 >nul 2>nul
 for %%I in ("%~dp0..\share\vpp") do set "VPP_HOME=%%~fI"
 set "VPP_HOME=%VPP_HOME:\=/%"
 set "VPP_AOT_VPP_OBJECT=%VPP_HOME%/native-vpp-runtime/runtime.o"
@@ -60,7 +62,6 @@ exit /b %errorlevel%
 
 :uninstall
 if not exist "%~dp0uninstall-native.ps1" exit /b 2
-(
-  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall-native.ps1" -Root "%~dp0.."
-  if errorlevel 1 (exit /b 1) else (exit /b 0)
-)
+rem Leave the batch context before PowerShell removes this file. Keep both
+rem commands on one line so cmd never reopens the deleted launcher.
+(goto) 2>nul & "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0uninstall-native.ps1" -Root "%~dp0.."
