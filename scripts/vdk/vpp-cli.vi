@@ -255,6 +255,15 @@ hàm riêng tư cli kiểm thử(compiler, args) {
     nếu (đạt != máy ảo lấy độ dài(tệp)) { trả về 1; };
     trả về 0;
 };
+// Formatter sinh LF; stdout của compiler Windows đi qua _write ở chế độ
+// văn bản. Đảo đúng một lần CRLF -> LF trước khi dùng kết quả làm mã nguồn
+// hoặc giá trị JSON. Không đổi các chuỗi escape hay đầu ra tiến trình khác.
+hàm riêng tư cli kết quả định dạng(văn bản) {
+    nếu (ten nền tảng máy ảo() == "windows") {
+        trả về máy ảo thay chuỗi chính xác(văn bản, "\r\n", "\n");
+    };
+    trả về văn bản;
+};
 hàm riêng tư cli định dạng(compiler, args, lệnh) {
     tệp = [];
     chế độ = "";
@@ -273,9 +282,9 @@ hàm riêng tư cli định dạng(compiler, args, lệnh) {
         nếu (r["mã thoát"] != 0) { cli xuất(2, tệp[i] + ": "); };
         cli xuất(2, r["lỗi"]);
         nếu (r["mã thoát"] != 0) { cli xuất(1, r["đầu ra"]); mã = 1; }
-        hoặc nếu (lệnh == "format" && chế độ == "write") { ghi tệp(tệp[i], r["đầu ra"]); }
+        hoặc nếu (lệnh == "format" && chế độ == "write") { ghi tệp(tệp[i], cli kết quả định dạng(r["đầu ra"])); }
         hoặc nếu (lệnh == "format" && chế độ == "check") {
-            nếu (đọc tệp(tệp[i]) != r["đầu ra"]) { in "Cần định dạng: " + tệp[i]; mã = 1; };
+            nếu (đọc tệp(tệp[i]) != cli kết quả định dạng(r["đầu ra"])) { in "Cần định dạng: " + tệp[i]; mã = 1; };
         } hoặc { cli xuất(1, r["đầu ra"]); };
     };
     trả về mã;
@@ -1288,7 +1297,7 @@ hàm riêng tư cli lsp(compiler) {
                 nếu (r["mã thoát"] != 0) { cli lsp lỗi(id, -32603, r["lỗi"]); }
                 hoặc {
                     z = cli lsp vị trí(nguồn, 2147483647, 2147483647);
-                    cli lsp kết quả(id, [{"range": {"start": {"line": 0, "character": 0}, "end": z}, "newText": r["đầu ra"]}]);
+                    cli lsp kết quả(id, [{"range": {"start": {"line": 0, "character": 0}, "end": z}, "newText": cli kết quả định dạng(r["đầu ra"])}]);
                 };
             } hoặc nếu (máy ảo có khóa từ điển(bản, "id")) {
                 cli lsp lỗi(id, -32601, "Phương thức chưa hỗ trợ");
