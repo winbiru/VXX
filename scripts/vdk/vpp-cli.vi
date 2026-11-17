@@ -945,10 +945,15 @@ hàm riêng tư cli thống kê(args) {
 // không ghi lại tài liệu chưa lưu và không chạy mã của người dùng.
 hàm riêng tư cli lsp đọc() {
     dài = -1;
+    có tiêu đề = sai;
     khi (đúng) {
         dòng = cli đọc dòng();
-        nếu (dòng == rỗng) { trả về rỗng; };
+        nếu (dòng == rỗng) {
+            nếu (có tiêu đề) { ném "Tiêu đề LSP bị cắt"; };
+            trả về rỗng;
+        };
         nếu (dòng == "") { thoát; };
+        có tiêu đề = đúng;
         nếu (bắt đầu bằng(chuỗi thường(dòng), "content-length:")) {
             nếu (dài != -1) { ném "Content-Length trùng"; };
             dài = thành số nguyên(bỏ khoảng trắng(cắt chuỗi(dòng, 15, máy ảo lấy độ dài(dòng) - 15)));
@@ -1232,7 +1237,7 @@ hàm riêng tư cli lsp(compiler) {
     thử {
         khi (đúng) {
             bản = cli lsp đọc();
-            nếu (bản == rỗng) { thoát; };
+            nếu (bản == rỗng) { ném "LSP: đầu vào đã kết thúc trước thông báo exit"; };
             lệnh = lấy từ điển(bản, "method", "");
             id = lấy từ điển(bản, "id", rỗng);
             tham số = lấy từ điển(bản, "params", {});

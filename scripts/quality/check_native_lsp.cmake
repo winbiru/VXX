@@ -107,8 +107,26 @@ if(NOT status STREQUAL "0")
     else()
         set(response_size 0)
     endif()
+    set(direct_diagnostic "")
+    if(WIN32)
+        get_filename_component(compiler_dir "${VPP_NATIVE_COMPILER}" DIRECTORY)
+        if(EXISTS "${compiler_dir}/vpp-tools.exe")
+            set(direct_output "${VPP_OUTPUT_DIR}/responses-direct.lsp")
+            execute_process(COMMAND "${compiler_dir}/vpp-tools.exe" "${VPP_NATIVE_COMPILER}" --lsp
+                INPUT_FILE "${input}" OUTPUT_FILE "${direct_output}"
+                RESULT_VARIABLE direct_status ERROR_VARIABLE direct_errors TIMEOUT 120)
+            set(direct_size 0)
+            if(EXISTS "${direct_output}")
+                file(SIZE "${direct_output}" direct_size)
+            endif()
+            set(direct_diagnostic "\nDirect vpp-tools.exe: exit ${direct_status}, output ${direct_size} bytes: ${direct_errors}")
+        endif()
+    endif()
     message(FATAL_ERROR
-        "LSP exited ${status} (input ${request_size} bytes, output ${response_size} bytes): ${errors}")
+        "LSP exited ${status} (input ${request_size} bytes, output ${response_size} bytes): ${errors}${direct_diagnostic}")
+endif()
+if(NOT errors STREQUAL "")
+    message(FATAL_ERROR "Unexpected LSP stderr: ${errors}")
 endif()
 # Both normal file(READ) and OUTPUT_VARIABLE normalize CRLF. Decode HEX so
 # framing and Content-Length are checked against the actual wire bytes.

@@ -86,6 +86,12 @@ def check(tools, compiler):
                                            stderr=subprocess.STDOUT, timeout=30).decode().strip()
 
         git("init", "-b", "main")
+        # Git may run automatic maintenance in the background after a commit.
+        # Its transient objects/maintenance.lock is not part of the package
+        # manager's changes and can disappear while we inspect the source.
+        # Keep this fixture stable without weakening the object integrity check.
+        git("config", "maintenance.auto", "false")
+        git("config", "gc.auto", "0")
         git("config", "user.name", "VPP Regression")
         git("config", "user.email", "vpp-regression@example.invalid")
         write(repository / "vpp.json", dict(schema=1, name="gitlib", version="1.0.0", dependencies=[]))

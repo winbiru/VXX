@@ -1,7 +1,5 @@
 @echo off
 setlocal DisableDelayedExpansion
-rem Match the UTF-8 Vietnamese command names, as in the VDK launcher.
-chcp 65001 >nul 2>nul
 for %%I in ("%~dp0..\share\vpp") do set "VPP_HOME=%%~fI"
 set "VPP_HOME=%VPP_HOME:\=/%"
 set "VPP_AOT_VPP_OBJECT=%VPP_HOME%/native-vpp-runtime/runtime.o"
@@ -10,6 +8,12 @@ set "VPP_AOT_PLATFORM_OBJECT=%VPP_HOME%/native-vpp-runtime/platform.o"
 set "VPP_WINDOWS_RUNTIME_OBJECT=%VPP_HOME%/windows-runtime.obj"
 set "VPP_NATIVE_TARGET=windows-x86_64"
 if not defined VPP_AOT_ASSEMBLER set "VPP_AOT_ASSEMBLER=clang.exe"
+rem LSP uses inherited byte streams, not a console. Do not change the code page
+rem or redirect any handles before launching the protocol server.
+if /I "%~1"=="--lsp" goto lsp
+if /I "%~1"=="lsp" goto lsp
+rem Match the UTF-8 Vietnamese command names for interactive commands.
+chcp 65001 >nul 2>nul
 if /I "%~1"=="uninstall" if "%~2"=="" goto uninstall
 if /I "%~1"=="gỡ cài đặt" if "%~2"=="" goto uninstall
 if /I "%~1"=="gỡ-cài-đặt" if "%~2"=="" goto uninstall
@@ -31,6 +35,13 @@ if /I "%~1"=="lint" goto native
 if /I "%~1"=="emit-program-asm" goto tools
 :tools
 if not exist "%~dp0vpp-tools.exe" goto native
+"%~dp0vpp-tools.exe" "%~dp0vpp-native.exe" %*
+exit /b %errorlevel%
+:lsp
+if not exist "%~dp0vpp-tools.exe" (
+    >&2 echo V++ LSP: vpp-tools.exe missing.
+    exit /b 2
+)
 "%~dp0vpp-tools.exe" "%~dp0vpp-native.exe" %*
 exit /b %errorlevel%
 :jit
