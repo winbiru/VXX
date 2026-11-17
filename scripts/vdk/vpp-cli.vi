@@ -38,18 +38,29 @@ hàm riêng tư cli đối số(i) {
 };
 hàm riêng tư cli xuất(kênh, văn bản) {
     vị trí = 0;
+    windows = ten nền tảng máy ảo() == "windows";
     khi (đúng) {
-        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 128));
+        // _write trên Windows chuyển LF thành CRLF. Bỏ CR có sẵn trước LF
+        // để chuyển tiếp đúng dòng từ tiến trình con và khung LSP.
+        // Đọc trước một byte để xử lý cả cặp CRLF nằm giữa hai khối.
+        bytes = chuỗi thành byte máy ảo(máy ảo cắt chuỗi theo byte(văn bản, vị trí, 129));
         n = máy ảo lấy độ dài(bytes);
         nếu (n == 0) { thoát; };
-        lặp(i = 0; i < n; i++) { nếu (máy ghi byte(3376 + i, bytes[i]) != 0) { ném "Không thể ghi đầu ra"; }; };
+        giới hạn = n; nếu (giới hạn > 128) { giới hạn = 128; };
+        số ghi = 0;
+        lặp(i = 0; i < giới hạn; i++) {
+            nếu (!(windows && bytes[i] == 13 && i + 1 < n && bytes[i + 1] == 10)) {
+                nếu (máy ghi byte(3376 + số ghi, bytes[i]) != 0) { ném "Không thể ghi đầu ra"; };
+                số ghi += 1;
+            };
+        };
         đã ghi = 0;
-        khi (đã ghi < n) {
-            got = máy ghi(kênh, 3376 + đã ghi, n - đã ghi);
+        khi (đã ghi < số ghi) {
+            got = máy ghi(kênh, 3376 + đã ghi, số ghi - đã ghi);
             nếu (got <= 0) { ném "Không thể ghi đầu ra"; };
             đã ghi += got;
         };
-        vị trí += n;
+        vị trí += giới hạn;
     };
 };
 hàm riêng tư cli đuôi(args, bắt đầu) {
@@ -1375,7 +1386,7 @@ hàm chính() {
         nếu (lệnh == "jit") {
             nếu (máy ảo lấy độ dài(args) > 0) {
                 i = 0;
-                nếu (args[0] == "--dynamic" || args[0] == "--check-dynamic") { i = 1; };
+                nếu (args[0] == "--dynamic" || args[0] == "--check-dynamic" || args[0] == "--raw-program" || args[0] == "--vm-image") { i = 1; };
                 nếu (i < máy ảo lấy độ dài(args)) { nếu (là tệp(args[i])) { cli gói kiểm nguồn(args[i]); }; };
             };
             trình = đường dẫn nối(đường dẫn cha(compiler), "vpp-jit");
@@ -1430,7 +1441,7 @@ hàm chính() {
             trả về cli thống kê(args);
         };
         nếu (lệnh == "targets" || lệnh == "--list-targets" || lệnh == "đích") { trả về cli đích(args); };
-        nếu (lệnh == "--kiểm-khóa-nguồn") {
+        nếu (lệnh == "--kiểm-khóa-nguồn" || lệnh == "--check-source-lock") {
             nếu (máy ảo lấy độ dài(args) != 1) { ném "Cần tệp nguồn"; };
             trả về cli gói kiểm nguồn(args[0]);
         };

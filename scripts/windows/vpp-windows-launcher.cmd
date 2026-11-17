@@ -13,6 +13,7 @@ if /I "%~1"=="gỡ cài đặt" if "%~2"=="" goto uninstall
 if /I "%~1"=="gỡ-cài-đặt" if "%~2"=="" goto uninstall
 if /I "%~1"=="gỡ" if /I "%~2"=="cài" if /I "%~3"=="đặt" if "%~4"=="" goto uninstall
 if /I "%~1"=="gỡ" if /I "%~2"=="cài đặt" if "%~3"=="" goto uninstall
+if "%~1"=="jit" goto jit
 if /I "%~1"=="build" goto build
 if /I "%~1"=="format" if exist "%~2\NUL" goto tools
 if /I "%~1"=="lint" if exist "%~2\NUL" goto tools
@@ -29,6 +30,21 @@ if /I "%~1"=="emit-program-asm" goto tools
 :tools
 if not exist "%~dp0vpp-tools.exe" goto native
 "%~dp0vpp-tools.exe" "%~dp0vpp-native.exe" %*
+exit /b %errorlevel%
+:jit
+rem vpp-jit accepts the leading jit argument; keep all original argv and stdio.
+set "jit_source=%~2"
+if "%~2"=="--dynamic" set "jit_source=%~3"
+if "%~2"=="--check-dynamic" set "jit_source=%~3"
+if "%~2"=="--raw-program" set "jit_source=%~3"
+if "%~2"=="--vm-image" set "jit_source=%~3"
+if not exist "%~dp0vpp-tools.exe" goto jit_run
+if not defined jit_source goto jit_run
+if not exist "%jit_source%" goto jit_run
+"%~dp0vpp-tools.exe" "%~dp0vpp-native.exe" --check-source-lock "%jit_source%"
+if errorlevel 1 exit /b %errorlevel%
+:jit_run
+"%~dp0vpp-jit.exe" %*
 exit /b %errorlevel%
 :build
 if not exist "%~dp0vpp-tools.exe" goto native
