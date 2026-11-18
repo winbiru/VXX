@@ -1,0 +1,83 @@
+nhập gói.đồ họa.màu sắc.*;
+nhập gói.đồ họa.phông chữ.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.bảng mã.ký tự unicode;
+nhập gói.nhập xuất.tệp.ghi tệp;
+
+hàm công khai tọa độ đồ họa(số) {
+    trả về thành chuỗi(đồ họa kiểm tra số(số, -1000000, 1000000));
+};
+
+hàm công khai kích thước đồ họa(số) {
+    trả về thành chuỗi(đồ họa kiểm tra số(số, 0, 1000000));
+};
+
+lớp công khai Mặt Vẽ {
+    hàm công khai khởi tạo(rộng, cao) {
+        mình.rộng = đồ họa kiểm tra số(rộng, 1, 16384);
+        mình.cao = đồ họa kiểm tra số(cao, 1, 16384);
+        mình.nét = "";
+    };
+
+    hàm công khai xóa() {
+        mình.nét = "";
+        trả về mình;
+    };
+
+    hàm công khai hình chữ nhật(x, y, rộng, cao, màu) {
+        mình.nét = mình.nét + "<rect x=\"" + tọa độ đồ họa(x) + "\" y=\"" + tọa độ đồ họa(y) +
+            "\" width=\"" + kích thước đồ họa(rộng) + "\" height=\"" + kích thước đồ họa(cao) +
+            "\" fill=\"" + màu CSS(màu) + "\"/>";
+        trả về mình;
+    };
+
+    hàm công khai hình tròn(x, y, bán kính, màu) {
+        mình.nét = mình.nét + "<circle cx=\"" + tọa độ đồ họa(x) + "\" cy=\"" + tọa độ đồ họa(y) +
+            "\" r=\"" + kích thước đồ họa(bán kính) + "\" fill=\"" + màu CSS(màu) + "\"/>";
+        trả về mình;
+    };
+
+    hàm công khai đường thẳng(x, y, cuối x, cuối y, màu, độ dày = 1) {
+        mình.nét = mình.nét + "<line x1=\"" + tọa độ đồ họa(x) + "\" y1=\"" + tọa độ đồ họa(y) +
+            "\" x2=\"" + tọa độ đồ họa(cuối x) + "\" y2=\"" + tọa độ đồ họa(cuối y) +
+            "\" stroke=\"" + màu CSS(màu) + "\" stroke-width=\"" + kích thước đồ họa(độ dày) + "\"/>";
+        trả về mình;
+    };
+
+    hàm công khai văn bản(x, y, nội dung, phông, màu) {
+        mình.nét = mình.nét + "<text x=\"" + tọa độ đồ họa(x) + "\" y=\"" + tọa độ đồ họa(y) +
+            "\" font-family=\"" + đồ họa thoát(phông["tên"]) + "\" font-size=\"" +
+            kích thước đồ họa(phông["cỡ"]) + "\" fill=\"" + màu CSS(màu) + "\">" +
+            đồ họa thoát(nội dung) + "</text>";
+        trả về mình;
+    };
+
+    hàm công khai SVG() {
+        trả về "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + thành chuỗi(mình.rộng) +
+            "\" height=\"" + thành chuỗi(mình.cao) + "\" viewBox=\"0 0 " + thành chuỗi(mình.rộng) +
+            " " + thành chuỗi(mình.cao) + "\">" + mình.nét + "</svg>";
+    };
+
+    hàm công khai lưu SVG(đường) {
+        trả về ghi tệp(đường, mình.SVG());
+    };
+};
+
+hàm công khai terminal xóa màn hình() {
+    trả về ký tự unicode(27) + "[2J" + ký tự unicode(27) + "[H";
+};
+
+hàm công khai terminal con trỏ(hàng, cột) {
+    trả về ký tự unicode(27) + "[" + thành chuỗi(đồ họa kiểm tra số(hàng, 1, 9999)) +
+        ";" + thành chuỗi(đồ họa kiểm tra số(cột, 1, 9999)) + "H";
+};
+
+hàm công khai terminal màu chữ(màu) {
+    màu = màu RGB(màu[0], màu[1], màu[2]);
+    trả về ký tự unicode(27) + "[38;2;" + thành chuỗi(màu[0]) + ";" + thành chuỗi(màu[1]) +
+        ";" + thành chuỗi(màu[2]) + "m";
+};
+
+hàm công khai terminal đặt lại() {
+    trả về ký tự unicode(27) + "[0m";
+};

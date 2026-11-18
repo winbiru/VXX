@@ -1,0 +1,22 @@
+nhập gói.đồ họa.màu sắc.*;
+nhập gói.đồ họa.sự kiện.đồ họa đọc sự kiện;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
+
+hàm công khai GPU đọc màu(trợ giúp, lệnh, màu) {
+    nếu (loại của(màu) != "danh sách" || độ dài(màu) != 3) { ném "đồ họa: cần màu RGB"; };
+    màu = màu RGB(màu[0], màu[1], màu[2]);
+    kết quả = chạy tiến trình(đường dẫn tuyệt đối(trợ giúp),
+        [lệnh, thành chuỗi(màu[0]), thành chuỗi(màu[1]), thành chuỗi(màu[2])], {}, 30000);
+    nếu (!kết quả["khởi chạy"] || kết quả["mã thoát"] != 0) {
+        ném "đồ họa GPU: mã thoát " + thành chuỗi(kết quả["mã thoát"]) + ": " + kết quả["lỗi"];
+    };
+    điểm = đồ họa đọc sự kiện(kết quả["đầu ra"]);
+    khóa = ["đỏ", "lục", "lam", "alpha"];
+    lặp(i = 0; i < 4; i++) {
+        đồ họa kiểm tra số(điểm[khóa[i]], 0, 255);
+    };
+    trả về điểm;
+};

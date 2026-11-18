@@ -1,0 +1,22 @@
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.đồ họa.màu sắc.đồ họa kiểm tra số;
+
+// Thoát cả văn bản và thuộc tính HTML/SVG.
+hàm công khai đồ họa thoát(văn bản) {
+    văn bản = thành chuỗi(văn bản);
+    kết quả = "";
+    lặp(i = 0; i < độ dài(văn bản); i++) {
+        c = văn bản[i];
+        nếu (c == "&") { kết quả = kết quả + "&amp;"; }
+        hoặc nếu (c == "<") { kết quả = kết quả + "&lt;"; }
+        hoặc nếu (c == ">") { kết quả = kết quả + "&gt;"; }
+        hoặc nếu (c == "\"") { kết quả = kết quả + "&quot;"; }
+        hoặc nếu (c == "'") { kết quả = kết quả + "&#39;"; }
+        hoặc { kết quả = kết quả + c; };
+    };
+    trả về kết quả;
+};
+
+hàm công khai phông đồ họa(tên, cỡ) {
+    trả về {"tên": thành chuỗi(tên), "cỡ": đồ họa kiểm tra số(cỡ, 1, 512)};
+};

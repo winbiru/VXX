@@ -1,0 +1,86 @@
+nhập gói.đồ họa.màu sắc.đồ họa kiểm tra số;
+nhập gói.đồ họa.sự kiện.*;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.hệ thống.tiến trình.tiến trình dựng lệnh windows;
+
+// Vòng đời tiến trình và khung sự kiện dùng chung cho mọi cửa sổ.
+lớp công khai Tiến Trình Cửa Sổ {
+    hàm công khai khởi tạo(trợ giúp, đối số) {
+        mình.mã = 0;
+        mình.hàng đợi = Hàng Đợi Đồ Họa();
+        mình.dòng = [];
+        mình.đệm = [];
+        mình.mã thoát = rỗng;
+        mình.lỗi ra = [];
+        lặp(i = 0; i < 4096; i++) { máy ảo thêm cuối danh sách(mình.đệm, 0); };
+        mình.mã = máy tiến trình tạo(trợ giúp);
+        thử {
+            nếu (tên nền tảng() == "windows") {
+                máy tiến trình lệnh windows(mình.mã, tiến trình dựng lệnh windows(trợ giúp, đối số));
+            } hoặc {
+                lặp(i = 0; i < độ dài(đối số); i++) {
+                    máy tiến trình đối số(mình.mã, đối số[i]);
+                };
+            };
+            nếu (máy tiến trình bắt đầu(mình.mã) == 0) {
+                ném máy tiến trình lỗi(mình.mã);
+            };
+        } bắt lỗi(e) {
+            mình.đóng();
+            ném e;
+        };
+    };
+
+    hàm công khai đang mở() { trả về mình.mã != 0; };
+
+    hàm công khai thăm dò(chờ = 0) {
+        chờ = đồ họa kiểm tra số(chờ, 0, 1000);
+        nếu (!mình.đang mở()) { trả về mình; };
+        thử {
+            sẵn sàng = máy tiến trình thăm dò(mình.mã, chờ);
+            nếu (sẵn sàng == 4) {
+                nếu (độ dài(mình.dòng) != 0) { ném "đồ họa: dòng sự kiện bị cắt"; };
+                mình.mã thoát = máy tiến trình đợi(mình.mã);
+                mình.đóng();
+                nếu (mình.mã thoát != 0) { ném "đồ họa: cửa sổ kết thúc bất thường: " + chuỗi từ byte máy ảo(mình.lỗi ra); };
+                trả về mình;
+            };
+            nếu (sẵn sàng % 2 == 1) {
+                n = máy tiến trình đọc(mình.mã, 1, mình.đệm, 4096);
+                lặp(i = 0; i < n; i++) {
+                    nếu (mình.đệm[i] == 10) {
+                        nếu (độ dài(mình.dòng) > 0) {
+                            nếu (mình.hàng đợi.số lượng() >= 4096) { ném "đồ họa: hàng đợi sự kiện đầy"; };
+                            mình.hàng đợi.gửi(đồ họa đọc sự kiện(chuỗi từ byte máy ảo(mình.dòng)));
+                        };
+                        mình.dòng = [];
+                    } hoặc {
+                        nếu (độ dài(mình.dòng) >= 65536) { ném "đồ họa: dòng sự kiện quá dài"; };
+                        máy ảo thêm cuối danh sách(mình.dòng, mình.đệm[i]);
+                    };
+                };
+            };
+            // Luôn tháo pipe lỗi để tiến trình con không kẹt.
+            nếu (sẵn sàng >= 2) {
+                n = máy tiến trình đọc(mình.mã, 2, mình.đệm, 4096);
+                lặp(i = 0; i < n && độ dài(mình.lỗi ra) < 65536; i++) {
+                    máy ảo thêm cuối danh sách(mình.lỗi ra, mình.đệm[i]);
+                };
+            };
+        } bắt lỗi(e) {
+            mình.đóng();
+            ném e;
+        };
+        trả về mình;
+    };
+
+    hàm công khai lấy sự kiện() { trả về mình.hàng đợi.lấy(); };
+
+    hàm công khai đóng() {
+        nếu (mình.mã != 0) {
+            mã = mình.mã;
+            mình.mã = 0;
+            máy tiến trình đóng(mã);
+        };
+    };
+};

@@ -1,0 +1,16 @@
+nhập gói.đồ họa.màu sắc.màu RGB;
+nhập gói.đồ họa.gpu.chính.*;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+
+hàm chính() {
+    màu = màu RGB(30, 120, 220);
+    nếu (tên nền tảng() == "macos") {
+        in Metal đọc màu("build-pure-vpp/bin/vpp-graphics-metal", màu);
+    } hoặc nếu (tên nền tảng() == "windows") {
+        in OpenGL đọc màu("build-graphics/vpp-graphics-sdl.exe", màu);
+        in Vulkan đọc màu("build-graphics/vpp-graphics-vulkan.exe", màu);
+    } hoặc {
+        in OpenGL đọc màu("build-graphics/vpp-graphics-sdl", màu);
+        in Vulkan đọc màu("build-graphics/vpp-graphics-vulkan", màu);
+    };
+};

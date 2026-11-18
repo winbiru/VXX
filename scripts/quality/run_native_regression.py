@@ -669,6 +669,8 @@ def run_case(case, compiler, logs, env, timeout, vm=None, *, phase="both", work=
     logs.mkdir(parents=True, exist_ok=True)
     env = dict(env)
     env.update(case.get("env", {}))
+    if case.get("python_fixture"):
+        env["VPP_TEST_PYTHON"] = sys.executable
     if env.get("VPP_COMPILER_PROFILE_FILE"):
         env["VPP_COMPILER_PROFILE_FILE"] = str(logs / "compiler.profile")
     if "timezone" in case:

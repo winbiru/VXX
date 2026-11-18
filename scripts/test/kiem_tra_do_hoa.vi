@@ -1,0 +1,103 @@
+nhập gói.đồ họa.chính.*;
+nhập gói.đồ họa.cửa sổ bản địa.Tiến Trình Cửa Sổ;
+nhập gói.đồ họa.cửa sổ linux.Cửa Sổ Linux;
+nhập gói.đồ họa.cửa sổ windows.Cửa Sổ Windows;
+nhập gói.đồ họa.cửa sổ macos.Cửa Sổ MacOS;
+nhập gói.đồ họa.gpu.chính.*;
+nhập gói.đồ họa.gpu.đọc màu.GPU đọc màu;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.văn bản.chuỗi.tìm chuỗi chính xác;
+nhập gói.nhập xuất.tệp.đọc các byte tệp;
+nhập gói.mạng.http.máy khách.mạng http dựng phản hồi;
+
+hàm chính() {
+    in màu CSS(màu RGB(1, 2, 3)) == "rgb(1,2,3)";
+    in đồ họa thoát("<&\"'>") == "&lt;&amp;&quot;&#39;&gt;";
+    ảnh = Hình Ảnh RGB(3, 2, màu RGB(0, 0, 0));
+    ảnh.tô vùng(-1, 0, 3, 1, màu RGB(255, 4, 5));
+    in ảnh.lấy điểm(0, 0)[0] == 255 && ảnh.lấy điểm(1, 0)[1] == 4 && ảnh.lấy điểm(2, 0)[0] == 0;
+    in !ảnh.đặt điểm(-1, 0, màu RGB(0, 0, 0));
+    mặt = Mặt Vẽ(100, 60);
+    mặt.hình chữ nhật(0, 0, 20, 10, màu RGB(1, 2, 3));
+    mặt.hình tròn(10, 20, 5, màu RGB(1, 2, 3));
+    mặt.đường thẳng(0, 0, 10, 10, màu RGB(1, 2, 3), 2);
+    mặt.văn bản(1, 15, "<V++>", phông đồ họa("sans-serif", 14), màu RGB(1, 2, 3));
+    svg = mặt.SVG();
+    in tìm chuỗi chính xác(svg, "<rect") != rỗng && tìm chuỗi chính xác(svg, "<circle") != rỗng &&
+        tìm chuỗi chính xác(svg, "<line") != rỗng && tìm chuỗi chính xác(svg, "&lt;V++&gt;") != rỗng;
+    mặt.xóa();
+    in tìm chuỗi chính xác(mặt.SVG(), "<rect") == rỗng;
+    hàng đợi = Hàng Đợi Đồ Họa();
+    hàng đợi.gửi(sự kiện bàn phím("A", đúng));
+    hàng đợi.gửi(sự kiện chuột(4, 5, 0, sai));
+    in hàng đợi.số lượng() == 2;
+    in hàng đợi.lấy()["phím"] == "A" && hàng đợi.lấy()["x"] == 4 && hàng đợi.lấy() == rỗng;
+    in đồ họa đọc sự kiện("{\"loại\":\"nút\",\"mã\":\"chao\"}")["mã"] == "chao";
+    in độ dài(đồ họa đọc danh sách sự kiện("[{\"loại\":\"nút\"}]")) == 1;
+    cửa = Cửa Sổ Web("<V++>", 600, 200);
+    cửa.thêm(bố cục đồ họa([nút đồ họa("a\"", "Bấm"), nhãn đồ họa("<nhãn>"), ô nhập đồ họa("b", "Tên", "\""), thanh cuộn đồ họa(bảng đồ họa(["A"], [["B"]]), 50)]));
+    html = cửa.HTML();
+    in tìm chuỗi chính xác(html, "data-vpp=\"a&quot;\"") != rỗng && tìm chuỗi chính xác(html, "&lt;nhãn&gt;") != rỗng &&
+        tìm chuỗi chính xác(html, "<table>") != rỗng && tìm chuỗi chính xác(html, "overflow:auto") != rỗng;
+    in tìm chuỗi chính xác(html, "pointerdown") != rỗng && tìm chuỗi chính xác(html, "keydown") != rỗng;
+    in độ dài(terminal xóa màn hình()) > 0 && độ dài(terminal con trỏ(1, 2)) > 0 && độ dài(terminal màu chữ(màu RGB(1, 2, 3))) > 0;
+    lỗi = sai;
+    thử { màu RGB(256, 0, 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    ảnh.lưu PPM("kiem-tra-do-hoa.ppm");
+    dữ liệu = đọc các byte tệp("kiem-tra-do-hoa.ppm");
+    đầu = chuỗi thành byte máy ảo("P6\n3 2\n255\n");
+    in độ dài(dữ liệu) == độ dài(đầu) + 18 && dữ liệu[độ dài(đầu)] == 255 && dữ liệu[độ dài(đầu) + 1] == 4;
+    ảnh.lưu BMP("kiem-tra-do-hoa.bmp");
+    bmp = đọc các byte tệp("kiem-tra-do-hoa.bmp");
+    in độ dài(bmp) == 78 && bmp[0] == 66 && bmp[1] == 77 && bmp[2] == 78 &&
+        bmp[10] == 54 && bmp[14] == 40 && bmp[18] == 3 && bmp[22] == 2 && bmp[28] == 24;
+    in bmp[54] == 0 && bmp[65] == 0 && bmp[66] == 5 && bmp[67] == 4 && bmp[68] == 255 && bmp[77] == 0;
+    lỗi = sai;
+    thử { OpenGL đọc màu("không tồn tại", [256, 0, 0]); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { Vulkan đọc màu("không tồn tại", [1, 2]); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { Metal đọc màu("không tồn tại", [1, 2, 3]); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { Cửa Sổ Linux("không tồn tại", "không tồn tại", "V++", 1, 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { Cửa Sổ Windows("không tồn tại", "không tồn tại", "V++", 1, 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { Cửa Sổ MacOS("không tồn tại", "không tồn tại", "V++", 1, 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    // Runner cung cấp đường dẫn tuyệt đối đến Python trên cả ba hệ điều hành.
+    // Ghi byte trực tiếp để kiểm tra UTF-8 bị chia giữa hai lần đọc pipe.
+    python = đọc biến môi trường("VPP_TEST_PYTHON", "");
+    tiến trình = Tiến Trình Cửa Sổ(python, ["-c", "import sys,time; b=sys.argv[1].encode('utf-8'); i=b.index(bytes([195]))+1; sys.stdout.buffer.write(b[:i]); sys.stdout.buffer.flush(); time.sleep(0.2); sys.stdout.buffer.write(b[i:]+bytes([13,10])); sys.stdout.buffer.flush()", "{\"loại\":\"nút\",\"mã\":\"chào\"}"]);
+    lặp(i = 0; i < 100 && tiến trình.đang mở(); i++) { tiến trình.thăm dò(100); };
+    sự kiện = tiến trình.lấy sự kiện();
+    in !tiến trình.đang mở() && sự kiện["mã"] == "chào" && tiến trình.lấy sự kiện() == rỗng;
+    tiến trình.đóng();
+    tiến trình = Tiến Trình Cửa Sổ(python, ["-c", "import sys; sys.stdout.buffer.write(sys.argv[1].encode('utf-8'))", "{\"loại\":\"nút\"}"]);
+    lỗi = sai;
+    thử {
+        lặp(i = 0; i < 100 && tiến trình.đang mở(); i++) { tiến trình.thăm dò(100); };
+    } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi && !tiến trình.đang mở();
+    điểm = GPU đọc màu(python, "-cimport json,sys; print(json.dumps(dict(zip(('đỏ','lục','lam','alpha'),[int(x) for x in sys.argv[1:]]+[255]))))", [30, 120, 220]);
+    in điểm["đỏ"] == 30 && điểm["lục"] == 120 && điểm["lam"] == 220 && điểm["alpha"] == 255;
+    lỗi = sai;
+    thử { GPU đọc màu(python, "-cimport json; print(json.dumps({'đỏ':256,'lục':1,'lam':2,'alpha':3}))", [1, 2, 3]); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    tiến trình = Tiến Trình Cửa Sổ(python, ["-c", "import sys; sys.stderr.write('fixture error'); sys.exit(7)"]);
+    lỗi = sai;
+    thử {
+        lặp(i = 0; i < 100 && tiến trình.đang mở(); i++) { tiến trình.thăm dò(100); };
+    } bắt lỗi(e) { lỗi = tìm chuỗi chính xác(e, "fixture error") != rỗng; };
+    in lỗi && !tiến trình.đang mở() && tiến trình.mã thoát == 7;
+    in tìm chuỗi chính xác(mạng http dựng phản hồi(200, "xin chào"), "Content-Type: application/json; charset=utf-8") != rỗng;
+    phản hồi = mạng http dựng phản hồi(200, "xin chào", "text/html");
+    in tìm chuỗi chính xác(phản hồi, "Content-Type: text/html; charset=utf-8") != rỗng &&
+        tìm chuỗi chính xác(phản hồi, "Content-Length: 9\r\n") != rỗng;
+};

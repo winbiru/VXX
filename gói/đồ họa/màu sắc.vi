@@ -1,0 +1,19 @@
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm công khai đồ họa kiểm tra số(giá trị, nhỏ, lớn) {
+    nếu (loại của(giá trị) != "số nguyên" || giá trị < nhỏ || giá trị > lớn) {
+        ném "đồ họa: số nguyên ngoài phạm vi";
+    };
+    trả về giá trị;
+};
+
+hàm công khai màu RGB(đỏ, lục, lam) {
+    trả về [đồ họa kiểm tra số(đỏ, 0, 255), đồ họa kiểm tra số(lục, 0, 255), đồ họa kiểm tra số(lam, 0, 255)];
+};
+
+hàm công khai màu CSS(màu) {
+    nếu (loại của(màu) != "danh sách" || độ dài(màu) != 3) { ném "đồ họa: cần màu RGB"; };
+    màu = màu RGB(màu[0], màu[1], màu[2]);
+    trả về "rgb(" + thành chuỗi(màu[0]) + "," + thành chuỗi(màu[1]) + "," + thành chuỗi(màu[2]) + ")";
+};

@@ -118,6 +118,7 @@ node_modules/
 !docs/native-dynamic-vpp-runtime.md
 !docs/native-freestanding-linux.md
 !docs/kien-truc-oop-thu-vien-va-bien-dich.md
+!examples/do-hoa/README.md
 
 # Nguồn thử tạm và chẩn đoán cục bộ
 /__kiem_tra_noi_tai_*.vi

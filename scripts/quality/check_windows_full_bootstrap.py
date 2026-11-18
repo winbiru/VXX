@@ -262,6 +262,8 @@ def bootstrap(out, prefix, archive, clang, phase='all'):
             shutil.copy2(obj, home / 'native-vpp-runtime' / obj.name)
         shutil.copytree(ROOT / 'gói', home / 'gói')
         shutil.copytree(ASM, home / 'scripts/ASM')
+        shutil.copytree(ROOT / 'scripts/graphics', home / 'scripts/graphics',
+                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         for metadata in ('vpp-language.json', 'vpp-libraries.json'):
             shutil.copy2(ROOT / metadata, home / metadata)
         # The standalone VM has its own V++ main and needs the full OS boundary,

@@ -1,0 +1,11 @@
+nhập gói.đồ họa.phông chữ.đồ họa thoát;
+nhập gói.đồ họa.màn hình.kích thước đồ họa;
+
+hàm công khai bố cục đồ họa(các phần, theo hàng = sai, khoảng cách = 12) {
+    hướng = "column";
+    nếu (theo hàng) { hướng = "row"; };
+    kết quả = "<div style=\"display:flex;flex-direction:" + hướng + ";gap:" +
+        kích thước đồ họa(khoảng cách) + "px\">";
+    lặp(i = 0; i < độ dài(các phần); i++) { kết quả = kết quả + các phần[i]; };
+    trả về kết quả + "</div>";
+};

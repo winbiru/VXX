@@ -40,10 +40,14 @@ def required(platform):
         'share/vpp/templates/application/src/chính.vi', 'share/vpp/templates/backend/application.vi',
         'bin/dns-provider.vmb', 'share/vpp/vpp-language.json',
         'vpp-install-manifest.tsv', 'bin/uninstall-native.ps1' if platform == 'windows-x64' else 'bin/uninstall-native.sh',
-        'share/vpp/vpp-libraries.json', 'share/vpp/native-vpp-runtime/runtime.o']
+        'share/vpp/vpp-libraries.json', 'share/vpp/native-vpp-runtime/runtime.o',
+        'share/vpp/scripts/graphics/CMakeLists.txt',
+        'share/vpp/scripts/graphics/check_window.py',
+        'share/vpp/scripts/graphics/check_gpu.py']
     runtime = 'share/vpp/native-vpp-runtime/'
     if platform == 'macos-arm64':
         paths += [runtime + x for x in ('platform.o', 'dynamic-bridge.o')]
+        paths += ['bin/vpp-graphics-macos', 'bin/vpp-graphics-metal']
     elif platform == 'linux-x64':
         paths += ['share/vpp/scripts/quality/audit_linux_static_elf.sh']
         paths += [runtime + 'linux-objects/' + x + '.o' for x in

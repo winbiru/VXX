@@ -38,8 +38,8 @@ lớp công khai Máy Chủ HTTP {
         trả về mạng truy vấn tham số yêu cầu(mã yêu cầu, khóa);
     };
 
-    hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
-        trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung);
+    hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = "application/json") {
+        trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung, kiểu nội dung);
     };
 
     hàm công khai máy chủ http đóng(mã máy chủ) {
@@ -88,9 +88,9 @@ hàm công khai yêu cầu http tham số(mã yêu cầu, khóa) {
     trả về bộ chuyển tiếp.yêu cầu http tham số(mã yêu cầu, khóa);
 };
 
-hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
+hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = "application/json") {
     bộ chuyển tiếp = Máy Chủ HTTP();
-    trả về bộ chuyển tiếp.máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung);
+    trả về bộ chuyển tiếp.máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung);
 };
 
 hàm công khai máy chủ http đóng(mã máy chủ) {

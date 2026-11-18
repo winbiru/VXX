@@ -1,0 +1,6 @@
+nhập gói.đồ họa.phông chữ.đồ họa thoát;
+
+hàm công khai ô nhập đồ họa(mã, nhãn, giá trị = "") {
+    trả về "<label>" + đồ họa thoát(nhãn) + " <input type=\"text\" data-vpp=\"" +
+        đồ họa thoát(mã) + "\" value=\"" + đồ họa thoát(giá trị) + "\"></label>";
+};
