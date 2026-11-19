@@ -1,0 +1,25 @@
+nhập gói.đồ họa.sự kiện.đồ họa đọc sự kiện;
+nhập gói.mạng.http.máy chủ.*;
+
+// Ghép vào server do ứng dụng quản lý. Hàng đợi thuộc ứng dụng.
+// Không tự lắng nghe, vì ứng dụng phải quyết định phạm vi mạng và xác thực.
+hàm công khai đồ họa xử lý HTTP(cửa, hàng đợi, yêu cầu) {
+    phương thức = yêu cầu http phương thức(yêu cầu);
+    đường = yêu cầu http đường dẫn(yêu cầu);
+    nếu (phương thức == "GET" && đường == "/") {
+        máy chủ http trả lời(yêu cầu, 200, cửa.HTML(), "text/html");
+        trả về đúng;
+    };
+    nếu (phương thức == "POST" && đường == "/vpp-event") {
+        thử {
+            sự kiện = đồ họa đọc sự kiện(yêu cầu http nội dung(yêu cầu));
+            hàng đợi.gửi(sự kiện);
+        } bắt lỗi(e) {
+            máy chủ http trả lời(yêu cầu, 400, "{}");
+            trả về đúng;
+        };
+        máy chủ http trả lời(yêu cầu, 200, "{}");
+        trả về đúng;
+    };
+    trả về sai;
+};

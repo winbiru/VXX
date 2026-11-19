@@ -38,6 +38,11 @@
       "libraries": ["vi.application", "vi.starters", "vi.test"]
     },
     {
+      "name": "vi.graphics",
+      "displayName": "Đồ họa",
+      "libraries": ["vi.graphics", "vi.graphics.macos", "vi.graphics.web", "vi.graphics.linux", "vi.graphics.windows", "vi.graphics.opengl", "vi.graphics.vulkan", "vi.graphics.metal"]
+    },
+    {
       "name": "vi.science",
       "displayName": "Khoa học",
       "libraries": ["vi.physics", "vi.chemistry", "vi.quantum", "vi.quantum.qiskit"]
@@ -158,6 +163,102 @@
       "sourceRoot": "gói/lõi",
       "entry": "đồng thời.vi",
       "requires": [],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.graphics",
+      "package": "đồ họa",
+      "displayName": "Đồ họa",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "chính.vi",
+      "requires": ["vi.base", "vi.io", "vi.json"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.graphics.macos",
+      "package": "cửa sổ macos",
+      "displayName": "Cửa sổ macOS",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "cửa sổ macos.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["macos"]
+    },
+    {
+      "id": "vi.graphics.linux",
+      "package": "cửa sổ linux",
+      "displayName": "Cửa sổ Linux",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "cửa sổ linux.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["linux"]
+    },
+    {
+      "id": "vi.graphics.windows",
+      "package": "cửa sổ windows",
+      "displayName": "Cửa sổ Windows",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "cửa sổ windows.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["windows"]
+    },
+    {
+      "id": "vi.graphics.opengl",
+      "package": "opengl",
+      "displayName": "OpenGL",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "gpu/opengl.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["linux", "windows"]
+    },
+    {
+      "id": "vi.graphics.vulkan",
+      "package": "vulkan",
+      "displayName": "Vulkan",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "gpu/vulkan.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["linux", "windows"]
+    },
+    {
+      "id": "vi.graphics.metal",
+      "package": "metal",
+      "displayName": "Metal",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "gpu/metal.vi",
+      "requires": ["vi.graphics", "vi.system"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["macos"]
+    },
+    {
+      "id": "vi.graphics.web",
+      "package": "đồ họa web",
+      "displayName": "Đồ họa HTTP",
+      "version": "1.0.0",
+      "sourceRoot": "gói/đồ họa",
+      "entry": "web.vi",
+      "requires": ["vi.graphics", "vi.net.http.server"],
       "stability": "experimental",
       "kind": "runtime",
       "platforms": ["windows", "linux", "macos"]

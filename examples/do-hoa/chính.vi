@@ -1,0 +1,15 @@
+nhập gói.đồ họa.chính.*;
+
+hàm chính() {
+    mặt = Mặt Vẽ(480, 160);
+    mặt.hình chữ nhật(0, 0, 480, 160, màu RGB(225, 239, 249));
+    mặt.hình tròn(70, 80, 44, màu RGB(31, 119, 180));
+    mặt.văn bản(130, 90, "Xin chào V++!", phông đồ họa("sans-serif", 28), màu RGB(23, 36, 58));
+    cửa = Cửa Sổ Web("Đồ họa V++", 600, 300);
+    cửa.thêm(mặt.SVG());
+    cửa.thêm(bố cục đồ họa([nhãn đồ họa("Tên của bạn"), ô nhập đồ họa("ten", "Tên"), nút đồ họa("chao", "Xin chào")]));
+    cửa.thêm(thanh cuộn đồ họa(bảng đồ họa(["Gói", "Trạng thái"], [["Đồ họa 2D", "Hoạt động"], ["Sự kiện", "Hoạt động"]]), 150));
+    cửa.lưu HTML("vpp-do-hoa.html");
+    mặt.lưu SVG("vpp-do-hoa.svg");
+    in "Đã tạo vpp-do-hoa.html và vpp-do-hoa.svg";
+};

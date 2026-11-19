@@ -1,0 +1,7 @@
+nhập gói.đồ họa.màu sắc.đồ họa kiểm tra số;
+
+hàm công khai sự kiện chuột(x, y, nút, đang nhấn) {
+    trả về {"loại": "chuột", "x": đồ họa kiểm tra số(x, -1000000, 1000000),
+        "y": đồ họa kiểm tra số(y, -1000000, 1000000), "nút": đồ họa kiểm tra số(nút, 0, 4),
+        "đang nhấn": đang nhấn};
+};

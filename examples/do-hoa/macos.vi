@@ -1,0 +1,23 @@
+nhập gói.đồ họa.chính.*;
+nhập gói.đồ họa.cửa sổ macos.*;
+
+hàm chính() {
+    cửa = Cửa Sổ Web("V++ desktop", 640, 400);
+    cửa.thêm(nút đồ họa("chao", "Xin chào"));
+    cửa.thêm(ô nhập đồ họa("ten", "Tên"));
+    cửa.lưu HTML("vpp-desktop.html");
+    bản địa = Cửa Sổ MacOS("build-pure-vpp/bin/vpp-graphics-macos", "vpp-desktop.html", "V++ desktop", 640, 480);
+    thử {
+        khi (bản địa.đang mở()) {
+            bản địa.thăm dò(100);
+            sự kiện = bản địa.lấy sự kiện();
+            khi (sự kiện != rỗng) {
+                in sự kiện;
+                sự kiện = bản địa.lấy sự kiện();
+            };
+        };
+    } bắt lỗi(e) {
+        bản địa.đóng();
+        ném e;
+    };
+};

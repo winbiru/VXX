@@ -1,0 +1,5 @@
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm công khai sự kiện bàn phím(phím, đang nhấn) {
+    trả về {"loại": "bàn phím", "phím": thành chuỗi(phím), "đang nhấn": đang nhấn};
+};

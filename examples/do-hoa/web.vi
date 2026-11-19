@@ -1,0 +1,27 @@
+nhập gói.đồ họa.chính.*;
+nhập gói.đồ họa.web.*;
+nhập gói.mạng.http.máy chủ.*;
+
+hàm chính() {
+    cửa = Cửa Sổ Web("V++ HTTP", 640, 400);
+    cửa.thêm(nút đồ họa("chao", "Xin chào"));
+    cửa.thêm(ô nhập đồ họa("ten", "Tên"));
+    hàng đợi = Hàng Đợi Đồ Họa();
+    máy chủ = máy chủ http mở(18082);
+    thử {
+        khi (đúng) {
+            yêu cầu = máy chủ http yêu cầu kế tiếp(máy chủ);
+            nếu (!đồ họa xử lý HTTP(cửa, hàng đợi, yêu cầu)) {
+                máy chủ http trả lời(yêu cầu, 404, "{}");
+            };
+            sự kiện = hàng đợi.lấy();
+            khi (sự kiện != rỗng) {
+                in sự kiện;
+                sự kiện = hàng đợi.lấy();
+            };
+        };
+    } bắt lỗi(e) {
+        máy chủ http đóng(máy chủ);
+        ném e;
+    };
+};

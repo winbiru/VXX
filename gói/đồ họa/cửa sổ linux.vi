@@ -1,0 +1,36 @@
+nhập gói.đồ họa.màu sắc.đồ họa kiểm tra số;
+nhập gói.đồ họa.cửa sổ bản địa.Tiến Trình Cửa Sổ;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.hệ thống.tiến trình.tiến trình yêu cầu chuỗi;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.nhập xuất.đường dẫn.*;
+
+lớp công khai Cửa Sổ Linux {
+    hàm công khai khởi tạo(trợ giúp, đường ảnh, tiêu đề, rộng, cao) {
+        nếu (tên nền tảng() != "linux") { ném "đồ họa: cần Linux"; };
+        trợ giúp = đường dẫn tuyệt đối(trợ giúp);
+        đường ảnh = đường dẫn tuyệt đối(đường ảnh);
+        nếu (!đường dẫn có thể thực thi(trợ giúp) || !là tệp(đường ảnh)) {
+            ném "đồ họa: thiếu chương trình hỗ trợ hoặc tệp BMP";
+        };
+        đối số = ["--window", đường ảnh, tiến trình yêu cầu chuỗi(tiêu đề, "tiêu đề"),
+            thành chuỗi(đồ họa kiểm tra số(rộng, 1, 16384)),
+            thành chuỗi(đồ họa kiểm tra số(cao, 1, 16384))];
+        mình.tiến trình = Tiến Trình Cửa Sổ(trợ giúp, đối số);
+        mình.mã thoát = rỗng;
+    };
+
+    hàm công khai đang mở() { trả về mình.tiến trình.đang mở(); };
+    hàm công khai thăm dò(chờ = 0) {
+        thử {
+            mình.tiến trình.thăm dò(chờ);
+        } bắt lỗi(e) {
+            mình.mã thoát = mình.tiến trình.mã thoát;
+            ném e;
+        };
+        mình.mã thoát = mình.tiến trình.mã thoát;
+        trả về mình;
+    };
+    hàm công khai lấy sự kiện() { trả về mình.tiến trình.lấy sự kiện(); };
+    hàm công khai đóng() { mình.tiến trình.đóng(); };
+};

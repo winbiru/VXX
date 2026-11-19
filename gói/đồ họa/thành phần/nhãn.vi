@@ -1,0 +1,5 @@
+nhập gói.đồ họa.phông chữ.đồ họa thoát;
+
+hàm công khai nhãn đồ họa(nội dung) {
+    trả về "<span>" + đồ họa thoát(nội dung) + "</span>";
+};

@@ -1,0 +1,5 @@
+nhập gói.đồ họa.phông chữ.đồ họa thoát;
+
+hàm công khai nút đồ họa(mã, nhãn) {
+    trả về "<button type=\"button\" data-vpp=\"" + đồ họa thoát(mã) + "\">" + đồ họa thoát(nhãn) + "</button>";
+};

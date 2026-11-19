@@ -1,0 +1,103 @@
+nhập gói.đồ họa.màu sắc.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.nhập xuất.tệp.ghi các byte tệp;
+
+hàm đồ họa thêm số nhỏ(dữ liệu, số, số byte) {
+    lặp(i = 0; i < số byte; i++) {
+        máy ảo thêm cuối danh sách(dữ liệu, số % 256);
+        số = làm tròn xuống(số / 256);
+    };
+};
+
+// Bộ đệm RGB do V++ sở hữu, tọa độ gốc ở góc trên bên trái.
+lớp công khai Hình Ảnh RGB {
+    hàm công khai khởi tạo(rộng, cao, nền) {
+        mình.rộng = đồ họa kiểm tra số(rộng, 1, 4096);
+        mình.cao = đồ họa kiểm tra số(cao, 1, 4096);
+        nếu (rộng * cao > 1048576) { ném "đồ họa: ảnh vượt 1048576 điểm ảnh"; };
+        nền = màu RGB(nền[0], nền[1], nền[2]);
+        mình.đệm = [];
+        lặp(i = 0; i < rộng * cao; i++) {
+            máy ảo thêm cuối danh sách(mình.đệm, nền[0]);
+            máy ảo thêm cuối danh sách(mình.đệm, nền[1]);
+            máy ảo thêm cuối danh sách(mình.đệm, nền[2]);
+        };
+    };
+
+    hàm công khai đặt điểm(x, y, màu) {
+        x = đồ họa kiểm tra số(x, -1000000, 1000000);
+        y = đồ họa kiểm tra số(y, -1000000, 1000000);
+        nếu (x < 0 || y < 0 || x >= mình.rộng || y >= mình.cao) { trả về sai; };
+        màu = màu RGB(màu[0], màu[1], màu[2]);
+        vị trí = (y * mình.rộng + x) * 3;
+        mình.đệm[vị trí] = màu[0];
+        mình.đệm[vị trí + 1] = màu[1];
+        mình.đệm[vị trí + 2] = màu[2];
+        trả về đúng;
+    };
+
+    hàm công khai lấy điểm(x, y) {
+        x = đồ họa kiểm tra số(x, 0, mình.rộng - 1);
+        y = đồ họa kiểm tra số(y, 0, mình.cao - 1);
+        vị trí = (y * mình.rộng + x) * 3;
+        trả về [mình.đệm[vị trí], mình.đệm[vị trí + 1], mình.đệm[vị trí + 2]];
+    };
+
+    hàm công khai tô vùng(x, y, rộng, cao, màu) {
+        x = đồ họa kiểm tra số(x, -1000000, 1000000);
+        y = đồ họa kiểm tra số(y, -1000000, 1000000);
+        rộng = đồ họa kiểm tra số(rộng, 0, 1000000);
+        cao = đồ họa kiểm tra số(cao, 0, 1000000);
+        màu = màu RGB(màu[0], màu[1], màu[2]);
+        phải = x + rộng;
+        dưới = y + cao;
+        nếu (x < 0) { x = 0; };
+        nếu (y < 0) { y = 0; };
+        nếu (phải > mình.rộng) { phải = mình.rộng; };
+        nếu (dưới > mình.cao) { dưới = mình.cao; };
+        lặp(hàng = y; hàng < dưới; hàng++) {
+            lặp(cột = x; cột < phải; cột++) {
+                mình.đặt điểm(cột, hàng, màu);
+            };
+        };
+        trả về mình;
+    };
+
+    hàm công khai lưu BMP(đường) {
+        hàng byte = mình.rộng * 3;
+        đệm hàng = (4 - hàng byte % 4) % 4;
+        kích thước = (hàng byte + đệm hàng) * mình.cao;
+        dữ liệu = [66, 77];
+        đồ họa thêm số nhỏ(dữ liệu, 54 + kích thước, 4);
+        đồ họa thêm số nhỏ(dữ liệu, 0, 4);
+        đồ họa thêm số nhỏ(dữ liệu, 54, 4);
+        đồ họa thêm số nhỏ(dữ liệu, 40, 4);
+        đồ họa thêm số nhỏ(dữ liệu, mình.rộng, 4);
+        đồ họa thêm số nhỏ(dữ liệu, mình.cao, 4);
+        đồ họa thêm số nhỏ(dữ liệu, 1, 2);
+        đồ họa thêm số nhỏ(dữ liệu, 24, 2);
+        đồ họa thêm số nhỏ(dữ liệu, 0, 4);
+        đồ họa thêm số nhỏ(dữ liệu, kích thước, 4);
+        lặp(i = 0; i < 16; i++) { máy ảo thêm cuối danh sách(dữ liệu, 0); };
+        lặp(hàng = mình.cao - 1; hàng >= 0; hàng--) {
+            lặp(cột = 0; cột < mình.rộng; cột++) {
+                vị trí = (hàng * mình.rộng + cột) * 3;
+                máy ảo thêm cuối danh sách(dữ liệu, mình.đệm[vị trí + 2]);
+                máy ảo thêm cuối danh sách(dữ liệu, mình.đệm[vị trí + 1]);
+                máy ảo thêm cuối danh sách(dữ liệu, mình.đệm[vị trí]);
+            };
+            lặp(i = 0; i < đệm hàng; i++) { máy ảo thêm cuối danh sách(dữ liệu, 0); };
+        };
+        trả về ghi các byte tệp(đường, dữ liệu);
+    };
+
+    hàm công khai lưu PPM(đường) {
+        đầu = "P6\n" + thành chuỗi(mình.rộng) + " " + thành chuỗi(mình.cao) + "\n255\n";
+        dữ liệu = chuỗi thành byte máy ảo(đầu);
+        lặp(i = 0; i < độ dài(mình.đệm); i++) {
+            máy ảo thêm cuối danh sách(dữ liệu, mình.đệm[i]);
+        };
+        trả về ghi các byte tệp(đường, dữ liệu);
+    };
+};

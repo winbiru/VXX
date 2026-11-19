@@ -34,7 +34,7 @@ hàm graph_fixture(root, work, target) {
     source = work + "/source"; build = work + "/build";
     tạo thư mục(source);
     sao chép tệp(root + "/CMakeLists.txt", source + "/CMakeLists.txt");
-    parts = ["bootstrap/macos-arm64/vpp-native", "bootstrap/macos-arm64/vpp-i32", "bootstrap/macos-arm64/SHA256SUMS", "bootstrap/macos-arm64/vpp-full.S.gz", "scripts/build-vpp-aot-runtime.sh", "scripts/build-vpp-progress.sh", "scripts/macos/vpp-native-launcher.sh.in", "gói/máy ảo/chính.vi", "gói/biên dịch/dòng lệnh JIT.vi", "scripts/vdk/vpp-cli.vi", "scripts/ASM/fixture.inc", "templates/fixture.vi", "vpp-language.json", "vpp-libraries.json"];
+    parts = ["bootstrap/macos-arm64/vpp-native", "bootstrap/macos-arm64/vpp-i32", "bootstrap/macos-arm64/SHA256SUMS", "bootstrap/macos-arm64/vpp-full.S.gz", "scripts/build-vpp-aot-runtime.sh", "scripts/build-vpp-progress.sh", "scripts/macos/vpp-native-launcher.sh.in", "gói/máy ảo/chính.vi", "gói/biên dịch/dòng lệnh JIT.vi", "scripts/vdk/vpp-cli.vi", "scripts/ASM/fixture.inc", "scripts/ASM/macos/vpp_graphics_arm64.S", "scripts/ASM/macos/vpp_metal_arm64.S", "scripts/graphics/CMakeLists.txt", "templates/fixture.vi", "vpp-language.json", "vpp-libraries.json"];
     lặp(i = 0; i < độ dài(parts); i++) {
         path = source + "/" + parts[i];
         tạo thư mục(đường dẫn cha(path)); ghi tệp(path, "");
@@ -49,10 +49,18 @@ hàm graph_fixture(root, work, target) {
     ghi tệp(source + "/scripts/macos/build-vpp-vm.sh", vm);
     ghi tệp(source + "/scripts/macos/fake-vm.sh", vm);
     ghi tệp(source + "/scripts/macos/fake-jit.sh", "#!/bin/bash\nset -eu\ntest \"$#\" = 4 && test \"$1\" = build && test \"$3\" = -o\ntest -f \"$2\"\noutput=$4\nroot=$(dirname \"$(dirname \"$output\")\")\ncase \"$(basename \"$output\")\" in\n  vpp-jit) test \"$(basename \"$2\")\" = 'dòng lệnh JIT.vi'; kind=JIT ;;\n  vpp-tools) test \"$(basename \"$2\")\" = vpp-cli.vi; kind=tools ;;\n  *) exit 2 ;;\nesac\nprintf '%s\\n' \"$kind\" >> \"$root/invocations.log\"\nprintf '%s\\n' \"$kind\" > \"$output\"\nchmod +x \"$output\"\n");
-    cmake_run(["-G", "Unix Makefiles", "-S", source, "-B", build, "-DBUILD_TESTING=OFF"]);
+    graphics = source + "/scripts/macos/fake-clang.sh";
+    ghi tệp(graphics, "#!/bin/bash\nset -eu\ntest \"$1\" = -arch && test \"$2\" = arm64\ntest -f \"$3\"\noutput=${@: -1}\ncase \"$(basename \"$3\")\" in\n  vpp_graphics_arm64.S) test \"$(basename \"$output\")\" = vpp-graphics-macos ;;\n  vpp_metal_arm64.S) test \"$(basename \"$output\")\" = vpp-graphics-metal ;;\n  *) exit 2 ;;\nesac\nprintf '%s\\n' \"$(basename \"$output\")\" > \"$output\"\nchmod +x \"$output\"\n");
+    run_tool("/bin/chmod", ["+x", graphics]);
+    cmake_run(["-G", "Unix Makefiles", "-S", source, "-B", build, "-DBUILD_TESTING=OFF", "-DVPP_GRAPHICS_CLANG=" + graphics]);
     tất cả = target == "";
     build_graph(build, target); graph_bootstrap_log(build, tất cả, tất cả);
-    nếu (!tất cả) { khẳng định đúng(!là tệp(build + "/bin/vpp-tools"), "vpp-vm must not build vpp-tools"); };
+    nếu (tất cả) {
+        khẳng định đúng(là tệp(build + "/bin/vpp-graphics-macos") && là tệp(build + "/bin/vpp-graphics-metal"), "missing graphics helpers");
+    } hoặc {
+        khẳng định đúng(!là tệp(build + "/bin/vpp-tools"), "vpp-vm must not build vpp-tools");
+        khẳng định đúng(!là tệp(build + "/bin/vpp-graphics-macos") && !là tệp(build + "/bin/vpp-graphics-metal"), "vpp-vm must not build graphics helpers");
+    };
     build_graph(build, target); graph_log(build, "");
     run_tool("/bin/sleep", ["1.05"]); run_tool("/usr/bin/touch", [build + "/bin/vpp-i32"]);
     build_graph(build, target); graph_log(build, "vm\n");
@@ -73,10 +81,13 @@ hàm graph_fixture(root, work, target) {
         build_graph(build, "vpp-tools"); graph_log(build, "tools\n");
     };
     build_graph(build, "vpp-tools"); graph_log(build, "");
+    build_graph(build, "vpp-graphics"); graph_log(build, "");
     cmake_run(["--install", build, "--prefix", work + "/installed"]);
     khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-vm"), "shared VM\n");
     khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-jit"), "JIT\n");
     khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-tools"), "tools\n");
+    khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-graphics-macos"), "vpp-graphics-macos\n");
+    khẳng định bằng(đọc tệp(work + "/installed/bin/vpp-graphics-metal"), "vpp-graphics-metal\n");
     khẳng định đúng(là tệp(work + "/installed/vpp-install-manifest.tsv"), "missing install manifest");
     khẳng định bằng(đọc tệp(build + "/bootstrap-mode.log"), "OFF");
     prepared = work + "/prepared"; tạo thư mục(prepared);

@@ -58,8 +58,35 @@ add_custom_command(OUTPUT "${VPP_BIN}/vpp-tools"
   VERBATIM USES_TERMINAL)
 add_custom_target(vpp-tools ALL DEPENDS "${VPP_BIN}/vpp-tools")
 add_dependencies(vpp-tools vpp-cli)
+# Trợ giúp cửa sổ riêng biệt; chỉ ứng dụng đồ họa mới khởi chạy nó.
+find_program(VPP_GRAPHICS_CLANG clang REQUIRED)
+add_custom_command(OUTPUT "${VPP_BIN}/vpp-graphics-macos"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${VPP_BIN}"
+  COMMAND "${VPP_GRAPHICS_CLANG}" -arch arm64
+    "${CMAKE_SOURCE_DIR}/scripts/ASM/macos/vpp_graphics_arm64.S"
+    -framework Cocoa -framework WebKit -o "${VPP_BIN}/vpp-graphics-macos"
+  DEPENDS scripts/ASM/macos/vpp_graphics_arm64.S
+  VERBATIM)
+add_custom_command(OUTPUT "${VPP_BIN}/vpp-graphics-metal"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${VPP_BIN}"
+  COMMAND "${VPP_GRAPHICS_CLANG}" -arch arm64
+    "${CMAKE_SOURCE_DIR}/scripts/ASM/macos/vpp_metal_arm64.S"
+    -framework Metal -framework Foundation -o "${VPP_BIN}/vpp-graphics-metal"
+  DEPENDS scripts/ASM/macos/vpp_metal_arm64.S
+  VERBATIM)
+add_custom_target(vpp-graphics ALL DEPENDS "${VPP_BIN}/vpp-graphics-macos" "${VPP_BIN}/vpp-graphics-metal")
+install(PROGRAMS "${VPP_BIN}/vpp-graphics-macos" "${VPP_BIN}/vpp-graphics-metal" DESTINATION bin)
 include(CTest)
+option(VPP_GRAPHICS_GPU_TESTS "Kiểm tra GPU thực tế" OFF)
 if(BUILD_TESTING)
+  if(VPP_GRAPHICS_GPU_TESTS)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME vpp-graphics-metal COMMAND "${Python3_EXECUTABLE}"
+      "${CMAKE_SOURCE_DIR}/scripts/graphics/check_gpu.py" "${VPP_BIN}/vpp-graphics-metal" --metal)
+    set_tests_properties(vpp-graphics-metal PROPERTIES TIMEOUT 60)
+  endif()
+  add_test(NAME vpp-graphics-helper COMMAND "${VPP_BIN}/vpp-graphics-macos" --check)
+  set_tests_properties(vpp-graphics-helper PROPERTIES LABELS smoke)
   add_test(NAME vpp-source-boundary COMMAND /bin/sh "${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh")
   set_tests_properties(vpp-source-boundary PROPERTIES ENVIRONMENT "VPP_AUDIT_BINARY=${VPP_BIN}/vpp-native")
   find_program(VPP_NODE node)
@@ -131,6 +158,8 @@ install(FILES "${VPP_RUNTIME}/runtime.o" "${VPP_RUNTIME}/platform.o" "${VPP_RUNT
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/gói" "${CMAKE_SOURCE_DIR}/templates" DESTINATION share/vpp)
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/scripts/ASM" DESTINATION share/vpp/scripts
   FILES_MATCHING PATTERN "*.S" PATTERN "*.inc" PATTERN "*.md")
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/scripts/graphics" DESTINATION share/vpp/scripts
+  FILES_MATCHING PATTERN "CMakeLists.txt" PATTERN "*.py")
 install(FILES "${CMAKE_SOURCE_DIR}/vpp-language.json" "${CMAKE_SOURCE_DIR}/vpp-libraries.json" DESTINATION share/vpp)
 
 # Record only files installed by CMake, never unrelated files in a shared prefix.
@@ -144,7 +173,7 @@ if(Python3_Interpreter_FOUND)
     COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}" --prefix "${CMAKE_BINARY_DIR}/release-prefix"
     COMMAND "${CMAKE_BINARY_DIR}/release-prefix/bin/vpp" vm-build "${CMAKE_BINARY_DIR}/release-prefix/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "${CMAKE_BINARY_DIR}/release-prefix/bin/dns-provider.vmb"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/quality/package_release.py" --platform macos-arm64 --prefix "${CMAKE_BINARY_DIR}/release-prefix" --output "${CMAKE_BINARY_DIR}/release-candidates"
-    DEPENDS vpp-cli vpp-vm vpp-jit vpp-tools
+    DEPENDS vpp-cli vpp-vm vpp-jit vpp-tools vpp-graphics
     COMMENT "Đóng gói VPP và VDK từ compiler hiện tại"
     VERBATIM USES_TERMINAL)
 endif()

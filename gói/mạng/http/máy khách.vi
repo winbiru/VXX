@@ -886,17 +886,21 @@ lớp công khai Bộ Giao Thức HTTP {
         trả về "OK";
     };
 
-    hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối) {
+    hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = "application/json") {
+        nếu (kiểu nội dung != "application/json" && kiểu nội dung != "text/html" &&
+            kiểu nội dung != "text/plain" && kiểu nội dung != "image/svg+xml") {
+            ném "mạng http server: kiểu nội dung không hỗ trợ";
+        };
         số byte = máy ảo lấy độ dài(chuỗi thành các byte(thân khối, "UTF-8"));
         trả về "HTTP/1.1 " + thành chuỗi(mã trạng thái) + " " +
                 mình.mạng http trạng thái chữ(mã trạng thái) + "\r\n" +
-                "Content-Type: application/json; charset=utf-8\r\n" +
+                "Content-Type: " + kiểu nội dung + "; charset=utf-8\r\n" +
                 "Content-Length: " + thành chuỗi(số byte) + "\r\n" +
                 "Connection: close\r\n\r\n" + thân khối;
     };
 
     // Gửi response bằng socket primitive rồi đóng connection theo contract cũ.
-    hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối) {
+    hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = "application/json") {
         nếu (loại của(mã yêu cầu) != "từ điển") {
             ném "mạng http server: request handle không hợp lệ";
         };
@@ -905,7 +909,7 @@ lớp công khai Bộ Giao Thức HTTP {
             ném "mạng http server: request socket đã đóng hoặc không hợp lệ";
         };
         thử {
-            phản hồi = mình.mạng http dựng phản hồi(mã trạng thái, thân khối);
+            phản hồi = mình.mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung);
             đầu nối gửi(mã đầu nối, phản hồi);
             đầu nối đóng(mã đầu nối);
             đặt từ điển(mã yêu cầu, "socket", 0);
@@ -1043,14 +1047,14 @@ hàm công khai mạng đường tệp hậu tố yêu cầu(mã yêu cầu, ti�
     trả về bộ chuyển tiếp.mạng đường tệp hậu tố yêu cầu(mã yêu cầu, tiền tố);
 };
 
-hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối) {
+hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = "application/json") {
     bộ chuyển tiếp = Bộ Giao Thức HTTP();
-    trả về bộ chuyển tiếp.mạng http dựng phản hồi(mã trạng thái, thân khối);
+    trả về bộ chuyển tiếp.mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung);
 };
 
-hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối) {
+hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = "application/json") {
     bộ chuyển tiếp = Bộ Giao Thức HTTP();
-    trả về bộ chuyển tiếp.mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối);
+    trả về bộ chuyển tiếp.mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung);
 };
 
 hàm công khai mạng đóng máy chủ giao diện lập trình(mã máy chủ) {

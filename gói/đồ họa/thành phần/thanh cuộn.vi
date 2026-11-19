@@ -1,0 +1,5 @@
+nhập gói.đồ họa.màn hình.kích thước đồ họa;
+
+hàm công khai thanh cuộn đồ họa(nội dung, cao) {
+    trả về "<div style=\"overflow:auto;max-height:" + kích thước đồ họa(cao) + "px\">" + nội dung + "</div>";
+};

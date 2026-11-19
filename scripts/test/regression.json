@@ -20,6 +20,13 @@
       "suite": "full"
     },
     {
+      "id": "kiem_tra_do_hoa",
+      "source": "scripts/test/kiem_tra_do_hoa.vi",
+      "expected": "scripts/test/expected/kiem_tra_do_hoa.expected",
+      "python_fixture": true,
+      "suite": "full"
+    },
+    {
       "id": "kiem_tra_aot_byte_scan",
       "source": "scripts/test/kiem_tra_aot_byte_scan.vi",
       "expected": "scripts/test/expected/kiem_tra_aot_byte_scan.expected",

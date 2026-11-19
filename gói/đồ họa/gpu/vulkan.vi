@@ -1,0 +1,5 @@
+nhập gói.đồ họa.gpu.đọc màu.GPU đọc màu;
+
+hàm công khai Vulkan đọc màu(trợ giúp, màu) {
+    trả về GPU đọc màu(trợ giúp, "--vulkan", màu);
+};

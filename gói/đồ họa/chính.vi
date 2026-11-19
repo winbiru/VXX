@@ -1,0 +1,15 @@
+// Gói đồ họa độc lập; không tự khởi động mạng hoặc tải thư viện ngoài.
+công khai nhập gói.đồ họa.màu sắc.*;
+công khai nhập gói.đồ họa.phông chữ.*;
+công khai nhập gói.đồ họa.hình ảnh.*;
+công khai nhập gói.đồ họa.màn hình.*;
+công khai nhập gói.đồ họa.sự kiện.*;
+công khai nhập gói.đồ họa.bàn phím.*;
+công khai nhập gói.đồ họa.chuột.*;
+công khai nhập gói.đồ họa.bố cục.*;
+công khai nhập gói.đồ họa.cửa sổ.*;
+công khai nhập gói.đồ họa.thành phần.nút.*;
+công khai nhập gói.đồ họa.thành phần.nhãn.*;
+công khai nhập gói.đồ họa.thành phần.bảng.*;
+công khai nhập gói.đồ họa.thành phần.ô nhập.*;
+công khai nhập gói.đồ họa.thành phần.thanh cuộn.*;

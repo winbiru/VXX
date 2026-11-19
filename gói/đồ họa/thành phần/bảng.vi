@@ -1,0 +1,14 @@
+nhập gói.đồ họa.phông chữ.đồ họa thoát;
+
+hàm công khai bảng đồ họa(các cột, các hàng) {
+    kết quả = "<table><thead><tr>";
+    lặp(i = 0; i < độ dài(các cột); i++) { kết quả = kết quả + "<th>" + đồ họa thoát(các cột[i]) + "</th>"; };
+    kết quả = kết quả + "</tr></thead><tbody>";
+    lặp(i = 0; i < độ dài(các hàng); i++) {
+        nếu (độ dài(các hàng[i]) != độ dài(các cột)) { ném "đồ họa: số cột không khớp"; };
+        kết quả = kết quả + "<tr>";
+        lặp(j = 0; j < độ dài(các cột); j++) { kết quả = kết quả + "<td>" + đồ họa thoát(các hàng[i][j]) + "</td>"; };
+        kết quả = kết quả + "</tr>";
+    };
+    trả về kết quả + "</tbody></table>";
+};

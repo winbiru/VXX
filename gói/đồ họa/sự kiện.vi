@@ -1,0 +1,38 @@
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.dữ liệu.json.json.json phân tích;
+
+lớp công khai Hàng Đợi Đồ Họa {
+    hàm công khai khởi tạo() {
+        mình.danh sách = [];
+    };
+
+    hàm công khai gửi(sự kiện) {
+        nếu (loại của(sự kiện) != "từ điển") { ném "đồ họa: sự kiện phải là từ điển"; };
+        máy ảo thêm cuối danh sách(mình.danh sách, sự kiện);
+        trả về mình;
+    };
+
+    hàm công khai lấy() {
+        nếu (độ dài(mình.danh sách) == 0) { trả về rỗng; };
+        trả về máy ảo xóa vị trí danh sách(mình.danh sách, 0);
+    };
+
+    hàm công khai số lượng() {
+        trả về độ dài(mình.danh sách);
+    };
+};
+
+hàm công khai đồ họa đọc sự kiện(nội dung) {
+    giá trị = json phân tích(nội dung);
+    nếu (loại của(giá trị) != "từ điển") { ném "đồ họa: JSON sự kiện không hợp lệ"; };
+    trả về giá trị;
+};
+
+hàm công khai đồ họa đọc danh sách sự kiện(nội dung) {
+    danh sách = json phân tích(nội dung);
+    nếu (loại của(danh sách) != "danh sách") { ném "đồ họa: cần danh sách sự kiện"; };
+    lặp(i = 0; i < độ dài(danh sách); i++) {
+        nếu (loại của(danh sách[i]) != "từ điển") { ném "đồ họa: sự kiện không hợp lệ"; };
+    };
+    trả về danh sách;
+};

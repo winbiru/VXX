@@ -1,0 +1,28 @@
+nhập gói.đồ họa.chính.*;
+nhập gói.đồ họa.cửa sổ linux.Cửa Sổ Linux;
+nhập gói.đồ họa.cửa sổ windows.Cửa Sổ Windows;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+
+hàm chính() {
+    ảnh = Hình Ảnh RGB(320, 240, màu RGB(20, 30, 40));
+    ảnh.tô vùng(40, 40, 240, 160, màu RGB(30, 120, 220));
+    ảnh.lưu BMP("vpp-desktop.bmp");
+    nếu (tên nền tảng() == "windows") {
+        cửa = Cửa Sổ Windows("build-graphics/vpp-graphics-sdl.exe", "vpp-desktop.bmp", "Đồ họa V++", 640, 480);
+    } hoặc {
+        cửa = Cửa Sổ Linux("build-graphics/vpp-graphics-sdl", "vpp-desktop.bmp", "Đồ họa V++", 640, 480);
+    };
+    thử {
+        khi (cửa.đang mở()) {
+            cửa.thăm dò(100);
+            sự kiện = cửa.lấy sự kiện();
+            khi (sự kiện != rỗng) {
+                in sự kiện;
+                sự kiện = cửa.lấy sự kiện();
+            };
+        };
+    } bắt lỗi(e) {
+        cửa.đóng();
+        ném e;
+    };
+};
