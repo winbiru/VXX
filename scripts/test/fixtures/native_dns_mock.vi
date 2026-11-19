@@ -84,17 +84,30 @@ hàm chính() {
     nếu (queries < 1 || queries > 16) { trả về 2; };
     biến u = 65536; biến l = 65792; biến c = 66048;
     biến q = 70000; biến r = 74096; biến frame = 78192;
-    ctrl(u, 0);
-    biến fd = máy ổ cắm thô(7, u);
-    nếu (fd == -1 || fd == -13) { trả về 77; };
-    nếu (fd < 0) { trả về 3; };
-    biến port = máy ổ cắm thô(10, u);
-    nếu (port < 1 || port > 65535) { máy ổ cắm thô(5, u); trả về 4; };
-    ctrl(l, port); biến tcp = mode == 1 || mode >= 30;
-    nếu (tcp) {
-        nếu (máy ổ cắm thô(1, l) < 0) { máy ổ cắm thô(5, u); trả về 5; };
+    biến tcp = mode == 1 || mode >= 30;
+    biến port = 0; biến listen_error = 0;
+    // An ephemeral UDP port may already be occupied or reserved for TCP.
+    // Keep UDP bound while opening TCP, and publish only a complete pair.
+    lặp(attempt = 0; attempt < 16; attempt++) {
+        ctrl(u, 0);
+        biến fd = máy ổ cắm thô(7, u);
+        nếu (fd == -1 || fd == -13) { trả về 77; };
+        nếu (fd < 0) { write_number(2, -fd); trả về 3; };
+        port = máy ổ cắm thô(10, u);
+        nếu (port < 1 || port > 65535) { máy ổ cắm thô(5, u); trả về 4; };
+        nếu (!tcp) { thoát; };
+        ctrl(l, port);
+        listen_error = máy ổ cắm thô(1, l);
+        nếu (listen_error >= 0) { thoát; };
+        máy ổ cắm thô(5, u);
+        port = 0;
     };
-    nếu (write_number(1, port) < 1) { máy ổ cắm thô(5, u); trả về 6; };
+    nếu (port == 0) { write_number(2, -listen_error); trả về 5; };
+    nếu (write_number(1, port) < 1) {
+        máy ổ cắm thô(5, u);
+        nếu (tcp) { máy ổ cắm thô(5, l); };
+        trả về 6;
+    };
     nếu (gated && đọc số() != 1) {
         máy ổ cắm thô(5, u);
         nếu (tcp) { máy ổ cắm thô(5, l); };
