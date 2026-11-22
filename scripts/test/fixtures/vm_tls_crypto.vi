@@ -29,28 +29,28 @@ hàm chính() {
     tls vector bằng(hkdf.mở rộng(prk, tls vector hex("f0f1f2f3f4f5f6f7f8f9"), 42),
         "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865");
     key = []; lặp(i = 128; i < 160; i++) { thêm(key, i); };
-    nonce = tls vector hex("070000004041424344454647");
+    record_nonce = tls vector hex("070000004041424344454647");
     aad = tls vector hex("50515253c0c1c2c3c4c5c6c7");
     plain = chuỗi thành byte máy ảo("Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.");
-    encrypted = crypto.niêm(key, nonce, plain, aad);
+    encrypted = crypto.niêm(key, record_nonce, plain, aad);
     tls vector bằng(encrypted[0], "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116");
     tls vector bằng(encrypted[1], "1ae10b594f09e26a7e902ecbd0600691");
-    decrypted = crypto.mở(key, nonce, encrypted[0], aad, encrypted[1]);
+    decrypted = crypto.mở(key, record_nonce, encrypted[0], aad, encrypted[1]);
     nếu (chuỗi từ byte máy ảo(decrypted) != chuỗi từ byte máy ảo(plain)) { ném "TLS decrypt"; };
     refused = 0;
     lặp(i = 0; i < 16; i++) {
         tag = []; lặp(j = 0; j < 16; j++) { thêm(tag, encrypted[1][j]); };
         tag[i] = (tag[i] + 1) % 256;
-        thử { crypto.mở(key, nonce, encrypted[0], aad, tag); }
+        thử { crypto.mở(key, record_nonce, encrypted[0], aad, tag); }
         bắt lỗi(e) { refused = refused + 1; };
     };
     nếu (refused != 16) { ném "TLS accepted modified tag"; };
     refused = 0;
     thử { hkdf.mở rộng(prk, [], 8161); } bắt lỗi(e) { refused = refused + 1; };
-    thử { crypto.niêm([], nonce, [], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.niêm([], record_nonce, [], []); } bắt lỗi(e) { refused = refused + 1; };
     thử { crypto.niêm(key, [], [], []); } bắt lỗi(e) { refused = refused + 1; };
-    thử { crypto.niêm(key, nonce, [256], []); } bắt lỗi(e) { refused = refused + 1; };
-    thử { crypto.mở(key, nonce, [], [], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.niêm(key, record_nonce, [256], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.mở(key, record_nonce, [], [], []); } bắt lỗi(e) { refused = refused + 1; };
     nếu (refused != 5) { ném "TLS accepted malformed parameters"; };
     secret = []; lặp(i = 0; i < 32; i++) { thêm(secret, i); };
     sender = Bản Ghi TLS VPP(secret, 1); receiver = Bản Ghi TLS VPP(secret, 0);

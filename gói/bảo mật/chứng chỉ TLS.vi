@@ -1,0 +1,606 @@
+// Strict bounded PEM, DER and TLS 1.3 Certificate-message parsing in V++.
+// Parsing and checking names/dates do not establish trust. A TLS connection
+// additionally requires CA path validation and CertificateVerify signatures.
+nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+nhập gói.bảo mật.ed25519.Ed25519 VPP;
+nhập gói.thời gian.giờ quốc tế.thời gian đọc giờ quốc tế ffi;
+
+lớp công khai Chứng Chỉ TLS VPP {
+    hàm công khai khởi tạo() { mình.checker = Khóa TLS VPP(); };
+
+    hàm riêng tư phần(data, first, last) {
+        nếu (first < 0 || last < first || last > độ dài(data)) { ném "X509: invalid slice"; };
+        output = [];
+        lặp(i = first; i < last; i++) { thêm(output, data[i]); };
+        trả về output;
+    };
+
+    hàm riêng tư bằng(a, b) {
+        nếu (độ dài(a) != độ dài(b)) { trả về sai; };
+        lặp(i = 0; i < độ dài(a); i++) { nếu (a[i] != b[i]) { trả về sai; } };
+        trả về đúng;
+    };
+
+    // Validate base-128 subidentifiers, including nonminimal and truncated OIDs.
+    hàm riêng tư đọc oid(data, item) {
+        nếu (item[0] != 6 || item[1] == item[2]) { ném "X509: empty OID"; };
+        at = item[1];
+        khi (at < item[2]) {
+            nếu (data[at] == 128) { ném "X509: nonminimal OID"; };
+            khi (at < item[2] && data[at] >= 128) { at = at + 1; };
+            nếu (at >= item[2]) { ném "X509: unterminated OID"; };
+            at = at + 1;
+        };
+        trả về mình.phần(data, item[1], item[2]);
+    };
+
+    hàm riêng tư nguyên dương(data, item) {
+        nếu (item[0] != 2 || item[2] <= item[1] || item[2] - item[1] > 3 ||
+            data[item[1]] >= 128) { ném "X509: invalid positive INTEGER"; };
+        nếu (item[2] - item[1] > 1 && data[item[1]] == 0 && data[item[1] + 1] < 128) {
+            ném "X509: nonminimal INTEGER";
+        };
+        value = 0;
+        lặp(i = item[1]; i < item[2]; i++) { value = value * 256 + data[i]; };
+        trả về value;
+    };
+
+    // DER BIT STRING must have zero-filled unused bits.
+    hàm riêng tư bit string(data, item) {
+        nếu (item[0] != 3 || item[2] - item[1] < 2) { ném "X509: invalid BIT STRING"; };
+        unused = data[item[1]];
+        nếu (unused > 7 || (data[item[2] - 1] & ((1 << unused) - 1)) != 0) {
+            ném "X509: invalid unused bits";
+        };
+        trả về mình.phần(data, item[1] + 1, item[2]);
+    };
+
+    hàm riêng tư u24(data, at, limit) {
+        nếu (at + 3 > limit) { ném "TLS: truncated uint24"; };
+        trả về data[at] * 65536 + data[at + 1] * 256 + data[at + 2];
+    };
+
+    // Returns [tag, value start, value end, next element offset].
+    // Rejects indefinite/nonminimal lengths and high-tag-number encoding.
+    hàm công khai tlv(data, at, limit) {
+        nếu (at < 0 || limit > độ dài(data) || at + 2 > limit) {
+            ném "X509: truncated TLV";
+        };
+        tag = data[at];
+        nếu (tag == 0 || (tag & 31) == 31) { ném "X509: unsupported DER tag"; };
+        length = data[at + 1];
+        start = at + 2;
+        nếu (length >= 128) {
+            count = length - 128;
+            nếu (count < 1 || count > 3 || start + count > limit || data[start] == 0) {
+                ném "X509: noncanonical DER length";
+            };
+            length = 0;
+            lặp(i = 0; i < count; i++) { length = length * 256 + data[start + i]; };
+            nếu (length < 128) { ném "X509: nonminimal DER length"; };
+            start = start + count;
+        };
+        nếu (length > limit - start) { ném "X509: DER length overflow"; };
+        trả về [tag, start, start + length, start + length];
+    };
+
+    hàm riêng tư chữ số(data, at, count) {
+        result = 0;
+        lặp(i = at; i < at + count; i++) {
+            nếu (data[i] < 48 || data[i] > 57) { ném "X509: invalid time digits"; };
+            result = result * 10 + data[i] - 48;
+        };
+        trả về result;
+    };
+
+    // Strict UTC and GeneralizedTime, seconds and Z suffix required.
+    hàm công khai đọc ngày(data, item) {
+        digits = 4; expected = 15;
+        nếu (item[0] == 23) { digits = 2; expected = 13; }
+        hoặc nếu (item[0] != 24) { ném "X509: invalid time encoding"; };
+        nếu (item[2] - item[1] != expected || data[item[2] - 1] != 90) {
+            ném "X509: noncanonical time";
+        };
+        start = item[1];
+        year = mình.chữ số(data, start, digits);
+        nếu (digits == 2) {
+            nếu (year >= 50) { year = 1900 + year; }
+            hoặc { year = 2000 + year; };
+        };
+        month = mình.chữ số(data, start + digits, 2);
+        day = mình.chữ số(data, start + digits + 2, 2);
+        hour = mình.chữ số(data, start + digits + 4, 2);
+        minute = mình.chữ số(data, start + digits + 6, 2);
+        second = mình.chữ số(data, start + digits + 8, 2);
+        month_days = [31,28,31,30,31,30,31,31,30,31,30,31];
+        nếu (month < 1 || month > 12) { ném "X509: month out of range"; };
+        max_day = month_days[month - 1];
+        nếu (month == 2 && year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
+            max_day = 29;
+        };
+        nếu (day < 1 || day > max_day || hour > 23 || minute > 59 || second > 59) {
+            ném "X509: invalid calendar date";
+        };
+        nếu (digits == 4 && year >= 1950 && year < 2050) {
+            ném "X509: noncanonical GeneralizedTime";
+        };
+        trả về [year,month,day,hour,minute,second];
+    };
+
+    hàm công khai đọc pem(pem) {
+        nếu (loại của(pem) != "chuỗi") { ném "X509: expected PEM text"; };
+        data = chuỗi thành byte máy ảo(pem);
+        header = chuỗi thành byte máy ảo("-----BEGIN CERTIFICATE-----");
+        footer = chuỗi thành byte máy ảo("-----END CERTIFICATE-----");
+        at = 0;
+        khi (at < độ dài(data) && (data[at] == 10 || data[at] == 13 || data[at] == 32)) {
+            at = at + 1;
+        };
+        nếu (at + độ dài(header) > độ dài(data) ||
+            !mình.bằng(mình.phần(data, at, at + độ dài(header)), header)) {
+            ném "X509: missing PEM header";
+        };
+        at = at + độ dài(header);
+        encoded = []; found_end = sai;
+        khi (at < độ dài(data)) {
+            nếu (at + độ dài(footer) <= độ dài(data) &&
+                mình.bằng(mình.phần(data, at, at + độ dài(footer)), footer)) {
+                found_end = đúng;
+                at = at + độ dài(footer);
+                thoát;
+            };
+            b = data[at]; at = at + 1;
+            nếu (b == 10 || b == 13 || b == 32 || b == 9) { bỏ qua; };
+            nếu (độ dài(encoded) > 1400000) { ném "X509: PEM too large"; };
+            thêm(encoded, b);
+        };
+        nếu (!found_end || độ dài(encoded) == 0 || độ dài(encoded) % 4 != 0) {
+            ném "X509: incomplete PEM base64";
+        };
+        khi (at < độ dài(data)) {
+            nếu (data[at] != 10 && data[at] != 13 && data[at] != 32 && data[at] != 9) {
+                ném "X509: trailing PEM data";
+            };
+            at = at + 1;
+        };
+        output = [];
+        lặp(i = 0; i < độ dài(encoded); i = i + 4) {
+            values = []; pad = 0;
+            lặp(j = 0; j < 4; j++) {
+                b = encoded[i + j]; value = -1;
+                nếu (b >= 65 && b <= 90) { value = b - 65; }
+                hoặc nếu (b >= 97 && b <= 122) { value = b - 97 + 26; }
+                hoặc nếu (b >= 48 && b <= 57) { value = b - 48 + 52; }
+                hoặc nếu (b == 43) { value = 62; }
+                hoặc nếu (b == 47) { value = 63; }
+                hoặc nếu (b == 61 && j >= 2) { value = 0; pad = pad + 1; }
+                nếu (value < 0 || (pad > 0 && b != 61)) { ném "X509: invalid PEM base64"; };
+                thêm(values, value);
+            };
+            nếu ((pad > 0 && i + 4 != độ dài(encoded)) || pad > 2 ||
+                (pad == 1 && (values[2] & 3) != 0) ||
+                (pad == 2 && (values[1] & 15) != 0)) {
+                ném "X509: noncanonical PEM padding";
+            };
+            thêm(output, (values[0] * 4 + values[1] / 16));
+            nếu (pad < 2) { thêm(output, (values[1] % 16) * 16 + values[2] / 4); };
+            nếu (pad == 0) { thêm(output, (values[2] % 4) * 64 + values[3]); };
+            nếu (độ dài(output) > 1048576) { ném "X509: certificate too large"; };
+        };
+        trả về output;
+    };
+
+    // Parses DNS names only. Other GeneralName choices remain available in
+    // the original DER, and do not grant authorization for a DNS hostname.
+    hàm riêng tư chuẩn dns(data, wildcard) {
+        n = độ dài(data);
+        nếu (n == 0 || n > 253) { ném "X509: invalid DNS name length"; };
+        start = 0; wildcard_name = sai;
+        nếu (wildcard && n >= 3 && data[0] == 42 && data[1] == 46) {
+            wildcard_name = đúng; start = 2;
+        };
+        result = []; label_start = start; separators = 0;
+        lặp(i = start; i < n; i++) {
+            c = data[i];
+            nếu (c >= 65 && c <= 90) { c = c + 32; };
+            nếu (c == 46) {
+                nếu (i == label_start || i - label_start > 63 ||
+                    result[độ dài(result) - 1] == 45) {
+                    ném "X509: invalid DNS label";
+                };
+                separators = separators + 1; label_start = i + 1;
+            } hoặc nếu (!((c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c == 45) ||
+                       (c == 45 && i == label_start)) {
+                ném "X509: invalid DNS character";
+            };
+            thêm(result, c);
+        };
+        nếu (n == label_start || n - label_start > 63 || result[độ dài(result) - 1] == 45 ||
+            (wildcard_name && separators == 0)) { ném "X509: invalid DNS suffix"; };
+        nếu (wildcard_name) {
+            full = [42,46];
+            lặp(i = 0; i < độ dài(result); i++) { thêm(full, result[i]); };
+            trả về full;
+        };
+        trả về result;
+    };
+
+    hàm riêng tư đọc san(data, first, last) {
+        san = mình.tlv(data, first, last);
+        nếu (san[0] != 48 || san[3] != last) { ném "X509: invalid SAN sequence"; };
+        nếu (san[1] == san[2]) { ném "X509: empty SAN"; };
+        names = []; at = san[1];
+        khi (at < san[2]) {
+            entry = mình.tlv(data, at, san[2]);
+            nếu (entry[0] == 130) {
+                dns = mình.phần(data, entry[1], entry[2]);
+                thêm(names, mình.chuẩn dns(dns, đúng));
+            };
+            at = entry[3];
+        };
+        trả về names;
+    };
+
+    hàm riêng tư đọc ràng buộc ca(data, first, last) {
+        sequence = mình.tlv(data, first, last);
+        nếu (sequence[0] != 48 || sequence[3] != last) { ném "X509: invalid BasicConstraints"; };
+        is_ca = sai; path_limit = -1; at = sequence[1];
+        nếu (at < sequence[2]) {
+            field = mình.tlv(data, at, sequence[2]);
+            nếu (field[0] == 1) {
+                // BOOLEAN DEFAULT FALSE must be omitted in DER.
+                nếu (field[2] - field[1] != 1 || data[field[1]] != 255) {
+                    ném "X509: invalid CA boolean";
+                };
+                is_ca = đúng; at = field[3];
+            };
+        };
+        nếu (at < sequence[2]) {
+            field = mình.tlv(data, at, sequence[2]);
+            path_limit = mình.nguyên dương(data, field);
+            nếu (!is_ca || path_limit > 65535) { ném "X509: invalid CA path length"; };
+            at = field[3];
+        };
+        nếu (at != sequence[2]) { ném "X509: trailing BasicConstraints"; };
+        trả về [is_ca, path_limit];
+    };
+
+    hàm riêng tư đọc quyền khóa(data, first, last) {
+        bits = mình.tlv(data, first, last);
+        nếu (bits[3] != last) { ném "X509: invalid KeyUsage"; };
+        value = mình.bit string(data, bits);
+        nếu (độ dài(value) > 2 || value[độ dài(value) - 1] == 0) {
+            ném "X509: noncanonical KeyUsage";
+        };
+        nếu (độ dài(value) == 2) {
+            nếu (value[1] != 128) { ném "X509: noncanonical KeyUsage"; };
+        };
+        // X.509 KeyUsage bits 0 and 5 are digitalSignature and keyCertSign.
+        trả về [(value[0] & 128) != 0, (value[0] & 4) != 0];
+    };
+
+    hàm riêng tư đọc quyền mở rộng(data, first, last) {
+        sequence = mình.tlv(data, first, last);
+        nếu (sequence[0] != 48 || sequence[3] != last || sequence[1] == sequence[2]) {
+            ném "X509: invalid ExtendedKeyUsage";
+        };
+        server = sai; seen = []; at = sequence[1];
+        server_oid = [43,6,1,5,5,7,3,1];
+        khi (at < sequence[2]) {
+            item = mình.tlv(data, at, sequence[2]);
+            oid = mình.đọc oid(data, item);
+            lặp(i = 0; i < độ dài(seen); i++) {
+                nếu (mình.bằng(seen[i], oid)) { ném "X509: duplicate ExtendedKeyUsage"; };
+            };
+            thêm(seen, oid);
+            nếu (mình.bằng(oid, server_oid)) { server = đúng; };
+            at = item[3];
+        };
+        trả về server;
+    };
+
+    hàm riêng tư đọc phần mở rộng(data, first, last) {
+        sequence = mình.tlv(data, first, last);
+        nếu (sequence[0] != 48 || sequence[3] != last) { ném "X509: bad Extensions"; };
+        nếu (sequence[1] == sequence[2]) { ném "X509: empty Extensions"; };
+        san_oid = [85,29,17]; ca_oid = [85,29,19]; ku_oid = [85,29,15];
+        eku_oid = [85,29,37];
+        seen = []; names = []; ca = sai; limit = -1;
+        digital_signature = đúng; cert_sign = đúng; server_auth = đúng;
+        at = sequence[1];
+        khi (at < sequence[2]) {
+            ext = mình.tlv(data, at, sequence[2]);
+            nếu (ext[0] != 48 || độ dài(seen) >= 64) { ném "X509: bad Extension"; };
+            field = mình.tlv(data, ext[1], ext[2]);
+            oid = mình.đọc oid(data, field);
+            lặp(i = 0; i < độ dài(seen); i++) {
+                nếu (mình.bằng(seen[i], oid)) { ném "X509: duplicate Extension"; };
+            };
+            thêm(seen, oid);
+            pos = field[3]; value = mình.tlv(data, pos, ext[2]);
+            critical = sai;
+            nếu (value[0] == 1) {
+                nếu (value[2] - value[1] != 1 ||
+                    data[value[1]] != 255) {
+                    ném "X509: invalid critical boolean";
+                };
+                critical = đúng;
+                pos = value[3]; value = mình.tlv(data, pos, ext[2]);
+            };
+            nếu (value[0] != 4 || value[3] != ext[2]) { ném "X509: invalid extension value"; };
+            nếu (mình.bằng(oid, san_oid)) {
+                names = mình.đọc san(data, value[1], value[2]);
+            } hoặc nếu (mình.bằng(oid, ca_oid)) {
+                constraints = mình.đọc ràng buộc ca(data, value[1], value[2]);
+                ca = constraints[0]; limit = constraints[1];
+            } hoặc nếu (mình.bằng(oid, ku_oid)) {
+                usage = mình.đọc quyền khóa(data, value[1], value[2]);
+                digital_signature = usage[0]; cert_sign = usage[1];
+            } hoặc nếu (mình.bằng(oid, eku_oid)) {
+                server_auth = mình.đọc quyền mở rộng(data, value[1], value[2]);
+            } hoặc nếu (critical) {
+                // A critical extension must never silently bypass validation.
+                ném "X509: unsupported critical extension";
+            };
+            at = ext[3];
+        };
+        trả về [names, ca, limit, digital_signature, cert_sign, server_auth];
+    };
+
+    // Returns [tbs DER, signatureAlgorithm DER, signature bytes,
+    //          issuer DER, subject DER, SPKI DER, notBefore, notAfter,
+    //          SAN DNS byte arrays, CA, pathLimit, digitalSignature,
+    //          keyCertSign, serverAuth, publicKey, signatureOID, publicKeyOID,
+    //          complete DER]. This parser does not establish CA trust.
+    hàm công khai đọc der(data) {
+        checker = mình.checker; checker.bytes(data, 1048576);
+        outer = mình.tlv(data, 0, độ dài(data));
+        nếu (outer[0] != 48 || outer[3] != độ dài(data)) { ném "X509: invalid Certificate"; };
+        tbs = mình.tlv(data, outer[1], outer[2]);
+        alg = mình.tlv(data, tbs[3], outer[2]);
+        signature = mình.tlv(data, alg[3], outer[2]);
+        nếu (tbs[0] != 48 || alg[0] != 48 || signature[3] != outer[2]) {
+            ném "X509: invalid certificate signature framing";
+        };
+        sig_bytes = mình.bit string(data, signature);
+        outer_oid = mình.tlv(data, alg[1], alg[2]);
+        mình.đọc oid(data, outer_oid);
+        nếu (outer_oid[3] < alg[2]) {
+            params = mình.tlv(data, outer_oid[3], alg[2]);
+            nếu (params[3] != alg[2]) { ném "X509: invalid signature algorithm parameters"; };
+        };
+        // RFC 8410 Ed25519 algorithm identifiers must omit parameters.
+        nếu (mình.bằng(mình.phần(data, outer_oid[1], outer_oid[2]), [43,101,112]) &&
+            (outer_oid[3] != alg[2] || data[signature[1]] != 0 ||
+             độ dài(sig_bytes) != 64)) { ném "X509: invalid Ed25519 signature"; };
+        at = tbs[1]; version = 0;
+        version_item = mình.tlv(data, at, tbs[2]);
+        nếu (version_item[0] == 160) {
+            v = mình.tlv(data, version_item[1], version_item[2]);
+            nếu (v[0] != 2 || v[2] - v[1] != 1 || v[3] != version_item[2] ||
+                data[v[1]] == 0 || data[v[1]] > 2) { ném "X509: invalid version"; };
+            version = data[v[1]]; at = version_item[3];
+        };
+        serial = mình.tlv(data, at, tbs[2]);
+        nếu (serial[0] != 2 || serial[2] == serial[1] || serial[2] - serial[1] > 21) {
+            ném "X509: invalid serial";
+        };
+        nếu (data[serial[1]] >= 128 || (serial[2] - serial[1] > 1 &&
+            data[serial[1]] == 0 && data[serial[1] + 1] < 128)) {
+            ném "X509: invalid serial encoding";
+        };
+        nonzero = 0;
+        lặp(i = serial[1]; i < serial[2]; i++) { nonzero = nonzero | data[i]; };
+        nếu (nonzero == 0) { ném "X509: zero serial"; };
+        at = serial[3]; signed_alg = mình.tlv(data, at, tbs[2]);
+        nếu (signed_alg[0] != 48 ||
+            !mình.bằng(mình.phần(data, at, signed_alg[3]), mình.phần(data, tbs[3], alg[3]))) {
+            ném "X509: signature algorithm mismatch";
+        };
+        issuer = mình.tlv(data, signed_alg[3], tbs[2]);
+        validity = mình.tlv(data, issuer[3], tbs[2]);
+        subject = mình.tlv(data, validity[3], tbs[2]);
+        spki = mình.tlv(data, subject[3], tbs[2]);
+        nếu (issuer[0] != 48 || validity[0] != 48 || subject[0] != 48 || spki[0] != 48) {
+            ném "X509: malformed TBSCertificate";
+        };
+        spki_alg = mình.tlv(data, spki[1], spki[2]);
+        nếu (spki_alg[0] != 48) { ném "X509: invalid SPKI algorithm"; };
+        spki_oid = mình.tlv(data, spki_alg[1], spki_alg[2]);
+        mình.đọc oid(data, spki_oid);
+        nếu (spki_oid[3] < spki_alg[2]) {
+            params = mình.tlv(data, spki_oid[3], spki_alg[2]);
+            nếu (params[3] != spki_alg[2]) { ném "X509: invalid SPKI parameters"; };
+        };
+        spki_key = mình.tlv(data, spki_alg[3], spki[2]);
+        nếu (spki_key[3] != spki[2]) { ném "X509: invalid SPKI key"; };
+        public_bytes = mình.bit string(data, spki_key);
+        nếu (mình.bằng(mình.phần(data, spki_oid[1], spki_oid[2]), [43,101,112]) &&
+            (spki_oid[3] != spki_alg[2] || độ dài(public_bytes) != 32 ||
+             data[spki_key[1]] != 0)) {
+            ném "X509: invalid Ed25519 SPKI";
+        };
+        nb = mình.tlv(data, validity[1], validity[2]);
+        na = mình.tlv(data, nb[3], validity[2]);
+        nếu (na[3] != validity[2]) { ném "X509: invalid validity range"; };
+        before = mình.đọc ngày(data, nb); after = mình.đọc ngày(data, na);
+        san_names = []; is_ca = sai; path_limit = -1;
+        digital_signature = đúng; cert_sign = đúng; server_auth = đúng;
+        at = spki[3]; last_optional = 0;
+        khi (at < tbs[2]) {
+            optional = mình.tlv(data, at, tbs[2]);
+            rank = 0;
+            nếu (optional[0] == 129) { rank = 1; }
+            hoặc nếu (optional[0] == 130) { rank = 2; }
+            hoặc nếu (optional[0] == 163) { rank = 3; };
+            nếu (rank == 0 || rank <= last_optional || (rank < 3 && version < 1)) {
+                ném "X509: invalid optional TBSCertificate field";
+            };
+            last_optional = rank;
+            nếu (optional[0] == 163) {
+                nếu (version != 2 || optional[3] != tbs[2]) { ném "X509: invalid extensions version"; };
+                extensions = mình.đọc phần mở rộng(data, optional[1], optional[2]);
+                san_names = extensions[0]; is_ca = extensions[1]; path_limit = extensions[2];
+                digital_signature = extensions[3]; cert_sign = extensions[4];
+                server_auth = extensions[5];
+            };
+            at = optional[3];
+        };
+        trả về [mình.phần(data, outer[1], tbs[3]),
+                 mình.phần(data, tbs[3], alg[3]),
+                 sig_bytes,
+                 mình.phần(data, issuer[1], issuer[2]),
+                 mình.phần(data, subject[1], subject[2]),
+                 mình.phần(data, spki[1], spki[2]), before, after, san_names,
+                 is_ca, path_limit, digital_signature, cert_sign, server_auth,
+                 public_bytes, mình.phần(data, outer_oid[1], outer_oid[2]),
+                 mình.phần(data, spki_oid[1], spki_oid[2]), data];
+    };
+
+    // TLS 1.3 handshake message with empty certificate_request_context.
+    // Returns parsed certificates, leaf first, at most sixteen entries.
+    hàm công khai đọc danh sách(message) {
+        checker = mình.checker; checker.bytes(message, 1048576);
+        n = độ dài(message);
+        nếu (n < 8 || message[0] != 11 || mình.u24(message, 1, n) != n - 4 ||
+            message[4] != 0) { ném "TLS: invalid Certificate handshake"; };
+        list_len = mình.u24(message, 5, n); at = 8;
+        nếu (list_len != n - 8 || list_len == 0) { ném "TLS: invalid certificate list length"; };
+        chain = [];
+        khi (at < n) {
+            nếu (độ dài(chain) >= 16) { ném "TLS: certificate chain too long"; };
+            cert_len = mình.u24(message, at, n); at = at + 3;
+            nếu (cert_len == 0 || cert_len > 131072 || at + cert_len + 2 > n) {
+                ném "TLS: invalid CertificateEntry length";
+            };
+            der = mình.phần(message, at, at + cert_len);
+            thêm(chain, mình.đọc der(der));
+            at = at + cert_len;
+            ext_len = message[at] * 256 + message[at + 1];
+            nếu (at + 2 + ext_len > n) { ném "TLS: CertificateEntry extensions overflow"; };
+            // The client does not request OCSP/SCT extensions. Reject all
+            // unsolicited CertificateEntry extensions until implemented.
+            nếu (ext_len != 0) { ném "TLS: unsupported CertificateEntry extension"; };
+            at = at + 2;
+        };
+        trả về chain;
+    };
+
+    hàm công khai hợp lệ tại(metadata, now_utc) {
+        nếu (độ dài(now_utc) < 6) { ném "X509: expected UTC date"; };
+        trước = metadata[6]; sau = metadata[7];
+        nếu (độ dài(trước) != 6 || độ dài(sau) != 6) { ném "X509: missing validity"; };
+        older = 0; newer = 0;
+        lặp(i = 0; i < 6; i++) {
+            nếu (older == 0 && now_utc[i] != trước[i]) {
+                nếu (now_utc[i] < trước[i]) { older = -1; } hoặc { older = 1; };
+            };
+            nếu (newer == 0 && now_utc[i] != sau[i]) {
+                nếu (now_utc[i] < sau[i]) { newer = -1; } hoặc { newer = 1; };
+            };
+        };
+        trả về older >= 0 && newer <= 0;
+    };
+
+    hàm công khai hợp lệ lúc này(metadata) {
+        trả về mình.hợp lệ tại(metadata, thời gian đọc giờ quốc tế ffi());
+    };
+
+    hàm công khai khớp dns(host, metadata) {
+        nếu (loại của(host) != "chuỗi") { ném "X509: expected DNS hostname"; };
+        hostname = mình.chuẩn dns(chuỗi thành byte máy ảo(host), sai);
+        names = metadata[8];
+        lặp(k = 0; k < độ dài(names); k++) {
+            dns = mình.chuẩn dns(names[k], đúng);
+            nếu (mình.bằng(hostname, dns)) { trả về đúng; };
+            nếu (độ dài(dns) > 3 && dns[0] == 42 && dns[1] == 46) {
+                // Wildcard matches precisely one leftmost DNS label.
+                dot = -1;
+                lặp(i = 0; i < độ dài(hostname); i++) {
+                    nếu (hostname[i] == 46) { dot = i; thoát; };
+                };
+                suffix = mình.phần(dns, 2, độ dài(dns));
+                nếu (dot > 0 && dot + 1 < độ dài(hostname) &&
+                    mình.bằng(mình.phần(hostname, dot + 1, độ dài(hostname)), suffix)) {
+                    trả về đúng;
+                };
+            };
+        };
+        trả về sai;
+    };
+
+    // Attribute-only eligibility. This does not validate a trust anchor,
+    // signature or CA path, and cannot establish an authenticated TLS peer.
+    hàm công khai thuộc tính máy chủ(metadata, host, now_utc) {
+        nếu (metadata[9] || !metadata[11] || !metadata[13] ||
+            độ dài(metadata[8]) == 0) { trả về sai; };
+        trả về mình.hợp lệ tại(metadata, now_utc) && mình.khớp dns(host, metadata);
+    };
+
+    // Verify a leaf-first TLS Certificate chain against explicit DER trust
+    // anchors. An omitted root may be supplied by the trusted anchor store.
+    // Only Ed25519-signed chains and Ed25519 public keys are currently valid.
+    hàm công khai xác thực chuỗi(chain, trusted_der, host, now_utc) {
+        nếu (loại của(chain) != "danh sách" || độ dài(chain) < 1 ||
+            độ dài(chain) > 16 || loại của(trusted_der) != "danh sách" ||
+            độ dài(trusted_der) < 1 || độ dài(trusted_der) > 64) {
+            ném "X509: missing chain or trust anchors";
+        };
+        path = [];
+        lặp(i = 0; i < độ dài(chain); i++) { thêm(path, chain[i]); };
+        leaf = path[0];
+        nếu (!mình.thuộc tính máy chủ(leaf, host, now_utc)) {
+            ném "X509: server identity rejected";
+        };
+        ed_oid = [43,101,112];
+        last = path[độ dài(path) - 1];
+        anchored = sai;
+        lặp(i = 0; i < độ dài(trusted_der); i++) {
+            anchor = mình.đọc der(trusted_der[i]);
+            nếu (!anchor[9] || !anchor[12] ||
+                !mình.hợp lệ tại(anchor, now_utc) ||
+                !mình.bằng(anchor[16], ed_oid)) { bỏ qua; };
+            nếu (mình.bằng(last[17], anchor[17])) {
+                anchored = đúng; thoát;
+            };
+            nếu (mình.bằng(last[3], anchor[4])) {
+                nếu (độ dài(path) >= 16) { ném "X509: chain too deep"; };
+                thêm(path, anchor);
+                anchored = đúng; thoát;
+            };
+        };
+        nếu (!anchored) { ném "X509: no trusted issuer"; };
+        ed = Ed25519 VPP();
+        lặp(i = 0; i < độ dài(path); i++) {
+            cert = path[i];
+            nếu (!mình.hợp lệ tại(cert, now_utc) ||
+                !mình.bằng(cert[16], ed_oid)) {
+                ném "X509: invalid certificate or unsupported key";
+            };
+            nếu (i > 0) {
+                // RFC 5280 pathLenConstraint counts only non-self-issued
+                // intermediate CAs below this issuer, excluding the leaf.
+                subordinate_cas = 0;
+                lặp(j = 1; j < i; j++) {
+                    below = path[j];
+                    nếu (below[9] && !mình.bằng(below[3], below[4])) {
+                        subordinate_cas = subordinate_cas + 1;
+                    };
+                };
+                nếu (!cert[9] || !cert[12] ||
+                    (cert[10] >= 0 && subordinate_cas > cert[10])) {
+                    ném "X509: issuer CA constraints rejected";
+                };
+            };
+            nếu (i + 1 < độ dài(path)) {
+                issuer = path[i + 1];
+                nếu (!mình.bằng(cert[3], issuer[4]) ||
+                    !mình.bằng(cert[15], ed_oid) ||
+                    !ed.xác minh(issuer[14], cert[0], cert[2])) {
+                    ném "X509: issuer signature rejected";
+                };
+            };
+        };
+        trả về đúng;
+    };
+};

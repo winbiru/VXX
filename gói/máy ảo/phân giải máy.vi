@@ -123,14 +123,14 @@ hàm vm_resolver_dns(state, host) {
     };
     trả về addresses;
 };
-// Configuration query: raw socket operation 11 returns bounded numeric IP
+// Configuration query: raw socket operation 15 returns bounded numeric IP
 // records. Formatting is pure V++, and no OS DNS lookup is performed.
 hàm vm_resolver_windows_config() {
     biến ctl = vm_socket_control(-1);
     biến raw = vm_alloc(160, 0);
     nếu (ctl == 0 || raw == 0) { trả về 0; };
     vm_set(ctl, 4, raw);
-    biến count = máy ổ cắm thô(11, ctl);
+    biến count = máy ổ cắm thô(15, ctl);
     nếu (count < 0 || count > 8) { trả về vm_error(20); };
     biến addresses = vm_vector(8);
     lặp(i = 0; i < count; i++) {

@@ -1,0 +1,96 @@
+// TLS 1.3 record and handshake stream reassembly, entirely V++.
+// TCP chunks and TLS record boundaries are independent. Neither parser
+// authenticates its input; cryptographic verification belongs to the caller.
+nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+
+lớp công khai Bộ Tách Bản Ghi TLS VPP {
+    hàm công khai khởi tạo() {
+        mình.đệm = [];
+        mình.hỏng = sai;
+        mình.khóa = Khóa TLS VPP();
+    };
+
+    hàm công khai còn dở() { trả về độ dài(mình.đệm) != 0; };
+
+    // Returns complete wire records, retaining any incomplete last record.
+    hàm công khai nạp(chunk) {
+        nếu (mình.hỏng) { ném "TLS: record parser closed"; };
+        thử {
+            keys = mình.khóa;
+            keys.bytes(chunk, 1048576);
+            input = keys.nối(mình.đệm, chunk);
+            records = []; at = 0; n = độ dài(input);
+            khi (n - at >= 5) {
+                kind = input[at];
+                nếu (kind != 20 && kind != 21 && kind != 22 && kind != 23) {
+                    ném "TLS: unrecognized record type";
+                };
+                nếu (input[at + 1] != 3 || input[at + 2] != 3) {
+                    ném "TLS: unsupported record version";
+                };
+                size = input[at + 3] * 256 + input[at + 4];
+                max_size = 16384;
+                nếu (kind == 23) { max_size = 16640; };
+                nếu (size > max_size || size == 0 || (kind == 23 && size < 17) ||
+                    (kind == 20 && size != 1) || (kind == 21 && size != 2)) {
+                    ném "TLS: invalid record length";
+                };
+                nếu (n - at < size + 5) { thoát; };
+                record = [];
+                lặp(i = at; i < at + size + 5; i++) { thêm(record, input[i]); };
+                nếu (kind == 20 && record[5] != 1) {
+                    ném "TLS: invalid change_cipher_spec";
+                };
+                thêm(records, record);
+                at = at + size + 5;
+            };
+            mình.đệm = [];
+            lặp(i = at; i < n; i++) { thêm(mình.đệm, input[i]); };
+            nếu (độ dài(mình.đệm) > 16645) { ném "TLS: incomplete record overflow"; };
+            trả về records;
+        } bắt lỗi(e) {
+            mình.hỏng = đúng;
+            mình.đệm = [];
+            ném e;
+        };
+    };
+};
+
+lớp công khai Bộ Tách Bắt Tay TLS VPP {
+    hàm công khai khởi tạo(giới hạn = 1048576) {
+        mình.đệm = [];
+        mình.hỏng = sai;
+        mình.khóa = Khóa TLS VPP();
+        mình.giới hạn = giới hạn;
+    };
+
+    hàm công khai còn dở() { trả về độ dài(mình.đệm) != 0; };
+
+    // TLS Handshake framing is one content type transported in one or more
+    // encrypted records. A handshake message may span record boundaries.
+    hàm công khai nạp(chunk) {
+        nếu (mình.hỏng) { ném "TLS: handshake parser closed"; };
+        thử {
+            keys = mình.khóa;
+            keys.bytes(chunk, 1048576);
+            input = keys.nối(mình.đệm, chunk);
+            messages = []; at = 0; n = độ dài(input);
+            khi (n - at >= 4) {
+                size = input[at + 1] * 65536 + input[at + 2] * 256 + input[at + 3];
+                nếu (size > mình.giới hạn) { ném "TLS: handshake message too large"; };
+                nếu (n - at < size + 4) { thoát; };
+                message = [];
+                lặp(i = at; i < at + size + 4; i++) { thêm(message, input[i]); };
+                thêm(messages, message);
+                at = at + size + 4;
+            };
+            mình.đệm = [];
+            lặp(i = at; i < n; i++) { thêm(mình.đệm, input[i]); };
+            trả về messages;
+        } bắt lỗi(e) {
+            mình.hỏng = đúng;
+            mình.đệm = [];
+            ném e;
+        };
+    };
+};

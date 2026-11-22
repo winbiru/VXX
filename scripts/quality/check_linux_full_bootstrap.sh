@@ -78,6 +78,8 @@ cd "$ROOT_DIR"
 export VPP_HOME="$out/i32" VPP_NATIVE_ELF_LINK=1 VPP_NATIVE_NO_CACHE=1 VPP_NATIVE_BUILD_PROGRESS=1
 export VPP_AOT_ASSEMBLER="$(command -v clang)"
 export VPP_AOT_NATIVE_MACHO_LINK=0 VPP_AOT_NATIVE_ARM64_OBJECT=0
+# Stage convergence audits the compiler as a freestanding ELF.
+export VPP_AOT_LINUX_TLS=0
 if [[ "$phase" == all || "$phase" == prepare ]]; then
     progress 10 'Biên dịch bộ thực thi V++ từ mã nguồn'
     vpp_timed_command "$out/i32/bin/vpp-i32" runtime-object \

@@ -38,6 +38,24 @@ require_call() {
     fi
 }
 
+# Linux native TLS and socket providers are maintained as assembly sources.
+# Keep the migrated production boundary free of C/C++ implementations.
+for provider in \
+    "$root/scripts/ASM/linux/vpp_native_tls_linux_x86_64.S" \
+    "$root/scripts/ASM/linux/vpp_native_tls_linux_aarch64.S"; do
+    if [ ! -s "$provider" ]; then
+        printf 'FAIL: missing Linux TLS assembly provider %s\n' "$provider" >&2
+        exit 1
+    fi
+done
+linux_foreign_source=$(find "$root/scripts/ASM/linux" "$root/scripts/linux" -type f \
+    \( -name '*.c' -o -name '*.h' -o -name '*.cc' -o -name '*.cpp' -o -name '*.hpp' \) \
+    -print -quit)
+if [ -n "$linux_foreign_source" ]; then
+    printf 'FAIL: C/C++ source remains in Linux assembly boundary: %s\n' "$linux_foreign_source" >&2
+    exit 1
+fi
+
 foreign_functions=$(count_matches '^[[:space:]]*ngoại hàm ')
 foreign_libraries=$(count_matches '^[[:space:]]*ngoại thư viện ')
 printf 'V++ foreign library declarations: %s\n' "$foreign_libraries"
@@ -189,9 +207,9 @@ for identity in 'mã tiến trình' 'mã tiến trình cha' 'mã người dùng'
 done
 
 # Check all nonignored repository sources, including untracked new files.
-# The C comparison workload is an isolated benchmark reference, never a
-# production dependency. Deleted tracked paths and ignored historical build
-# artifacts do not participate in this audit.
+# The C comparison workload is isolated. The Linux TLS adapter is an OS
+# boundary to OpenSSL for dynamically linked AOT programs. Deleted paths
+# and ignored historical build artifacts do not participate in this audit.
 python3 - "$root" <<'PY'
 import os
 import subprocess
@@ -212,10 +230,13 @@ except (FileNotFoundError, subprocess.CalledProcessError):
              for p in (root / name).rglob('*') if p.is_file()]
 suffixes = ('.c', '.cc', '.cpp', '.cxx', '.c++', '.h', '.hh', '.hpp',
             '.hxx', '.h.in', '.hpp.in', '.mm')
+boundary_exceptions = {
+    'benchmark/languages/workloads.c',
+}
 forbidden = sorted({p for raw in paths if (p := os.fsdecode(raw))
-                    and p != 'benchmark/languages/workloads.c'
+                    and p not in boundary_exceptions
                     and p.lower().endswith(suffixes) and (root / p).is_file()})
-print(f'Remaining production C/C++ source and header files: {len(forbidden)}')
+print(f'C/C++ source and header files outside the boundary allowlist: {len(forbidden)}')
 if forbidden:
     print('\n'.join(forbidden), file=sys.stderr)
     sys.exit(1)

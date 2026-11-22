@@ -29,6 +29,7 @@ if [[ ! -x "$NATIVE" || ! -s "$RUNTIME" ]]; then
 fi
 export VPP_HOME="$ROOT_DIR" VPP_AOT_VPP_OBJECT="$RUNTIME"
 export VPP_AOT_ASSEMBLER="$(command -v clang)"
+export VPP_AOT_LINUX_TLS=0
 bash "$ROOT_DIR/scripts/quality/audit_linux_static_elf.sh" "$NATIVE"
 readelf -h "$RUNTIME" > "$OUTPUT_DIR/runtime-elf-header.txt"
 if ! grep -Eq 'Class:[[:space:]]+ELF64' "$OUTPUT_DIR/runtime-elf-header.txt" ||

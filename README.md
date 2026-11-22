@@ -251,7 +251,7 @@ Các thành phần chính của compiler nằm trong `gói/biên dịch/`: `từ
 
 Bootstrap dùng seed đã xác minh để tạo compiler từ source V++. Trong quy trình CI hiện tại, stage 1 liên kết Assembly seed với runtime hiện tại; stage 2 và stage 3 lần lượt biên dịch full compiler từ chính mã nguồn V++. Kiểm tra hội tụ yêu cầu hai thế hệ cuối giống nhau từng byte, đồng thời chạy fixture và kiểm tra định dạng executable. Không coi việc chỉ build thành công là đủ để chứng minh hội tụ.
 
-Trên macOS ARM64, đường full AOT có linker Mach-O trực tiếp và liên kết `libSystem`. Linux x86_64 full AOT tạo ELF tĩnh; Windows x64 tạo PE/COFF. Quy trình full trên Linux và Windows hiện vẫn dùng assembler/linker của toolchain hệ thống; các đường i32 native có cơ chế sinh object và liên kết riêng. CMake không build implementation C/C++ của compiler.
+Trên macOS ARM64, đường full AOT có linker Mach-O trực tiếp và liên kết `libSystem`. Trên Linux x86-64, full AOT liên kết động với OpenSSL 3 để xác minh TLS. Dùng `VPP_AOT_LINUX_TLS=0` để tạo ELF tĩnh cho chương trình chạy freestanding. Windows x64 tạo PE/COFF và dùng Schannel cho TLS. Quy trình full trên Linux và Windows dùng assembler/linker của toolchain hệ thống. Các đường i32 native có cơ chế sinh object và liên kết riêng. CMake không build implementation C/C++ của compiler.
 
 Chi tiết: [bootstrap](bootstrap/README.md), [Native AOT direct link](docs/native-aot-direct-link.md), [dynamic runtime](docs/native-dynamic-vpp-runtime.md), [standalone VM](docs/vm-asm.md).
 

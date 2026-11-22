@@ -150,7 +150,7 @@ def link(clang, objects, output, env, log):
     # Reserve enough native stack for the runtime's existing 4096-frame
     # guard to report error=15 before Win32 raises STATUS_STACK_OVERFLOW.
     # Pages remain demand committed; this does not commit 64 MiB at startup.
-    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-liphlpapi', '-lntdll',
+    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-liphlpapi', '-lsecur32', '-lcrypt32', '-lntdll',
              '-Wl,--no-insert-timestamp', '-Wl,--stack,67108864', '-o', output], env, log)
     audit_pe(output)
 

@@ -45,7 +45,7 @@ VMSOCK_SYM(vpp_native_os_socket):
     mov w21, w1
     bl VMSOCK_SYM(vpp_native_memory_base)
     cbz x0, Lo_cam_sai_a
-    cmp w19, #10
+    cmp w19, #14
     b.hi Lo_cam_sai_a
 // Vùng nhớ 135271424 byte; khối điều khiển 128 byte, căn theo 16 byte.
     mov w9, #4992
@@ -56,6 +56,37 @@ VMSOCK_SYM(vpp_native_os_socket):
     b.ne Lo_cam_sai_a
     add x20, x0, w21, uxtw
     str wzr, [x20, #28]
+    cmp w19, #11
+    b.lo Lo_cam_dispatch_a
+    // TLS control blocks require 160 bytes, rather than the socket ABI's 128.
+    mov w9, #4960
+    movk w9, #2064, lsl #16
+    cmp w21, w9
+    b.hi Lo_cam_sai_a
+#ifdef __APPLE__
+    mov w0, w19
+    mov x1, x20
+    bl _vpp_native_tls_socket
+#elif defined(VPP_LINUX_OPENSSL_TLS)
+    mov w0, w19
+    mov x1, x20
+    bl vpp_native_tls_socket
+#else
+    // The freestanding AArch64 provider has no TLS allocations. Cleanup
+    // must still succeed so VM socket retirement closes the TCP descriptor.
+    cmp w19, #14
+    b.ne Lo_cam_tls_chua_ho_tro_a
+    str xzr, [x20, #120]
+    str wzr, [x20, #144]
+    mov w0, #0
+    b Lo_cam_ve_a
+Lo_cam_tls_chua_ho_tro_a:
+    mov w9, #95
+    str w9, [x20, #28]
+    mov w0, #-95 // Provider unavailable on this platform.
+#endif
+    b Lo_cam_ve_a
+Lo_cam_dispatch_a:
     cmp w19, #7
     b.eq Lo_cam_udp_gan_a
     cmp w19, #8

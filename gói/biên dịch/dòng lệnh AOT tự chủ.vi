@@ -136,13 +136,20 @@ hàm riêng tư AOT tự chủ liên kết linux(tạm, kế hoạch, gốc) {
     biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
         đường dẫn nối(tạm, "program.S"), "-DVPP_AOT_VPP_RUNTIME=1",
         "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"), "-o", đối tượng], "V++ program assembly");
-    liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
-        "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
-        "-Wl,-z,noexecstack", đối tượng];
+    tls = đọc biến môi trường("VPP_AOT_LINUX_TLS", "1") == "1";
+    liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu"];
+    nếu (tls) { máy ảo thêm cuối danh sách(liên kết, "-nostartfiles"); }
+    hoặc {
+        máy ảo thêm cuối danh sách(liên kết, "-nostdlib");
+        máy ảo thêm cuối danh sách(liên kết, "-static");
+    };
+    cờ liên kết = ["-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined",
+        "-Wl,--build-id=none", "-Wl,-z,noexecstack", đối tượng];
+    lặp(i = 0; i < độ dài(cờ liên kết); i++) { máy ảo thêm cuối danh sách(liên kết, cờ liên kết[i]); };
     thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
     nền = đọc biến môi trường("VPP_AOT_LINUX_OBJECT_DIR", "");
     lặp(i = 0; i < độ dài(thành phần); i++) {
-        nếu (nền != "") {
+        nếu (nền != "" && !(tls && thành phần[i] == "socket")) {
             phần = đường dẫn nối(nền, thành phần[i] + ".o");
             nếu (!đường dẫn là tuyệt đối(phần) || !là tệp(phần)) {
                 ném "Native AOT: packaged Linux platform object missing: " + phần;
@@ -151,16 +158,31 @@ hàm riêng tư AOT tự chủ liên kết linux(tạm, kế hoạch, gốc) {
             bỏ qua;
         };
         phần = đường dẫn nối(tạm, thành phần[i] + ".o");
-        biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+        lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
             đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S"),
-            "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"), "-o", phần], "Linux " + thành phần[i] + " assembly");
+            "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"), "-o", phần];
+        nếu (tls && thành phần[i] == "socket") { máy ảo thêm cuối danh sách(lệnh, "-DVPP_LINUX_OPENSSL_TLS=1"); };
+        biên dịch AOT chạy lệnh(lệnh, "Linux " + thành phần[i] + " assembly");
         máy ảo thêm cuối danh sách(liên kết, phần);
     };
     máy ảo thêm cuối danh sách(liên kết, runtime);
+    nếu (tls) {
+        crypto = đường dẫn nối(tạm, "tls-linux.o");
+        biên dịch AOT chạy lệnh([công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+            đường dẫn nối(asm gốc, "linux/vpp_native_tls_linux_x86_64.S"), "-o", crypto], "Linux ASM TLS provider");
+        máy ảo thêm cuối danh sách(liên kết, crypto);
+        máy ảo thêm cuối danh sách(liên kết, "-lssl");
+        máy ảo thêm cuối danh sách(liên kết, "-lcrypto");
+        máy ảo thêm cuối danh sách(liên kết, "-lc");
+    };
     máy ảo thêm cuối danh sách(liên kết, "-o");
     máy ảo thêm cuối danh sách(liên kết, executable);
     biên dịch AOT chạy lệnh(liên kết, "V++ executable link");
-    biên dịch AOT chạy lệnh(["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable], "freestanding ELF audit");
+    nếu (tls) {
+        biên dịch AOT chạy lệnh(["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_tls_elf.sh"), executable], "Linux verified TLS ELF audit");
+    } hoặc {
+        biên dịch AOT chạy lệnh(["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable], "freestanding ELF audit");
+    };
     biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);
     đổi tên tệp(executable, kế hoạch[2]);
 };
@@ -181,7 +203,7 @@ hàm riêng tư AOT tự chủ liên kết windows(tạm, kế hoạch, gốc) {
         "-DVPP_AOT_VPP_RUNTIME=1", "-I" + asm gốc, "-I" + đường dẫn nối(asm gốc, "common"),
         "-o", đối tượng], "Windows V++ program assembly");
     biên dịch AOT chạy lệnh([công cụ, đối tượng, runtime, lõi, nền,
-        "-lshell32", "-lbcrypt", "-lws2_32", "-liphlpapi", "-lntdll", "-Wl,--no-insert-timestamp",
+        "-lshell32", "-lbcrypt", "-lws2_32", "-liphlpapi", "-lsecur32", "-lcrypt32", "-lntdll", "-Wl,--no-insert-timestamp",
         "-Wl,--stack,67108864",
         "-o", executable], "Windows V++ executable link");
     biên dịch AOT chuẩn hóa yêu cầu(kế hoạch);

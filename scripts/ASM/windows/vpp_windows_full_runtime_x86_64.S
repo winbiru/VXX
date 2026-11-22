@@ -25,3 +25,4 @@ RT_EXPORT vpp_native_f64_text, vpp_fn_vm_f64_text, 2
 #include "aot_x86_64/thu_muc.inc"
 #include "aot_x86_64/tien_trinh_day_du.inc"
 #include "aot_x86_64/o_cam.inc"
+#include "aot_x86_64/tls.inc"

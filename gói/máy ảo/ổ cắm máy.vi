@@ -1,7 +1,7 @@
 // POSIX socket policy for the standalone VM. No host pointers or raw file
 // descriptors escape the V++ resource table; the OS boundary is ASM.
-// Opcode parity: 185..192. Resolver (203..205) and verified TLS (206..208)
-// are deliberately separate providers.
+// Opcode parity: 185..192. Resolver (203..205) and TLS (206..208)
+// share the resource table, keeping encrypted sessions bound to TCP tokens.
 hàm vm_socket_lookup(state, value) {
     nếu (vm_tag(value) != 1 || vm_number(value) < 1073741825) { trả về 0; };
     biến table = vm_get(state, 13);
@@ -50,10 +50,24 @@ hàm vm_socket_register(state, fd, kind, ctl) {
     trả về guest_token;
 };
 hàm vm_socket_control(fd) {
-    biến ctl = vm_alloc(128, 0);
+    // TLS provider owns context@120, framework handles@128/136 and verified@144.
+    biến ctl = vm_alloc(160, 0);
     nếu (ctl == 0) { trả về 0; };
+    // A reused allocation must not contain stale native TLS pointers.
+    lặp(i = 0; i < 40; i++) { vm_set(ctl, i, 0); };
     vm_set(ctl, 0, fd);
     trả về ctl;
+};
+// Retire the token before releasing any OS resources. A failed TLS session
+// must never be reused as plaintext, even when TLS is unavailable on the host.
+hàm vm_socket_retire(resource) {
+    biến ctl = vm_get(resource, 4);
+    biến kind = vm_get(resource, 2);
+    vm_set(resource, 3, 0);
+    vm_set(resource, 1, -1);
+    vm_set(resource, 2, 4);
+    nếu (kind == 2 || kind == 4) { máy ổ cắm thô(14, ctl); };
+    trả về máy ổ cắm thô(5, ctl);
 };
 hàm vm_socket_open(state, op, a, b, c, d) {
     biến port = 0; biến timeout = 300000;
@@ -99,9 +113,7 @@ hàm vm_socket_host(state, op, a, b, c, d) {
     nếu (op == 186) {
         // Invalidate token before closing: a close failure must not allow
         // accidental reuse of a descriptor that the OS may have recycled.
-        vm_set(resource, 3, 0);
-        vm_set(resource, 1, -1);
-        biến rc = máy ổ cắm thô(5, ctl);
+        biến rc = vm_socket_retire(resource);
         nếu (rc < 0) { trả về vm_error(20); };
         // Machine ABI returns the POSIX status (0), as Stage 0 does.
         // The public V++ socket wrapper turns that into boolean success.
@@ -127,7 +139,7 @@ hàm vm_socket_host(state, op, a, b, c, d) {
         trả về result;
     };
     nếu (op == 188 || op == 189) {
-        nếu (kind == 3 || vm_tag(b) != 4 || vm_tag(c) != 1 || vm_tag(d) != 1) { trả về vm_error(2); };
+        nếu (kind == 3 || kind == 2 || kind == 4 || vm_tag(b) != 4 || vm_tag(c) != 1 || vm_tag(d) != 1) { trả về vm_error(2); };
         biến count = vm_number(c);
         nếu (count < 1 || count > 65536 || vm_get(b, 1) != count || vm_number(d) != 0) { trả về vm_error(2); };
         nếu (kind == 1 && op == 188 && count > 65507) { trả về vm_error(2); };
@@ -150,6 +162,60 @@ hàm vm_socket_host(state, op, a, b, c, d) {
     };
     trả về vm_error(22);
 };
+// TLS provider operates only on an existing connected TCP token. The OS
+// boundary owns cryptographic state and certificate/hostname verification.
+hàm vm_tls_host(state, op, a, b, c) {
+    biến resource = vm_socket_find(state, a);
+    nếu (resource == 0) { trả về 0; };
+    biến kind = vm_get(resource, 2);
+    biến ctl = vm_get(resource, 4);
+    nếu (op == 206) {
+        nếu (kind != 0 || vm_tag(b) != 3) { trả về vm_error(2); };
+        biến size = vm_get(b, 1);
+        nếu (size < 1 || size > 253) { trả về vm_error(2); };
+        biến raw = vm_get(b, 2);
+        lặp(i = 0; i < size; i++) {
+            biến byte = máy đọc byte(raw + i);
+            // Reject NUL, controls and non-ASCII bytes. System trust policy
+            // validates the actual DNS or IP identity after the handshake.
+            nếu (byte < 33 || byte > 126) { trả về vm_error(2); };
+        };
+        vm_set(ctl, 4, raw);
+        vm_set(ctl, 5, size);
+        // Mark the token as unusable for plaintext before the handshake.
+        vm_set(resource, 2, 4);
+        biến status = máy ổ cắm thô(11, ctl);
+        nếu (status < 0) {
+            vm_socket_retire(resource);
+            nếu (status == -95) { trả về vm_error(22); };
+            trả về vm_error(20);
+        };
+        vm_set(resource, 2, 2);
+        trả về a;
+    };
+    nếu (kind != 2 || vm_tag(b) != 4 || vm_tag(c) != 1) { trả về vm_error(2); };
+    biến count = vm_number(c);
+    nếu (count < 1 || count > 65536 || vm_get(b, 1) != count) { trả về vm_error(2); };
+    biến raw = vm_alloc(count, 0); nếu (raw == 0) { trả về 0; };
+    nếu (op == 207) {
+        lặp(i = 0; i < count; i++) {
+            biến v = vm_at(b, i);
+            nếu (vm_tag(v) != 1 || vm_number(v) < 0 || vm_number(v) > 255) { trả về vm_error(2); };
+            máy ghi byte(raw + i, vm_number(v));
+        };
+    };
+    vm_set(ctl, 4, raw); vm_set(ctl, 5, count);
+    biến mode = 12; nếu (op == 208) { mode = 13; };
+    biến got = máy ổ cắm thô(mode, ctl);
+    nếu (got < 0 || got > count) {
+        vm_socket_retire(resource);
+        trả về vm_error(20);
+    };
+    nếu (op == 208) {
+        lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(raw + i))); };
+    };
+    trả về vm_int(got);
+};
 hàm vm_socket_close_all(state) {
     nếu (state == 0) { trả về 0; };
     biến table = vm_get(state, 13);
@@ -158,11 +224,7 @@ hàm vm_socket_close_all(state) {
     lặp(i = 0; i < vm_get(table, 1); i++) {
         biến resource = vm_at(table, i);
         nếu (resource != 0 && vm_get(resource, 3) == 1) {
-            biến ctl = vm_get(resource, 4);
-            vm_set(ctl, 0, vm_get(resource, 1));
-            vm_set(resource, 3, 0);
-            vm_set(resource, 1, -1);
-            máy ổ cắm thô(5, ctl);
+            vm_socket_retire(resource);
         };
     };
     trả về 0;

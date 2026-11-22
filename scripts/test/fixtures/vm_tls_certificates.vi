@@ -1,0 +1,53 @@
+nhập gói.bảo mật.chứng chỉ TLS.*;
+
+hàm tls cert nối(a, b) {
+    result = [];
+    lặp(i = 0; i < độ dài(a); i++) { thêm(result, a[i]); };
+    lặp(i = 0; i < độ dài(b); i++) { thêm(result, b[i]); };
+    trả về result;
+};
+
+hàm tls cert u24(n) {
+    trả về [(n - n % 65536) / 65536, (n % 65536 - n % 256) / 256, n % 256];
+};
+
+hàm chính() {
+    decoder = Chứng Chỉ TLS VPP();
+    pem = "-----BEGIN CERTIFICATE-----MIIBYjCCARSgAwIBAgIUR9qIxv+0DOgdnzF14kv/ZevdX0IwBQYDK2VwMBQxEjAQBgNVBAMMCWxvY2FsaG9zdDAeFw0yNjExMjEwOTIwMTBaFw0zNjExMTgwOTIwMTBaMBQxEjAQBgNVBAMMCWxvY2FsaG9zdDAqMAUGAytlcAMhAMXAiuLpnrAzr5umvOvYQkCUBw6MVbHa25rYgIrWcTMno3gwdjAdBgNVHQ4EFgQUCyWINeZoBKySyI/EoCzk5qXYFYMwHwYDVR0jBBgwFoAUCyWINeZoBKySyI/EoCzk5qXYFYMwDwYDVR0TAQH/BAUwAwEB/zAjBgNVHREEHDAagglsb2NhbGhvc3SCDSouZXhhbXBsZS5vcmcwBQYDK2VwA0EAxufrVuulV6Nf0kZSNFBonAX2wbuQ786o2OsX6Uj7QMXxGuX/AWBxp2UBe9ldyUM6MxRVdrbvttYtBFzoMgIEAA==-----END CERTIFICATE-----";
+    der = decoder.đọc pem(pem);
+    metadata = decoder.đọc der(der);
+    nếu (độ dài(metadata[2]) != 64 || độ dài(metadata[8]) != 2 ||
+        !decoder.khớp dns("localhost", metadata) ||
+        !decoder.khớp dns("API.EXAMPLE.ORG", metadata) ||
+        decoder.khớp dns("x.y.example.org", metadata) ||
+        decoder.khớp dns("example.org", metadata) ||
+        decoder.khớp dns("other.test", metadata)) {
+        ném "TLS: certificate SAN or signature metadata";
+    };
+    nếu (!decoder.hợp lệ tại(metadata, metadata[6]) ||
+        !decoder.hợp lệ tại(metadata, metadata[7]) ||
+        decoder.hợp lệ tại(metadata, [2000,1,1,0,0,0]) ||
+        decoder.hợp lệ tại(metadata, [2200,1,1,0,0,0])) {
+        ném "TLS: certificate validity";
+    };
+    entry = tls cert nối(tls cert u24(độ dài(der)), der);
+    entry = tls cert nối(entry, [0,0]);
+    body = tls cert nối([0], tls cert nối(tls cert u24(độ dài(entry)), entry));
+    handshake = tls cert nối([11], tls cert nối(tls cert u24(độ dài(body)), body));
+    chain = decoder.đọc danh sách(handshake);
+    nếu (độ dài(chain) != 1 || độ dài(chain[0][8]) != 2) {
+        ném "TLS: invalid parsed certificate chain";
+    };
+    rejected = 0;
+    broken = tls cert nối([], der); broken[0] = 49;
+    thử { decoder.đọc der(broken); } bắt lỗi(e) { rejected = rejected + 1; };
+    broken = tls cert nối([], handshake); broken[3] = 0;
+    thử { decoder.đọc danh sách(broken); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { decoder.đọc pem("-----BEGIN CERTIFICATE-----@===-----END CERTIFICATE-----"); }
+    bắt lỗi(e) { rejected = rejected + 1; };
+    thử { decoder.tlv([48,128,0,0], 0, 4); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { decoder.đọc ngày([50,54,49,51,51,50,48,48,48,48,48,48,90], [23,0,13,13]); }
+    bắt lỗi(e) { rejected = rejected + 1; };
+    nếu (rejected != 5) { ném "TLS: malformed certificate accepted"; };
+    in "TLS VPP CERTIFICATE PARSING OK";
+};

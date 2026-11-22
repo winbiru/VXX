@@ -95,6 +95,18 @@ if(BUILD_TESTING)
   endif()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+    add_test(NAME vpp-native-tls COMMAND "${Python3_EXECUTABLE}"
+      "${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_native_tls_macos.py")
+    set_tests_properties(vpp-native-tls PROPERTIES TIMEOUT 60 LABELS "smoke;tls")
+    add_test(NAME vpp-tls-x509 COMMAND "${CMAKE_COMMAND}" -E env "VPP_TLS_TEST_BINARY=${VPP_BIN}/vpp"
+      "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_tls_vpp_cert_paths.py")
+    set_tests_properties(vpp-tls-x509 PROPERTIES TIMEOUT 1530 LABELS tls)
+    foreach(fixture IN ITEMS authenticated_handshake certificates client ed25519 handshake sha512 stream x25519)
+      add_test(NAME "vpp-tls-${fixture}" COMMAND "${VPP_BIN}/vpp" run
+        "${CMAKE_SOURCE_DIR}/scripts/test/fixtures/vm_tls_${fixture}.vi")
+      set_tests_properties("vpp-tls-${fixture}" PROPERTIES TIMEOUT 900 LABELS tls
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    endforeach()
     add_test(NAME vpp-worker-machine COMMAND "${Python3_EXECUTABLE}"
       "${CMAKE_SOURCE_DIR}/scripts/quality/check_worker_machine.py")
     set_tests_properties(vpp-worker-machine PROPERTIES TIMEOUT 120 LABELS "smoke;worker")

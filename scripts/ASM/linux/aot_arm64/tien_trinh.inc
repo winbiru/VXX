@@ -38,5 +38,8 @@ vpp_native_os_waitpid:
     mov w0, w12
     add x1, x9, w1, uxtw
     mov w2, #0
-    bl waitpid
+    mov x3, #0
+    mov x8, #260               // __NR_wait4
+    svc #0
+    bl Llinux_file_syscall_result
     TRA_BO_NHO

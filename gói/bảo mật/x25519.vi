@@ -1,0 +1,185 @@
+// X25519 (RFC 7748), implemented using V++ byte-array field arithmetic.
+// The 2^255-19 field is represented as 32 little-endian radix-256 limbs.
+// Keep intermediates small enough for the VM's signed 32-bit operations.
+// This implementation requires side-channel review before production use.
+nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+nhập gói.lõi.toán học.làm tròn xuống;
+
+lớp công khai X25519 VPP {
+    hàm công khai khởi tạo() { mình.checker = Khóa TLS VPP(); };
+
+    hàm riêng tư zero() {
+        r = [];
+        lặp(i = 0; i < 32; i++) { thêm(r, 0); };
+        trả về r;
+    };
+
+    hàm riêng tư copy(a) {
+        r = [];
+        lặp(i = 0; i < 32; i++) { thêm(r, a[i]); };
+        trả về r;
+    };
+
+    // Normalize radix-256 limbs, including the reduction 2^255 = 19.
+    hàm riêng tư reduce(a) {
+        lặp(pass = 0; pass < 3; pass++) {
+            lặp(i = 0; i < 31; i++) {
+                carry = làm tròn xuống(a[i] / 256);
+                a[i] = a[i] % 256;
+                a[i + 1] = a[i + 1] + carry;
+            };
+            carry = làm tròn xuống(a[31] / 128);
+            a[31] = a[31] % 128;
+            a[0] = a[0] + carry * 19;
+        };
+        // Canonical representation. This comparison is currently variable-time.
+        ge = đúng;
+        lặp(i = 31; i >= 0; i--) {
+            p = 255;
+            nếu (i == 0) { p = 237; };
+            nếu (i == 31) { p = 127; };
+            nếu (a[i] > p) { thoát; };
+            nếu (a[i] < p) { ge = sai; thoát; };
+        };
+        nếu (ge) {
+            borrow = 0;
+            lặp(i = 0; i < 32; i++) {
+                p = 255;
+                nếu (i == 0) { p = 237; };
+                nếu (i == 31) { p = 127; };
+                value = a[i] - p - borrow;
+                borrow = 0;
+                nếu (value < 0) { value = value + 256; borrow = 1; };
+                a[i] = value;
+            };
+        };
+        trả về a;
+    };
+
+    hàm riêng tư add(a, b) {
+        r = mình.zero();
+        lặp(i = 0; i < 32; i++) { r[i] = a[i] + b[i]; };
+        trả về mình.reduce(r);
+    };
+
+    hàm riêng tư sub(a, b) {
+        r = mình.zero();
+        // Add 2p to keep every limb nonnegative before carrying.
+        lặp(i = 0; i < 32; i++) {
+            p = 255;
+            nếu (i == 0) { p = 237; };
+            nếu (i == 31) { p = 127; };
+            r[i] = a[i] + 2 * p - b[i];
+        };
+        trả về mình.reduce(r);
+    };
+
+    hàm riêng tư mul(a, b) {
+        t = [];
+        lặp(i = 0; i < 63; i++) { thêm(t, 0); };
+        lặp(i = 0; i < 32; i++) {
+            lặp(j = 0; j < 32; j++) { t[i + j] = t[i + j] + a[i] * b[j]; };
+        };
+        // 2^256 = 38 (mod 2^255-19).
+        lặp(i = 62; i >= 32; i--) { t[i - 32] = t[i - 32] + 38 * t[i]; };
+        r = mình.zero();
+        lặp(i = 0; i < 32; i++) { r[i] = t[i]; };
+        trả về mình.reduce(r);
+    };
+
+    hàm riêng tư constant(a, k) {
+        r = mình.zero();
+        lặp(i = 0; i < 32; i++) { r[i] = a[i] * k; };
+        trả về mình.reduce(r);
+    };
+
+    hàm riêng tư invert(a) {
+        // Fermat inverse a^(p-2). Exponent is public, with 255 fixed steps.
+        result = mình.zero(); result[0] = 1;
+        lặp(bit = 254; bit >= 0; bit--) {
+            result = mình.mul(result, result);
+            exponent_byte = 255;
+            nếu (bit < 8) { exponent_byte = 235; };
+            nếu (bit >= 248) { exponent_byte = 127; };
+            power = 1;
+            lặp(i = 0; i < bit % 8; i++) { power = power * 2; };
+            nếu ((làm tròn xuống(exponent_byte / power) % 2) == 1) {
+                result = mình.mul(result, a);
+            };
+        };
+        trả về result;
+    };
+
+    hàm riêng tư swap(a, b, choice) {
+        // Branchless conditional swap on normalized limbs.
+        mask = 0 - choice;
+        lặp(i = 0; i < 32; i++) {
+            delta = (a[i] ^ b[i]) & mask;
+            a[i] = a[i] ^ delta;
+            b[i] = b[i] ^ delta;
+        };
+    };
+
+    // Field operations shared with the Ed25519 verifier. These accept
+    // normalized radix-256 field elements owned by V++ cryptographic code.
+    hàm công khai trường không() { trả về mình.zero(); };
+    hàm công khai trường sao(a) { trả về mình.copy(a); };
+    hàm công khai trường cộng(a, b) { trả về mình.add(a, b); };
+    hàm công khai trường trừ(a, b) { trả về mình.sub(a, b); };
+    hàm công khai trường nhân(a, b) { trả về mình.mul(a, b); };
+    hàm công khai trường nghịch đảo(a) { trả về mình.invert(a); };
+
+    hàm công khai tính(scalar, point) {
+        checker = mình.checker;
+        checker.bytes(scalar, 32);
+        checker.bytes(point, 32);
+        nếu (độ dài(scalar) != 32 || độ dài(point) != 32) { ném "X25519: key length"; };
+        key = mình.copy(scalar);
+        key[0] = key[0] & 248;
+        key[31] = (key[31] & 127) | 64;
+        x1 = mình.copy(point); x1[31] = x1[31] & 127;
+        x1 = mình.reduce(x1);
+        x2 = mình.zero(); x2[0] = 1;
+        z2 = mình.zero();
+        x3 = mình.copy(x1);
+        z3 = mình.zero(); z3[0] = 1;
+        previous = 0;
+        lặp(bit = 254; bit >= 0; bit--) {
+            power = 1;
+            lặp(i = 0; i < bit % 8; i++) { power = power * 2; };
+            selected = làm tròn xuống(key[làm tròn xuống(bit / 8)] / power) % 2;
+            previous = previous ^ selected;
+            mình.swap(x2, x3, previous);
+            mình.swap(z2, z3, previous);
+            previous = selected;
+
+            a = mình.add(x2, z2);
+            aa = mình.mul(a, a);
+            b = mình.sub(x2, z2);
+            bb = mình.mul(b, b);
+            e = mình.sub(aa, bb);
+            c = mình.add(x3, z3);
+            d = mình.sub(x3, z3);
+            da = mình.mul(d, a);
+            cb = mình.mul(c, b);
+            sum = mình.add(da, cb);
+            x3 = mình.mul(sum, sum);
+            diff = mình.sub(da, cb);
+            z3 = mình.mul(x1, mình.mul(diff, diff));
+            x2 = mình.mul(aa, bb);
+            z2 = mình.mul(e, mình.add(aa, mình.constant(e, 121665)));
+        };
+        mình.swap(x2, x3, previous);
+        mình.swap(z2, z3, previous);
+        shared = mình.mul(x2, mình.invert(z2));
+        nonzero = 0;
+        lặp(i = 0; i < 32; i++) { nonzero = nonzero | shared[i]; };
+        nếu (nonzero == 0) { ném "X25519: invalid all-zero shared secret"; };
+        trả về shared;
+    };
+
+    hàm công khai công khai(scalar) {
+        base = mình.zero(); base[0] = 9;
+        trả về mình.tính(scalar, base);
+    };
+};

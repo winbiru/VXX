@@ -17,6 +17,36 @@ env:
   PYTHONUTF8: '1'
   PYTHONIOENCODING: utf-8
 jobs:
+  tls-linux:
+    name: TLS provider - ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSL development headers
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Verify identity, encrypted I/O and cleanup across the socket ABI
+        run: python3 scripts/quality/check_vm_native_tls_linux.py
+  tls-windows:
+    name: TLS provider - Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-python
+      - name: Verify Schannel identity, encrypted I/O and cleanup across Winsock
+        shell: msys2 {0}
+        run: python scripts/quality/check_vm_native_tls_windows.py
   graphics-linux:
     name: Linux x64 - SDL2, OpenGL and Vulkan
     runs-on: ubuntu-24.04
@@ -64,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15-intel]
+        os: [ubuntu-24.04-arm, ubuntu-24.04, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -136,6 +166,14 @@ jobs:
           install -m 755 "$RUNNER_TEMP/macos-full/vpp-native-stage3" build-pure-vpp/bin/vpp-native
           cmake --build build-pure-vpp --target vpp-jit
           ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
+      - name: Verify V++ X.509 paths and fragmented TLS 1.3 tickets
+        run: |
+          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
+          ctest --test-dir build-pure-vpp -R '^vpp-tls-' --output-on-failure -j 4
+          python3 -m venv "$RUNNER_TEMP/tls-venv"
+          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
+          VPP_TLS_TEST_BINARY="$GITHUB_WORKSPACE/build-pure-vpp/bin/vpp" \
+            "$RUNNER_TEMP/tls-venv/bin/python" scripts/quality/check_vm_tls_vpp_interop.py
       - name: Package and test installed compiler
         run: |
           cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
@@ -242,6 +280,8 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Install OpenSSL development headers for AOT programs
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - uses: actions/download-artifact@v4
         with:
           name: linux-i32-selfhost
@@ -281,7 +321,7 @@ jobs:
           mkdir -p "$package/share/vpp/scripts/graphics"
           install -m 644 scripts/graphics/CMakeLists.txt scripts/graphics/*.py "$package/share/vpp/scripts/graphics/"
           install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
-          install -m 644 scripts/quality/audit_linux_static_elf.sh "$package/share/vpp/scripts/quality/"
+          install -m 644 scripts/quality/audit_linux_{static,tls}_elf.sh "$package/share/vpp/scripts/quality/"
           install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
           sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/macos/vpp-native-launcher.sh.in > "$package/bin/vpp"
           chmod 755 "$package/bin/vpp"
@@ -290,7 +330,7 @@ jobs:
             cmake -DVPP_ROOT="$GITHUB_WORKSPACE" -DVPP_NATIVE_COMPILER="$out/vpp-native-stage3" \
               -DVPP_VM="$package/bin/vpp-vm" -DVPP_OUTPUT_DIR="$out/compiler-workers" \
               -P scripts/quality/check_compiler_workers.cmake
-          VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
+          VPP_AOT_LINUX_TLS=0 VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
           "$package/bin/vpp" vm-build "$package/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$package/bin/dns-provider.vmb"
           cp -R templates "$package/share/vpp/"
           VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build scripts/vdk/vpp-cli.vi -o "$package/bin/vpp-tools"

@@ -63,6 +63,37 @@ vpp_freestanding_socket_probe:
     js .Lsp_fail
     movl %eax, -36(%rbp)
 
+    // Freestanding Linux has no X.509/TLS provider. All TLS I/O must reject
+    // explicitly, never fall back to the plaintext socket operations.
+    // Use a separate 160-byte control to avoid overlapping legacy 128-byte
+    // socket controls while exercising the TLS-specific fields.
+    movl %eax, 90896(%r12)
+    SOCK_CALL 11, 90896
+    cmpl $-95, %eax
+    jne .Lsp_fail
+    cmpl $95, 90924(%r12)
+    jne .Lsp_fail
+    SOCK_CALL 12, 90896
+    cmpl $-95, %eax
+    jne .Lsp_fail
+    cmpl $95, 90924(%r12)
+    jne .Lsp_fail
+    SOCK_CALL 13, 90896
+    cmpl $-95, %eax
+    jne .Lsp_fail
+    cmpl $95, 90924(%r12)
+    jne .Lsp_fail
+    SOCK_CALL 14, 90896
+    testl %eax, %eax
+    jne .Lsp_fail
+    cmpq $0, 91016(%r12)
+    jne .Lsp_fail
+    cmpl $0, 91040(%r12)
+    jne .Lsp_fail
+    SOCK_CALL 14, 90896
+    testl %eax, %eax
+    jne .Lsp_fail
+
     movl -32(%rbp), %eax
     movl %eax, 90384(%r12)
     movl $1000, 90396(%r12)
