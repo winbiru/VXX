@@ -36,6 +36,13 @@ def verify_seeds():
     for name, sha in pins.items():
         if digest(SEEDS / name) != sha:
             raise RuntimeError(f'Windows seed checksum mismatch: {name}')
+    # Stage 1 executes the bundled assembly seed, which can lag behind the
+    # current .vi source even when its checksum is correctly pinned.
+    with gzip.open(SEEDS / 'vpp-full.S.gz', 'rb') as compressed:
+        full_seed = compressed.read()
+    for library in (b'-lsecur32', b'-lcrypt32'):
+        if b'.asciz "' + library + b'"' not in full_seed:
+            raise RuntimeError(f'Windows full seed missing TLS link library: {library.decode()}')
 
 
 def audit_pe(path, deterministic=True):

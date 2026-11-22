@@ -247,14 +247,22 @@ lớp công khai Đối Tượng MachO {
         rộng = làm tròn xuống(cờ / 2) % 4;
         ngoài = làm tròn xuống(cờ / 8) % 2;
         loại = làm tròn xuống(cờ / 16);
-        // Limit the first reader to the relocation shapes actually emitted
-        // by the current full compiler, runtime and platform objects.
-        bỏ kết quả = macho yêu cầu(ngoài == 1 && đích < mình.số ký hiệu());
-        bỏ kết quả = macho yêu cầu((loại == 0 && rộng == 3 && tương đối == 0) || (loại == 2 && rộng == 2 && tương đối == 1) || (loại == 3 && rộng == 2 && tương đối == 1) || (loại == 4 && rộng == 2 && tương đối == 0));
+        // ARM64_RELOC_ADDEND precedes the PAGE21/PAGEOFF12 relocation at
+        // the same address. Its signed 24-bit field carries an addend, not
+        // a symbol index. Pairing is validated by the relocation consumer.
+        cộng = 0;
+        nếu (loại == 10) {
+            bỏ kết quả = macho yêu cầu(ngoài == 0 && rộng == 2 && tương đối == 0);
+            cộng = đích;
+            nếu (cộng >= 8388608) { cộng -= 16777216; };
+        } hoặc {
+            bỏ kết quả = macho yêu cầu(ngoài == 1 && đích < mình.số ký hiệu());
+            bỏ kết quả = macho yêu cầu((loại == 0 && rộng == 3 && tương đối == 0) || (loại == 2 && rộng == 2 && tương đối == 1) || (loại == 3 && rộng == 2 && tương đối == 1) || (loại == 4 && rộng == 2 && tương đối == 0));
+        };
         byte rộng = 4;
         nếu (rộng == 3) { byte rộng = 8; }
         hoặc { bỏ kết quả = macho yêu cầu(địa % 4 == 0); };
         bỏ kết quả = macho yêu cầu(địa <= s["size"] && byte rộng <= s["size"] - địa);
-        trả về {"address": địa, "symbol": đích, "pcrel": tương đối, "length": rộng, "type": loại};
+        trả về {"address": địa, "symbol": đích, "pcrel": tương đối, "length": rộng, "type": loại, "addend": cộng};
     };
 };

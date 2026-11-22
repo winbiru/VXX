@@ -259,10 +259,24 @@ hàm macho rt tạo(đối tượng, runtime, kết quả) {
                 biến rt rel = macho rt trường(s, 12) + i * 8;
                 biến vị trí tái định vị runtime = byte đọc số nguyên ba mươi hai bit(runtime, rt rel);
                 biến bits = byte lấy(runtime, rt rel + 7);
+                biến cộng = 0;
+                // ARM64_RELOC_ADDEND is followed by PAGE21/PAGEOFF12 at
+                // the same address. Its lower 24 bits are a signed addend.
+                nếu (bits == 164) {
+                    nếu (i + 1 >= macho rt trường(s, 16)) { trạng thái = -1; thoát; };
+                    cộng = byte lấy(runtime, rt rel + 4) + byte lấy(runtime, rt rel + 5) * 256 + byte lấy(runtime, rt rel + 6) * 65536;
+                    nếu (cộng >= 8388608) { cộng -= 16777216; };
+                    i += 1;
+                    rt rel += 8;
+                    nếu (byte đọc số nguyên ba mươi hai bit(runtime, rt rel) != vị trí tái định vị runtime) { trạng thái = -1; thoát; };
+                    bits = byte lấy(runtime, rt rel + 7);
+                    nếu (bits != 61 && bits != 76) { trạng thái = -1; thoát; };
+                };
                 biến chỉ mục tái định vị runtime = byte lấy(runtime, rt rel + 4) + byte lấy(runtime, rt rel + 5) * 256 + byte lấy(runtime, rt rel + 6) * 65536;
                 biến loại tái định vị runtime = bits / 16;
                 nếu (chỉ mục tái định vị runtime >= nsym || (bits != 45 && bits != 61 && bits != 76) || vị trí tái định vị runtime < 0 || vị trí tái định vị runtime > macho rt trường(s, 4) - 4) { trạng thái = -1; thoát; };
-                nếu (macho rt vá(mã, macho rt trường(s, 24) + vị trí tái định vị runtime, máy đọc số nguyên ba mươi hai bit(67210000 + chỉ mục tái định vị runtime * 4), loại tái định vị runtime) != 0) { trạng thái = -1; thoát; };
+                biến đích tái định vị = máy đọc số nguyên ba mươi hai bit(67210000 + chỉ mục tái định vị runtime * 4) + cộng;
+                nếu (macho rt vá(mã, macho rt trường(s, 24) + vị trí tái định vị runtime, đích tái định vị, loại tái định vị runtime) != 0) { trạng thái = -1; thoát; };
             };
         };
     };

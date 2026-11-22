@@ -14,7 +14,7 @@ mỗi batch. Có thể điều chỉnh bằng `VPP_BENCH_RUNS` và
 `benchmark/reports/` (hoặc đường dẫn truyền vào run.sh).
 Bộ đo so sánh đa ngôn ngữ vẫn mặc định 6 bài cũ;
 `--extended` chọn đủ 21 bài; V++ AOT, Python và Node.js đã có mã cho
-toàn bộ 21 bài. C và i32 có 3 bài, C++ và Java có 5 bài, Ruby có 6 bài.
+toàn bộ 21 bài. i32 có 3 bài, C++ và Java có 5 bài, Ruby có 6 bài.
 Mỗi runtime chỉ chạy những bài có trong manifest của nó.
 Kết quả đo ngày 16/11/2026 xem ở [README chính](../../README.md#-benchmark).
 

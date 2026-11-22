@@ -315,9 +315,9 @@ hàm nạp mô đun đường tuyệt đối(đường tệp) {
             };
         };
         lặp (i = đầu; i < byte dài(đường tệp); i++) {
-            biến ký tự = byte lấy(đường tệp, i);
-            nếu (windows == 1 && ký tự == 92) { ký tự = 47; };
-            nếu (byte thêm(kết quả trả về, ký tự) != 0) { mã trạng thái = -1; thoát; };
+            biến ký tự đường = byte lấy(đường tệp, i);
+            nếu (windows == 1 && ký tự đường == 92) { ký tự đường = 47; };
+            nếu (byte thêm(kết quả trả về, ký tự đường) != 0) { mã trạng thái = -1; thoát; };
         };
     };
     nếu (mã trạng thái != 0 || byte dài(kết quả trả về) >= 4096) {

@@ -118,6 +118,12 @@ jobs:
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
           "$RUNNER_TEMP/macos-i32/vpp-i32" check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
           "$RUNNER_TEMP/macos-i32/vpp-i32" check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+      - name: Check ARM64 Mach-O merger and native executable
+        run: |
+          bash scripts/quality/check_macos_native_macho_linker.sh \
+            "$RUNNER_TEMP/macos-i32/vpp-i32" "$RUNNER_TEMP/macos-macho-linker"
+          bash scripts/quality/check_macos_native_macho_executable.sh \
+            "$RUNNER_TEMP/macos-i32/vpp-i32"
       - name: Check ELF and COFF symbol index regression
         run: |
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
@@ -149,7 +155,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
           tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
-          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=ON
+          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=OFF
       - name: Bootstrap full compiler (Stage 1)
         run: |
           cmake --build build-pure-vpp --parallel

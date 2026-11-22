@@ -201,7 +201,13 @@ hàm macho hợp nhất mô đun(kho, đích) {
         nếu (byte lấy(kho, gốc + dài - 1) != 0) { trạng thái = -1; thoát; };
         biến gốc mã = byte dài(mã);
         biến gốc chuỗi = byte dài(chuỗi);
-        nếu (gốc mã > 900000 - dài mã) { trạng thái = -1; thoát; };
+        // Multiple valid source objects can exceed the old 900000-byte
+        // aggregate limit. The final object, including relocations and
+        // symbols, is bounded by the 2 MiB byte-buffer capacity below.
+        nếu (gốc mã > 2097152 - dài mã) {
+            thực thi liên kết báo lỗi("V++ Mach-O: merged code exceeds byte-buffer capacity\n");
+            trạng thái = -1; thoát;
+        };
         nếu (tổng ký hiệu > 16777215 - nsym) { trạng thái = -1; thoát; };
         nếu (số đối tượng == 0) {
             biến phần đầu = byte cắt(kho, gốc, 232);
@@ -301,7 +307,10 @@ hàm macho hợp nhất mô đun(kho, đích) {
         khi (reloff - máy chia số nguyên ba mươi hai bit(reloff, 8) * 8 != 0) { reloff = reloff + 1; };
         biến symoff = reloff + byte dài(tái định vị);
         biến stroff = symoff + byte dài(bảng ký hiệu);
-        nếu (stroff > 2097152 - byte dài(chuỗi)) { trạng thái = -1; };
+        nếu (stroff > 2097152 - byte dài(chuỗi)) {
+            thực thi liên kết báo lỗi("V++ Mach-O: merged object exceeds byte-buffer capacity\n");
+            trạng thái = -1;
+        };
         nếu (trạng thái == 0) {
             nếu (byte ghi số nguyên ba mươi hai bit(đích, 64, n) != 0) { trạng thái = -1; };
             nếu (byte ghi số nguyên ba mươi hai bit(đích, 80, n) != 0) { trạng thái = -1; };
