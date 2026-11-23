@@ -1,0 +1,917 @@
+// Thực thi AST trực tiếp trong tiến trình V++ đang chạy.
+// Parser là bước duy nhất trước khi chạy. Không sinh IR, bytecode hoặc mã máy.
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.nguồn tệp.Bộ Nạp Nguồn;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn lên;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+lớp công khai Bộ Thông Dịch {
+    hàm công khai khởi tạo() {
+        mình.toàn cục = mình.phạm vi mới(rỗng);
+    };
+
+    hàm riêng tư phạm vi mới(cha, ranh giới hàm = sai) {
+        trả về {"giá trị": {}, "cha": cha, "ranh giới hàm": ranh giới hàm};
+    };
+
+    hàm riêng tư phạm vi tìm(môi trường, tên) {
+        hiện tại = môi trường;
+        khi (hiện tại != rỗng) {
+            nếu (máy ảo có khóa từ điển(hiện tại["giá trị"], tên)) { trả về hiện tại; };
+            hiện tại = hiện tại["cha"];
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư lấy biến(môi trường, tên) {
+        phạm vi = mình.phạm vi tìm(môi trường, tên);
+        // Các slot i32 chưa được ghi có giá trị mặc định 0 trong runtime.
+        nếu (phạm vi == rỗng) { trả về 0; };
+        trả về phạm vi["giá trị"][tên];
+    };
+
+    hàm riêng tư đặt biến(môi trường, tên, giá trị, khai báo = sai) {
+        phạm vi = môi trường;
+        nếu (!khai báo) {
+            tìm = mình.phạm vi tìm(môi trường, tên);
+            nếu (tìm != rỗng) { phạm vi = tìm; }
+            hoặc {
+                // Gán biến mới trong khối thuộc phạm vi hàm gần nhất.
+                hiện tại = môi trường;
+                khi (hiện tại != rỗng) {
+                    phạm vi = hiện tại;
+                    nếu (hiện tại["ranh giới hàm"]) { thoát; };
+                    hiện tại = hiện tại["cha"];
+                };
+            };
+        };
+        phạm vi["giá trị"][tên] = giá trị;
+        trả về giá trị;
+    };
+
+    hàm riêng tư chuỗi literal(văn bản) {
+        nguồn = chuỗi thành byte máy ảo(văn bản);
+        ra = [];
+        n = máy ảo lấy độ dài(nguồn);
+        lặp(i = 1; i < n - 1; i++) {
+            c = nguồn[i];
+            nếu (c == 92 && i + 1 < n - 1) {
+                i++;
+                c = nguồn[i];
+                nếu (c == 110) { c = 10; }
+                hoặc nếu (c == 114) { c = 13; }
+                hoặc nếu (c == 116) { c = 9; }
+                hoặc nếu (c == 48) { c = 0; };
+            };
+            máy ảo thêm cuối danh sách(ra, c);
+        };
+        trả về chuỗi từ byte máy ảo(ra);
+    };
+
+    hàm riêng tư hằng(nút) {
+        loại = nút["kiểu"];
+        s = nút["giá trị"];
+        nếu (loại == "số nguyên") { trả về thành số nguyên(s); };
+        nếu (loại == "số thực") { trả về thành số thực(s); };
+        nếu (loại == "chuỗi") { trả về mình.chuỗi literal(s); };
+        nếu (s == "đúng") { trả về đúng; };
+        nếu (s == "sai") { trả về sai; };
+        nếu (s == "rỗng") { trả về rỗng; };
+        ném "thông dịch: hằng chưa hỗ trợ '" + s + "'";
+    };
+
+    hàm riêng tư phép toán(toán tử, trái, phải) {
+        chọn (toán tử) {
+            ca "+": { trả về trái + phải; }
+            ca "-": { trả về trái - phải; }
+            ca "*": { trả về trái * phải; }
+            ca "/": { trả về trái / phải; }
+            ca "%": { trả về trái % phải; }
+            ca "==": { trả về trái == phải; }
+            ca "!=": { trả về trái != phải; }
+            ca "<": { trả về trái < phải; }
+            ca "<=": { trả về trái <= phải; }
+            ca ">": { trả về trái > phải; }
+            ca ">=": { trả về trái >= phải; }
+            ca "&": { trả về trái & phải; }
+            ca "|": { trả về trái | phải; }
+            ca "^": { trả về trái ^ phải; }
+            ca "<<": { trả về trái << phải; }
+            ca ">>": { trả về trái >> phải; }
+            mặc định: { ném "thông dịch: toán tử chưa hỗ trợ '" + toán tử + "'"; }
+        };
+    };
+
+    // Lexer có thể gộp `đối_tượng.trường` thành một tên duy nhất.
+    hàm riêng tư tách tên(tên) {
+        lặp(i = 1; i < máy ảo lấy độ dài(tên) - 1; i++) {
+            nếu (tên[i] == ".") {
+                trả về {"nhận": máy ảo cắt chuỗi(tên, 0, i),
+                    "tên": máy ảo cắt chuỗi(tên, i + 1, máy ảo lấy độ dài(tên) - i - 1)};
+            };
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư tìm phương thức(lớp, tên) {
+        hiện tại = lớp;
+        khi (hiện tại != rỗng) {
+            các hàm = hiện tại["lớp thông dịch"]["phương thức"];
+            lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+                nếu (các hàm[i]["tên"] == tên) {
+                    trả về {"hàm": các hàm[i], "lớp": hiện tại};
+                };
+            };
+            hiện tại = hiện tại["lớp cha thông dịch"];
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư đọc thành viên(đối tượng, tên, gọi = sai) {
+        nếu (máy ảo lấy loại(đối tượng) != "từ điển") {
+            ném "thông dịch: không thể truy cập thành viên '" + tên + "'";
+        };
+        cặp = mình.tách tên(tên);
+        nếu (cặp != rỗng) {
+            trả về mình.đọc thành viên(mình.đọc thành viên(đối tượng, cặp["nhận"]), cặp["tên"], gọi);
+        };
+        nếu (máy ảo có khóa từ điển(đối tượng, "gốc thông dịch")) {
+            phương thức = mình.tìm phương thức(đối tượng["gốc thông dịch"], tên);
+            nếu (phương thức == rỗng) { ném "thông dịch: phương thức lớp cha không tồn tại '" + tên + "'"; };
+            trả về {"hàm thông dịch": phương thức["hàm"],
+                "môi trường": phương thức["lớp"]["môi trường"],
+                "nhận": đối tượng["đối tượng thông dịch"], "lớp hiện tại": phương thức["lớp"]};
+        };
+        nếu (máy ảo có khóa từ điển(đối tượng, "đối tượng thông dịch")) {
+            // Vị trí gọi ưu tiên phương thức khi tên phương thức trùng tên trường.
+            nếu (gọi) {
+                phương thức = mình.tìm phương thức(đối tượng["đối tượng thông dịch"], tên);
+                nếu (phương thức != rỗng) {
+                    trả về {"hàm thông dịch": phương thức["hàm"],
+                        "môi trường": phương thức["lớp"]["môi trường"],
+                        "nhận": đối tượng, "lớp hiện tại": phương thức["lớp"]};
+                };
+            };
+            trường = đối tượng["trường"];
+            nếu (máy ảo có khóa từ điển(trường, tên)) { trả về trường[tên]; };
+            phương thức = mình.tìm phương thức(đối tượng["đối tượng thông dịch"], tên);
+            nếu (phương thức == rỗng) { ném "thông dịch: thành viên chưa khai báo '" + tên + "'"; };
+            trả về {"hàm thông dịch": phương thức["hàm"],
+                "môi trường": phương thức["lớp"]["môi trường"],
+                "nhận": đối tượng, "lớp hiện tại": phương thức["lớp"]};
+        };
+        nếu (máy ảo có khóa từ điển(đối tượng, "lớp thông dịch")) {
+            phương thức = mình.tìm phương thức(đối tượng, tên);
+            nếu (phương thức == rỗng) { ném "thông dịch: phương thức lớp không tồn tại '" + tên + "'"; };
+            trả về {"hàm thông dịch": phương thức["hàm"],
+                "môi trường": phương thức["lớp"]["môi trường"],
+                "nhận": đối tượng, "lớp hiện tại": phương thức["lớp"]};
+        };
+        trả về đối tượng[tên];
+    };
+
+    hàm riêng tư phương thức ngầm(môi trường, tên) {
+        phạm vi = mình.phạm vi tìm(môi trường, "mình");
+        nếu (phạm vi == rỗng) { trả về rỗng; };
+        nhận = phạm vi["giá trị"]["mình"];
+        nếu (máy ảo lấy loại(nhận) != "từ điển") { trả về rỗng; };
+        kiểu nhận = rỗng;
+        nếu (máy ảo có khóa từ điển(nhận, "đối tượng thông dịch")) {
+            kiểu nhận = nhận["đối tượng thông dịch"];
+        } hoặc nếu (máy ảo có khóa từ điển(nhận, "lớp thông dịch")) {
+            kiểu nhận = nhận;
+        };
+        nếu (kiểu nhận == rỗng) { trả về rỗng; };
+        phương thức = mình.tìm phương thức(kiểu nhận, tên);
+        nếu (phương thức == rỗng) { trả về rỗng; };
+        trả về {"hàm thông dịch": phương thức["hàm"],
+            "môi trường": phương thức["lớp"]["môi trường"],
+            "nhận": nhận, "lớp hiện tại": phương thức["lớp"]};
+    };
+
+    hàm riêng tư ghi thành viên(đối tượng, tên, giá trị) {
+        nếu (máy ảo lấy loại(đối tượng) != "từ điển") {
+            ném "thông dịch: không thể gán thành viên '" + tên + "'";
+        };
+        cặp = mình.tách tên(tên);
+        nếu (cặp != rỗng) {
+            trả về mình.ghi thành viên(mình.đọc thành viên(đối tượng, cặp["nhận"]), cặp["tên"], giá trị);
+        };
+        nếu (máy ảo có khóa từ điển(đối tượng, "đối tượng thông dịch")) {
+            đối tượng["trường"][tên] = giá trị;
+        } hoặc { đối tượng[tên] = giá trị; };
+        trả về giá trị;
+    };
+
+    hàm riêng tư đọc tên(môi trường, tên, gọi = sai) {
+        phạm vi = mình.phạm vi tìm(môi trường, tên);
+        nếu (phạm vi != rỗng) { trả về phạm vi["giá trị"][tên]; };
+        cặp = mình.tách tên(tên);
+        nếu (cặp != rỗng) {
+            trả về mình.đọc thành viên(mình.đọc tên(môi trường, cặp["nhận"]), cặp["tên"], gọi);
+        };
+        trả về 0;
+    };
+
+    hàm riêng tư đọc đích(nút, môi trường) {
+        loại = nút["loại"];
+        nếu (loại == "tên") { trả về mình.đọc tên(môi trường, nút["giá trị"]); };
+        nếu (loại == "thành viên") {
+            trả về mình.đọc thành viên(mình.biểu thức(nút["đối tượng"], môi trường), nút["tên"]);
+        };
+        nếu (loại == "chỉ số") {
+            gốc = mình.biểu thức(nút["đối tượng"], môi trường);
+            chỉ số = mình.biểu thức(nút["chỉ số"], môi trường);
+            trả về gốc[chỉ số];
+        };
+        ném "thông dịch: vế trái phép gán chưa hỗ trợ";
+    };
+
+    hàm riêng tư ghi đích(nút, môi trường, giá trị) {
+        loại = nút["loại"];
+        nếu (loại == "tên") {
+            tên = nút["giá trị"];
+            nếu (mình.phạm vi tìm(môi trường, tên) == rỗng) {
+                cặp = mình.tách tên(tên);
+                nếu (cặp != rỗng) {
+                    trả về mình.ghi thành viên(mình.đọc tên(môi trường, cặp["nhận"]), cặp["tên"], giá trị);
+                };
+            };
+            trả về mình.đặt biến(môi trường, tên, giá trị);
+        };
+        nếu (loại == "thành viên") {
+            trả về mình.ghi thành viên(mình.biểu thức(nút["đối tượng"], môi trường), nút["tên"], giá trị);
+        };
+        nếu (loại == "chỉ số") {
+            gốc = mình.biểu thức(nút["đối tượng"], môi trường);
+            chỉ số = mình.biểu thức(nút["chỉ số"], môi trường);
+            gốc[chỉ số] = giá trị;
+            trả về giá trị;
+        };
+        ném "thông dịch: đích phép gán chưa hỗ trợ";
+    };
+
+    // Giữ đối tượng và chỉ số của vế trái trước khi thực thi vế phải.
+    // Các biểu thức có tác dụng phụ trong đích gán chỉ được đánh giá một lần.
+    hàm riêng tư giữ đích(nút, môi trường) {
+        loại = nút["loại"];
+        nếu (loại == "tên") {
+            tên = nút["giá trị"];
+            nếu (mình.phạm vi tìm(môi trường, tên) == rỗng) {
+                cặp = mình.tách tên(tên);
+                nếu (cặp != rỗng) {
+                    trả về {"loại": "thành viên", "nhận": mình.đọc tên(môi trường, cặp["nhận"]),
+                        "tên": cặp["tên"]};
+                };
+            };
+            trả về {"loại": "tên", "tên": tên, "môi trường": môi trường};
+        };
+        nếu (loại == "thành viên") {
+            trả về {"loại": "thành viên", "nhận": mình.biểu thức(nút["đối tượng"], môi trường),
+                "tên": nút["tên"]};
+        };
+        nếu (loại == "chỉ số") {
+            trả về {"loại": "chỉ số", "nhận": mình.biểu thức(nút["đối tượng"], môi trường),
+                "chỉ số": mình.biểu thức(nút["chỉ số"], môi trường)};
+        };
+        ném "thông dịch: đích phép gán chưa hỗ trợ";
+    };
+
+    hàm riêng tư đọc đích giữ(đích) {
+        nếu (đích["loại"] == "tên") {
+            trả về mình.đọc tên(đích["môi trường"], đích["tên"]);
+        };
+        nếu (đích["loại"] == "thành viên") {
+            trả về mình.đọc thành viên(đích["nhận"], đích["tên"]);
+        };
+        trả về đích["nhận"][đích["chỉ số"]];
+    };
+
+    hàm riêng tư ghi đích giữ(đích, giá trị) {
+        nếu (đích["loại"] == "tên") {
+            trả về mình.đặt biến(đích["môi trường"], đích["tên"], giá trị);
+        };
+        nếu (đích["loại"] == "thành viên") {
+            trả về mình.ghi thành viên(đích["nhận"], đích["tên"], giá trị);
+        };
+        đích["nhận"][đích["chỉ số"]] = giá trị;
+        trả về giá trị;
+    };
+
+    hàm riêng tư gọi hàm(hàm nguồn, đối số) {
+        nếu (máy ảo lấy loại(hàm nguồn) != "từ điển") {
+            ném "thông dịch: đối tượng không thể gọi như hàm";
+        };
+        nếu (!máy ảo có khóa từ điển(hàm nguồn, "hàm thông dịch") &&
+            !máy ảo có khóa từ điển(hàm nguồn, "lớp thông dịch")) {
+            ném "thông dịch: đối tượng không thể gọi như hàm";
+        };
+        nếu (máy ảo có khóa từ điển(hàm nguồn, "lớp thông dịch")) {
+            thể hiện = {"đối tượng thông dịch": hàm nguồn, "trường": {}};
+            khởi tạo = mình.tìm phương thức(hàm nguồn, "khởi tạo");
+            nếu (khởi tạo == rỗng) {
+                nếu (máy ảo lấy độ dài(đối số) != 0) { ném "thông dịch: lớp không có hàm khởi tạo"; };
+            } hoặc {
+                mình.gọi hàm({"hàm thông dịch": khởi tạo["hàm"],
+                    "môi trường": khởi tạo["lớp"]["môi trường"],
+                    "nhận": thể hiện, "lớp hiện tại": khởi tạo["lớp"]}, đối số);
+            };
+            trả về thể hiện;
+        };
+        nút = hàm nguồn["hàm thông dịch"];
+        môi trường = mình.phạm vi mới(hàm nguồn["môi trường"], đúng);
+        nếu (máy ảo có khóa từ điển(hàm nguồn, "nhận")) {
+            mình.đặt biến(môi trường, "mình", hàm nguồn["nhận"], đúng);
+            cha kiểu = hàm nguồn["lớp hiện tại"]["lớp cha thông dịch"];
+            nếu (cha kiểu != rỗng) {
+                mình.đặt biến(môi trường, "gốc", {"gốc thông dịch": cha kiểu,
+                    "đối tượng thông dịch": hàm nguồn["nhận"]}, đúng);
+            };
+        };
+        tham số = nút["tham số"];
+        mặc định = nút["mặc định tham số"];
+        nếu (máy ảo lấy độ dài(đối số) > máy ảo lấy độ dài(tham số)) {
+            ném "thông dịch: quá nhiều đối số của hàm '" + nút["tên"] + "'";
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
+            giá trị = rỗng;
+            nếu (i < máy ảo lấy độ dài(đối số)) { giá trị = đối số[i]; }
+            hoặc nếu (mặc định[i] != rỗng) { giá trị = mình.biểu thức(mặc định[i], môi trường); }
+            hoặc { ném "thông dịch: thiếu đối số của hàm '" + nút["tên"] + "'"; };
+            mình.đặt biến(môi trường, tham số[i], giá trị, đúng);
+        };
+        kết quả = mình.câu lệnh(nút["thân"], môi trường);
+        nếu (kết quả["luồng"] == "trả về") { trả về kết quả["giá trị"]; };
+        nếu (kết quả["luồng"] != "") { ném "thông dịch: điều khiển luồng ngoài vòng lặp"; };
+        trả về rỗng;
+    };
+
+    hàm riêng tư gọi nội tại(tên, đối số) {
+        nếu (tên == "máy tiến trình mã tiến trình" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã tiến trình();
+        };
+        nếu (tên == "máy tiến trình mã tiến trình cha" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã tiến trình cha();
+        };
+        nếu (tên == "máy tiến trình mã người dùng" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã người dùng();
+        };
+        nếu (tên == "máy tiến trình mã người dùng hiệu lực" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã người dùng hiệu lực();
+        };
+        nếu (tên == "máy tiến trình mã nhóm" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã nhóm();
+        };
+        nếu (tên == "máy tiến trình mã nhóm hiệu lực" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy tiến trình mã nhóm hiệu lực();
+        };
+        nếu (tên == "máy tiến trình tạo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tiến trình tạo(đối số[0]);
+        };
+        nếu (tên == "máy tiến trình bắt đầu" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tiến trình bắt đầu(đối số[0]);
+        };
+        nếu (tên == "máy tiến trình thăm dò" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tiến trình thăm dò(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tiến trình đọc" && máy ảo lấy độ dài(đối số) == 4) {
+            trả về máy tiến trình đọc(đối số[0], đối số[1], đối số[2], đối số[3]);
+        };
+        nếu (tên == "máy tiến trình đợi" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tiến trình đợi(đối số[0]);
+        };
+        nếu (tên == "máy tiến trình lỗi" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tiến trình lỗi(đối số[0]);
+        };
+        nếu (tên == "máy tiến trình đóng" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tiến trình đóng(đối số[0]);
+        };
+        nếu (tên == "máy tiến trình đối số" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tiến trình đối số(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tiến trình môi trường" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy tiến trình môi trường(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy tiến trình lệnh windows" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tiến trình lệnh windows(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy bộ phân giải mở" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy bộ phân giải mở(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy bộ phân giải tiếp" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy bộ phân giải tiếp(đối số[0]);
+        };
+        nếu (tên == "máy bộ phân giải đóng" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy bộ phân giải đóng(đối số[0]);
+        };
+        nếu (tên == "máy JIT thô" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy JIT thô(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "chuỗi thành byte máy ảo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về chuỗi thành byte máy ảo(đối số[0]);
+        };
+        nếu (tên == "chuỗi từ byte máy ảo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về chuỗi từ byte máy ảo(đối số[0]);
+        };
+        nếu (tên == "máy ảo cắt chuỗi" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy ảo cắt chuỗi(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy ảo cắt chuỗi theo byte" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy ảo cắt chuỗi theo byte(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy ảo thay chuỗi chính xác" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy ảo thay chuỗi chính xác(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy đường loại" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy đường loại(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy đường tuyệt đối" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đường tuyệt đối(đối số[0]);
+        };
+        nếu (tên == "máy đường chuẩn" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đường chuẩn(đối số[0]);
+        };
+        nếu (tên == "máy đường thống kê" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đường thống kê(đối số[0]);
+        };
+        nếu (tên == "máy đường cùng tệp" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy đường cùng tệp(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy đường hiện tại" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy đường hiện tại();
+        };
+        nếu (tên == "máy đường thực thi" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đường thực thi(đối số[0]);
+        };
+        nếu (tên == "máy đường đặt hiện tại" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đường đặt hiện tại(đối số[0]);
+        };
+        nếu (tên == "máy đường tạm" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy đường tạm();
+        };
+        nếu (tên == "máy tệp mở" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tệp mở(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tệp đọc" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy tệp đọc(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy tệp ghi" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy tệp ghi(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy tệp đóng" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp đóng(đối số[0]);
+        };
+        nếu (tên == "máy tệp xóa" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp xóa(đối số[0]);
+        };
+        nếu (tên == "máy tệp dịch" && máy ảo lấy độ dài(đối số) == 3) {
+            trả về máy tệp dịch(đối số[0], đối số[1], đối số[2]);
+        };
+        nếu (tên == "máy tệp khóa" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp khóa(đối số[0]);
+        };
+        nếu (tên == "máy tệp vị trí" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp vị trí(đối số[0]);
+        };
+        nếu (tên == "máy tệp đổi tên" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tệp đổi tên(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tệp sao chép" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tệp sao chép(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tệp liên kết cứng" && máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy tệp liên kết cứng(đối số[0], đối số[1]);
+        };
+        nếu (tên == "máy tệp lỗi" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp lỗi(đối số[0]);
+        };
+        nếu (tên == "máy thư mục mở" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục mở(đối số[0]);
+        };
+        nếu (tên == "máy thư mục kế" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục kế(đối số[0]);
+        };
+        nếu (tên == "máy thư mục đóng" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục đóng(đối số[0]);
+        };
+        nếu (tên == "máy thư mục tạo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục tạo(đối số[0]);
+        };
+        nếu (tên == "máy thư mục xóa" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục xóa(đối số[0]);
+        };
+        nếu (tên == "máy đồng hồ đơn điệu" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy đồng hồ đơn điệu();
+        };
+        nếu (tên == "máy đồng hồ giờ quốc tế" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về máy đồng hồ giờ quốc tế();
+        };
+        nếu (tên == "máy đồng hồ địa phương" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy đồng hồ địa phương(đối số[0]);
+        };
+        nếu (tên == "máy ngủ mili giây" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ngủ mili giây(đối số[0]);
+        };
+        nếu (tên == "máy ảo xem byte chuỗi" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo xem byte chuỗi(đối số[0]);
+        };
+        nếu (tên == "máy ảo kiểm tra utf8" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo kiểm tra utf8(đối số[0]);
+        };
+        nếu (tên == "bit số thực máy ảo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về bit số thực máy ảo(đối số[0]);
+        };
+        nếu (tên == "số thực từ bit máy ảo" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về số thực từ bit máy ảo(đối số[0]);
+        };
+        nếu (tên == "máy ảo quét dãy số nguyên" && máy ảo lấy độ dài(đối số) == 4) {
+            trả về máy ảo quét dãy số nguyên(đối số[0], đối số[1], đối số[2], đối số[3]);
+        };
+        nếu (tên == "mã trung gian chạy máy ảo" && máy ảo lấy độ dài(đối số) == 4) {
+            trả về mã trung gian chạy máy ảo(đối số[0], đối số[1], đối số[2], đối số[3]);
+        };
+        nếu (tên == "mã trung gian chạy bản địa" && máy ảo lấy độ dài(đối số) == 5) {
+            trả về mã trung gian chạy bản địa(đối số[0], đối số[1], đối số[2], đối số[3], đối số[4]);
+        };
+        nếu (tên == "máy môi trường đọc" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy môi trường đọc(đối số[0]);
+        };
+        nếu (tên == "máy nguồn ngẫu nhiên các byte" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy nguồn ngẫu nhiên các byte(đối số[0]);
+        };
+        nếu ((tên == "băm định danh" || tên == "máy ảo băm định danh") &&
+            máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo băm định danh(đối số[0]);
+        };
+        nếu ((tên == "máy ảo lấy độ dài" || tên == "độ dài" || tên == "do_dai") &&
+            máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo lấy độ dài(đối số[0]);
+        };
+        nếu ((tên == "máy ảo lấy loại" || tên == "loại của" || tên == "loai_cua") &&
+            máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo lấy loại(đối số[0]);
+        };
+        nếu ((tên == "máy ảo thêm cuối danh sách" || tên == "thêm" || tên == "them") &&
+            máy ảo lấy độ dài(đối số) == 2) {
+            máy ảo thêm cuối danh sách(đối số[0], đối số[1]);
+            trả về rỗng;
+        };
+        nếu ((tên == "máy ảo có khóa từ điển" || tên == "có khóa" || tên == "co_khoa") &&
+            máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy ảo có khóa từ điển(đối số[0], đối số[1]);
+        };
+        nếu ((tên == "máy ảo liệt kê khóa từ điển" || tên == "khóa map" || tên == "khoa_map") &&
+            máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy ảo liệt kê khóa từ điển(đối số[0]);
+        };
+        nếu ((tên == "máy ảo xóa khóa từ điển" || tên == "xóa khóa" || tên == "xoa_khoa") &&
+            máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy ảo xóa khóa từ điển(đối số[0], đối số[1]);
+        };
+        nếu ((tên == "máy ảo xóa vị trí danh sách" || tên == "xóa tại" || tên == "xoa_tai") &&
+            máy ảo lấy độ dài(đối số) == 2) {
+            trả về máy ảo xóa vị trí danh sách(đối số[0], đối số[1]);
+        };
+        nếu (tên == "bộ" && máy ảo lấy độ dài(đối số) == 1) {
+            trả về bộ(đối số[0]);
+        };
+        nếu (tên == "ten nền tảng máy ảo" && máy ảo lấy độ dài(đối số) == 0) {
+            trả về ten nền tảng máy ảo();
+        };
+        nếu (tên == "thành chuỗi" && máy ảo lấy độ dài(đối số) == 1) { trả về thành chuỗi(đối số[0]); };
+        nếu (tên == "thành số nguyên" && máy ảo lấy độ dài(đối số) == 1) { trả về thành số nguyên(đối số[0]); };
+        nếu (tên == "thành số thực" && máy ảo lấy độ dài(đối số) == 1) { trả về thành số thực(đối số[0]); };
+        ném "thông dịch: hàm nội tại chưa hỗ trợ '" + tên + "' (" +
+            thành chuỗi(máy ảo lấy độ dài(đối số)) + " đối số)";
+    };
+
+    hàm riêng tư biểu thức(nút, môi trường) {
+        nếu (nút == rỗng) { trả về rỗng; };
+        loại = nút["loại"];
+        nếu (loại == "hằng") { trả về mình.hằng(nút); };
+        nếu (loại == "tên") { trả về mình.đọc tên(môi trường, nút["giá trị"]); };
+        nếu (loại == "thành viên") { trả về mình.đọc đích(nút, môi trường); };
+        nếu (loại == "hàm ẩn danh") { trả về {"hàm thông dịch": nút, "môi trường": môi trường}; };
+        nếu (loại == "danh sách") {
+            ra = [];
+            phần tử = nút["phần tử"];
+            lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
+                máy ảo thêm cuối danh sách(ra, mình.biểu thức(phần tử[i], môi trường));
+            };
+            trả về ra;
+        };
+        nếu (loại == "từ điển") {
+            ra = {};
+            mục = nút["mục"];
+            lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+                khóa = mục[i]["khóa"];
+                tên = "";
+                nếu (khóa["loại"] == "tên") { tên = khóa["giá trị"]; }
+                hoặc { tên = mình.biểu thức(khóa, môi trường); };
+                ra[tên] = mình.biểu thức(mục[i]["giá trị"], môi trường);
+            };
+            trả về ra;
+        };
+        nếu (loại == "chỉ số") { trả về mình.đọc đích(nút, môi trường); };
+        nếu (loại == "một ngôi") {
+            // Giá trị i32 nhỏ nhất chỉ biểu diễn được khi lấy dấu âm trước literal.
+            nếu (nút["toán tử"] == "-" && nút["toán hạng"]["loại"] == "hằng" &&
+                nút["toán hạng"]["giá trị"] == "2147483648") {
+                trả về -2147483647 - 1;
+            };
+            x = mình.biểu thức(nút["toán hạng"], môi trường);
+            chọn (nút["toán tử"]) {
+                ca "!": { trả về !x; }
+                ca "-": { trả về -x; }
+                ca "+": { trả về +x; }
+                ca "~": { trả về ~x; }
+                mặc định: { ném "thông dịch: toán tử một ngôi chưa hỗ trợ"; }
+            };
+        };
+        nếu (loại == "cập nhật") {
+            đích giữ = mình.giữ đích(nút["đối tượng"], môi trường);
+            x = mình.đọc đích giữ(đích giữ);
+            giá trị = rỗng;
+            nếu (nút["toán tử"] == "++") { giá trị = x + 1; }
+            hoặc nếu (nút["toán tử"] == "--") { giá trị = x - 1; }
+            hoặc { ném "thông dịch: phép cập nhật chưa hỗ trợ"; };
+            // ++/-- ghi i32, cắt phần thập phân về phía 0 và tràn vòng 32 bit.
+            nếu (máy ảo lấy loại(giá trị) == "số thực") {
+                nếu (giá trị < 0.0) { giá trị = làm tròn lên(giá trị); }
+                hoặc { giá trị = làm tròn xuống(giá trị); };
+                nếu (máy ảo lấy loại(giá trị) == "số thực") {
+                    nếu (giá trị >= 2147483648.0) { giá trị -= 4294967296.0; }
+                    hoặc nếu (giá trị < -2147483648.0) { giá trị += 4294967296.0; };
+                    giá trị = thành số nguyên(giá trị);
+                };
+            };
+            mình.ghi đích giữ(đích giữ, giá trị);
+            trả về x;
+        };
+        nếu (loại == "hai ngôi") {
+            toán tử = nút["toán tử"];
+            trái = nút["trái"];
+            phải = nút["phải"];
+            // Toán tử logic V++ đánh giá cả hai vế, kể cả khi vế trái đã quyết định kết quả.
+            nếu (toán tử == "&&") {
+                a = mình.biểu thức(trái, môi trường);
+                b = mình.biểu thức(phải, môi trường);
+                trả về !!a && !!b;
+            };
+            nếu (toán tử == "||") {
+                a = mình.biểu thức(trái, môi trường);
+                b = mình.biểu thức(phải, môi trường);
+                trả về !!a || !!b;
+            };
+            nếu (toán tử == "=" || toán tử == "+=" || toán tử == "-=" ||
+                toán tử == "*=" || toán tử == "/=" || toán tử == "%=" ||
+                toán tử == "&=" || toán tử == "|=" || toán tử == "^=" ||
+                toán tử == "<<=" || toán tử == ">>=") {
+                a = rỗng;
+                đích giữ = rỗng;
+                nếu (toán tử != "=") {
+                    đích giữ = mình.giữ đích(trái, môi trường);
+                    a = mình.đọc đích giữ(đích giữ);
+                };
+                b = mình.biểu thức(phải, môi trường);
+                nếu (toán tử != "=") {
+                    phép = toán tử[0];
+                    nếu (toán tử == "<<=") { phép = "<<"; };
+                    nếu (toán tử == ">>=") { phép = ">>"; };
+                    b = mình.phép toán(phép, a, b);
+                };
+                nếu (toán tử == "=") { trả về mình.ghi đích(trái, môi trường, b); };
+                trả về mình.ghi đích giữ(đích giữ, b);
+            };
+            a = mình.biểu thức(trái, môi trường);
+            b = mình.biểu thức(phải, môi trường);
+            trả về mình.phép toán(toán tử, a, b);
+        };
+        nếu (loại == "gọi") {
+            đích = nút["hàm"];
+            đối số = [];
+            tham số = nút["đối số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
+                máy ảo thêm cuối danh sách(đối số, mình.biểu thức(tham số[i], môi trường));
+            };
+            nếu (đích["loại"] == "tên") {
+                tên đích = đích["giá trị"];
+                // Hàm nội tại bộ() ưu tiên cú pháp gọi, kể cả khi có biến tên bộ.
+                nếu (tên đích == "bộ") { trả về mình.gọi nội tại(tên đích, đối số); };
+                phạm vi tên = mình.phạm vi tìm(môi trường, tên đích);
+                nếu (phạm vi tên != rỗng) {
+                    trả về mình.gọi hàm(phạm vi tên["giá trị"][tên đích], đối số);
+                } hoặc {
+                    tên ghép = mình.tách tên(tên đích);
+                    nếu (tên ghép == rỗng) {
+                        phương thức = mình.phương thức ngầm(môi trường, tên đích);
+                        nếu (phương thức != rỗng) {
+                            trả về mình.gọi hàm(phương thức, đối số);
+                        };
+                        trả về mình.gọi nội tại(tên đích, đối số);
+                    };
+                };
+            };
+            callee = rỗng;
+            nếu (đích["loại"] == "tên") {
+                callee = mình.đọc tên(môi trường, đích["giá trị"], đúng);
+            } hoặc nếu (đích["loại"] == "thành viên") {
+                callee = mình.đọc thành viên(mình.biểu thức(đích["đối tượng"], môi trường),
+                    đích["tên"], đúng);
+            } hoặc {
+                callee = mình.biểu thức(đích, môi trường);
+            };
+            trả về mình.gọi hàm(callee, đối số);
+        };
+        ném "thông dịch: biểu thức chưa hỗ trợ '" + loại + "'";
+    };
+
+    hàm riêng tư bình thường() { trả về {"luồng": "", "giá trị": rỗng}; };
+
+    hàm riêng tư câu lệnh(nút, môi trường) {
+        nếu (nút == rỗng) { trả về mình.bình thường(); };
+        loại = nút["loại"];
+        nếu (loại == "khối" || loại == "chương trình") {
+            phạm vi = môi trường;
+            nếu (loại == "khối") { phạm vi = mình.phạm vi mới(môi trường); };
+            các câu = nút["câu lệnh"];
+            // Đăng ký ràng buộc trong cùng phạm vi trước khi chạy câu lệnh.
+            // Biến đọc trước câu khai báo dùng slot cục bộ mặc định là 0.
+            lặp(i = 0; i < máy ảo lấy độ dài(các câu); i++) {
+                câu = các câu[i];
+                nếu (câu["loại"] == "biến") {
+                    mình.đặt biến(phạm vi, câu["tên"], 0, đúng);
+                } hoặc nếu (câu["loại"] == "hàm") {
+                    mình.đặt biến(phạm vi, câu["tên"], {"hàm thông dịch": câu, "môi trường": phạm vi}, đúng);
+                } hoặc nếu (câu["loại"] == "lớp") {
+                    mình.đặt biến(phạm vi, câu["tên"], {"lớp thông dịch": câu,
+                        "môi trường": phạm vi, "lớp cha thông dịch": rỗng}, đúng);
+                } hoặc nếu (câu["loại"] == "giao diện") {
+                    // Giao diện cung cấp tên kiểu cho các module nhập nó.
+                    mình.đặt biến(phạm vi, câu["tên"], {"giao diện thông dịch": câu}, đúng);
+                };
+            };
+            // Giải quyết lớp cha sau khi đăng ký hết các kiểu cùng phạm vi.
+            lặp(i = 0; i < máy ảo lấy độ dài(các câu); i++) {
+                câu = các câu[i];
+                nếu (câu["loại"] == "lớp" && câu["lớp cha"] != "") {
+                    mình.lấy biến(phạm vi, câu["tên"])["lớp cha thông dịch"] =
+                        mình.đọc tên(phạm vi, câu["lớp cha"]);
+                };
+            };
+            lặp(i = 0; i < máy ảo lấy độ dài(các câu); i++) {
+                câu = các câu[i];
+                nếu (câu["loại"] != "hàm" && câu["loại"] != "lớp") {
+                    kết quả = mình.câu lệnh(câu, phạm vi);
+                    nếu (kết quả["luồng"] != "") { trả về kết quả; };
+                };
+            };
+            trả về mình.bình thường();
+        };
+        nếu (loại == "trống" || loại == "hàm" || loại == "lớp" ||
+            loại == "giao diện" || loại == "nhập") { trả về mình.bình thường(); };
+        nếu (loại == "biến") {
+            mình.đặt biến(môi trường, nút["tên"], mình.biểu thức(nút["giá trị"], môi trường), đúng);
+            trả về mình.bình thường();
+        };
+        nếu (loại == "biểu thức") { mình.biểu thức(nút["biểu thức"], môi trường); trả về mình.bình thường(); };
+        nếu (loại == "in") { in mình.biểu thức(nút["biểu thức"], môi trường); trả về mình.bình thường(); };
+        nếu (loại == "trả về") {
+            giá trị = 0;
+            nếu (nút["biểu thức"] != rỗng) { giá trị = mình.biểu thức(nút["biểu thức"], môi trường); };
+            trả về {"luồng": "trả về", "giá trị": giá trị};
+        };
+        nếu (loại == "bỏ qua" || loại == "thoát") { trả về {"luồng": loại, "giá trị": rỗng}; };
+        nếu (loại == "ném") { ném mình.biểu thức(nút["biểu thức"], môi trường); };
+        nếu (loại == "nếu") {
+            nếu (mình.biểu thức(nút["điều kiện"], môi trường)) { trả về mình.câu lệnh(nút["thân"], môi trường); };
+            trả về mình.câu lệnh(nút["nhánh khác"], môi trường);
+        };
+        nếu (loại == "lặp") {
+            nếu (nút["khởi tạo"] != rỗng) { mình.biểu thức(nút["khởi tạo"], môi trường); };
+            khi (đúng) {
+                nếu (nút["điều kiện"] != rỗng) {
+                    nếu (!mình.biểu thức(nút["điều kiện"], môi trường)) { thoát; };
+                };
+                kết quả = mình.câu lệnh(nút["thân"], môi trường);
+                nếu (kết quả["luồng"] == "trả về") { trả về kết quả; };
+                nếu (kết quả["luồng"] == "thoát") { thoát; };
+                nếu (nút["cập nhật"] != rỗng) { mình.biểu thức(nút["cập nhật"], môi trường); };
+            };
+            trả về mình.bình thường();
+        };
+        nếu (loại == "chọn") {
+            giá trị = mình.biểu thức(nút["biểu thức"], môi trường);
+            các nhánh = nút["nhánh"];
+            mặc định = rỗng;
+            lặp(i = 0; i < máy ảo lấy độ dài(các nhánh); i++) {
+                nhánh = các nhánh[i];
+                nếu (nhánh["loại"] == "mặc định") { mặc định = nhánh["thân"]; }
+                hoặc nếu (thành chuỗi(giá trị) == thành chuỗi(mình.biểu thức(nhánh["nhãn"], môi trường))) {
+                    kết quả = mình.câu lệnh(nhánh["thân"], môi trường);
+                    nếu (kết quả["luồng"] == "thoát") { trả về mình.bình thường(); };
+                    trả về kết quả;
+                };
+            };
+            kết quả = mình.câu lệnh(mặc định, môi trường);
+            nếu (kết quả["luồng"] == "thoát") { trả về mình.bình thường(); };
+            trả về kết quả;
+        };
+        nếu (loại == "thử") {
+            thử { trả về mình.câu lệnh(nút["thân"], môi trường); }
+            bắt lỗi(e) {
+                phạm vi = mình.phạm vi mới(môi trường);
+                nếu (nút["biến lỗi"] != "") { mình.đặt biến(phạm vi, nút["biến lỗi"], e, đúng); };
+                trả về mình.câu lệnh(nút["bắt"], phạm vi);
+            };
+        };
+        ném "thông dịch: câu lệnh chưa hỗ trợ '" + loại + "'";
+    };
+
+    // Thứ tự khởi tạo và giải quyết đường import dùng chung Bộ Nạp Nguồn.
+    // Mỗi module có scope riêng, các hàm nhập giữ closure trên scope đó.
+    hàm riêng tư nhập từ đồ thị(đồ thị, đường, môi trường, phạm vi mô đun) {
+        cạnh = đồ thị["cạnh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
+            mục = cạnh[i];
+            nếu (mục["nguồn"] != đường) { bỏ qua; };
+            xuất = phạm vi mô đun[mục["đích"]]["giá trị"];
+            bí danh = mục["bí danh"];
+            nếu (bí danh != "") {
+                mình.đặt biến(môi trường, bí danh, xuất, đúng);
+                bỏ qua;
+            };
+            tên nhập = "*";
+            nếu (máy ảo có khóa từ điển(mục, "tên nhập")) { tên nhập = mục["tên nhập"]; };
+            nếu (tên nhập != "" && tên nhập != "*") {
+                nếu (!máy ảo có khóa từ điển(xuất, tên nhập)) {
+                    ném "thông dịch: không có tên nhập '" + tên nhập + "'";
+                };
+                mình.đặt biến(môi trường, tên nhập, xuất[tên nhập], đúng);
+            } hoặc {
+                các tên = máy ảo liệt kê khóa từ điển(xuất);
+                lặp(j = 0; j < máy ảo lấy độ dài(các tên); j++) {
+                    tên = các tên[j];
+                    mình.đặt biến(môi trường, tên, xuất[tên], đúng);
+                };
+            };
+        };
+    };
+
+    hàm công khai chạy(nguồn, tệp = "", thư viện = "") {
+        cây = biên dịch phân tích chương trình thuần(nguồn);
+        nếu (tệp != "") {
+            đồ thị = Bộ Nạp Nguồn(thư viện).đồ thị(tệp, nguồn, cây);
+            các mô đun = đồ thị["mô đun"];
+            các phạm vi = {};
+            các cây = {};
+            gốc = đồ thị["điểm vào"];
+            các phạm vi[gốc] = mình.toàn cục;
+            lặp(i = 0; i < máy ảo lấy độ dài(các mô đun); i++) {
+                mục = các mô đun[i];
+                các phạm vi[mục["định danh"]] = mình.phạm vi mới(rỗng);
+                các cây[mục["định danh"]] = mục["cây"];
+            };
+            thứ tự = đồ thị["thứ tự khởi tạo"];
+            lặp(i = 0; i < máy ảo lấy độ dài(thứ tự); i++) {
+                đường = thứ tự[i];
+                mình.nhập từ đồ thị(đồ thị, đường, các phạm vi[đường], các phạm vi);
+                mình.câu lệnh(các cây[đường], các phạm vi[đường]);
+            };
+            mình.nhập từ đồ thị(đồ thị, gốc, mình.toàn cục, các phạm vi);
+        };
+        mình.câu lệnh(cây, mình.toàn cục);
+        phạm vi chính = mình.phạm vi tìm(mình.toàn cục, "chính");
+        nếu (phạm vi chính == rỗng) {
+            phạm vi lớp = mình.phạm vi tìm(mình.toàn cục, "Chính");
+            nếu (phạm vi lớp != rỗng) {
+                lớp_điểm_vào = phạm vi lớp["giá trị"]["Chính"];
+                thể_hiện_chính = mình.gọi hàm(lớp_điểm_vào, []);
+                phương_thức_chạy = mình.đọc thành viên(thể_hiện_chính, "chạy", đúng);
+                kết quả = mình.gọi hàm(phương_thức_chạy, []);
+                nếu (kết quả == rỗng) { trả về 0; };
+                nếu (máy ảo lấy loại(kết quả) != "số nguyên") {
+                    ném "thông dịch: Chính.chạy phải trả về số nguyên hoặc rỗng";
+                };
+                trả về kết quả;
+            };
+            // Cho phép chương trình script có lệnh trực tiếp ở top-level.
+            trả về 0;
+        };
+        kết quả = mình.gọi hàm(phạm vi chính["giá trị"]["chính"], []);
+        nếu (kết quả == rỗng) { trả về 0; };
+        nếu (máy ảo lấy loại(kết quả) != "số nguyên") {
+            ném "thông dịch: hàm chính phải trả về số nguyên hoặc rỗng";
+        };
+        trả về kết quả;
+    };
+};
+
+hàm công khai thông dịch nguồn(nguồn, tệp = "", thư viện = "") {
+    bộ = Bộ Thông Dịch();
+    trả về bộ.chạy(nguồn, tệp, thư viện);
+};

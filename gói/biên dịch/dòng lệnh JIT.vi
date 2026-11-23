@@ -3,6 +3,7 @@ nhập gói.biên dịch.JIT.Bộ Biên Dịch JIT;
 nhập gói.biên dịch.JIT động.jit động tệp;
 nhập gói.biên dịch.dòng lệnh VM.biên dịch dòng lệnh VM;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.thông dịch.thông dịch nguồn;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.nhập xuất.đường dẫn.đường dẫn tuyệt đối;
@@ -16,7 +17,7 @@ hàm riêng tư jit đối số(i) {
     trả về chuỗi từ byte máy ảo(các byte);
 };
 hàm riêng tư jit giúp đỡ() {
-    in "Usage: vpp jit <source.vi> [--function name] [-- i32 arguments] | vpp jit --raw-program <source.vi> [arguments...] | vpp jit --dynamic <source.vi> [arguments...] | vpp jit --check-dynamic <source.vi> | vpp jit --vm-image <source.vi> -o <image.vmb>";
+    in "Usage: vpp jit <source.vi> [--function name] [-- i32 arguments] | vpp jit --interpret <source.vi> | vpp jit --raw-program <source.vi> [arguments...] | vpp jit --dynamic <source.vi> [arguments...] | vpp jit --check-dynamic <source.vi> | vpp jit --vm-image <source.vi> -o <image.vmb>";
 };
 hàm chính() {
     nếu (đối số đếm() < 2) {
@@ -29,6 +30,13 @@ hàm chính() {
         nếu (đầu >= đối số đếm()) { ném "V++ JIT: thiếu tệp nguồn"; };
         tệp = jit đối số(đầu);
         nếu (tệp == "--help" || tệp == "-h") { jit giúp đỡ(); trả về 0; };
+        nếu (tệp == "--interpret") {
+            nếu (đầu + 2 != đối số đếm()) { ném "V++: --interpret cần đúng một tệp .vi"; };
+            đường = đường dẫn tuyệt đối(jit đối số(đầu + 1));
+            thư viện = đọc biến môi trường("VPP_HOME", "");
+            nếu (thư viện != "") { thư viện = đường dẫn tuyệt đối(thư viện); };
+            trả về thông dịch nguồn(đọc tệp(đường), đường, thư viện);
+        };
         // The VM serialization gate exercises the existing V++ image writer,
         // without a compiler process or a native test executable.
         nếu (tệp == "--vm-image") {
