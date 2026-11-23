@@ -197,7 +197,21 @@ def make_certificates(work: Path) -> None:
     leaf_pem = work / "leaf.pem"
     root_der = work / "root.der"
     leaf_der = work / "leaf.der"
+    openssl_config = work / "openssl.cnf"
     extensions = work / "leaf.ext"
+    # The runner's default openssl.cnf can already add CA extensions to
+    # `req -x509`. Combining those with -addext produces duplicate OIDs,
+    # which Apple's SecTrust rejects with errSecDuplicateExtension (-67903).
+    openssl_config.write_text(
+        "[req]\n"
+        "distinguished_name=subject\n"
+        "x509_extensions=test_ca\n"
+        "[subject]\n"
+        "[test_ca]\n"
+        "basicConstraints=critical,CA:TRUE\n"
+        "keyUsage=critical,keyCertSign,cRLSign\n"
+        "subjectKeyIdentifier=hash\n"
+    )
     extensions.write_text(
         "basicConstraints=critical,CA:FALSE\n"
         "keyUsage=critical,digitalSignature,keyEncipherment\n"
@@ -206,10 +220,10 @@ def make_certificates(work: Path) -> None:
     )
     run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
         "-days", "1", "-keyout", str(root_key), "-out", str(root_pem),
-        "-subj", "/CN=VPP TLS Test Root", "-addext",
-        "basicConstraints=critical,CA:TRUE")
+        "-subj", "/CN=VPP TLS Test Root", "-config", str(openssl_config))
     run("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-keyout",
-        str(leaf_key), "-out", str(leaf_csr), "-subj", "/CN=localhost")
+        str(leaf_key), "-out", str(leaf_csr), "-subj", "/CN=localhost",
+        "-config", str(openssl_config))
     run("openssl", "x509", "-req", "-in", str(leaf_csr), "-CA",
         str(root_pem), "-CAkey", str(root_key), "-CAcreateserial",
         "-out", str(leaf_pem), "-days", "1", "-sha256",
@@ -218,6 +232,8 @@ def make_certificates(work: Path) -> None:
         "-out", str(root_der))
     run("openssl", "x509", "-in", str(leaf_pem), "-outform", "DER",
         "-out", str(leaf_der))
+    run("openssl", "verify", "-CAfile", str(root_pem),
+        "-purpose", "sslserver", "-verify_hostname", "localhost", str(leaf_pem))
 
 
 def compile_probe(work: Path, custom_ca: bool) -> Path:

@@ -55,10 +55,39 @@ JIT_I32_HARNESSES = {
 JIT_VM_PHASES = {"core", "directory", "system", "process", "resolver", "socket", "socket_negative", "tls"}
 JIT_CASE_KEYS = {"id", "suite", "source", "expected", "expected_stderr", "stdout", "exit", "smoke", "jit", "platforms"}
 
+# Reviewed runtime-error cases also check an exact exit status and diagnostic regex.
+INTERPRETED_RUNTIME_DIAGNOSTICS = {
+    "kiem_tra_de_quy_vuot_gioi_han", "kiem_tra_loi_can_so_nguyen",
+    "kiem_tra_loi_chia_du_so_thuc",
+    "kiem_tra_loi_chi_so_vuot_pham_vi", "kiem_tra_loi_du_lieu_khong_the_danh_chi_so",
+    "kiem_tra_loi_giam_sai_kieu", "kiem_tra_loi_kieu_chi_so",
+    "kiem_tra_loi_phep_tinh_can_so", "kiem_tra_loi_so_sanh_khac_kieu",
+    "kiem_tra_loi_opcode_tien_trinh",
+}
+
 # Reviewed, self-contained programs with no imports or filesystem dependencies.
 # Pin the reviewed source contents so edited fixtures fall back to private copies.
 # Normalize line endings for Windows checkouts.
 FIXTURE_FREE_SOURCES = {
+    "scripts/test/fixtures/native_i32_backend_calls.vi": "a59d48cdd69cba6a26545f6df8578a3583ef4368c3deb38ee2e0e7a7bc4b47db",
+    "scripts/test/fixtures/native_i32_direct_calls.vi": "8f7372583175636980fdb94d3aa9960c58ec96a263bf47fe3f7dc997350dd1da",
+    "scripts/test/fixtures/native_i32_expression_calls.vi": "ac0200c8fdfd16c9801f2cd6767e4862a4f0ce82f60aadbcf614248118e11e6c",
+    "scripts/test/kiem_tra_loi_chia_du_so_thuc.vi": "a9f1d45440933099acf0b88a83efb410d8bb6434fb78e2d293201eb380171c0a",
+    "scripts/test/fixtures/native_aot_index.vi": "48128ed494fc4f4252596b8a5f27dfa759bd47cc34b48881874c76314764a62f",
+    "scripts/test/fixtures/native_aot_private_method.vi": "c1ceb6aaec2df8676d0217d7c2232ed1d1c603ca16ab849a1ac3e33e36bdd2e0",
+    "scripts/test/fixtures/native_frame_pool_gc.vi": "00e318b0489397e44d94989939e037c13c9034f216b77e344db7358b06cb8f4a",
+    "scripts/test/fixtures/native_i32_call_chain.vi": "852893d811986895f227b12c07bdb86011c244d3b4c4a75c1f5392a1c50b0b9d",
+    "scripts/test/fixtures/native_i32_expression.vi": "0f73bb62239cef139b499e834a4b9bf5b3110739fed31d67fccd76c8993164f5",
+    "scripts/test/fixtures/native_i32_nested_calls.vi": "55ea6c30afad9af3f3476bb1e85720bf8dbfd425252eba5a243de7bf879e43af",
+    "scripts/test/kiem_tra_de_quy_vuot_gioi_han.vi": "e6699248bfa010b342ff78d1b7827c89db8664670f27e7c3f5e4554f2c2f7866",
+    "scripts/test/kiem_tra_loi_can_so_nguyen.vi": "cb45efe086ea279da3fba46df0e5af896ac1f3c444b73414358f0bafecdde0c0",
+    "scripts/test/kiem_tra_loi_chi_so_vuot_pham_vi.vi": "ed4eaa17e9bbf715585d07d6843cbfe5c4e8e86137970ccaacba71611564c647",
+    "scripts/test/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi": "a1e1a0a8100aa25c3e1adff153209f23e034421faa9c68026e1e71f028d394d0",
+    "scripts/test/kiem_tra_loi_giam_sai_kieu.vi": "1dce701d0c8e07988ead8362f91c516df610d73522a22fd15457ab88e6aefcac",
+    "scripts/test/kiem_tra_loi_kieu_chi_so.vi": "70e09d955a2f76514591e160f2d3774a1836fad7bd6b57c8616b5ef5800609a8",
+    "scripts/test/kiem_tra_loi_phep_tinh_can_so.vi": "ac722837ec132aa1a2952fac001bb60d9ae04ecb9b5c675ce5e18eb044671b65",
+    "scripts/test/kiem_tra_loi_so_sanh_khac_kieu.vi": "bc56bbc85e71ae5089cfe87698aa4642fc9f90e411cd32e2f5beaf0385d4d1e8",
+    "scripts/test/kiem_tra_loi_opcode_tien_trinh.vi": "c61da7d16c8229b56b7d090cf4bb37c098cb6e83e2f3a88e22edb68c80b735db",
     "scripts/test/fixtures/native_exit_scalar.vi": "de165b049c19703100686619350ef5691f2498ba690f27748209030343c8df50",
     "scripts/test/fixtures/native_return_semantics.vi": "1d17f633992f50078054ee14ae4044edd85f1e4969296bcc78b32db4e3135ccc",
     "scripts/test/fixtures/native_protected_loop.vi": "01e8b155c56c6ff4c17b199e78324b33e7d43956dcc290a5e53949107662b4d7",
@@ -126,6 +155,10 @@ FIXTURE_FREE_SOURCES = {
 # Golden-verified sources that resolve library imports from VPP_HOME. Each has
 # run in an empty working directory with external assembler and linker denied.
 REVIEWED_IMPORTED_SOURCES = {
+    "scripts/test/fixtures/native_aot_facade/entry.vi": "2367346bd74bc64569e8152a4824af32bc1becc14d71fdba487669de471bb693",
+    "scripts/test/fixtures/native_source_paths.vi": "8814c763635aa7ba31063398b34a194da546b3fe4403b6970fc44a152cc6b7e1",
+    "scripts/test/kiem_tra_native_leaf_vi.vi": "a2c2359135d0fd0fc7fd0bf1b06ce0f61d97436b01c8d0767ff4aa3126350968",
+    "scripts/test/kiem_tra_loi_tep_co_cau_truc.vi": "3a4929caf7e6edcc873026b616bede9dc910249be93a0ee1bee905f7ebbcf7c5",
     "scripts/test/kiem_tra_escape_bien_dich_tu_chu.vi": "a0de862f851d230ff14b7e799881574689cd443e425fec2a592c78662b155910",
     "scripts/test/kiem_tra_kien_truc_oop_compiler.vi": "4c2bcd0fe459938c9f5aad654a0e2456b16dab6504be8b6c6641d23b6e9d4861",
     "scripts/test/kiem_tra_bien_dich_tu_vung_vi.vi": "77acb1435c5551d380b49993d8065faae4c8656c2b0845c935b6379a6a623bec",
@@ -314,6 +347,12 @@ REVIEWED_SOURCE_DEPENDENCIES = {
 # These source programs read fixed regression fixtures relative to their working
 # directory. Only the exact hash-pinned inputs are copied for AST execution.
 REVIEWED_RELATIVE_FIXTURES = {
+    "kiem_tra_native_facade": {
+        "fixtures/native_aot_facade/gói/demo/chuyển tiếp.vi": "3098de37a8c32a402e08649b2975d54544084339f4069b06e92a2ec65c915131",
+        "fixtures/native_aot_facade/gói/demo/chính.vi": "93f16c3b361fac07000bb73cd131dcabffd86499bb3f6b00b4c8186e934ed4e3",
+        "fixtures/native_aot_facade/gói/demo/phép cộng.vi": "344b875767ba85e97232e29f5632f6a94fe5b2790110565af62b54e1d4bbb698",
+        "fixtures/native_aot_facade/gói/demo/toán.vi": "3b8b7cc8795a287c154d490901522977c41386372e32f5e9b93b0386f37a75c9",
+    },
     "kiem_tra_ham_an_danh_tu_chu": {
         "fixtures/anonymous_functions/entry.vi": "f974f9a59d7ce32cf77dacd5ea5de93ea527dfcdfa5bfc23541ce4cb71e962aa",
         "fixtures/anonymous_modules/entry.vi": "9cdce8babd05c97596abd533d94ed5d901c8875250ae9771adaa2fa231669ef1",
@@ -328,11 +367,16 @@ REVIEWED_RELATIVE_FIXTURES = {
 # Other JIT fixtures keep their existing dynamic backend and are never guessed.
 INTERPRETED_CASES = {
     "native_exit_scalar", "native_return_semantics", "native_protected_loop",
+    "kiem_tra_native_facade", "native_i32_backend_calls", "native_i32_direct_calls",
+    "native_i32_expression_calls",
+    "native_aot_index", "native_aot_private_method", "native_frame_pool_gc",
+    "native_i32_call_chain", "native_i32_expression", "native_i32_nested_calls",
+    "native-source-paths", "native-leaf-architectures",
+    "kiem_tra_loi_tep_co_cau_truc",
     "kiem_tra_escape_bien_dich_tu_chu",
     "kiem_tra_lien_ket_tu_chu", "kiem_tra_so_ham_module_tu_chu",
     "kiem_tra_khai_bao_kieu_ffi_tu_chu", "kiem_tra_do_thi_module_tu_chu",
     "kiem_tra_goi_quan_ly_goi", "kiem_tra_native_oop_snapshot",
-    "kiem_tra_codec_uuid_bitset",
     "kiem_tra_dns_cau_hinh",
     "kiem_tra_ham_an_danh_tu_chu",
     "kiem_tra_ffi_gio_dia_phuong", "kiem_tra_lien_ket_module_tu_chu",
@@ -457,7 +501,11 @@ INTERPRETED_CASES = {
 
 
 def fixture_free(case, source):
-    if case.get("suite") != "full" or set(case) - JIT_CASE_KEYS:
+    diagnostic_case = case["id"] in INTERPRETED_RUNTIME_DIAGNOSTICS
+    allowed_keys = JIT_CASE_KEYS | ({"historical_expected", "run_diagnostic_regex"} if diagnostic_case else set())
+    if case.get("suite") != "full" or set(case) - allowed_keys:
+        return False
+    if diagnostic_case and (case.get("exit") != 1 or not case.get("run_diagnostic_regex")):
         return False
     digest = FIXTURE_FREE_SOURCES.get(case["source"])
     return digest is not None and hashlib.sha256(
@@ -486,7 +534,7 @@ def reviewed_imported(case, source):
 
 
 def interpretable(case):
-    return (case["id"] in INTERPRETED_CASES and
+    return ((case["id"] in INTERPRETED_CASES or case["id"] in INTERPRETED_RUNTIME_DIAGNOSTICS) and
             (fixture_free(case, ROOT / case["source"]) or
              reviewed_imported(case, ROOT / case["source"])))
 
