@@ -6,6 +6,9 @@ nhập gói.bảo mật.bắt tay TLS.Bắt Tay TLS VPP;
 nhập gói.bảo mật.bản ghi TLS.Bản Ghi TLS VPP;
 nhập gói.bảo mật.luồng TLS.*;
 nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+nhập gói.bảo mật.x25519.X25519 VPP;
+nhập gói.bảo mật.ed25519.Ed25519 VPP;
+nhập gói.lõi.nguồn ngẫu nhiên.nguồn ngẫu nhiên bảo mật các byte;
 nhập gói.thời gian.giờ quốc tế.thời gian đọc giờ quốc tế ffi;
 nhập gói.mạng.ổ cắm.đầu nối giao vận tin cậy mở;
 nhập gói.mạng.ổ cắm.đầu nối gửi;
@@ -16,6 +19,7 @@ nhập gói.lõi.chuyển kiểu.thành chuỗi;
 lớp công khai Kết Nối TLS VPP {
     hàm công khai khởi tạo() {
         mình.socket = 0;
+        mình.phía máy chủ = sai;
         mình.sẵn sàng = sai;
         mình.đã đóng = sai;
         mình.bản ghi = Bộ Tách Bản Ghi TLS VPP();
@@ -61,16 +65,16 @@ lớp công khai Kết Nối TLS VPP {
             // TLS 1.3 allows one dummy compatibility ChangeCipherSpec.
             nếu (record[0] == 20) {
                 mình.đếm ccs = mình.đếm ccs + 1;
-                nếu (mình.đếm ccs > 1) { ném "TLS: repeated change_cipher_spec"; };
+                nếu ((mình.phía máy chủ && !mình.mã hóa bắt tay) || mình.đếm ccs > 1) { ném "TLS: repeated change_cipher_spec"; };
                 bỏ qua;
             };
             plain = [];
             nếu (!mình.mã hóa bắt tay) {
-                nếu (record[0] != 22) { ném "TLS: expected plaintext ServerHello"; };
+                nếu (record[0] != 22) { ném "TLS: expected plaintext hello"; };
                 lặp(i = 5; i < độ dài(record); i++) { thêm(plain, record[i]); };
             } hoặc {
                 nếu (record[0] != 23) {
-                    ném "TLS: expected encrypted server handshake, record type " + thành chuỗi(record[0]);
+                    ném "TLS: expected encrypted handshake, record type " + thành chuỗi(record[0]);
                 };
                 receiver = mình.đọc bắt tay;
                 decrypted = receiver.mở(record);
@@ -132,6 +136,74 @@ lớp công khai Kết Nối TLS VPP {
         };
     };
 
+    // Ownership of the accepted TCP handle transfers to this connection.
+    // Only the listener calls this after validating its configured identity.
+    hàm công khai chấp nhận(socket, certificate message, seed) {
+        nếu (mình.socket != 0 || mình.đã đóng) { ném "TLS: connection already used"; };
+        nếu (loại của(socket) != "số nguyên" || socket <= 0) { ném "TLS: invalid TCP handle"; };
+        mình.socket = socket;
+        mình.phía máy chủ = đúng;
+        mình.bản ghi = Bộ Tách Bản Ghi TLS VPP(đúng);
+        thử {
+            handshake = Bắt Tay TLS VPP();
+            keys = Khóa TLS VPP();
+            curve = X25519 VPP();
+            ed = Ed25519 VPP();
+            client hello = mình.nhận thông điệp();
+            parsed = handshake.đọc khách chào(client hello);
+            parser = mình.bắt tay;
+            nếu (parser.còn dở() || độ dài(mình.hàng bắt tay) != 0) {
+                ném "TLS: unexpected plaintext handshake data";
+            };
+            private key = nguồn ngẫu nhiên bảo mật các byte(32);
+            server hello = handshake.máy chủ chào(private key, nguồn ngẫu nhiên bảo mật các byte(32), parsed[1]);
+            shared = curve.tính(private key, parsed[0]);
+            hs = handshake.khóa bắt tay từ chung(shared, client hello, server hello);
+            mình.đọc bắt tay = Bản Ghi TLS VPP(hs[0], 0);
+            mình.viết bắt tay = Bản Ghi TLS VPP(hs[1], 1);
+            mình.gửi bản ghi(handshake.bản ghi chào(server hello));
+            mình.mã hóa bắt tay = đúng;
+            extensions = [8,0,0,2,0,0];
+            transcript = keys.nối(keys.nối(client hello, server hello), extensions);
+            transcript = keys.nối(transcript, certificate message);
+            signature = ed.ký(seed, handshake.dữ liệu ký máy chủ(transcript));
+            verify = handshake.đóng gói thông điệp(15, keys.nối([8,7,0,64], signature));
+            transcript = keys.nối(transcript, verify);
+            finished = handshake.đóng gói thông điệp(20, handshake.mã hoàn tất(hs[1], transcript));
+            transcript = keys.nối(transcript, finished);
+            mình.gửi thông điệp mã hóa(extensions);
+            mình.gửi thông điệp mã hóa(certificate message);
+            mình.gửi thông điệp mã hóa(verify);
+            mình.gửi thông điệp mã hóa(finished);
+            client finished = mình.nhận thông điệp();
+            handshake.xác thực hoàn tất(hs[0], transcript, client finished);
+            nếu (parser.còn dở() || độ dài(mình.hàng bắt tay) != 0) {
+                ném "TLS: unexpected client handshake data";
+            };
+            app = handshake.khóa ứng dụng từ chung(shared, transcript);
+            mình.viết ứng dụng = Bản Ghi TLS VPP(app[1], 1);
+            mình.đọc ứng dụng = Bản Ghi TLS VPP(app[0], 0);
+            mình.sẵn sàng = đúng;
+            trả về đúng;
+        } bắt lỗi(e) {
+            thử { mình.giải phóng socket(); } bắt lỗi(ignored) {};
+            ném e;
+        };
+    };
+
+    hàm riêng tư gửi thông điệp mã hóa(message) {
+        sender = mình.viết bắt tay;
+        lặp(at = 0; at < độ dài(message); at = at + 16384) {
+            part = [];
+            end = at + 16384;
+            nếu (end > độ dài(message)) { end = độ dài(message); };
+            lặp(i = at; i < end; i++) { thêm(part, message[i]); };
+            mình.gửi bản ghi(sender.niêm(part, 22));
+        };
+    };
+
+    hàm công khai đang mở() { trả về mình.sẵn sàng && !mình.đã đóng; };
+
     // Byte-safe application-data API. The caller may convert UTF-8 as needed.
     hàm công khai gửi(bytes) {
         nếu (!mình.sẵn sàng || mình.đã đóng) { ném "TLS: connection not authenticated"; };
@@ -180,7 +252,7 @@ lớp công khai Kết Nối TLS VPP {
                     mình.đóng();
                     trả về [];
                 };
-                ném "TLS: server sent fatal alert";
+                ném "TLS: peer sent fatal alert";
             };
             // TLS 1.3 NewSessionTicket is optional. Ignore tickets for this
             // non-resuming client; KeyUpdate and other messages are rejected.
@@ -188,7 +260,7 @@ lớp công khai Kết Nối TLS VPP {
             nếu (độ dài(decoded[1]) == 0) { ném "TLS: empty post-handshake fragment"; };
             messages = parser.nạp(decoded[1]);
             lặp(i = 0; i < độ dài(messages); i++) {
-                nếu (messages[i][0] != 4) { ném "TLS: unsupported post-handshake message"; };
+                nếu (mình.phía máy chủ || messages[i][0] != 4) { ném "TLS: unsupported post-handshake message"; };
             };
         };
     };

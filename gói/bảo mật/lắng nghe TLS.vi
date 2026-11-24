@@ -1,0 +1,59 @@
+// TLS 1.3 server listener using V++ cryptography and TCP socket primitives.
+// One explicit Ed25519 identity, no client certificates or session resumption.
+nhập gói.bảo mật.kết nối TLS.Kết Nối TLS VPP;
+nhập gói.bảo mật.bắt tay TLS.Bắt Tay TLS VPP;
+nhập gói.bảo mật.chứng chỉ TLS.Chứng Chỉ TLS VPP;
+nhập gói.bảo mật.ed25519.Ed25519 VPP;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.lõi.giao diện tài nguyên.Đóng Được;
+
+lớp công khai Bộ Lắng Nghe TLS VPP triển khai Đóng Được {
+    hàm công khai khởi tạo(chain, seed) {
+        handshake = Bắt Tay TLS VPP();
+        message = handshake.thông điệp chứng chỉ(chain);
+        decoder = Chứng Chỉ TLS VPP();
+        parsed = decoder.đọc danh sách(message);
+        leaf = parsed[0];
+        nếu (leaf[9] || !leaf[11] || !leaf[13] || độ dài(leaf[14]) != 32 ||
+            độ dài(leaf[16]) != 3 || leaf[16][0] != 43 || leaf[16][1] != 101 || leaf[16][2] != 112 ||
+            !decoder.hợp lệ lúc này(leaf)) {
+            ném "TLS: invalid server certificate identity";
+        };
+        ed = Ed25519 VPP();
+        public key = ed.khóa công khai(seed);
+        difference = 0;
+        lặp(i = 0; i < 32; i++) { difference = difference | (public key[i] ^ leaf[14][i]); };
+        nếu (difference != 0) { ném "TLS: certificate and private key mismatch"; };
+        mình.seed = [];
+        lặp(i = 0; i < 32; i++) { thêm(mình.seed, seed[i]); };
+        mình.certificate message = message;
+        mình.socket = 0;
+        mình.đã đóng = sai;
+    };
+
+    hàm công khai mở(cổng, hàng đợi = 64) {
+        nếu (mình.socket != 0 || mình.đã đóng) { ném "TLS: listener already used"; };
+        mình.socket = đầu nối giao vận tin cậy lắng nghe(cổng, hàng đợi);
+        trả về đúng;
+    };
+
+    hàm công khai đang mở() { trả về mình.socket != 0 && !mình.đã đóng; };
+
+    hàm công khai chấp nhận(thời gian chờ = 20000) {
+        nếu (!mình.đang mở()) { ném "TLS: listener not open"; };
+        connection = Kết Nối TLS VPP();
+        socket = đầu nối chấp nhận(mình.socket, thời gian chờ);
+        connection.chấp nhận(socket, mình.certificate message, mình.seed);
+        trả về connection;
+    };
+
+    hàm công khai đóng() {
+        nếu (mình.đã đóng) { trả về đúng; };
+        mình.đã đóng = đúng;
+        socket = mình.socket;
+        mình.socket = 0;
+        lặp(i = 0; i < độ dài(mình.seed); i++) { mình.seed[i] = 0; };
+        nếu (socket != 0) { đầu nối đóng(socket); };
+        trả về đúng;
+    };
+};

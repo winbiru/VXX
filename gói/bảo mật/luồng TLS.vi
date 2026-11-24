@@ -4,8 +4,9 @@
 nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
 
 lớp công khai Bộ Tách Bản Ghi TLS VPP {
-    hàm công khai khởi tạo() {
+    hàm công khai khởi tạo(chấp nhận phiên bản đầu = sai) {
         mình.đệm = [];
+        mình.phiên bản đầu = chấp nhận phiên bản đầu;
         mình.hỏng = sai;
         mình.khóa = Khóa TLS VPP();
     };
@@ -25,7 +26,8 @@ lớp công khai Bộ Tách Bản Ghi TLS VPP {
                 nếu (kind != 20 && kind != 21 && kind != 22 && kind != 23) {
                     ném "TLS: unrecognized record type";
                 };
-                nếu (input[at + 1] != 3 || input[at + 2] != 3) {
+                nếu (input[at + 1] != 3 || (input[at + 2] != 3 &&
+                    !(mình.phiên bản đầu && kind == 22 && input[at + 2] == 1))) {
                     ném "TLS: unsupported record version";
                 };
                 size = input[at + 3] * 256 + input[at + 4];
@@ -42,6 +44,7 @@ lớp công khai Bộ Tách Bản Ghi TLS VPP {
                     ném "TLS: invalid change_cipher_spec";
                 };
                 thêm(records, record);
+                mình.phiên bản đầu = sai;
                 at = at + size + 5;
             };
             mình.đệm = [];

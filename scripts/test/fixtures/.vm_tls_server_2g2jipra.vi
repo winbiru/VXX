@@ -1,0 +1,16 @@
+nhập gói.bảo mật.chứng chỉ TLS.Chứng Chỉ TLS VPP;
+nhập gói.mạng.http.proxy TLS.Proxy TLS VPP;
+
+hàm chính() {
+    decoder = Chứng Chỉ TLS VPP();
+    chain = [decoder.đọc pem("-----BEGIN CERTIFICATE-----\nMIIBcjCCASSgAwIBAgIUKpsAMfone42lJU063kpHlh8Ku+QwBQYDK2VwMA8xDTAL\nBgNVBAMMBHJvb3QwHhcNMjYxMTI0MTAwNDQ1WhcNMjYxMTI2MTAwNDQ1WjAUMRIw\nEAYDVQQDDAlsb2NhbGhvc3QwKjAFBgMrZXADIQBwa2XjQwAHf/I4TjLKz1DsWGkD\nktZhv2NaKjSH37SVVqOBjDCBiTAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIH\ngDATBgNVHSUEDDAKBggrBgEFBQcDATAUBgNVHREEDTALgglsb2NhbGhvc3QwHQYD\nVR0OBBYEFNcSYUduCJTTrMnkkcNo5ovz/spsMB8GA1UdIwQYMBaAFCVGFpLF0fhK\n0kQypl72prPHWJgmMAUGAytlcANBAEFlO2rirgnyxLuGO8wlQfIUj2SSDAsVyG7K\n6genb8varmDb6N6NKg8VOKbqMtkar8PTUOzP2ls19DOCjo44+AM=\n-----END CERTIFICATE-----\n")];
+    proxy = Proxy TLS VPP(chain, [63, 198, 12, 248, 128, 127, 221, 8, 80, 28, 81, 86, 207, 82, 240, 220, 73, 73, 185, 30, 177, 31, 132, 96, 45, 42, 226, 215, 23, 52, 172, 129], "http://127.0.0.1:53695", 120000);
+    proxy.mở(53694);
+    rejected = sai;
+    thử { proxy.chuyển tiếp(); } bắt lỗi(e) { rejected = đúng; };
+    nếu (!rejected) { ném "TLS: malformed client accepted"; };
+    proxy.chuyển tiếp();
+    proxy.đóng();
+    proxy.đóng();
+    in "TLS VPP SERVER AND PROXY OK";
+};

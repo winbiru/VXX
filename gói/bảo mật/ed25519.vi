@@ -169,6 +169,61 @@ lớp công khai Ed25519 VPP {
         trả về r;
     };
 
+    // RFC 8032 signing from a 32-byte seed. Experimental: the V++ field
+    // arithmetic and scalar operations have not been audited for timing leakage.
+    hàm riêng tư bí mật(seed) {
+        checker = mình.checker;
+        checker.bytes(seed, 32);
+        nếu (độ dài(seed) != 32) { ném "Ed25519: seed length"; };
+        sha = mình.hash;
+        digest = sha.băm(seed);
+        digest[0] = digest[0] & 248;
+        digest[31] = (digest[31] & 63) | 64;
+        trả về digest;
+    };
+
+    hàm riêng tư mã hóa điểm(point) {
+        f = mình.field;
+        inverse = f.trường nghịch đảo(point[2]);
+        x = f.trường nhân(point[0], inverse);
+        y = f.trường nhân(point[1], inverse);
+        y[31] = y[31] | ((x[0] & 1) << 7);
+        trả về y;
+    };
+
+    hàm công khai khóa công khai(seed) {
+        digest = mình.bí mật(seed);
+        trả về mình.mã hóa điểm(mình.point scalar(mình.point base(), digest));
+    };
+
+    hàm công khai ký(seed, message) {
+        checker = mình.checker;
+        checker.bytes(message, 1048576);
+        digest = mình.bí mật(seed);
+        public key = mình.mã hóa điểm(mình.point scalar(mình.point base(), digest));
+        prefix = [];
+        lặp(i = 32; i < 64; i++) { thêm(prefix, digest[i]); };
+        sha = mình.hash;
+        nonce = mình.reduce scalar(sha.băm(checker.nối(prefix, message)));
+        encoded = mình.mã hóa điểm(mình.point scalar(mình.point base(), nonce));
+        challenge = mình.reduce scalar(sha.băm(checker.nối(checker.nối(encoded, public key), message)));
+        // Compute nonce + challenge * secret as an unreduced 512-bit integer.
+        product = [];
+        lặp(i = 0; i < 64; i++) { thêm(product, 0); };
+        lặp(i = 0; i < 32; i++) {
+            product[i] = product[i] + nonce[i];
+            lặp(j = 0; j < 32; j++) {
+                product[i + j] = product[i + j] + challenge[i] * digest[j];
+            };
+        };
+        lặp(i = 0; i < 63; i++) {
+            carry = product[i] >> 8;
+            product[i] = product[i] & 255;
+            product[i + 1] = product[i + 1] + carry;
+        };
+        trả về checker.nối(encoded, mình.reduce scalar(product));
+    };
+
     hàm công khai xác minh(public_key, message, signature) {
         checker = mình.checker;
         checker.bytes(public_key, 32);
