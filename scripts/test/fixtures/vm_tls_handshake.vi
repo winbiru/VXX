@@ -70,5 +70,21 @@ hàm chính() {
     thử { tls.xác thực hoàn tất(test_secret, test_transcript, finished_message); }
     bắt lỗi(e) { bad = bad + 1; };
     nếu (bad != 7) { ném "TLS: invalid handshakes accepted"; };
+
+    // OpenSSL 3.6 advertises supported_groups in TLS 1.3 EncryptedExtensions.
+    groups = [8,0,0,10,0,8,0,10,0,4,0,2,0,29];
+    sni_groups = [8,0,0,14,0,12,0,0,0,0,0,10,0,4,0,2,0,29];
+    nếu (!tls.đọc mở rộng mã hóa(groups) || !tls.đọc mở rộng mã hóa(sni_groups)) {
+        ném "TLS: valid encrypted supported_groups rejected";
+    };
+    invalid_groups = tls nối([], groups);
+    invalid_groups[11] = 3;
+    duplicated_groups = [8,0,0,18,0,16,0,10,0,4,0,2,0,29,0,10,0,4,0,2,0,29];
+    unknown_extension = [8,0,0,6,0,4,0,11,0,0];
+    bad_ee = 0;
+    thử { tls.đọc mở rộng mã hóa(invalid_groups); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    thử { tls.đọc mở rộng mã hóa(duplicated_groups); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    thử { tls.đọc mở rộng mã hóa(unknown_extension); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    nếu (bad_ee != 3) { ném "TLS: invalid encrypted extensions accepted"; };
     in "TLS VPP HANDSHAKE FRAMING OK";
 };

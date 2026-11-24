@@ -165,8 +165,9 @@ lớp công khai Bắt Tay TLS VPP {
         trả về [peer, message];
     };
 
-    // TLS 1.3 EncryptedExtensions. Only the empty SNI acknowledgement was
-    // offered by this ClientHello. ALPN and other extensions are unsupported.
+    // TLS 1.3 EncryptedExtensions. The client offered SNI and supported_groups,
+    // so the server may acknowledge SNI or advertise its supported groups.
+    // ALPN and other extensions remain unsupported.
     hàm công khai đọc mở rộng mã hóa(message) {
         keys = mình.hkdf;
         keys.bytes(message, 65535);
@@ -176,17 +177,26 @@ lớp công khai Bắt Tay TLS VPP {
             mình.u16(message, 4) != n - 6) {
             ném "TLS: invalid EncryptedExtensions";
         };
-        at = 6; seen_sni = sai;
+        at = 6; seen_sni = sai; seen_groups = sai;
         khi (at < n) {
             nếu (at + 4 > n) { ném "TLS: truncated encrypted extension"; };
             type = mình.u16(message, at);
             size = mình.u16(message, at + 2);
             at = at + 4;
             nếu (at + size > n) { ném "TLS: encrypted extension overflow"; };
-            nếu (type != 0 || size != 0 || seen_sni) {
+            nếu (type == 0) {
+                nếu (size != 0 || seen_sni) { ném "TLS: invalid encrypted SNI extension"; };
+                seen_sni = đúng;
+            } hoặc nếu (type == 10) {
+                // NamedGroupList is a nonempty vector of uint16 identifiers.
+                nếu (seen_groups || size < 4 || size % 2 != 0 ||
+                    mình.u16(message, at) != size - 2) {
+                    ném "TLS: invalid encrypted supported_groups";
+                };
+                seen_groups = đúng;
+            } hoặc {
                 ném "TLS: unsolicited encrypted extension";
             };
-            seen_sni = đúng;
             at = at + size;
         };
         trả về đúng;

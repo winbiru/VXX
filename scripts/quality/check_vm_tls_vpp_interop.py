@@ -2,6 +2,7 @@
 """Verify pure V++ TLS fixtures, certificate paths and live TLS 1.3 interoperability."""
 
 import argparse
+import contextlib
 import hashlib
 import hmac
 import json
@@ -153,7 +154,9 @@ def check_interop():
         env = dict(os.environ, VPP_DNS_VI_HOSTS_FILE=hosts.as_posix())
         errors = []
 
-        with socket.socket() as server:
+        with contextlib.ExitStack() as cleanup, socket.socket() as server:
+            # Windows keeps the keylog file locked while SSLContext holds it.
+            cleanup.callback(setattr, context, "keylog_filename", None)
             server.bind(("127.0.0.1", 0))
             server.listen(1)
             server.settimeout(420)
