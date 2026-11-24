@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Exercise V++ TLS 1.3 against loopback OpenSSL with controlled record boundaries."""
+"""Verify pure V++ TLS fixtures, certificate paths and live TLS 1.3 interoperability."""
 
+import argparse
 import hashlib
 import hmac
 import json
@@ -8,13 +9,14 @@ import os
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
-from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-
 from check_vm_tls_vpp_cert_paths import ROOT, authority, leaf
+from run_native_regression import execute
 
 RESPONSE = b"TLS VPP INTEROP RESPONSE"
 SUCCESS = "TLS VPP REAL OPENSSL SERVER INTEROP OK"
@@ -77,6 +79,8 @@ def ticket(nonce):
 
 
 def encrypted_records(keylog, records):
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
     secret = next(
         bytes.fromhex(line.split()[2])
         for line in reversed(keylog.read_text().splitlines())
@@ -132,7 +136,7 @@ def serve(server, context, keylog):
                     raise AssertionError("V++ client did not close the TCP stream")
 
 
-def main():
+def check_interop():
     with tempfile.TemporaryDirectory(prefix="vpp_tls_interop_") as tmp:
         directory = Path(tmp)
         root = authority(directory, "VPP-local-root")
@@ -146,7 +150,7 @@ def main():
         context.keylog_filename = str(keylog)
         hosts = directory / "hosts"
         hosts.write_text("127.0.0.1 localhost\n", encoding="ascii")
-        env = dict(os.environ, VPP_DNS_VI_HOSTS_FILE=str(hosts))
+        env = dict(os.environ, VPP_DNS_VI_HOSTS_FILE=hosts.as_posix())
         errors = []
 
         with socket.socket() as server:
@@ -160,22 +164,28 @@ def main():
                 except Exception as exc:
                     errors.append(exc)
 
-            worker = threading.Thread(target=run_server, daemon=True)
-            worker.start()
             with tempfile.NamedTemporaryFile(
                 prefix=".vm_tls_live_", suffix=".vi", dir=ROOT / "scripts/test/fixtures", mode="w",
                 encoding="utf-8", delete=False,
             ) as source:
                 source.write(fixture(server.getsockname()[1], root[1].read_text()))
                 source_path = Path(source.name)
+            program = directory / ("client.exe" if os.name == "nt" else "client")
+            start = time.monotonic()
             try:
-                result = subprocess.run(
+                subprocess.run(
                     [os.environ.get("VPP_TLS_TEST_BINARY", str(ROOT / "VPP")),
-                     "chạy", str(source_path.relative_to(ROOT))],
-                    cwd=ROOT, env=env, capture_output=True, text=True, timeout=1200,
+                     "build", str(source_path.relative_to(ROOT)), "-o", str(program)],
+                    cwd=ROOT, env=env, check=True, timeout=300,
                 )
             finally:
                 source_path.unlink()
+            worker = threading.Thread(target=run_server, daemon=True)
+            worker.start()
+            result = subprocess.run(
+                [str(program)], cwd=ROOT, env=env, capture_output=True, text=True,
+                timeout=1200 - (time.monotonic() - start),
+            )
 
             print(result.stdout, end="")
             print(result.stderr, end="")
@@ -190,6 +200,96 @@ def main():
                 raise RuntimeError("local TLS server failed") from errors[0]
             if worker.is_alive():
                 raise RuntimeError("local TLS server did not finish")
+
+
+FIXTURES = {
+    "authenticated_handshake": "TLS VPP AUTHENTICATED FLIGHT OK",
+    "ed25519": "Ed25519 VPP RFC VECTOR OK",
+    "handshake": "TLS VPP HANDSHAKE FRAMING OK",
+    "x25519": "X25519 VPP RFC VECTORS OK",
+    "certificates": "TLS VPP CERTIFICATE PARSING OK",
+    "client": "TLS VPP CLIENT API OK",
+    "sha512": "SHA512 VPP FIPS VECTORS OK",
+    "stream": "TLS VPP STREAM REASSEMBLY OK",
+}
+FIXTURE_TIMEOUT = 900
+SCRIPTS = {
+    "x509": ("check_vm_tls_vpp_cert_paths.py", 1530),
+    "interop": ("check_vm_tls_vpp_interop.py", 1200),
+}
+
+
+def checked(command, env, logs, phase, timeout, expected=None):
+    if timeout <= 0:
+        raise TimeoutError(f"{logs.name}: fixture time budget exhausted before {phase}")
+    try:
+        status = execute(command, ROOT, env, logs, phase, timeout)
+    except subprocess.TimeoutExpired as error:
+        raise TimeoutError(f"{logs.name}/{phase}: timeout after {timeout:.2f}s; see {logs}") from error
+    stdout = (logs / (phase + ".stdout")).read_bytes().replace(b"\r\n", b"\n")
+    if status or (expected is not None and stdout != (expected + "\n").encode()):
+        stderr = (logs / (phase + ".stderr")).read_bytes()
+        raise RuntimeError(f"{logs.name}/{phase}: exit {status}\n"
+                           f"{stdout[-4000:].decode('utf-8', 'replace')}\n"
+                           f"{stderr[-4000:].decode('utf-8', 'replace')}")
+
+
+def run_fixture(compiler, env, logs, name):
+    directory = logs / name
+    directory.mkdir(parents=True, exist_ok=True)
+    source = ROOT / "scripts/test/fixtures" / f"vm_tls_{name}.vi"
+    start = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix=f"vpp-tls-{name}-") as temporary:
+        binary = Path(temporary) / ("program.exe" if os.name == "nt" else "program")
+        checked([compiler, "build", source, "-o", binary], env, directory, "build", FIXTURE_TIMEOUT)
+        checked([binary], env, directory, "run", FIXTURE_TIMEOUT - (time.monotonic() - start),
+                FIXTURES[name])
+    return f"vpp-tls-{name}: PASS ({time.monotonic() - start:.2f}s)"
+
+
+def main():
+    # Preserve the original standalone interoperability entry point.
+    if len(sys.argv) == 1:
+        check_interop()
+        return
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--list-fixtures", action="store_true")
+    parser.add_argument("--case", choices=(*FIXTURES, *SCRIPTS))
+    parser.add_argument("--compiler", type=Path)
+    parser.add_argument("--clang", type=Path)
+    parser.add_argument("--logs", type=Path)
+    args = parser.parse_args()
+    if args.list_fixtures:
+        print(";".join(FIXTURES))
+        return
+    if not all((args.case, args.compiler, args.logs)):
+        parser.error("--case, --compiler and --logs are required")
+    compiler = args.compiler.resolve(strict=True)
+    logs = args.logs.resolve()
+    env = dict(os.environ)
+    if os.name == "nt":
+        if args.clang is None:
+            parser.error("--clang is required on Windows")
+        from check_windows_full_bootstrap import package_env
+        env = package_env(compiler.parent.parent, args.clang.resolve(strict=True))
+    elif sys.platform.startswith("linux"):
+        env["VPP_AOT_LINUX_OBJECT_DIR"] = str(compiler.parent.parent / "share/vpp/native-vpp-runtime/linux-objects")
+        # Exercise the V++ TLS implementation using raw sockets, without libssl.
+        env["VPP_AOT_LINUX_TLS"] = "0"
+    env["VPP_TLS_TEST_BINARY"] = str(compiler)
+    try:
+        if args.case in FIXTURES:
+            print(run_fixture(compiler, env, logs, args.case), flush=True)
+        else:
+            script, timeout = SCRIPTS[args.case]
+            directory = logs / args.case
+            directory.mkdir(parents=True, exist_ok=True)
+            checked([sys.executable, ROOT / "scripts/quality" / script], env, directory, "run", timeout)
+            print((directory / "run.stdout").read_text(encoding="utf-8"), end="", flush=True)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(error, file=sys.stderr, flush=True)
+        raise SystemExit(1) from error
+
 
 
 if __name__ == "__main__":

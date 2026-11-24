@@ -57,7 +57,8 @@ lớp công khai Ed25519 VPP {
         a = f.trường nhân(f.trường trừ(p[1], p[0]), f.trường trừ(q[1], q[0]));
         b = f.trường nhân(f.trường cộng(p[1], p[0]), f.trường cộng(q[1], q[0]));
         c = f.trường nhân(f.trường nhân(p[3], q[3]), mình.d2);
-        d = f.trường cộng(f.trường nhân(p[2], q[2]), f.trường nhân(p[2], q[2]));
+        z = f.trường nhân(p[2], q[2]);
+        d = f.trường cộng(z, z);
         e = f.trường trừ(b, a); ff = f.trường trừ(d, c);
         g = f.trường cộng(d, c); h = f.trường cộng(b, a);
         trả về [f.trường nhân(e, ff), f.trường nhân(g, h),
@@ -71,8 +72,8 @@ lớp công khai Ed25519 VPP {
         z2 = f.trường nhân(p[2], p[2]);
         c = f.trường cộng(z2, z2);
         d = f.trường trừ(mình.zero(), a);
-        e = f.trường trừ(f.trường trừ(
-            f.trường nhân(f.trường cộng(p[0], p[1]), f.trường cộng(p[0], p[1])), a), b);
+        sum = f.trường cộng(p[0], p[1]);
+        e = f.trường trừ(f.trường trừ(f.trường nhân(sum, sum), a), b);
         g = f.trường cộng(d, b);
         ff = f.trường trừ(g, c);
         h = f.trường trừ(d, b);
@@ -90,7 +91,7 @@ lớp công khai Ed25519 VPP {
         result = mình.point identity();
         current = point;
         lặp(bit = 0; bit < 256; bit++) {
-            byte = scalar[làm tròn xuống(bit / 8)];
+            byte = scalar[bit >> 3];
             nếu (((byte >> (bit % 8)) & 1) == 1) {
                 result = mình.point add(result, current);
             };
@@ -149,11 +150,11 @@ lớp công khai Ed25519 VPP {
     hàm riêng tư reduce scalar(digest) {
         r = mình.zero();
         lặp(bit = 511; bit >= 0; bit--) {
-            carry = (digest[làm tròn xuống(bit / 8)] >> (bit % 8)) & 1;
+            carry = (digest[bit >> 3] >> (bit % 8)) & 1;
             lặp(i = 0; i < 32; i++) {
                 value = r[i] * 2 + carry;
                 r[i] = value % 256;
-                carry = làm tròn xuống(value / 256);
+                carry = value >> 8;
             };
             nếu (!mình.less(r, mình.order)) {
                 borrow = 0;
@@ -193,11 +194,10 @@ lớp công khai Ed25519 VPP {
             left = mình.point scalar(mình.point base(), s);
             right = mình.point add(r, mình.point scalar(a, challenge));
             nếu (!mình.point equal(left, right)) { trả về sai; };
-            // Reject torsion and mixed-order encodings for both public key
-            // and R. RFC 8032 keys and nonce points belong to the L subgroup.
+            // Check A's subgroup. The exact equation already verified above
+            // implies R = [S]B - [challenge]A, hence R also belongs to it.
             identity = mình.point identity();
-            nếu (!mình.point equal(mình.point scalar(a, mình.order), identity) ||
-                !mình.point equal(mình.point scalar(r, mình.order), identity)) {
+            nếu (!mình.point equal(mình.point scalar(a, mình.order), identity)) {
                 trả về sai;
             };
             trả về đúng;

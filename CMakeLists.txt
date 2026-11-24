@@ -1,6 +1,41 @@
 cmake_minimum_required(VERSION 3.20)
 project(VPP VERSION 1.0.0 LANGUAGES NONE)
 
+set(VPP_TLS_TEST_COMPILER "" CACHE FILEPATH "Existing V++ compiler for standalone TLS tests")
+set(VPP_TLS_TEST_CLANG "" CACHE FILEPATH "Clang toolchain for Windows TLS tests")
+option(VPP_TLS_INTEROP_TESTS "Run live TLS tests (requires Python cryptography)" OFF)
+
+function(vpp_register_tls_tests compiler)
+  set(runner "${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_tls_vpp_interop.py")
+  set(args --compiler "${compiler}" --logs "${CMAKE_BINARY_DIR}/tls-tests")
+  if(CMAKE_HOST_WIN32)
+    if(NOT VPP_TLS_TEST_CLANG)
+      message(FATAL_ERROR "VPP_TLS_TEST_CLANG is required for Windows TLS tests")
+    endif()
+    list(APPEND args --clang "${VPP_TLS_TEST_CLANG}")
+  endif()
+  execute_process(COMMAND "${Python3_EXECUTABLE}" "${runner}" --list-fixtures
+    OUTPUT_VARIABLE fixtures OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
+  foreach(fixture IN LISTS fixtures)
+    add_test(NAME "vpp-tls-${fixture}" COMMAND "${Python3_EXECUTABLE}" "${runner}" ${args} --case "${fixture}")
+    set_tests_properties("vpp-tls-${fixture}" PROPERTIES TIMEOUT 900 LABELS tls)
+  endforeach()
+  add_test(NAME vpp-tls-x509 COMMAND "${Python3_EXECUTABLE}" "${runner}" ${args} --case x509)
+  set_tests_properties(vpp-tls-x509 PROPERTIES TIMEOUT 1530 LABELS tls RUN_SERIAL TRUE)
+  if(VPP_TLS_INTEROP_TESTS)
+    add_test(NAME vpp-tls-interop COMMAND "${Python3_EXECUTABLE}" "${runner}" ${args} --case interop)
+    set_tests_properties(vpp-tls-interop PROPERTIES TIMEOUT 1200 LABELS tls RUN_SERIAL TRUE)
+  endif()
+endfunction()
+
+# Test an existing compiler on any supported host without rebuilding the macOS bootstrap.
+if(VPP_TLS_TEST_COMPILER)
+  enable_testing()
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  vpp_register_tls_tests("${VPP_TLS_TEST_COMPILER}")
+  return()
+endif()
+
 set(VPP_BOOTSTRAP_FULL "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-native" CACHE FILEPATH "Autonomous V++ compiler seed")
 set(VPP_BOOTSTRAP_I32 "${CMAKE_SOURCE_DIR}/bootstrap/macos-arm64/vpp-i32" CACHE FILEPATH "V++ i32 compiler seed")
 set(VPP_PREBUILT_I32_RUNTIME "" CACHE PATH "Prepared macOS i32 compiler and bootstrap runtime directory")
@@ -94,19 +129,11 @@ if(BUILD_TESTING)
     add_test(NAME vpp-extension COMMAND "${VPP_NODE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_extension.js")
   endif()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  vpp_register_tls_tests("${VPP_BIN}/vpp")
   if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
     add_test(NAME vpp-native-tls COMMAND "${Python3_EXECUTABLE}"
       "${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_native_tls_macos.py")
     set_tests_properties(vpp-native-tls PROPERTIES TIMEOUT 60 LABELS "smoke;tls")
-    add_test(NAME vpp-tls-x509 COMMAND "${CMAKE_COMMAND}" -E env "VPP_TLS_TEST_BINARY=${VPP_BIN}/vpp"
-      "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_tls_vpp_cert_paths.py")
-    set_tests_properties(vpp-tls-x509 PROPERTIES TIMEOUT 1530 LABELS tls)
-    foreach(fixture IN ITEMS authenticated_handshake certificates client ed25519 handshake sha512 stream x25519)
-      add_test(NAME "vpp-tls-${fixture}" COMMAND "${VPP_BIN}/vpp" run
-        "${CMAKE_SOURCE_DIR}/scripts/test/fixtures/vm_tls_${fixture}.vi")
-      set_tests_properties("vpp-tls-${fixture}" PROPERTIES TIMEOUT 900 LABELS tls
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-    endforeach()
     add_test(NAME vpp-worker-machine COMMAND "${Python3_EXECUTABLE}"
       "${CMAKE_SOURCE_DIR}/scripts/quality/check_worker_machine.py")
     set_tests_properties(vpp-worker-machine PROPERTIES TIMEOUT 120 LABELS "smoke;worker")

@@ -172,14 +172,6 @@ jobs:
           install -m 755 "$RUNNER_TEMP/macos-full/vpp-native-stage3" build-pure-vpp/bin/vpp-native
           cmake --build build-pure-vpp --target vpp-jit
           ctest --test-dir build-pure-vpp -L smoke -E "^vpp-native-smoke$" --output-on-failure
-      - name: Verify V++ X.509 paths and fragmented TLS 1.3 tickets
-        run: |
-          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
-          ctest --test-dir build-pure-vpp -R '^vpp-tls-' --output-on-failure -j 4
-          python3 -m venv "$RUNNER_TEMP/tls-venv"
-          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
-          VPP_TLS_TEST_BINARY="$GITHUB_WORKSPACE/build-pure-vpp/bin/vpp" \
-            "$RUNNER_TEMP/tls-venv/bin/python" scripts/quality/check_vm_tls_vpp_interop.py
       - name: Package and test installed compiler
         run: |
           cmake --install build-pure-vpp --prefix "$RUNNER_TEMP/vpp-install"
@@ -196,6 +188,13 @@ jobs:
           python3 scripts/quality/check_jit_cli.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit"
           python3 scripts/quality/check_jit_dynamic.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit" "$RUNNER_TEMP/vpp-extracted/share/vpp"
           python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$RUNNER_TEMP/vpp-extracted/bin/vpp" --timeout 900 --logs "$RUNNER_TEMP/host-regression"
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        run: |
+          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
+          python3 -m venv "$RUNNER_TEMP/tls-venv"
+          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
+          cmake -S . -B "$RUNNER_TEMP/macos-full/tls" -DVPP_TLS_TEST_COMPILER="$RUNNER_TEMP/vpp-extracted/bin/vpp" -DVPP_TLS_INTEROP_TESTS=ON -DPython3_EXECUTABLE="$RUNNER_TEMP/tls-venv/bin/python"
+          ctest --test-dir "$RUNNER_TEMP/macos-full/tls" --output-on-failure -j 4
       - name: Check Linux cross emitter
         run: |
           probe="$RUNNER_TEMP/probe.vi"
@@ -237,6 +236,7 @@ jobs:
             build-pure-vpp/full-compiler-profile.log
             ${{ runner.temp }}/macos-full/**/*.log
             ${{ runner.temp }}/macos-full/convergence.sha256
+            ${{ runner.temp }}/macos-full/tls/tls-tests/
             ${{ runner.temp }}/host-regression/
           if-no-files-found: ignore
   linux-i32:
@@ -364,6 +364,12 @@ jobs:
           python3 scripts/quality/check_jit_dynamic.py "$out/extracted/bin/vpp-jit" "$out/extracted/share/vpp"
           VPP_AOT_LINUX_OBJECT_DIR="$out/extracted/share/vpp/native-vpp-runtime/linux-objects" python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$out/extracted/bin/vpp" --timeout 900 --logs "$out/host-regression"
           echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tls-venv"
+          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
+          cmake -S . -B "$RUNNER_TEMP/linux-full/tls" -DVPP_TLS_TEST_COMPILER="$RUNNER_TEMP/linux-full/extracted/bin/vpp" -DVPP_TLS_INTEROP_TESTS=ON -DPython3_EXECUTABLE="$RUNNER_TEMP/tls-venv/bin/python"
+          ctest --test-dir "$RUNNER_TEMP/linux-full/tls" --output-on-failure -j 2
       - name: Upload full compiler
         uses: actions/upload-artifact@v4
         with:
@@ -394,6 +400,7 @@ jobs:
             ${{ runner.temp }}/linux-full/**/*.log
             ${{ runner.temp }}/linux-full/convergence.sha256
             ${{ runner.temp }}/linux-full/host-regression/
+            ${{ runner.temp }}/linux-full/tls/tls-tests/
           if-no-files-found: ignore
   windows-i32:
     name: Windows x86-64 - native i32 selfhost
@@ -502,7 +509,7 @@ jobs:
         id: msys2
         with:
           msystem: CLANG64
-          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm mingw-w64-clang-x86_64-openssl
       - name: Prepare runtime
         shell: pwsh
         run: |
@@ -536,6 +543,18 @@ jobs:
       - name: Package and test installed compiler
         shell: pwsh
         run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase package
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP/tls-venv"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $python = "$env:RUNNER_TEMP/tls-venv/Scripts/python.exe"
+          & $python -m pip install cryptography
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -S . -B "$env:RUNNER_TEMP/windows-full/tls" "-DVPP_TLS_TEST_COMPILER=$env:RUNNER_TEMP/windows-full/extracted/bin/vpp-native.exe" "-DVPP_TLS_TEST_CLANG=$env:VPP_CI_CLANG" "-DVPP_TLS_INTEROP_TESTS=ON" "-DPython3_EXECUTABLE=$python"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir "$env:RUNNER_TEMP/windows-full/tls" --output-on-failure -j 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check native LSP
         shell: pwsh
         run: |
@@ -584,6 +603,7 @@ jobs:
             ${{ runner.temp }}/windows-full/**/*.log
             ${{ runner.temp }}/windows-full/convergence.sha256
             ${{ runner.temp }}/windows-full/host-regression/
+            ${{ runner.temp }}/windows-full/tls/tls-tests/
           if-no-files-found: ignore
 
   macos-regression:

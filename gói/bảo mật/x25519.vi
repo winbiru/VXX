@@ -24,12 +24,12 @@ lớp công khai X25519 VPP {
     hàm riêng tư reduce(a) {
         lặp(pass = 0; pass < 3; pass++) {
             lặp(i = 0; i < 31; i++) {
-                carry = làm tròn xuống(a[i] / 256);
-                a[i] = a[i] % 256;
+                carry = a[i] >> 8;
+                a[i] = a[i] & 255;
                 a[i + 1] = a[i + 1] + carry;
             };
-            carry = làm tròn xuống(a[31] / 128);
-            a[31] = a[31] % 128;
+            carry = a[31] >> 7;
+            a[31] = a[31] & 127;
             a[0] = a[0] + carry * 19;
         };
         // Canonical representation. This comparison is currently variable-time.
@@ -74,16 +74,56 @@ lớp công khai X25519 VPP {
         trả về mình.reduce(r);
     };
 
-    hàm riêng tư mul(a, b) {
-        t = [];
-        lặp(i = 0; i < 63; i++) { thêm(t, 0); };
+    // Keep the byte-array ABI, but multiply in radix 2^13. At most 20
+    // products contribute to a coefficient, so even the carry fits in i32.
+    hàm riêng tư pack limbs(bytes) {
+        limbs = []; accumulator = 0; bits = 0;
         lặp(i = 0; i < 32; i++) {
-            lặp(j = 0; j < 32; j++) { t[i + j] = t[i + j] + a[i] * b[j]; };
+            accumulator = accumulator | (bytes[i] << bits);
+            bits = bits + 8;
+            nếu (bits >= 13) {
+                thêm(limbs, accumulator & 8191);
+                accumulator = accumulator >> 13;
+                bits = bits - 13;
+            };
         };
-        // 2^256 = 38 (mod 2^255-19).
-        lặp(i = 62; i >= 32; i--) { t[i - 32] = t[i - 32] + 38 * t[i]; };
-        r = mình.zero();
-        lặp(i = 0; i < 32; i++) { r[i] = t[i]; };
+        thêm(limbs, accumulator);
+        trả về limbs;
+    };
+
+    hàm riêng tư mul(a, b) {
+        aa = mình.pack limbs(a); bb = mình.pack limbs(b);
+        t = []; carry = 0;
+        lặp(k = 0; k < 39; k++) {
+            first = 0; last = k;
+            nếu (k >= 20) { first = k - 19; last = 19; };
+            sum = carry;
+            lặp(i = first; i <= last; i++) { sum = sum + aa[i] * bb[k - i]; };
+            thêm(t, sum & 8191);
+            carry = sum >> 13;
+        };
+        thêm(t, carry);
+        // Fold normalized high limbs using 2^260 = 608 mod p.
+        lặp(i = 0; i < 20; i++) { t[i] = t[i] + 608 * t[i + 20]; };
+        // The last limb has eight field bits (19*13 + 8 = 255).
+        lặp(pass = 0; pass < 3; pass++) {
+            lặp(i = 0; i < 19; i++) {
+                t[i + 1] = t[i + 1] + (t[i] >> 13);
+                t[i] = t[i] & 8191;
+            };
+            t[0] = t[0] + 19 * (t[19] >> 8);
+            t[19] = t[19] & 255;
+        };
+        r = []; accumulator = 0; bits = 0;
+        lặp(i = 0; i < 20; i++) {
+            accumulator = accumulator | (t[i] << bits);
+            bits = bits + 13;
+            khi (bits >= 8 && độ dài(r) < 32) {
+                thêm(r, accumulator & 255);
+                accumulator = accumulator >> 8;
+                bits = bits - 8;
+            };
+        };
         trả về mình.reduce(r);
     };
 
@@ -145,9 +185,7 @@ lớp công khai X25519 VPP {
         z3 = mình.zero(); z3[0] = 1;
         previous = 0;
         lặp(bit = 254; bit >= 0; bit--) {
-            power = 1;
-            lặp(i = 0; i < bit % 8; i++) { power = power * 2; };
-            selected = làm tròn xuống(key[làm tròn xuống(bit / 8)] / power) % 2;
+            selected = (key[bit >> 3] >> (bit & 7)) & 1;
             previous = previous ^ selected;
             mình.swap(x2, x3, previous);
             mình.swap(z2, z3, previous);
