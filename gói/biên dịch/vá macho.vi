@@ -66,10 +66,22 @@ hàm công khai macho bản vá phần(o, j, v, bảng) {
     đã vá = {};
     lặp(k = 0; k < s["relocationCount"]; k += 1) {
         r = o.lấy tái định vị(j, k);
+        cộng = 0;
+        nếu (r["type"] == 10) {
+            bỏ kết quả = macho vá cần(k + 1 < s["relocationCount"], "ADDEND thiếu relocation đi kèm");
+            cộng = r["addend"];
+            địa cộng = r["address"];
+            k += 1;
+            r = o.lấy tái định vị(j, k);
+            bỏ kết quả = macho vá cần(r["address"] == địa cộng && (r["type"] == 3 || r["type"] == 4), "ADDEND không ghép với PAGE21/PAGEOFF12");
+        };
         nơi = r["address"];
         bỏ kết quả = macho vá cần(!máy ảo có khóa từ điển(đã vá, nơi), "relocation trùng vị trí");
         đã vá[nơi] = đúng;
-        bản vá = macho bản vá(o, s, r, v, bảng[r["symbol"]]);
+        đích = bảng[r["symbol"]];
+        mục tiêu = đích[0] + cộng;
+        bỏ kết quả = macho vá cần(mục tiêu >= 0 && mục tiêu <= 2147483647, "ADDEND ngoài phạm vi ảnh");
+        bản vá = macho bản vá(o, s, r, v, [mục tiêu, đích[1]]);
         bỏ kết quả = máy ảo thêm cuối danh sách(ra, bản vá);
     };
     trả về ra;

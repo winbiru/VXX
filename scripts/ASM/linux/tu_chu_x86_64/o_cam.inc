@@ -14,7 +14,7 @@ vpp_native_os_socket:
     call vpp_native_memory_base
     testq %rax, %rax
     je .Lo_cam_khong_hop_le_truoc_x
-    cmpl $10, %ebx
+    cmpl $14, %ebx
     ja .Lo_cam_khong_hop_le_truoc_x
     cmpl $(135271424-128), %r13d
     ja .Lo_cam_khong_hop_le_truoc_x
@@ -22,6 +22,22 @@ vpp_native_os_socket:
     jnz .Lo_cam_khong_hop_le_truoc_x
     leaq (%rax,%r13), %r12
     movl $0, 28(%r12)
+    cmpl $11, %ebx
+    jb .Lo_cam_dispatch_x
+    cmpl $(135271424-160), %r13d
+    ja .Lo_cam_khong_hop_le_x
+    cmpl $14, %ebx
+    jne .Lo_cam_tls_khong_ho_tro_x
+    // No TLS context is allocated by the freestanding Linux backend.
+    movq $0, 120(%r12)
+    movl $0, 144(%r12)
+    xorl %eax, %eax
+    jmp .Lo_cam_tra_ve_x
+.Lo_cam_tls_khong_ho_tro_x:
+    movl $95, 28(%r12)
+    movl $-95, %eax
+    jmp .Lo_cam_tra_ve_x
+.Lo_cam_dispatch_x:
     cmpl $7, %ebx
     je .Lo_cam_udp_gan_x
     cmpl $8, %ebx

@@ -36,6 +36,13 @@ def verify_seeds():
     for name, sha in pins.items():
         if digest(SEEDS / name) != sha:
             raise RuntimeError(f'Windows seed checksum mismatch: {name}')
+    # Stage 1 executes the bundled assembly seed, which can lag behind the
+    # current .vi source even when its checksum is correctly pinned.
+    with gzip.open(SEEDS / 'vpp-full.S.gz', 'rb') as compressed:
+        full_seed = compressed.read()
+    for library in (b'-lsecur32', b'-lcrypt32'):
+        if b'.asciz "' + library + b'"' not in full_seed:
+            raise RuntimeError(f'Windows full seed missing TLS link library: {library.decode()}')
 
 
 def audit_pe(path, deterministic=True):
@@ -150,7 +157,7 @@ def link(clang, objects, output, env, log):
     # Reserve enough native stack for the runtime's existing 4096-frame
     # guard to report error=15 before Win32 raises STATUS_STACK_OVERFLOW.
     # Pages remain demand committed; this does not commit 64 MiB at startup.
-    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-liphlpapi', '-lntdll',
+    command([clang, *objects, '-lshell32', '-lbcrypt', '-lws2_32', '-liphlpapi', '-lsecur32', '-lcrypt32', '-lntdll',
              '-Wl,--no-insert-timestamp', '-Wl,--stack,67108864', '-o', output], env, log)
     audit_pe(output)
 

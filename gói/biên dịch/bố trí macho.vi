@@ -155,17 +155,28 @@ hàm công khai macho kế hoạch tái định vị(đối tượng, kế hoạ
             băm = 0;
             lặp(k = 0; k < s["relocationCount"]; k += 1) {
                 r = o.lấy tái định vị(j, k);
+                cộng = 0;
+                nếu (r["type"] == 10) {
+                    bỏ kết quả = macho kế hoạch cần(k + 1 < s["relocationCount"], "ADDEND thiếu relocation đi kèm");
+                    cộng = r["addend"];
+                    địa cộng = r["address"];
+                    k += 1;
+                    r = o.lấy tái định vị(j, k);
+                    bỏ kết quả = macho kế hoạch cần(r["address"] == địa cộng && (r["type"] == 3 || r["type"] == 4), "ADDEND không ghép với PAGE21/PAGEOFF12");
+                };
                 loại = r["type"];
                 đích = bảng[r["symbol"]];
                 bỏ kết quả = macho kế hoạch cần((loại == 0 && v[0] == 2 && đích[1] == 0 && r["address"] % 8 == 0) || (loại != 0 && v[0] == 0 && (đích[1] == 0 || loại == 2)), "relocation chưa hỗ trợ");
+                mục tiêu = đích[0] + cộng;
+                bỏ kết quả = macho kế hoạch cần(mục tiêu >= 0 && mục tiêu <= 2147483647, "ADDEND ngoài phạm vi ảnh");
                 tại = macho kế hoạch cộng(v[1], r["address"]);
                 nếu (loại == 2) {
-                    lệch = đích[0] - tại;
+                    lệch = mục tiêu - tại;
                     bỏ kết quả = macho kế hoạch cần(lệch % 4 == 0 && lệch >= -134217728 && lệch < 134217728, "BRANCH26 ngoài phạm vi");
                 };
                 đếm[loại] = đếm[loại] + 1;
                 băm = (băm * 31 + tại % 1000003) % 1000003;
-                băm = (băm * 31 + đích[0] % 1000003) % 1000003;
+                băm = (băm * 31 + mục tiêu % 1000003) % 1000003;
                 băm = (băm * 31 + loại) % 1000003;
             };
             bỏ kết quả = máy ảo thêm cuối danh sách(ra, [i, j, đếm, băm]);

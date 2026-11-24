@@ -209,13 +209,17 @@ hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
             primitives, cache, phụ thuộc asm, cảnh[4]);
         AOT thêm(liên kết, [primitives, runtime object, "-Wl,-dead_strip", "-o", executable]);
     } hoặc {
-        liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-nostdlib", "-static",
+        tls = đọc biến môi trường("VPP_AOT_LINUX_TLS", "1") == "1";
+        liên kết = [công cụ, "-target", "x86_64-unknown-linux-gnu"];
+        nếu (tls) { máy ảo thêm cuối danh sách(liên kết, "-nostartfiles"); }
+        hoặc { AOT thêm(liên kết, ["-nostdlib", "-static"]); };
+        AOT thêm(liên kết, [
             "-no-pie", "-Wl,-e,_start", "-Wl,--no-undefined", "-Wl,--build-id=none",
-            "-Wl,-z,noexecstack", đối tượng];
+            "-Wl,-z,noexecstack", đối tượng]);
         thành phần = ["start", "syscalls", "runtime_core", "directory", "sha256", "process", "socket", "aot_runtime_bridge", "f64"];
         đối tượng nền tảng = đọc biến môi trường("VPP_AOT_LINUX_OBJECT_DIR", "");
         lặp(i = 0; i < độ dài(thành phần); i++) {
-            nếu (đối tượng nền tảng != "") {
+            nếu (đối tượng nền tảng != "" && !(tls && thành phần[i] == "socket")) {
                 phần = đường dẫn nối(đối tượng nền tảng, thành phần[i] + ".o");
                 nếu (!đường dẫn là tuyệt đối(phần) || !là tệp(phần)) {
                     ném "Native AOT: packaged Linux platform object missing: " + phần;
@@ -226,17 +230,33 @@ hàm công khai biên dịch AOT kế hoạch(asm, cảnh) {
             phần = đường dẫn nối(tạm, thành phần[i] + ".o");
             lệnh = [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
                 đường dẫn nối(asm gốc, "linux/vpp_linux_" + thành phần[i] + "_x86_64.S")];
+            nếu (tls && thành phần[i] == "socket") {
+                máy ảo thêm cuối danh sách(lệnh, "-DVPP_LINUX_OPENSSL_TLS=1");
+            };
             AOT thêm(lệnh, bao gồm); AOT thêm(lệnh, ["-o", "%VPP_OBJECT%"]);
             AOT đối tượng(bước, "Linux " + thành phần[i] + " assembly", lệnh, phần, cache, phụ thuộc asm, cảnh[4]);
             máy ảo thêm cuối danh sách(liên kết, phần);
         };
-        AOT thêm(liên kết, [runtime object, "-o", executable]);
+        máy ảo thêm cuối danh sách(liên kết, runtime object);
+        nếu (tls) {
+            crypto = đường dẫn nối(tạm, "tls-linux.o");
+            AOT đối tượng(bước, "Linux ASM TLS provider",
+                [công cụ, "-target", "x86_64-unknown-linux-gnu", "-c",
+                 đường dẫn nối(asm gốc, "linux/vpp_native_tls_linux_x86_64.S"), "-o", "%VPP_OBJECT%"],
+                crypto, cache, [[asm gốc, [".S", ".inc"]]], cảnh[4]);
+            AOT thêm(liên kết, [crypto, "-lssl", "-lcrypto", "-lc"]);
+        };
+        AOT thêm(liên kết, ["-o", executable]);
     };
     máy ảo thêm cuối danh sách(bước, ["mark", "prepare-vpp-runtime"]);
     AOT chạy(bước, "V++ executable link", "link-vpp-executable", liên kết);
     nếu (hệ == "linux") {
-        AOT chạy(bước, "freestanding ELF audit", "audit-linux-vpp-executable",
-            ["/bin/bash", đường dẫn nối(gốc, "scripts/quality/audit_linux_static_elf.sh"), executable]);
+        kiểm toán = "scripts/quality/audit_linux_static_elf.sh";
+        nếu (đọc biến môi trường("VPP_AOT_LINUX_TLS", "1") == "1") {
+            kiểm toán = "scripts/quality/audit_linux_tls_elf.sh";
+        };
+        AOT chạy(bước, "Linux ELF audit", "audit-linux-vpp-executable",
+            ["/bin/bash", đường dẫn nối(gốc, kiểm toán), executable]);
     };
     nếu (đọc biến môi trường("VPP_AOT_KEEP_ASM", "") != "") {
         máy ảo thêm cuối danh sách(bước, ["copy", nguồn, cảnh[3] + ".S"]);

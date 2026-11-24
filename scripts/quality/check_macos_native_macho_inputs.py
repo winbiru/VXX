@@ -131,6 +131,15 @@ def main():
     many_result = run("many-source-units", archive(*many), True).read_bytes()
     assert struct.unpack_from("<I", many_result, 196)[0] == len(many)
 
+    # Two individually valid objects can contain more than 900000 bytes of
+    # code when combined. This previously rejected the full VM runtime after
+    # worker support increased its generated machine code.
+    padding = struct.pack("<I", 0xD503201F) * 114000  # ARM64 NOP
+    large_a = object_file(b"_vpp_large_a", padding)
+    large_b = object_file(b"_vpp_large_b", padding)
+    large_result = run("merged-code-above-900k", archive(large_a, large_b), True).read_bytes()
+    assert struct.unpack_from("<I", large_result, 144)[0] == len(padding) * 2
+
     helper_sym = struct.unpack_from("<I", helper, 192)[0]
     helper_str = struct.unpack_from("<I", helper, 200)[0]
 
@@ -180,6 +189,7 @@ def main():
     print("MACOS_NATIVE_MACHO_SYMBOL_RESOLUTION=PASS")
     print("MACOS_NATIVE_MACHO_UNDEFINED_DEDUP=PASS")
     print("MACOS_NATIVE_MACHO_MANY_SOURCE_UNITS=PASS")
+    print("MACOS_NATIVE_MACHO_MERGED_CODE_ABOVE_900K=PASS")
 
 
 if __name__ == "__main__":

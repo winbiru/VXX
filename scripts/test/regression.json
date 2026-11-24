@@ -2721,6 +2721,15 @@
     }
   ],
   "unregistered_sources": {
+    "scripts/test/fixtures/vm_tls_authenticated_handshake.vi": "TLS authenticated handshake CTest fixture",
+    "scripts/test/fixtures/vm_tls_certificates.vi": "TLS X.509 parsing CTest fixture",
+    "scripts/test/fixtures/vm_tls_client.vi": "TLS client API CTest fixture",
+    "scripts/test/fixtures/vm_tls_continue_probe.vi": "Standalone loop-control probe for the TLS implementation",
+    "scripts/test/fixtures/vm_tls_ed25519.vi": "TLS Ed25519 CTest fixture",
+    "scripts/test/fixtures/vm_tls_handshake.vi": "TLS handshake framing CTest fixture",
+    "scripts/test/fixtures/vm_tls_sha512.vi": "TLS SHA-512 CTest fixture",
+    "scripts/test/fixtures/vm_tls_stream.vi": "TLS record reassembly CTest fixture",
+    "scripts/test/fixtures/vm_tls_x25519.vi": "TLS X25519 CTest fixture",
     "scripts/test/fixtures/vm_asm_resolver_config.vi": "Windows installed VM DNS configuration fixture exercised by check_windows_full_bootstrap.py",
     "scripts/test/fixtures/native_jit_pressure.vi": "Dynamic JIT tier pressure fixture exercised by check_jit_dynamic.py",
     "scripts/test/bootstrapstage2.vi": "Standalone candidate without registered oracle; requires porting",

@@ -1022,6 +1022,9 @@ hàm vm_host(state, op, args) {
         // Preserve the host opcode when the V++ resolver rejects a request.
         trả về vm_resolver_host(state, op, a, b, c);
     };
+    nếu (op >= 206 && op <= 208) {
+        trả về vm_tls_host(state, op, a, b, c);
+    };
     trả về vm_error(22);
 };
 

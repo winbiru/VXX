@@ -36,7 +36,7 @@ cat > "$work/branch.vi" <<'VI'
 hàm chính() { biến x=0; lặp (i=0; i<7; i++) { nếu (i<3) {x=x+2;} hoặc {x=x+4;}; }; trả về x; };
 VI
 cat > "$work/unresolved.vi" <<'VI'
-hàm chính() { trả về máy đặt quyền tệp mở(-1, 448); };
+hàm chính() { trả về hàm_chưa_định_nghĩa(); };
 VI
 cat > "$work/bad.vi" <<'VI'
 hàm chính( { trả về 3; };

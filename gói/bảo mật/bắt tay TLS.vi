@@ -1,0 +1,333 @@
+// TLS 1.3 wire-format and handshake traffic key schedule, entirely V++.
+// Restricted to X25519 and TLS_CHACHA20_POLY1305_SHA256 (RFC 8446).
+// No socket is marked secure until Certificate, CertificateVerify and Finished
+// are authenticated against a trusted X.509 chain. This module does not yet
+// implement that certificate verification or network state machine.
+nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+nhập gói.bảo mật.x25519.X25519 VPP;
+nhập gói.bảo mật.ed25519.Ed25519 VPP;
+nhập gói.bảo mật.chứng chỉ TLS.Chứng Chỉ TLS VPP;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
+nhập gói.lõi.nguồn ngẫu nhiên.nguồn ngẫu nhiên bảo mật các byte;
+
+lớp công khai Bắt Tay TLS VPP {
+    hàm công khai khởi tạo() {
+        mình.hkdf = Khóa TLS VPP();
+        mình.curve = X25519 VPP();
+        mình.hash = Bộ Mật Mã();
+    };
+
+    hàm riêng tư ghép(a, b) {
+        keys = mình.hkdf;
+        trả về keys.nối(a, b);
+    };
+
+    hàm riêng tư số hai(n) {
+        nếu (n < 0 || n > 65535) { ném "TLS: uint16 overflow"; };
+        trả về [(n - n % 256) / 256, n % 256];
+    };
+
+    hàm riêng tư số ba(n) {
+        nếu (n < 0 || n > 16777215) { ném "TLS: uint24 overflow"; };
+        trả về [(n - n % 65536) / 65536, (n % 65536 - n % 256) / 256, n % 256];
+    };
+
+    hàm riêng tư phần(data, start, n) {
+        nếu (start < 0 || n < 0 || start + n > độ dài(data)) { ném "TLS: truncated message"; };
+        result = [];
+        lặp(i = start; i < start + n; i++) { thêm(result, data[i]); };
+        trả về result;
+    };
+
+    hàm riêng tư u16(data, pos) {
+        nếu (pos < 0 || pos + 2 > độ dài(data)) { ném "TLS: truncated uint16"; };
+        trả về data[pos] * 256 + data[pos + 1];
+    };
+
+    hàm riêng tư phần mở rộng(type, data) {
+        result = mình.số hai(type);
+        result = mình.ghép(result, mình.số hai(độ dài(data)));
+        trả về mình.ghép(result, data);
+    };
+
+    hàm riêng tư hostname(host) {
+        nếu (loại của(host) != "chuỗi") { ném "TLS: hostname type"; };
+        bytes = chuỗi thành byte máy ảo(host);
+        nếu (độ dài(bytes) < 1 || độ dài(bytes) > 253) { ném "TLS: hostname length"; };
+        trước = 0;
+        lặp(i = 0; i < độ dài(bytes); i++) {
+            c = bytes[i];
+            letter = (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+            digit = c >= 48 && c <= 57;
+            nếu (!letter && !digit && c != 45 && c != 46) { ném "TLS: invalid DNS name"; };
+            nếu ((i == 0 || i == độ dài(bytes) - 1) && (c == 45 || c == 46)) {
+                ném "TLS: invalid DNS boundary";
+            };
+            nếu ((c == 46 && (trước == 46 || trước == 45)) || (trước == 46 && c == 45)) {
+                ném "TLS: empty or invalid DNS label";
+            };
+            trước = c;
+        };
+        trả về bytes;
+    };
+
+    // Deterministic constructor for test vectors. Caller owns the private key.
+    // Output [TLSPlaintext record, ClientHello handshake bytes, X25519 public].
+    hàm công khai khách chào(host, private, random) {
+        keys = mình.hkdf; curve = mình.curve;
+        keys.bytes(private, 32); keys.bytes(random, 32);
+        nếu (độ dài(private) != 32 || độ dài(random) != 32) {
+            ném "TLS: ClientHello key/random length";
+        };
+        dns_name = mình.hostname(host);
+        public = curve.công khai(private);
+        // server_name extension [list length, name type, hostname length, name].
+        name = mình.ghép([0], mình.ghép(mình.số hai(độ dài(dns_name)), dns_name));
+        sni = mình.phần mở rộng(0, mình.ghép(mình.số hai(độ dài(name)), name));
+        versions = mình.phần mở rộng(43, [2, 3, 4]);
+        groups = mình.phần mở rộng(10, [0, 2, 0, 29]);
+        // Only advertise schemes with a V++ verifier.
+        signatures = mình.phần mở rộng(13, [0, 2, 8, 7]);
+        entry = mình.ghép([0, 29, 0, 32], public);
+        share = mình.phần mở rộng(51, mình.ghép(mình.số hai(độ dài(entry)), entry));
+        ext = mình.ghép(sni, versions);
+        ext = mình.ghép(ext, groups);
+        ext = mình.ghép(ext, signatures);
+        ext = mình.ghép(ext, share);
+        body = mình.ghép([3, 3], random);
+        body = mình.ghép(body, [0, 0, 2, 19, 3, 1, 0]);
+        body = mình.ghép(body, mình.ghép(mình.số hai(độ dài(ext)), ext));
+        handshake = mình.ghép([1], mình.ghép(mình.số ba(độ dài(body)), body));
+        record = mình.ghép([22, 3, 1], mình.ghép(mình.số hai(độ dài(handshake)), handshake));
+        trả về [record, handshake, public];
+    };
+
+    hàm công khai tạo khách chào(host) {
+        private = nguồn ngẫu nhiên bảo mật các byte(32);
+        random = nguồn ngẫu nhiên bảo mật các byte(32);
+        trả về [mình.khách chào(host, private, random), private];
+    };
+
+    // Accept only TLS 1.3 ServerHello for the selected cipher and X25519.
+    // Output [peer key-share, original ServerHello handshake bytes].
+    hàm công khai đọc máy chủ chào(message) {
+        keys = mình.hkdf;
+        keys.bytes(message, 65535);
+        n = độ dài(message);
+        nếu (n < 44 || message[0] != 2 ||
+            message[1] * 65536 + message[2] * 256 + message[3] != n - 4 ||
+            message[4] != 3 || message[5] != 3) {
+            ném "TLS: invalid ServerHello framing/version";
+        };
+        // TLS 1.3 HelloRetryRequest magic random.
+        retry = [207, 33, 173, 116, 229, 154, 97, 17, 190, 29, 140, 2, 30, 101, 184, 145,
+                 194, 162, 17, 22, 122, 187, 140, 94, 7, 158, 9, 226, 200, 168, 51, 156];
+        equal = đúng;
+        lặp(i = 0; i < 32; i++) { nếu (message[6 + i] != retry[i]) { equal = sai; } };
+        nếu (equal) { ném "TLS: HelloRetryRequest unsupported"; };
+        sid = message[38];
+        // Our ClientHello always sends an empty legacy_session_id.
+        nếu (sid != 0) { ném "TLS: unexpected session id echo"; };
+        at = 39 + sid;
+        nếu (at + 5 > n || mình.u16(message, at) != 4867 || message[at + 2] != 0) {
+            ném "TLS: unsupported suite/compression";
+        };
+        ext_len = mình.u16(message, at + 3);
+        at = at + 5;
+        nếu (at + ext_len != n) { ném "TLS: invalid extension vector"; };
+        has_version = sai; has_share = sai; peer = [];
+        khi (at < n) {
+            nếu (at + 4 > n) { ném "TLS: incomplete extension"; };
+            type = mình.u16(message, at);
+            size = mình.u16(message, at + 2);
+            at = at + 4;
+            nếu (at + size > n) { ném "TLS: extension overrun"; };
+            nếu (type == 43) {
+                nếu (has_version || size != 2 || message[at] != 3 || message[at + 1] != 4) {
+                    ném "TLS: unsupported selected version";
+                };
+                has_version = đúng;
+            } hoặc nếu (type == 51) {
+                nếu (has_share || size != 36 || mình.u16(message, at) != 29 ||
+                    mình.u16(message, at + 2) != 32) {
+                    ném "TLS: invalid key-share";
+                };
+                peer = mình.phần(message, at + 4, 32);
+                has_share = đúng;
+            } hoặc {
+                // No other ServerHello extensions were offered by this client.
+                ném "TLS: unsolicited ServerHello extension";
+            };
+            at = at + size;
+        };
+        nếu (!has_version || !has_share) { ném "TLS: missing ServerHello requirements"; };
+        trả về [peer, message];
+    };
+
+    // TLS 1.3 EncryptedExtensions. The client offered SNI and supported_groups,
+    // so the server may acknowledge SNI or advertise its supported groups.
+    // ALPN and other extensions remain unsupported.
+    hàm công khai đọc mở rộng mã hóa(message) {
+        keys = mình.hkdf;
+        keys.bytes(message, 65535);
+        n = độ dài(message);
+        nếu (n < 6 || message[0] != 8 ||
+            message[1] * 65536 + message[2] * 256 + message[3] != n - 4 ||
+            mình.u16(message, 4) != n - 6) {
+            ném "TLS: invalid EncryptedExtensions";
+        };
+        at = 6; seen_sni = sai; seen_groups = sai;
+        khi (at < n) {
+            nếu (at + 4 > n) { ném "TLS: truncated encrypted extension"; };
+            type = mình.u16(message, at);
+            size = mình.u16(message, at + 2);
+            at = at + 4;
+            nếu (at + size > n) { ném "TLS: encrypted extension overflow"; };
+            nếu (type == 0) {
+                nếu (size != 0 || seen_sni) { ném "TLS: invalid encrypted SNI extension"; };
+                seen_sni = đúng;
+            } hoặc nếu (type == 10) {
+                // NamedGroupList is a nonempty vector of uint16 identifiers.
+                nếu (seen_groups || size < 4 || size % 2 != 0 ||
+                    mình.u16(message, at) != size - 2) {
+                    ném "TLS: invalid encrypted supported_groups";
+                };
+                seen_groups = đúng;
+            } hoặc {
+                ném "TLS: unsolicited encrypted extension";
+            };
+            at = at + size;
+        };
+        trả về đúng;
+    };
+
+    // Returns the server signature scheme and signature bytes. The returned
+    // signature MUST be cryptographically verified with the certificate key.
+    hàm công khai đọc xác minh chứng chỉ(message) {
+        keys = mình.hkdf;
+        keys.bytes(message, 65535);
+        n = độ dài(message);
+        nếu (n < 9 || message[0] != 15 ||
+            message[1] * 65536 + message[2] * 256 + message[3] != n - 4) {
+            ném "TLS: invalid CertificateVerify";
+        };
+        scheme = mình.u16(message, 4);
+        signature_length = mình.u16(message, 6);
+        nếu (scheme != 2055 || signature_length != 64 || signature_length != n - 8) {
+            ném "TLS: unsupported CertificateVerify signature";
+        };
+        trả về [scheme, mình.phần(message, 8, signature_length)];
+    };
+
+    // RFC 8446 section 4.4.3: 64 spaces, server context, 0x00, transcript
+    // hash. Pass the result to the Ed25519 verifier with the leaf public key.
+    hàm công khai dữ liệu ký máy chủ(transcript) {
+        keys = mình.hkdf;
+        keys.bytes(transcript, 1048576);
+        output = [];
+        lặp(i = 0; i < 64; i++) { thêm(output, 32); };
+        output = mình.ghép(output, chuỗi thành byte máy ảo("TLS 1.3, server CertificateVerify"));
+        thêm(output, 0);
+        trả về mình.ghép(output, mật mã sha256 các byte(transcript));
+    };
+
+    // Derive handshake traffic secrets from verified wire transcripts.
+    // Output [client handshake traffic secret, server handshake traffic secret].
+    // Caller must authenticate the ensuing CertificateVerify and Finished.
+    hàm công khai khóa bắt tay(private, peer_public, client_hello, server_hello) {
+        keys = mình.hkdf; curve = mình.curve;
+        keys.bytes(client_hello, 65535);
+        parsed = mình.đọc máy chủ chào(server_hello);
+        nếu (độ dài(peer_public) != 32) { ném "TLS: key share length"; };
+        difference = 0;
+        lặp(i = 0; i < 32; i++) { difference = difference | (peer_public[i] ^ parsed[0][i]); };
+        nếu (difference != 0) { ném "TLS: ServerHello key share changed"; };
+        zero = []; lặp(i = 0; i < 32; i++) { thêm(zero, 0); };
+        early = keys.trích(zero, zero);
+        derived = keys.dẫn xuất(early, "derived", []);
+        shared = curve.tính(private, peer_public);
+        handshake = keys.trích(derived, shared);
+        transcript = mình.ghép(client_hello, server_hello);
+        trả về [keys.dẫn xuất(handshake, "c hs traffic", transcript),
+                keys.dẫn xuất(handshake, "s hs traffic", transcript)];
+    };
+
+    // TLS 1.3 Finished = HMAC(finished_key, SHA256(handshake transcript)).
+    // Authenticating Finished alone does not authenticate an X.509 identity.
+    hàm công khai mã hoàn tất(traffic_secret, transcript) {
+        keys = mình.hkdf;
+        keys.bytes(traffic_secret, 32);
+        keys.bytes(transcript, 1048576);
+        nếu (độ dài(traffic_secret) != 32) { ném "TLS: invalid traffic secret"; };
+        finished_key = keys.nhãn(traffic_secret, "finished", [], 32);
+        return_hash = mật mã sha256 các byte(transcript);
+        trả về keys.hmac(finished_key, return_hash);
+    };
+
+    hàm công khai xác thực hoàn tất(traffic_secret, transcript, message) {
+        keys = mình.hkdf;
+        keys.bytes(message, 36);
+        nếu (độ dài(message) != 36 || message[0] != 20 ||
+            message[1] != 0 || message[2] != 0 || message[3] != 32) {
+            ném "TLS: invalid Finished handshake framing";
+        };
+        expected = mình.mã hoàn tất(traffic_secret, transcript);
+        difference = 0;
+        lặp(i = 0; i < 32; i++) { difference = difference | (message[4 + i] ^ expected[i]); };
+        nếu (difference != 0) { ném "TLS: Finished authentication failed"; };
+        trả về đúng;
+    };
+
+    // Derive application secrets after the server Finished was authenticated.
+    // The caller must independently validate CertificateVerify and X.509.
+    hàm công khai khóa ứng dụng(private, peer_public, client_hello, server_hello, server_finished_transcript) {
+        keys = mình.hkdf; curve = mình.curve;
+        parsed = mình.đọc máy chủ chào(server_hello);
+        keys.bytes(peer_public, 32);
+        nếu (độ dài(peer_public) != 32) { ném "TLS: invalid key share"; };
+        mismatch = 0;
+        lặp(i = 0; i < 32; i++) { mismatch = mismatch | (peer_public[i] ^ parsed[0][i]); };
+        nếu (mismatch != 0) { ném "TLS: ServerHello key share changed"; };
+        zero = []; lặp(i = 0; i < 32; i++) { thêm(zero, 0); };
+        early = keys.trích(zero, zero);
+        handshake = keys.trích(keys.dẫn xuất(early, "derived", []), curve.tính(private, peer_public));
+        master = keys.trích(keys.dẫn xuất(handshake, "derived", []), zero);
+        keys.bytes(server_finished_transcript, 1048576);
+        trả về [keys.dẫn xuất(master, "c ap traffic", server_finished_transcript),
+                keys.dẫn xuất(master, "s ap traffic", server_finished_transcript)];
+    };
+
+    // Authenticated TLS 1.3 server flight. Inputs are complete, decrypted
+    // handshake messages, in wire order. The caller must reassemble records
+    // before calling this function. Trust anchors are explicit DER certificates.
+    // Returns [client app secret, server app secret, client Finished handshake].
+    hàm công khai xác thực bắt tay(private, client_hello, server_hello,
+                                  encrypted_extensions, certificate_message,
+                                  certificate_verify, server_finished,
+                                  trusted_der, host, now_utc) {
+        server = mình.đọc máy chủ chào(server_hello);
+        mình.đọc mở rộng mã hóa(encrypted_extensions);
+        decoder = Chứng Chỉ TLS VPP();
+        chain = decoder.đọc danh sách(certificate_message);
+        nếu (!decoder.xác thực chuỗi(chain, trusted_der, host, now_utc)) {
+            ném "TLS: untrusted X509 chain";
+        };
+        transcript = mình.ghép(client_hello, server_hello);
+        transcript = mình.ghép(transcript, encrypted_extensions);
+        transcript = mình.ghép(transcript, certificate_message);
+        cv = mình.đọc xác minh chứng chỉ(certificate_verify);
+        ed = Ed25519 VPP();
+        nếu (!ed.xác minh(chain[0][14], mình.dữ liệu ký máy chủ(transcript), cv[1])) {
+            ném "TLS: CertificateVerify authentication failed";
+        };
+        transcript = mình.ghép(transcript, certificate_verify);
+        handshake_secrets = mình.khóa bắt tay(private, server[0], client_hello, server_hello);
+        mình.xác thực hoàn tất(handshake_secrets[1], transcript, server_finished);
+        transcript = mình.ghép(transcript, server_finished);
+        app_secrets = mình.khóa ứng dụng(private, server[0], client_hello, server_hello, transcript);
+        client_verify = mình.mã hoàn tất(handshake_secrets[0], transcript);
+        client_finished = mình.ghép([20,0,0,32], client_verify);
+        trả về [app_secrets[0], app_secrets[1], client_finished];
+    };
+};

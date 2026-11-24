@@ -1,0 +1,21 @@
+nhập gói.bảo mật.sha512.SHA512 VPP;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+
+hàm chính() {
+    sha = SHA512 VPP(); hex = Bộ Mật Mã();
+    empty = hex.mật mã thập lục phân(sha.băm([]));
+    nếu (empty != "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e") {
+        ném "SHA512 empty vector";
+    };
+    abc = hex.mật mã thập lục phân(sha.băm(chuỗi thành byte máy ảo("abc")));
+    nếu (abc != "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f") {
+        ném "SHA512 abc vector";
+    };
+    large = [];
+    lặp(i = 0; i < 130; i++) { thêm(large, 65); };
+    multi = hex.mật mã thập lục phân(sha.băm(large));
+    nếu (multi != "d4426e18470ca1b94106ca189255cdaf4c4e6c08bde1e7f66e3430d0707b3edc2851d5c30bf32ca1c654fa3fa4c357c722899ea10985498f7cba4c07201daaee") {
+        ném "SHA512 multi-block vector";
+    };
+    in "SHA512 VPP FIPS VECTORS OK";
+};

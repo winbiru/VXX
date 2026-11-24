@@ -72,7 +72,7 @@ assemble() {
 link() {
     local label=$1 output=$2
     shift 2
-    run "$label" "$clang" "$@" -lshell32 -lbcrypt -lws2_32 -liphlpapi -lntdll \
+    run "$label" "$clang" "$@" -lshell32 -lbcrypt -lws2_32 -liphlpapi -lsecur32 -lcrypt32 -lntdll \
         -Wl,--no-insert-timestamp -Wl,--stack,67108864 -o "$output"
 }
 

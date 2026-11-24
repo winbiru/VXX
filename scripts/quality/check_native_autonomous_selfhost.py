@@ -171,8 +171,12 @@ def macho_reader_expected(path):
         if count:
             for i in (0, count - 1):
                 address, bits = struct.unpack_from('<iI', data, part['relocationOffset'] + i * 8)
-                expected.append(dict(address=address, symbol=bits & 0xffffff, pcrel=(bits >> 24) & 1,
-                                     length=(bits >> 25) & 3, type=bits >> 28))
+                kind = bits >> 28
+                symbol = bits & 0xffffff
+                addend = symbol - 0x1000000 if kind == 10 and symbol & 0x800000 else symbol
+                expected.append(dict(address=address, symbol=symbol, pcrel=(bits >> 24) & 1,
+                                     length=(bits >> 25) & 3, type=kind,
+                                     addend=addend if kind == 10 else 0))
     if nsyms:
         for i in (0, nsyms - 1):
             name, kind, sect, desc, low, high = struct.unpack_from('<IBBHii', data, symoff + i * 16)

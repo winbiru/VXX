@@ -1,0 +1,41 @@
+nhập gói.bảo mật.x25519.*;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+
+hàm tls x25519 bytes(hex) {
+    raw = chuỗi thành byte máy ảo(hex);
+    result = [];
+    nếu (độ dài(raw) % 2 != 0) { ném "X25519 test hex length"; };
+    lặp(i = 0; i < độ dài(raw); i = i + 2) {
+        high = raw[i] - 48; low = raw[i + 1] - 48;
+        nếu (high > 9) { high = raw[i] - 87; };
+        nếu (low > 9) { low = raw[i + 1] - 87; };
+        thêm(result, high * 16 + low);
+    };
+    trả về result;
+};
+
+hàm chính() {
+    x = X25519 VPP(); crypto = Bộ Mật Mã();
+    // RFC 7748, section 6.1, Alice's key pair.
+    private = tls x25519 bytes("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
+    expected = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
+    actual = crypto.mật mã thập lục phân(x.công khai(private));
+    nếu (actual != expected) { ném "X25519 RFC 7748 Alice public key: " + actual; };
+    bob_private = tls x25519 bytes("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb");
+    bob_public = "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f";
+    shared = "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742";
+    nếu (crypto.mật mã thập lục phân(x.công khai(bob_private)) != bob_public) {
+        ném "X25519 RFC 7748 Bob public key";
+    };
+    nếu (crypto.mật mã thập lục phân(x.tính(private, tls x25519 bytes(bob_public))) != shared ||
+        crypto.mật mã thập lục phân(x.tính(bob_private, tls x25519 bytes(expected))) != shared) {
+        ném "X25519 RFC 7748 shared secret";
+    };
+    rejected = 0;
+    zeros = []; lặp(i = 0; i < 32; i++) { thêm(zeros, 0); };
+    thử { x.tính(private, zeros); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { x.công khai([1]); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { x.tính(private, [256]); } bắt lỗi(e) { rejected = rejected + 1; };
+    nếu (rejected != 3) { ném "X25519 invalid inputs accepted"; };
+    in "X25519 VPP RFC VECTORS OK";
+};

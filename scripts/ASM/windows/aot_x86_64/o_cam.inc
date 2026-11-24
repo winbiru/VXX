@@ -4,15 +4,23 @@
 .globl vpp_native_os_socket
 vpp_native_os_socket:
     WIN_VAO
-    cmpl $11, %r12d
+    cmpl $15, %r12d
     ja .Lwin_khong_hop_le
     cmpl $(VPP_ARENA_SIZE-128), %r13d
     ja .Lwin_khong_hop_le
     testl $15, %r13d
     jnz .Lwin_khong_hop_le
     leaq (%rbx,%r13), %r15
-    cmpl $11, %r12d
+    cmpl $15, %r12d
     je .Lwin_dns_config
+    cmpl $11, %r12d
+    jb .Lwin_socket_wsa
+    // Schannel keeps all native state behind the VM-owned TCP control block.
+    cmpl $(VPP_ARENA_SIZE-160), %r13d
+    ja .Lwin_khong_hop_le
+    call .Lwin_tls_socket
+    WIN_RA
+.Lwin_socket_wsa:
     cmpl $0, .Lwin_wsa_san_sang(%rip)
     jne 1f
     movl $0x202, %ecx
@@ -328,7 +336,7 @@ vpp_native_os_socket:
 .Lwin_wsa_du_lieu: .zero 512
 .text
 
-// Operation 11: read configured DNS servers, never resolve a hostname.
+// Operation 15: read configured DNS servers, never resolve a hostname.
 // ctl[4] is an arena offset to 8 records {u32 length, u8 address[16]}.
 // GetAdaptersAddresses returns OS-owned layout only inside our temporary
 // malloc buffer; no native pointer crosses the VM boundary.

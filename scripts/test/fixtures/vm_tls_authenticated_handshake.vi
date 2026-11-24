@@ -1,0 +1,65 @@
+// Independently generated Ed25519 X.509 + TLS 1.3 server flight.
+// Deterministic private keys are TEST-ONLY and must never be deployed.
+nhập gói.bảo mật.bắt tay TLS.*;
+nhập gói.bảo mật.chứng chỉ TLS.*;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+
+hàm tls fixture hex(text) {
+    raw = chuỗi thành byte máy ảo(text);
+    result = [];
+    lặp(i = 0; i < độ dài(raw); i = i + 2) {
+        hi = raw[i] - 48; lo = raw[i + 1] - 48;
+        nếu (hi > 9) { hi = raw[i] - 87; };
+        nếu (lo > 9) { lo = raw[i + 1] - 87; };
+        thêm(result, hi * 16 + lo);
+    };
+    trả về result;
+};
+
+hàm chính() {
+    tls = Bắt Tay TLS VPP();
+    decoder = Chứng Chỉ TLS VPP();
+    crypto = Bộ Mật Mã();
+    cpriv = []; random = [];
+    lặp(i = 0; i < 32; i++) { thêm(cpriv, i + 1); thêm(random, i + 32); };
+    hello = tls.khách chào("localhost", cpriv, random);
+    nếu (crypto.mật mã thập lục phân(hello[1]) != "0100007e0303202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f0000021303010000530000000e000c0000096c6f63616c686f7374002b0003020304000a00040002001d000d000400020807003300260024001d002007a37cbc142093c8b755dc1b10e86cb426374ad16aa853ed0bdfc0b2b86d1c7c") {
+        ném "TLS ClientHello differs from independent fixture";
+    };
+    sh = tls fixture hex("0200005603035a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071727374757677787900130300002e002b0002030400330024001d00205869aff450549732cbaaed5e5df9b30a6da31cb0e5742bad5ad4a1a768f1a67b");
+    ee = tls fixture hex("080000020000");
+    cert = tls fixture hex("0b0001360000013200012d308201293081dca003020102020207d2300506032b6570301b3119301706035504030c10562b2b204669787475726520526f6f74301e170d3236303130313030303030305a170d3334303130313030303030305a30143112301006035504030c096c6f63616c686f7374302a300506032b6570032100e7f162a10bec559afea195e4dce84b69568d5d2cb0963eb446c0685e2b17f2f0a34b3049300c0603551d130101ff04023000300e0603551d0f0101ff04040302078030140603551d11040d300b82096c6f63616c686f737430130603551d25040c300a06082b06010505070301300506032b6570034100c8d836738ca737d5c56052c3078b48cc722214ea3035d8555298d82ec03e60dac36f1f8efb836350fa6a19556fdf1fdcec29a18633bffceab0bde1e1ecc89a010000");
+    cv = tls fixture hex("0f000044080700400d39803d0cd728ff6886bdd7d22a2851b965ae8fa27c1d16d3f48f682867d551af517983c9a8f23bf70e61a5c37a0f136ca348a2b45fe4011de40ae9d8ee1f04");
+    finished = tls fixture hex("14000020c8b5020e3bbf72b626e0df6ac5e9e346d9a501108d3b6c9474bddddc4038300c");
+    trust = decoder.đọc pem("-----BEGIN CERTIFICATE-----MIIBCzCBvqADAgECAgID6TAFBgMrZXAwGzEZMBcGA1UEAwwQVisrIEZpeHR1cmUgUm9vdDAeFw0yNjAxMDEwMDAwMDBaFw0zNDAxMDEwMDAwMDBaMBsxGTAXBgNVBAMMEFYrKyBGaXh0dXJlIFJvb3QwKjAFBgMrZXADIQB5tVYuj+ZU+UB4sRLoqYunkB+FOuaVvtfg45ELrQSWZKMmMCQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwBQYDK2VwA0EAoOXxKN/FLGpy2VOSeBHkNHwYQpw+jDH7vuOl/dxvPxoGYxQSUgBXKYy+c3nwnvZwkX9+ahrdfjG+yj/Ku6rxBg==-----END CERTIFICATE-----");
+    result = tls.xác thực bắt tay(cpriv, hello[1], sh, ee, cert, cv, finished,
+                                  [trust], "localhost", [2026,11,21,9,30,0]);
+    nếu (crypto.mật mã thập lục phân(result[0]) != "d6ad11e4d34b9a97a385b16c82719a001d95985db3284c77c66146b695fe272d" ||
+        crypto.mật mã thập lục phân(result[1]) != "5f79157429c6f5d777538043618144baaa81f63b75d1addb514ba4523f1263a3" ||
+        crypto.mật mã thập lục phân(result[2]) != "14000020e4448c8ab40ae1e40cf8b3f987d81b82cdbb748896ed11bab65fd57d9a60cf56") {
+        ném "TLS 1.3 independent application secrets/Finished mismatch";
+    };
+    rejected = 0;
+    thử {
+        tls.xác thực bắt tay(cpriv, hello[1], sh, ee, cert, cv, finished,
+                             [], "localhost", [2026,11,21,9,30,0]);
+    } bắt lỗi(e) { rejected = rejected + 1; };
+    thử {
+        tls.xác thực bắt tay(cpriv, hello[1], sh, ee, cert, cv, finished,
+                             [trust], "not-localhost.test", [2026,11,21,9,30,0]);
+    } bắt lỗi(e) { rejected = rejected + 1; };
+    invalid_cv = tls fixture hex("0f000044080700400d39803d0cd728ff6886bdd7d22a2851b965ae8fa27c1d16d3f48f682867d551af517983c9a8f23bf70e61a5c37a0f136ca348a2b45fe4011de40ae9d8ee1f04");
+    invalid_cv[9] = invalid_cv[9] ^ 1;
+    thử {
+        tls.xác thực bắt tay(cpriv, hello[1], sh, ee, cert, invalid_cv, finished,
+                             [trust], "localhost", [2026,11,21,9,30,0]);
+    } bắt lỗi(e) { rejected = rejected + 1; };
+    invalid_finished = tls fixture hex("14000020c8b5020e3bbf72b626e0df6ac5e9e346d9a501108d3b6c9474bddddc4038300c");
+    invalid_finished[5] = invalid_finished[5] ^ 1;
+    thử {
+        tls.xác thực bắt tay(cpriv, hello[1], sh, ee, cert, cv, invalid_finished,
+                             [trust], "localhost", [2026,11,21,9,30,0]);
+    } bắt lỗi(e) { rejected = rejected + 1; };
+    nếu (rejected != 4) { ném "TLS untrusted or modified handshake accepted"; };
+    in "TLS VPP AUTHENTICATED FLIGHT OK";
+};

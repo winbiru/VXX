@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Exercise the OS-thread boundary directly; guest worker ABI tests are separate."""
 import ctypes as C
+import errno
 import os
 from pathlib import Path
 import platform
+import stat
 import struct
 import subprocess
 import tempfile
@@ -108,6 +110,228 @@ def check(dylib):
 
     root = base()
     assert root and write(OFFSET, 99) == 0 and not worker_current()
+    if platform.system() == "Linux" and platform.machine().lower() in ("aarch64", "arm64"):
+        open_file = bind("os_open", i32, i32, i32)
+        read_file = bind("os_read", i32, i32, i32, i32)
+        write_file = bind("os_write", i32, i32, i32, i32)
+        close_file = bind("os_close", i32, i32)
+        seek_file = bind("os_seek", i32, i32, i32, i32)
+        file_errno = bind("os_errno", i32)
+        mkstemp_file = bind("os_mkstemp", i32, i32)
+        rename_file = bind("os_rename", i32, i32, i32)
+        stat_file = bind("os_stat", i32, i32, i32)
+        lstat_file = bind("os_lstat", i32, i32, i32)
+        fstat_file = bind("os_fstat", i32, i32, i32)
+        access_exec = bind("os_access_exec", i32, i32)
+        fchmod_file = bind("os_fchmod", i32, i32, i32)
+        unlink_file = bind("os_unlink", i32, i32)
+        mkdir_file = bind("os_mkdir", i32, i32)
+        executable_path = bind("os_executable_path", i32, i32)
+        cwd_path = bind("os_cwd", i32, i32)
+        wait_child = bind("os_waitpid", i32, i32, i32)
+        home_path = bind("os_home", i32, i32)
+        env_copy = bind("os_env_copy", i32, i32, i32)
+        pathname_offset, input_offset, output_offset = 65536, 69632, 73728
+        payload = b"V++ Linux ARM64 native syscalls"
+        with tempfile.TemporaryDirectory(prefix="vpp-arm64-file-syscall-") as tmp:
+            pathname = os.fsencode(str(Path(tmp) / "data.bin")) + b"\0"
+            C.memmove(root + pathname_offset, pathname, len(pathname))
+            C.memmove(root + input_offset, payload, len(payload))
+            fd = open_file(pathname_offset, 1537)
+            assert fd >= 0, file_errno()
+            try:
+                assert write_file(fd, input_offset, len(payload)) == len(payload)
+                assert seek_file(fd, 0, os.SEEK_SET) == 0
+            finally:
+                assert close_file(fd) == 0
+
+            fd = open_file(pathname_offset, os.O_RDONLY)
+            assert fd >= 0, file_errno()
+            try:
+                assert read_file(fd, output_offset, len(payload)) == len(payload)
+                assert C.string_at(root + output_offset, len(payload)) == payload
+                assert seek_file(fd, -1, os.SEEK_SET) == -1
+                assert file_errno() == errno.EINVAL
+                assert seek_file(fd, (1 << 31) - 1, os.SEEK_SET) == (1 << 31) - 1
+                assert seek_file(fd, 1, os.SEEK_CUR) == -1
+                assert file_errno() == errno.EOVERFLOW
+            finally:
+                assert close_file(fd) == 0
+
+            fd = open_file(pathname_offset, 521)
+            assert fd >= 0, file_errno()
+            try:
+                assert write_file(fd, input_offset, len(payload)) == len(payload)
+            finally:
+                assert close_file(fd) == 0
+            assert (Path(tmp) / "data.bin").read_bytes() == payload * 2
+            assert close_file(-1) == -1 and file_errno() == errno.EBADF
+            assert read_file(-1, output_offset, 1) == -1
+            assert file_errno() == errno.EBADF
+
+            template_offset, renamed_offset, invalid_offset = 77824, 81920, 86016
+            template = os.fsencode(str(Path(tmp) / "secure-XXXXXX")) + b"\0"
+            renamed = Path(tmp) / "renamed.bin"
+            renamed_path = os.fsencode(str(renamed)) + b"\0"
+            C.memmove(root + template_offset, template, len(template))
+            C.memmove(root + renamed_offset, renamed_path, len(renamed_path))
+
+            secure_fd = mkstemp_file(template_offset)
+            assert secure_fd >= 0, file_errno()
+            created = Path(os.fsdecode(C.string_at(root + template_offset)))
+            assert created.name.startswith("secure-") and len(created.name) == 13
+            assert created.exists()
+            try:
+                assert os.fstat(secure_fd).st_mode & 0o177 == 0
+                assert write_file(secure_fd, input_offset, len(payload)) == len(payload)
+            finally:
+                assert close_file(secure_fd) == 0
+
+            assert rename_file(template_offset, renamed_offset) == 0
+            assert not created.exists() and renamed.read_bytes() == payload
+            assert rename_file(template_offset, renamed_offset) == -1
+            assert file_errno() == errno.ENOENT
+            invalid = os.fsencode(str(Path(tmp) / "invalid-XXXXX")) + b"\0"
+            C.memmove(root + invalid_offset, invalid, len(invalid))
+            assert mkstemp_file(invalid_offset) == -1
+            assert file_errno() == errno.EINVAL
+
+            # The Linux kernel stat layout is converted to the V++ header
+            # shared with the Darwin runtime (mode at byte offset +4).
+            def mode_at(offset):
+                return C.c_uint32.from_address(root + offset + 4).value
+            assert stat_file(renamed_offset, 3376) == 0
+            assert stat.S_ISREG(mode_at(3376))
+            assert stat_file(renamed_offset, 3584) == 0
+            assert stat.S_ISREG(mode_at(3584))
+
+            metadata_fd = open_file(renamed_offset, os.O_RDONLY)
+            assert metadata_fd >= 0
+            try:
+                assert fstat_file(metadata_fd, 3376) == 0
+                assert stat.S_ISREG(mode_at(3376))
+                assert fchmod_file(metadata_fd, 0o700) == 0
+                assert access_exec(renamed_offset) == 0
+                assert fchmod_file(metadata_fd, 0o600) == 0
+                assert access_exec(renamed_offset) == -1
+                assert file_errno() == errno.EACCES
+            finally:
+                assert close_file(metadata_fd) == 0
+            assert fchmod_file(-1, 0o600) == -1
+            assert file_errno() == errno.EBADF
+
+            directory_offset, link_offset, missing_offset = 90112, 94208, 98304
+            directory = Path(tmp) / "private"
+            link = Path(tmp) / "file-link"
+            missing = Path(tmp) / "missing"
+            for offset, path in ((directory_offset, directory),
+                                 (link_offset, link), (missing_offset, missing)):
+                encoded = os.fsencode(str(path)) + b"\0"
+                C.memmove(root + offset, encoded, len(encoded))
+            assert mkdir_file(directory_offset) == 0
+            assert directory.is_dir() and directory.stat().st_mode & 0o777 == 0o700
+            assert mkdir_file(directory_offset) == -1
+            assert file_errno() == errno.EEXIST
+            os.symlink(renamed, link)
+            assert lstat_file(link_offset, 3376) == 0
+            assert stat.S_ISLNK(mode_at(3376))
+            assert stat_file(link_offset, 3376) == 0
+            assert stat.S_ISREG(mode_at(3376))
+            assert unlink_file(link_offset) == 0 and not link.is_symlink()
+            assert unlink_file(link_offset) == -1
+            assert file_errno() == errno.ENOENT
+            assert unlink_file(directory_offset) == -1
+            assert file_errno() == errno.EISDIR
+            assert access_exec(missing_offset) == -1
+            assert file_errno() == errno.ENOENT
+            assert stat_file(missing_offset, 3376) == -1
+            assert file_errno() == errno.ENOENT
+            assert lstat_file(missing_offset, 3376) == -1
+            assert file_errno() == errno.ENOENT
+            assert stat_file(renamed_offset, 0) == -1
+            assert stat_file(-1, 3376) == -1
+            assert unlink_file(renamed_offset) == 0 and not renamed.exists()
+            directory.rmdir()
+
+        path_offset = 102400
+        executable_length = executable_path(path_offset)
+        assert executable_length > 0
+        assert C.string_at(root + path_offset, executable_length) == os.fsencode(
+            os.readlink("/proc/self/exe"))
+        cwd_length = cwd_path(path_offset)
+        assert cwd_length == len(os.fsencode(os.getcwd()))
+        assert C.string_at(root + path_offset, cwd_length + 1) == os.fsencode(
+            os.getcwd()) + b"\0"
+
+        child_pid = os.fork()
+        if child_pid == 0:
+            os._exit(37)
+        status_offset = 106496
+        assert wait_child(child_pid, status_offset) == child_pid
+        assert os.waitstatus_to_exitcode(C.c_int32.from_address(root + status_offset).value) == 37
+        assert wait_child(child_pid, status_offset) == -1
+        assert file_errno() == errno.ECHILD
+
+        key_offset, env_output_offset = 110592, 114688
+        key = "VPP_ARM64_ENV_LOOKUP_TEST"
+        previous_home = os.environ.get("VPP_HOME")
+        previous_value = os.environ.get(key)
+        C.memmove(root + key_offset, key.encode() + b"\0", len(key) + 1)
+        try:
+            os.environ["VPP_HOME"] = "arm64-test-home"
+            os.environ[key] = "arm64-test-value"
+            assert home_path(env_output_offset) == len("arm64-test-home")
+            assert C.string_at(root + env_output_offset) == b"arm64-test-home"
+            assert env_copy(key_offset, env_output_offset) == len("arm64-test-value")
+            assert C.string_at(root + env_output_offset) == b"arm64-test-value"
+            os.environ[key] = ""
+            assert env_copy(key_offset, env_output_offset) == 0
+            assert C.string_at(root + env_output_offset, 1) == b"\0"
+            os.environ[key] = "x" * 4096
+            assert env_copy(key_offset, env_output_offset) == -1
+            del os.environ[key]
+            assert env_copy(key_offset, env_output_offset) == -1
+        finally:
+            if previous_home is None:
+                del os.environ["VPP_HOME"]
+            else:
+                os.environ["VPP_HOME"] = previous_home
+            if previous_value is not None:
+                os.environ[key] = previous_value
+        print("PASS Linux ARM64 native filesystem, paths, process wait and environment syscalls")
+
+        # All callers race the very first worker start. Exactly one caller
+        # must create both pthread keys and transfer the root arena to TLS.
+        ready_to_start = threading.Barrier(16, timeout=15)
+        startup_errors = []
+
+        @ENTRY
+        def startup_entry(record, context):
+            return 17 if worker_current() == record and current() != root else -1
+
+        def start_from_thread():
+            try:
+                ready_to_start.wait()
+                record = start(startup_entry, None)
+                assert record
+                try:
+                    assert join(record) == 0
+                    value = i32()
+                    assert result(record, C.byref(value)) == 0 and value.value == 17
+                finally:
+                    assert dispose(record) == 0
+            except BaseException as exc:
+                startup_errors.append(repr(exc))
+
+        starters = [threading.Thread(target=start_from_thread) for _ in range(16)]
+        for starter in starters:
+            starter.start()
+        for starter in starters:
+            starter.join(20)
+            assert not starter.is_alive()
+        assert not startup_errors, startup_errors
+        assert current() == root and read(OFFSET) == 99
+
     count = 24
     ready = threading.Barrier(count + 1, timeout=20)
     release = threading.Event()
@@ -459,6 +683,15 @@ def check(dylib):
             assert query(address, C.byref(info), C.sizeof(info)) == C.sizeof(info)
             return info.state != 0x10000  # MEM_FREE
 
+    elif platform.system() == "Linux":
+        def mapped(address):
+            with open("/proc/self/maps", encoding="ascii") as mappings:
+                for line in mappings:
+                    start, end = (int(part, 16) for part in line.split()[0].split("-"))
+                    if start <= address < end:
+                        return True
+            return False
+
     else:
         libc = C.CDLL(None)
         region = libc.mach_vm_region
@@ -617,6 +850,20 @@ if __name__ == "__main__":
                 if result.returncode:
                     raise SystemExit(f"Linux worker test failed: phase={result.returncode}, mode={mode}")
         print("PASS Linux freestanding workers: 24 arenas, private errno, cancellation, 135 compact snapshots, repeated copies, nested workers, self-wait detection and shutdown/join")
+        raise SystemExit(0)
+    if system == "Linux" and arch in ("aarch64", "arm64"):
+        clang = os.environ.get("VPP_CLANG", "clang")
+        with tempfile.TemporaryDirectory(prefix="vpp-worker-linux-arm64-") as tmp:
+            dylib = Path(tmp) / "worker.so"
+            subprocess.run([clang, "-shared", "-fPIC", "-pthread", "-Wl,-z,noexecstack",
+                            str(ROOT / "scripts/quality/fixtures/worker_machine_linux_aarch64.S"),
+                            "-o", str(dylib)], check=True)
+            symbols = subprocess.check_output(["nm", "-D", "--undefined-only", str(dylib)], text=True)
+            unresolved = {line.split()[-1].split("@")[0] for line in symbols.splitlines() if line.split()}
+            assert not ({"mmap", "munmap", "memcpy", "stat", "lstat", "fstat",
+                         "access", "fchmod", "unlink", "mkdir", "readlink", "getcwd",
+                         "waitpid", "getenv"} & unresolved), unresolved
+            check(dylib)
         raise SystemExit(0)
     windows = system == "Windows" and arch in ("amd64", "x86_64")
     macos = system == "Darwin" and arch in ("arm64", "x86_64")

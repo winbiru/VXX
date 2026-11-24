@@ -1,0 +1,208 @@
+// RFC 8032 Ed25519 verification, implemented in V++ over the 2^255-19 field.
+// Uses SHA-512 from V++ and enforces canonical encodings and prime-order
+// points. The existing field arithmetic needs a side-channel/security audit.
+nhập gói.bảo mật.sha512.SHA512 VPP;
+nhập gói.bảo mật.x25519.X25519 VPP;
+nhập gói.bảo mật.khóa TLS.Khóa TLS VPP;
+nhập gói.lõi.toán học.làm tròn xuống;
+
+lớp công khai Ed25519 VPP {
+    hàm công khai khởi tạo() {
+        mình.field = X25519 VPP();
+        mình.hash = SHA512 VPP();
+        mình.checker = Khóa TLS VPP();
+        mình.d2 = [89,241,178,38,148,155,214,235,86,177,131,130,154,20,224,0,
+                    48,209,243,238,242,128,142,25,231,252,223,86,220,217,6,36];
+        mình.sqrt_m1 = [176,160,14,74,39,27,238,196,120,228,47,173,6,24,67,47,
+                        167,215,251,61,153,0,77,43,11,223,193,79,128,36,131,43];
+        mình.d = [163,120,89,19,202,77,235,117,171,216,65,65,77,10,112,0,
+                   152,232,121,119,121,64,199,140,115,254,111,43,238,108,3,82];
+        mình.order = [237,211,245,92,26,99,18,88,214,156,247,162,222,249,222,20,
+                      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,16];
+        mình.p = [237,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+                   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,127];
+    };
+
+    hàm riêng tư zero() {
+        f = mình.field;
+        trả về f.trường không();
+    };
+
+    hàm riêng tư one() {
+        result = mình.zero(); result[0] = 1; trả về result;
+    };
+
+    hàm riêng tư equal(a, b) {
+        nếu (độ dài(a) != độ dài(b)) { trả về sai; };
+        difference = 0;
+        lặp(i = 0; i < độ dài(a); i++) { difference = difference | (a[i] ^ b[i]); };
+        trả về difference == 0;
+    };
+
+    hàm riêng tư less(a, b) {
+        lặp(i = độ dài(a) - 1; i >= 0; i--) {
+            nếu (a[i] < b[i]) { trả về đúng; };
+            nếu (a[i] > b[i]) { trả về sai; };
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư point identity() {
+        trả về [mình.zero(), mình.one(), mình.one(), mình.zero()];
+    };
+
+    // Extended Edwards coordinates (X:Y:Z:T), with XY = ZT.
+    hàm riêng tư point add(p, q) {
+        f = mình.field;
+        a = f.trường nhân(f.trường trừ(p[1], p[0]), f.trường trừ(q[1], q[0]));
+        b = f.trường nhân(f.trường cộng(p[1], p[0]), f.trường cộng(q[1], q[0]));
+        c = f.trường nhân(f.trường nhân(p[3], q[3]), mình.d2);
+        z = f.trường nhân(p[2], q[2]);
+        d = f.trường cộng(z, z);
+        e = f.trường trừ(b, a); ff = f.trường trừ(d, c);
+        g = f.trường cộng(d, c); h = f.trường cộng(b, a);
+        trả về [f.trường nhân(e, ff), f.trường nhân(g, h),
+                 f.trường nhân(ff, g), f.trường nhân(e, h)];
+    };
+
+    hàm riêng tư point double(p) {
+        f = mình.field;
+        a = f.trường nhân(p[0], p[0]);
+        b = f.trường nhân(p[1], p[1]);
+        z2 = f.trường nhân(p[2], p[2]);
+        c = f.trường cộng(z2, z2);
+        d = f.trường trừ(mình.zero(), a);
+        sum = f.trường cộng(p[0], p[1]);
+        e = f.trường trừ(f.trường trừ(f.trường nhân(sum, sum), a), b);
+        g = f.trường cộng(d, b);
+        ff = f.trường trừ(g, c);
+        h = f.trường trừ(d, b);
+        trả về [f.trường nhân(e, ff), f.trường nhân(g, h),
+                 f.trường nhân(ff, g), f.trường nhân(e, h)];
+    };
+
+    hàm riêng tư point equal(p, q) {
+        f = mình.field;
+        trả về mình.equal(f.trường nhân(p[0], q[2]), f.trường nhân(q[0], p[2])) &&
+                mình.equal(f.trường nhân(p[1], q[2]), f.trường nhân(q[1], p[2]));
+    };
+
+    hàm riêng tư point scalar(point, scalar) {
+        result = mình.point identity();
+        current = point;
+        lặp(bit = 0; bit < 256; bit++) {
+            byte = scalar[bit >> 3];
+            nếu (((byte >> (bit % 8)) & 1) == 1) {
+                result = mình.point add(result, current);
+            };
+            current = mình.point double(current);
+        };
+        trả về result;
+    };
+
+    hàm riêng tư point base() {
+        f = mình.field;
+        x = [26,213,37,143,96,45,86,201,178,167,37,149,96,199,44,105,
+             92,220,214,253,49,226,164,192,254,83,110,205,211,54,105,33];
+        y = [88,102,102,102,102,102,102,102,102,102,102,102,102,102,102,102,
+             102,102,102,102,102,102,102,102,102,102,102,102,102,102,102,102];
+        trả về [x, y, mình.one(), f.trường nhân(x, y)];
+    };
+
+    // (p+3)/8 = 2^252 - 2. The exponent depends only on the public field size.
+    hàm riêng tư sqrt exponent(a) {
+        f = mình.field; result = mình.one();
+        lặp(bit = 251; bit >= 0; bit--) {
+            result = f.trường nhân(result, result);
+            nếu (bit > 0) { result = f.trường nhân(result, a); };
+        };
+        trả về result;
+    };
+
+    hàm riêng tư point decode(encoded) {
+        f = mình.field;
+        y = f.trường sao(encoded);
+        sign = (y[31] >> 7) & 1;
+        y[31] = y[31] & 127;
+        nếu (!mình.less(y, mình.p)) { ném "Ed25519: noncanonical point"; };
+        y2 = f.trường nhân(y, y);
+        numerator = f.trường trừ(y2, mình.one());
+        denominator = f.trường cộng(f.trường nhân(mình.d, y2), mình.one());
+        nếu (mình.equal(denominator, mình.zero())) {
+            ném "Ed25519: noninvertible point";
+        };
+        x2 = f.trường nhân(numerator, f.trường nghịch đảo(denominator));
+        x = mình.sqrt exponent(x2);
+        nếu (!mình.equal(f.trường nhân(x, x), x2)) {
+            x = f.trường nhân(x, mình.sqrt_m1);
+            nếu (!mình.equal(f.trường nhân(x, x), x2)) {
+                ném "Ed25519: point not on curve";
+            };
+        };
+        nếu ((x[0] & 1) != sign) { x = f.trường trừ(mình.zero(), x); };
+        nếu (sign == 1 && mình.equal(x, mình.zero())) {
+            ném "Ed25519: negative zero";
+        };
+        trả về [x, y, mình.one(), f.trường nhân(x, y)];
+    };
+
+    // Reduce a 512-bit hash modulo the group order using byte-level arithmetic.
+    hàm riêng tư reduce scalar(digest) {
+        r = mình.zero();
+        lặp(bit = 511; bit >= 0; bit--) {
+            carry = (digest[bit >> 3] >> (bit % 8)) & 1;
+            lặp(i = 0; i < 32; i++) {
+                value = r[i] * 2 + carry;
+                r[i] = value % 256;
+                carry = value >> 8;
+            };
+            nếu (!mình.less(r, mình.order)) {
+                borrow = 0;
+                lặp(i = 0; i < 32; i++) {
+                    value = r[i] - mình.order[i] - borrow;
+                    borrow = 0;
+                    nếu (value < 0) { value = value + 256; borrow = 1; };
+                    r[i] = value;
+                };
+            };
+        };
+        trả về r;
+    };
+
+    hàm công khai xác minh(public_key, message, signature) {
+        checker = mình.checker;
+        checker.bytes(public_key, 32);
+        checker.bytes(message, 1048576);
+        checker.bytes(signature, 64);
+        nếu (độ dài(public_key) != 32 || độ dài(signature) != 64) { trả về sai; };
+        s = []; r_bytes = [];
+        lặp(i = 0; i < 32; i++) {
+            thêm(r_bytes, signature[i]);
+            thêm(s, signature[32 + i]);
+        };
+        nếu (!mình.less(s, mình.order)) { trả về sai; };
+        thử {
+            a = mình.point decode(public_key);
+            r = mình.point decode(r_bytes);
+            // Ed25519 hashes R || A || M, with R the first 32 signature bytes.
+            transcript = [];
+            lặp(i = 0; i < 32; i++) { thêm(transcript, r_bytes[i]); };
+            lặp(i = 0; i < 32; i++) { thêm(transcript, public_key[i]); };
+            lặp(i = 0; i < độ dài(message); i++) { thêm(transcript, message[i]); };
+            sha = mình.hash;
+            challenge = mình.reduce scalar(sha.băm(transcript));
+            left = mình.point scalar(mình.point base(), s);
+            right = mình.point add(r, mình.point scalar(a, challenge));
+            nếu (!mình.point equal(left, right)) { trả về sai; };
+            // Check A's subgroup. The exact equation already verified above
+            // implies R = [S]B - [challenge]A, hence R also belongs to it.
+            identity = mình.point identity();
+            nếu (!mình.point equal(mình.point scalar(a, mình.order), identity)) {
+                trả về sai;
+            };
+            trả về đúng;
+        } bắt lỗi(err) {
+            trả về sai;
+        };
+    };
+};

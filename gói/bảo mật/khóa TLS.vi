@@ -25,15 +25,15 @@ lớp công khai Khóa TLS VPP {
     };
     hàm công khai hmac(key, data) {
         mình.bytes(key, 1048576); mình.bytes(data, 1048576);
-        nếu (độ dài(key) > 64) { key = mình.băm.mật mã sha256 các byte(key); };
+        nếu (độ dài(key) > 64) { key = mật mã sha256 các byte(key); };
         inner = []; outer = [];
         lặp(i = 0; i < 64; i++) {
             b = 0; nếu (i < độ dài(key)) { b = key[i]; };
-            thêm(inner, mình.băm.mật mã xor byte(b, 54));
-            thêm(outer, mình.băm.mật mã xor byte(b, 92));
+            thêm(inner, mật mã xor byte(b, 54));
+            thêm(outer, mật mã xor byte(b, 92));
         };
-        digest = mình.băm.mật mã sha256 các byte(mình.nối(inner, data));
-        trả về mình.băm.mật mã sha256 các byte(mình.nối(outer, digest));
+        digest = mật mã sha256 các byte(mình.nối(inner, data));
+        trả về mật mã sha256 các byte(mình.nối(outer, digest));
     };
     hàm công khai trích(salt, ikm) { trả về mình.hmac(salt, ikm); };
     hàm công khai mở rộng(prk, info, count) {
@@ -63,6 +63,6 @@ lớp công khai Khóa TLS VPP {
     };
     hàm công khai dẫn xuất(secret, label, transcript) {
         mình.bytes(transcript, 1048576);
-        trả về mình.nhãn(secret, label, mình.băm.mật mã sha256 các byte(transcript), 32);
+        trả về mình.nhãn(secret, label, mật mã sha256 các byte(transcript), 32);
     };
 };

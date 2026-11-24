@@ -5,3 +5,4 @@
 #include "../../common/posix/vpp_vm_directory_primitives.inc"
 #include "../../common/posix/vpp_vm_process_primitives.inc"
 #include "../../common/posix/vpp_vm_socket_primitives.inc"
+#include "tls.inc"

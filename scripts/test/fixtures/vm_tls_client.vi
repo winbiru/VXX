@@ -1,0 +1,10 @@
+nhập gói.bảo mật.kết nối TLS.Kết Nối TLS VPP;
+
+hàm chính() {
+    client = Kết Nối TLS VPP();
+    rejected = sai;
+    thử { client.mở("localhost", 443, []); } bắt lỗi(e) { rejected = đúng; };
+    nếu (!rejected) { ném "TLS: connection accepted missing trust anchor"; };
+    client.đóng();
+    in "TLS VPP CLIENT API OK";
+};

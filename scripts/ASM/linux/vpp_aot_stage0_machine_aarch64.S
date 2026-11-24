@@ -20,4 +20,14 @@ Lclang_duong: .asciz "/usr/bin/clang"
 .bss
 .p2align 3
 vpp_native_arena_base: .skip 8
+.p2align 2
+vpp_native_arena_owner_tid: .skip 4
+.p2align 3
+vpp_native_arena_tls_key: .skip 8
+.p2align 2
+vpp_native_arena_tls_enabled: .skip 4
+.p2align 2
+vpp_native_arena_tls_lock: .skip 4
+.p2align 3
+vpp_native_worker_tls_key: .skip 8
 .section .note.GNU-stack,"",@progbits

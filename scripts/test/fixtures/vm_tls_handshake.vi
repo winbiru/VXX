@@ -1,0 +1,90 @@
+nhập gói.bảo mật.bắt tay TLS.*;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+nhập gói.bảo mật.x25519.X25519 VPP;
+
+hàm tls nối(a, b) {
+    result = [];
+    lặp(i = 0; i < độ dài(a); i++) { thêm(result, a[i]); };
+    lặp(i = 0; i < độ dài(b); i++) { thêm(result, b[i]); };
+    trả về result;
+};
+
+hàm chính() {
+    tls = Bắt Tay TLS VPP(); hash = Bộ Mật Mã();
+    private = []; random = []; server_private = [];
+    lặp(i = 0; i < 32; i++) {
+        thêm(private, i + 1);
+        thêm(random, i + 32);
+        thêm(server_private, i + 64);
+    };
+    hello = tls.khách chào("localhost", private, random);
+    nếu (hello[0][0] != 22 || hello[0][1] != 3 || hello[0][2] != 1 ||
+        hello[1][0] != 1 || hello[1][4] != 3 || hello[1][5] != 3 ||
+        độ dài(hello[2]) != 32 || độ dài(hello[0]) != độ dài(hello[1]) + 5) {
+        ném "TLS: invalid ClientHello";
+    };
+    curve = X25519 VPP();
+    peer = curve.công khai(server_private);
+    server = [2,0,0,86,3,3];
+    lặp(i = 0; i < 32; i++) { thêm(server, 90 + i); };
+    server = tls nối(server, [0,19,3,0,0,46,0,43,0,2,3,4,0,51,0,36,0,29,0,32]);
+    server = tls nối(server, peer);
+    parsed = tls.đọc máy chủ chào(server);
+    nếu (hash.mật mã thập lục phân(parsed[0]) != hash.mật mã thập lục phân(peer)) {
+        ném "TLS: ServerHello key share";
+    };
+    secrets = tls.khóa bắt tay(private, peer, hello[1], server);
+    nếu (độ dài(secrets[0]) != 32 || độ dài(secrets[1]) != 32) {
+        ném "TLS: handshake traffic secret";
+    };
+    test_secret = []; lặp(i = 0; i < 32; i++) { thêm(test_secret, i); };
+    test_transcript = chuỗi thành byte máy ảo("V++ TLS Finished transcript");
+    verify = tls.mã hoàn tất(test_secret, test_transcript);
+    nếu (hash.mật mã thập lục phân(verify) !=
+        "d23623c7db15e9064e1d06b9c2f9de0fc1cc919d7e1e2fa8782bc8d8689df29f") {
+        ném "TLS: Finished independent SHA256/HKDF vector";
+    };
+    finished_message = tls nối([20,0,0,32], verify);
+    nếu (!tls.xác thực hoàn tất(test_secret, test_transcript, finished_message)) {
+        ném "TLS: expected Finished verification";
+    };
+    app_secrets = tls.khóa ứng dụng(private, peer, hello[1], server, test_transcript);
+    nếu (độ dài(app_secrets[0]) != 32 || độ dài(app_secrets[1]) != 32) {
+        ném "TLS: application secrets";
+    };
+    bad = 0;
+    thử { tls.khách chào("bad..host", private, random); } bắt lỗi(e) { bad = bad + 1; };
+    thử { tls.khách chào("bad_host", private, random); } bắt lỗi(e) { bad = bad + 1; };
+    try_server = tls nối([], server);
+    try_server[42] = 2;
+    thử { tls.đọc máy chủ chào(try_server); } bắt lỗi(e) { bad = bad + 1; };
+    try_server = tls nối([], server);
+    try_server[47] = 1;
+    thử { tls.đọc máy chủ chào(try_server); } bắt lỗi(e) { bad = bad + 1; };
+    try_server = tls nối([], server);
+    try_server[3] = 85;
+    thử { tls.đọc máy chủ chào(try_server); } bắt lỗi(e) { bad = bad + 1; };
+    fake = tls nối([], peer); fake[0] = fake[0] ^ 1;
+    thử { tls.khóa bắt tay(private, fake, hello[1], server); } bắt lỗi(e) { bad = bad + 1; };
+    finished_message[10] = finished_message[10] ^ 1;
+    thử { tls.xác thực hoàn tất(test_secret, test_transcript, finished_message); }
+    bắt lỗi(e) { bad = bad + 1; };
+    nếu (bad != 7) { ném "TLS: invalid handshakes accepted"; };
+
+    // OpenSSL 3.6 advertises supported_groups in TLS 1.3 EncryptedExtensions.
+    groups = [8,0,0,10,0,8,0,10,0,4,0,2,0,29];
+    sni_groups = [8,0,0,14,0,12,0,0,0,0,0,10,0,4,0,2,0,29];
+    nếu (!tls.đọc mở rộng mã hóa(groups) || !tls.đọc mở rộng mã hóa(sni_groups)) {
+        ném "TLS: valid encrypted supported_groups rejected";
+    };
+    invalid_groups = tls nối([], groups);
+    invalid_groups[11] = 3;
+    duplicated_groups = [8,0,0,18,0,16,0,10,0,4,0,2,0,29,0,10,0,4,0,2,0,29];
+    unknown_extension = [8,0,0,6,0,4,0,11,0,0];
+    bad_ee = 0;
+    thử { tls.đọc mở rộng mã hóa(invalid_groups); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    thử { tls.đọc mở rộng mã hóa(duplicated_groups); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    thử { tls.đọc mở rộng mã hóa(unknown_extension); } bắt lỗi(e) { bad_ee = bad_ee + 1; };
+    nếu (bad_ee != 3) { ném "TLS: invalid encrypted extensions accepted"; };
+    in "TLS VPP HANDSHAKE FRAMING OK";
+};

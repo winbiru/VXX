@@ -1,0 +1,45 @@
+nhập gói.bảo mật.luồng TLS.*;
+
+hàm tls stream nối(a, b) {
+    result = [];
+    lặp(i = 0; i < độ dài(a); i++) { thêm(result, a[i]); };
+    lặp(i = 0; i < độ dài(b); i++) { thêm(result, b[i]); };
+    trả về result;
+};
+
+hàm chính() {
+    records = Bộ Tách Bản Ghi TLS VPP();
+    one = [22,3,3,0,4,1,0,0,0];
+    two = [23,3,3,0,17];
+    lặp(i = 0; i < 17; i++) { thêm(two, i); };
+    nếu (độ dài(records.nạp([22,3])) != 0 || !records.còn dở()) {
+        ném "TLS: split record header";
+    };
+    nếu (độ dài(records.nạp([3,0,4,1,0])) != 0) {
+        ném "TLS: split record payload";
+    };
+    many = records.nạp(tls stream nối([0,0], two));
+    nếu (độ dài(many) != 2 || độ dài(many[0]) != 9 ||
+        độ dài(many[1]) != 22 || records.còn dở()) {
+        ném "TLS: merged records";
+    };
+    handshake = Bộ Tách Bắt Tay TLS VPP();
+    nếu (độ dài(handshake.nạp([11,0])) != 0) { ném "TLS: split handshake header"; };
+    nếu (độ dài(handshake.nạp([0,3,7])) != 0) { ném "TLS: split handshake body"; };
+    combined = handshake.nạp([8,9,20,0,0,0]);
+    nếu (độ dài(combined) != 2 || combined[0][4] != 7 || combined[1][0] != 20 ||
+        handshake.còn dở()) { ném "TLS: handshake multiplexing"; };
+    invalid = Bộ Tách Bản Ghi TLS VPP();
+    rejected = 0;
+    thử { invalid.nạp([23,3,3,65,1]); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { invalid.nạp(one); } bắt lỗi(e) { rejected = rejected + 1; };
+    invalid = Bộ Tách Bản Ghi TLS VPP();
+    thử { invalid.nạp([20,3,3,0,1,2]); } bắt lỗi(e) { rejected = rejected + 1; };
+    invalid = Bộ Tách Bản Ghi TLS VPP();
+    thử { invalid.nạp([22,3,1,0,1,1]); } bắt lỗi(e) { rejected = rejected + 1; };
+    bad_handshake = Bộ Tách Bắt Tay TLS VPP();
+    thử { bad_handshake.nạp([11,16,0,1]); } bắt lỗi(e) { rejected = rejected + 1; };
+    thử { bad_handshake.nạp([20,0,0,0]); } bắt lỗi(e) { rejected = rejected + 1; };
+    nếu (rejected != 6) { ném "TLS: invalid framing accepted"; };
+    in "TLS VPP STREAM REASSEMBLY OK";
+};

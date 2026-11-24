@@ -17,6 +17,36 @@ env:
   PYTHONUTF8: '1'
   PYTHONIOENCODING: utf-8
 jobs:
+  tls-linux:
+    name: TLS provider - ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSL development headers
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Verify identity, encrypted I/O and cleanup across the socket ABI
+        run: python3 scripts/quality/check_vm_native_tls_linux.py
+  tls-windows:
+    name: TLS provider - Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-python
+      - name: Verify Schannel identity, encrypted I/O and cleanup across Winsock
+        shell: msys2 {0}
+        run: python scripts/quality/check_vm_native_tls_windows.py
   graphics-linux:
     name: Linux x64 - SDL2, OpenGL and Vulkan
     runs-on: ubuntu-24.04
@@ -24,7 +54,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install graphics SDK and software drivers
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri xvfb xauth
+        run: |
+          # Avoid slow regional mirrors on the hosted Ubuntu runner.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends \
+            libsdl2-dev libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri xvfb xauth
       - name: Build native graphics helpers
         run: |
           cmake -S scripts/graphics -B build-graphics
@@ -64,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15-intel]
+        os: [ubuntu-24.04-arm, ubuntu-24.04, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -88,6 +126,12 @@ jobs:
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
           "$RUNNER_TEMP/macos-i32/vpp-i32" check 'gói/biên dịch/bản địa/bộ biên dịch.vi'
           "$RUNNER_TEMP/macos-i32/vpp-i32" check './gói/biên dịch/bản địa/bộ biên dịch.vi'
+      - name: Check ARM64 Mach-O merger and native executable
+        run: |
+          bash scripts/quality/check_macos_native_macho_linker.sh \
+            "$RUNNER_TEMP/macos-i32/vpp-i32" "$RUNNER_TEMP/macos-macho-linker"
+          bash scripts/quality/check_macos_native_macho_executable.sh \
+            "$RUNNER_TEMP/macos-i32/vpp-i32"
       - name: Check ELF and COFF symbol index regression
         run: |
           export VPP_HOME="$GITHUB_WORKSPACE" VPP_NATIVE_NO_CACHE=1
@@ -119,7 +163,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/macos-i32-prefix"
           tar -C "$RUNNER_TEMP/macos-i32-prefix" -xzf "$RUNNER_TEMP/macos-i32-artifact/vpp-macos-arm64-i32.tar.gz"
-          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=ON
+          cmake -S . -B build-pure-vpp -DVPP_PREBUILT_I32_RUNTIME="$RUNNER_TEMP/macos-i32-prefix" -DVPP_CI_PINNED_FULL_STAGE1=OFF
       - name: Bootstrap full compiler (Stage 1)
         run: |
           cmake --build build-pure-vpp --parallel
@@ -152,6 +196,13 @@ jobs:
           python3 scripts/quality/check_jit_cli.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit"
           python3 scripts/quality/check_jit_dynamic.py "$RUNNER_TEMP/vpp-extracted/bin/vpp-jit" "$RUNNER_TEMP/vpp-extracted/share/vpp"
           python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$RUNNER_TEMP/vpp-extracted/bin/vpp" --timeout 900 --logs "$RUNNER_TEMP/host-regression"
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        run: |
+          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
+          python3 -m venv "$RUNNER_TEMP/tls-venv"
+          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
+          cmake -S . -B "$RUNNER_TEMP/macos-full/tls" -DVPP_TLS_TEST_COMPILER="$RUNNER_TEMP/vpp-extracted/bin/vpp" -DVPP_TLS_INTEROP_TESTS=ON -DPython3_EXECUTABLE="$RUNNER_TEMP/tls-venv/bin/python"
+          ctest --test-dir "$RUNNER_TEMP/macos-full/tls" --output-on-failure -j 4
       - name: Check Linux cross emitter
         run: |
           probe="$RUNNER_TEMP/probe.vi"
@@ -193,6 +244,7 @@ jobs:
             build-pure-vpp/full-compiler-profile.log
             ${{ runner.temp }}/macos-full/**/*.log
             ${{ runner.temp }}/macos-full/convergence.sha256
+            ${{ runner.temp }}/macos-full/tls/tls-tests/
             ${{ runner.temp }}/host-regression/
           if-no-files-found: ignore
   linux-i32:
@@ -242,6 +294,8 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Install OpenSSL development headers for AOT programs
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - uses: actions/download-artifact@v4
         with:
           name: linux-i32-selfhost
@@ -281,7 +335,7 @@ jobs:
           mkdir -p "$package/share/vpp/scripts/graphics"
           install -m 644 scripts/graphics/CMakeLists.txt scripts/graphics/*.py "$package/share/vpp/scripts/graphics/"
           install -m 644 "$out/i32/scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.o" "$package/share/vpp/scripts/ASM/linux/"
-          install -m 644 scripts/quality/audit_linux_static_elf.sh "$package/share/vpp/scripts/quality/"
+          install -m 644 scripts/quality/audit_linux_{static,tls}_elf.sh "$package/share/vpp/scripts/quality/"
           install -m 644 vpp-language.json vpp-libraries.json "$package/share/vpp/"
           sed 's|@VPP_SOURCE_ROOT@|""|g' scripts/macos/vpp-native-launcher.sh.in > "$package/bin/vpp"
           chmod 755 "$package/bin/vpp"
@@ -290,7 +344,7 @@ jobs:
             cmake -DVPP_ROOT="$GITHUB_WORKSPACE" -DVPP_NATIVE_COMPILER="$out/vpp-native-stage3" \
               -DVPP_VM="$package/bin/vpp-vm" -DVPP_OUTPUT_DIR="$out/compiler-workers" \
               -P scripts/quality/check_compiler_workers.cmake
-          VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
+          VPP_AOT_LINUX_TLS=0 VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build "$package/share/vpp/gói/biên dịch/dòng lệnh JIT.vi" -o "$package/bin/vpp-jit"
           "$package/bin/vpp" vm-build "$package/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "$package/bin/dns-provider.vmb"
           cp -R templates "$package/share/vpp/"
           VPP_AOT_LINUX_OBJECT_DIR="$platform_objects" "$package/bin/vpp" build scripts/vdk/vpp-cli.vi -o "$package/bin/vpp-tools"
@@ -318,6 +372,12 @@ jobs:
           python3 scripts/quality/check_jit_dynamic.py "$out/extracted/bin/vpp-jit" "$out/extracted/share/vpp"
           VPP_AOT_LINUX_OBJECT_DIR="$out/extracted/share/vpp/native-vpp-runtime/linux-objects" python3 scripts/quality/run_native_regression.py --suite host --backend aot --compiler "$out/extracted/bin/vpp" --timeout 900 --logs "$out/host-regression"
           echo '[Biên dịch V++ Linux đầy đủ 100%] Biên dịch và kiểm tra gói cài đặt hoàn tất'
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tls-venv"
+          "$RUNNER_TEMP/tls-venv/bin/python" -m pip install cryptography
+          cmake -S . -B "$RUNNER_TEMP/linux-full/tls" -DVPP_TLS_TEST_COMPILER="$RUNNER_TEMP/linux-full/extracted/bin/vpp" -DVPP_TLS_INTEROP_TESTS=ON -DPython3_EXECUTABLE="$RUNNER_TEMP/tls-venv/bin/python"
+          ctest --test-dir "$RUNNER_TEMP/linux-full/tls" --output-on-failure -j 2
       - name: Upload full compiler
         uses: actions/upload-artifact@v4
         with:
@@ -348,6 +408,7 @@ jobs:
             ${{ runner.temp }}/linux-full/**/*.log
             ${{ runner.temp }}/linux-full/convergence.sha256
             ${{ runner.temp }}/linux-full/host-regression/
+            ${{ runner.temp }}/linux-full/tls/tls-tests/
           if-no-files-found: ignore
   windows-i32:
     name: Windows x86-64 - native i32 selfhost
@@ -456,7 +517,7 @@ jobs:
         id: msys2
         with:
           msystem: CLANG64
-          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm
+          install: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-lld mingw-w64-clang-x86_64-llvm mingw-w64-clang-x86_64-openssl
       - name: Prepare runtime
         shell: pwsh
         run: |
@@ -490,6 +551,18 @@ jobs:
       - name: Package and test installed compiler
         shell: pwsh
         run: python scripts/quality/check_windows_full_bootstrap.py --clang "$env:VPP_CI_CLANG" bootstrap "$env:RUNNER_TEMP/windows-full" --i32-prefix "$env:RUNNER_TEMP/windows-i32-prefix" --archive "$env:RUNNER_TEMP/vpp-windows-x86_64-full.zip" --phase package
+      - name: Verify pure V++ TLS, X.509 paths and loopback interoperability
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP/tls-venv"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $python = "$env:RUNNER_TEMP/tls-venv/Scripts/python.exe"
+          & $python -m pip install cryptography
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -S . -B "$env:RUNNER_TEMP/windows-full/tls" "-DVPP_TLS_TEST_COMPILER=$env:RUNNER_TEMP/windows-full/extracted/bin/vpp-native.exe" "-DVPP_TLS_TEST_CLANG=$env:VPP_CI_CLANG" "-DVPP_TLS_INTEROP_TESTS=ON" "-DPython3_EXECUTABLE=$python"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir "$env:RUNNER_TEMP/windows-full/tls" -C Release --output-on-failure -j 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check native LSP
         shell: pwsh
         run: |
@@ -538,13 +611,14 @@ jobs:
             ${{ runner.temp }}/windows-full/**/*.log
             ${{ runner.temp }}/windows-full/convergence.sha256
             ${{ runner.temp }}/windows-full/host-regression/
+            ${{ runner.temp }}/windows-full/tls/tls-tests/
           if-no-files-found: ignore
 
   macos-regression:
     name: macOS ARM64 - JIT regression
     needs: macos-full
     runs-on: macos-15
-    # Cold JIT includes parsing, linking and native code generation per case.
+    # AST-reviewed sources run directly; compiler-specific cases keep dynamic JIT.
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -559,7 +633,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-macos-arm64.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 900 --profile --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 4 --timeout 900 --profile --interpret-reviewed --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -590,7 +664,7 @@ jobs:
           tar -C "$RUNNER_TEMP/regression-compiler" -xzf "$RUNNER_TEMP/regression-package/vpp-linux-x86_64-full.tar.gz"
       - name: Run full V++ regression (JIT only)
         run: |
-          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 900 --profile --logs regression-logs/full
+          python3 scripts/quality/run_native_regression.py --suite full --backend jit --jit "$RUNNER_TEMP/regression-compiler/bin/vpp-jit" --jobs 2 --timeout 900 --profile --interpret-reviewed --logs regression-logs/full
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -627,7 +701,7 @@ jobs:
         shell: pwsh
         run: |
           $package = "$env:RUNNER_TEMP/regression-compiler"
-          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 2 --timeout 900 --profile --logs regression-logs/full
+          python scripts/quality/run_native_regression.py --suite full --backend jit --jit "$package/bin/vpp-jit.exe" --jobs 4 --timeout 900 --profile --interpret-reviewed --logs regression-logs/full
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

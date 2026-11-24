@@ -1,0 +1,11 @@
+hàm chính() {
+    i = 0;
+    visits = 0;
+    khi (i < 3) {
+        i = i + 1;
+        nếu (i == 2) { bỏ qua; };
+        visits = visits + 1;
+    };
+    nếu (visits != 2) { ném "TLS: continue not working"; };
+    in "TLS CONTINUE OK";
+};

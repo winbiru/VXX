@@ -18,17 +18,18 @@ lớp công khai Mã Bản Ghi TLS VPP {
         trả về [data[start + 3], data[start + 2], data[start + 1], data[start]];
     };
     hàm công khai vòng(x, a, b, c, d) {
-        x[a] = mình.băm.mật mã cộng từ máy(x[a], x[b]);
-        x[d] = mình.băm.mật mã quay phải(mình.băm.mật mã xor từ máy(x[d], x[a]), 16);
-        x[c] = mình.băm.mật mã cộng từ máy(x[c], x[d]);
-        x[b] = mình.băm.mật mã quay phải(mình.băm.mật mã xor từ máy(x[b], x[c]), 20);
-        x[a] = mình.băm.mật mã cộng từ máy(x[a], x[b]);
-        x[d] = mình.băm.mật mã quay phải(mình.băm.mật mã xor từ máy(x[d], x[a]), 24);
-        x[c] = mình.băm.mật mã cộng từ máy(x[c], x[d]);
-        x[b] = mình.băm.mật mã quay phải(mình.băm.mật mã xor từ máy(x[b], x[c]), 25);
+        x[a] = mật mã cộng từ máy(x[a], x[b]);
+        x[d] = mật mã quay phải(mật mã xor từ máy(x[d], x[a]), 16);
+        x[c] = mật mã cộng từ máy(x[c], x[d]);
+        x[b] = mật mã quay phải(mật mã xor từ máy(x[b], x[c]), 20);
+        x[a] = mật mã cộng từ máy(x[a], x[b]);
+        x[d] = mật mã quay phải(mật mã xor từ máy(x[d], x[a]), 24);
+        x[c] = mật mã cộng từ máy(x[c], x[d]);
+        x[b] = mật mã quay phải(mật mã xor từ máy(x[b], x[c]), 25);
     };
     hàm công khai khối(key, nonce, counter) {
-        mình.khóa.bytes(key, 32); mình.khóa.bytes(nonce, 12);
+        keys = mình.khóa;
+        keys.bytes(key, 32); keys.bytes(nonce, 12);
         nếu (độ dài(key) != 32 || độ dài(nonce) != 12 || loại của(counter) != "số nguyên" || counter < 0) {
             ném "TLS: ChaCha20 key/nonce/counter";
         };
@@ -47,23 +48,25 @@ lớp công khai Mã Bản Ghi TLS VPP {
         };
         output = [];
         lặp(i = 0; i < 16; i++) {
-            word = mình.băm.mật mã cộng từ máy(x[i], initial[i]);
+            word = mật mã cộng từ máy(x[i], initial[i]);
             lặp(j = 3; j >= 0; j--) { thêm(output, word[j]); };
         };
         trả về output;
     };
     hàm công khai dòng(key, nonce, input) {
-        mình.khóa.bytes(input, 65536); result = []; counter = 1;
+        keys = mình.khóa;
+        keys.bytes(input, 65536); result = []; counter = 1;
         lặp(at = 0; at < độ dài(input); at = at + 64) {
             block = mình.khối(key, nonce, counter); counter = counter + 1;
             lặp(i = 0; i < 64 && at + i < độ dài(input); i++) {
-                thêm(result, mình.băm.mật mã xor byte(input[at + i], block[i]));
+                thêm(result, mật mã xor byte(input[at + i], block[i]));
             };
         };
         trả về result;
     };
     hàm công khai poly(key, message) {
-        mình.khóa.bytes(key, 32); mình.khóa.bytes(message, 262144);
+        keys = mình.khóa;
+        keys.bytes(key, 32); keys.bytes(message, 262144);
         nếu (độ dài(key) != 32) { ném "TLS: Poly1305 key"; };
         r = []; h = [];
         lặp(i = 0; i < 17; i++) {
@@ -106,9 +109,10 @@ lớp công khai Mã Bản Ghi TLS VPP {
         trả về result;
     };
     hàm công khai mac data(aad, cipher) {
-        result = mình.khóa.nối([], aad);
+        keys = mình.khóa;
+        result = keys.nối([], aad);
         khi (độ dài(result) % 16 != 0) { thêm(result, 0); };
-        result = mình.khóa.nối(result, cipher);
+        result = keys.nối(result, cipher);
         khi (độ dài(result) % 16 != 0) { thêm(result, 0); };
         lặp(which = 0; which < 2; which++) {
             n = độ dài(aad); nếu (which == 1) { n = độ dài(cipher); };
@@ -117,19 +121,21 @@ lớp công khai Mã Bản Ghi TLS VPP {
         trả về result;
     };
     hàm công khai niêm(key, nonce, plain, aad) {
-        mình.khóa.bytes(plain, 65536); mình.khóa.bytes(aad, 65536);
+        keys = mình.khóa;
+        keys.bytes(plain, 65536); keys.bytes(aad, 65536);
         block = mình.khối(key, nonce, 0);
         cipher = mình.dòng(key, nonce, plain);
         tag = mình.poly(mình.phần(block, 0, 32), mình.mac data(aad, cipher));
         trả về [cipher, tag];
     };
     hàm công khai mở(key, nonce, cipher, aad, tag) {
-        mình.khóa.bytes(cipher, 65536); mình.khóa.bytes(aad, 65536); mình.khóa.bytes(tag, 16);
+        keys = mình.khóa;
+        keys.bytes(cipher, 65536); keys.bytes(aad, 65536); keys.bytes(tag, 16);
         nếu (độ dài(tag) != 16) { ném "TLS: sai độ dài tag"; };
         block = mình.khối(key, nonce, 0);
         expected = mình.poly(mình.phần(block, 0, 32), mình.mac data(aad, cipher));
         difference = 0;
-        lặp(i = 0; i < 16; i++) { difference = difference + mình.băm.mật mã xor byte(tag[i], expected[i]); };
+        lặp(i = 0; i < 16; i++) { difference = difference + mật mã xor byte(tag[i], expected[i]); };
         nếu (difference != 0) { ném "TLS: bad_record_mac"; };
         // Do not compute or expose plaintext until authentication succeeds.
         trả về mình.dòng(key, nonce, cipher);
@@ -150,11 +156,12 @@ lớp công khai Bản Ghi TLS VPP {
     };
     hàm riêng tư nonce() {
         nếu (mình.hết || mình.hỏng) { ném "TLS: record state closed"; };
-        nonce = mình.mã.phần(mình.iv, 0, 12);
+        codec = mình.mã;
+        record_nonce = codec.phần(mình.iv, 0, 12);
         lặp(i = 0; i < 8; i++) {
-            nonce[4+i] = mình.băm.mật mã xor byte(nonce[4+i], mình.sequence[i]);
+            record_nonce[4+i] = mật mã xor byte(record_nonce[4+i], mình.sequence[i]);
         };
-        trả về nonce;
+        trả về record_nonce;
     };
     hàm riêng tư tiến() {
         lặp(i = 7; i >= 0; i--) {
@@ -165,38 +172,40 @@ lớp công khai Bản Ghi TLS VPP {
     };
     hàm công khai niêm(plain, loại = 23, padding = 0) {
         nếu (mình.gửi != 1) { ném "TLS: receive record state"; };
-        mình.mã.khóa.bytes(plain, 16384);
+        codec = mình.mã; keys = Khóa TLS VPP();
+        keys.bytes(plain, 16384);
         nếu ((loại != 21 && loại != 22 && loại != 23) || loại của(padding) != "số nguyên" || padding < 0 || padding > 255) {
             ném "TLS: record content type/padding";
         };
         n = độ dài(plain) + 1 + padding + 16;
         nếu (n > 16640) { ném "TLS: record overflow"; };
-        inner = mình.mã.phần(plain, 0, độ dài(plain)); thêm(inner, loại);
+        inner = codec.phần(plain, 0, độ dài(plain)); thêm(inner, loại);
         lặp(i = 0; i < padding; i++) { thêm(inner, 0); };
         header = [23, 3, 3, (n - n % 256) / 256, n % 256];
-        encrypted = mình.mã.niêm(mình.key, mình.nonce(), inner, header);
+        encrypted = codec.niêm(mình.key, mình.nonce(), inner, header);
         mình.tiến();
-        trả về mình.mã.khóa.nối(mình.mã.khóa.nối(header, encrypted[0]), encrypted[1]);
+        trả về keys.nối(keys.nối(header, encrypted[0]), encrypted[1]);
     };
     hàm công khai mở(record) {
         nếu (mình.gửi != 0) { ném "TLS: send record state"; };
-        nonce = mình.nonce();
+        codec = mình.mã; keys = Khóa TLS VPP();
+        record_nonce = mình.nonce();
         thử {
-            mình.mã.khóa.bytes(record, 16645);
+            keys.bytes(record, 16645);
             nếu (độ dài(record) < 22 || record[0] != 23 || record[1] != 3 || record[2] != 3) {
                 ném "TLS: invalid encrypted record header";
             };
             n = record[3] * 256 + record[4];
             nếu (n != độ dài(record) - 5 || n > 16640) { ném "TLS: record overflow/length"; };
-            inner = mình.mã.mở(mình.key, nonce, mình.mã.phần(record, 5, n-16),
-                mình.mã.phần(record, 0, 5), mình.mã.phần(record, n-11, 16));
+            inner = codec.mở(mình.key, record_nonce, codec.phần(record, 5, n-16),
+                codec.phần(record, 0, 5), codec.phần(record, n-11, 16));
             cuối = độ dài(inner) - 1;
             khi (cuối >= 0 && inner[cuối] == 0) { cuối = cuối - 1; };
             nếu (cuối < 0 || cuối > 16384) { ném "TLS: invalid inner plaintext"; };
             loại = inner[cuối];
             nếu (loại != 21 && loại != 22 && loại != 23) { ném "TLS: invalid inner content type"; };
             mình.tiến();
-            trả về [loại, mình.mã.phần(inner, 0, cuối)];
+            trả về [loại, codec.phần(inner, 0, cuối)];
         } bắt lỗi(e) { mình.hỏng = đúng; ném e; };
     };
 };
