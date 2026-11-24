@@ -561,7 +561,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake -S . -B "$env:RUNNER_TEMP/windows-full/tls" "-DVPP_TLS_TEST_COMPILER=$env:RUNNER_TEMP/windows-full/extracted/bin/vpp-native.exe" "-DVPP_TLS_TEST_CLANG=$env:VPP_CI_CLANG" "-DVPP_TLS_INTEROP_TESTS=ON" "-DPython3_EXECUTABLE=$python"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ctest --test-dir "$env:RUNNER_TEMP/windows-full/tls" --output-on-failure -j 2
+          ctest --test-dir "$env:RUNNER_TEMP/windows-full/tls" -C Release --output-on-failure -j 2
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check native LSP
         shell: pwsh
