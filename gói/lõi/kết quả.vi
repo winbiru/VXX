@@ -1,0 +1,60 @@
+// Option và Result có tag riêng, phân biệt giá trị rỗng với vắng mặt.
+lớp công khai Tùy Chọn {
+    hàm công khai khởi tạo(có, giá trị) {
+        mình.hiện diện = có;
+        mình.nội dung = giá trị;
+    };
+    hàm công khai có() { trả về mình.hiện diện; };
+    hàm công khai lấy() {
+        nếu (!mình.có()) { ném "OPTION_EMPTY"; };
+        trả về mình.nội dung;
+    };
+    hàm công khai hoặc tạo(tạo) {
+        nếu (mình.có()) { trả về mình.lấy(); };
+        trả về tạo();
+    };
+    hàm công khai ánh xạ(xử lý) {
+        nếu (mình.có()) { trả về Tùy Chọn(đúng, xử lý(mình.lấy())); };
+        trả về Tùy Chọn(sai, rỗng);
+    };
+    hàm công khai nối(xử lý) {
+        nếu (mình.có()) { trả về xử lý(mình.lấy()); };
+        trả về mình;
+    };
+    hàm công khai phân nhánh(khi có, khi vắng) {
+        nếu (mình.có()) { trả về khi có(mình.lấy()); };
+        trả về khi vắng();
+    };
+};
+hàm công khai một giá trị(giá trị) { trả về Tùy Chọn(đúng, giá trị); };
+hàm công khai không giá trị() { trả về Tùy Chọn(sai, rỗng); };
+
+lớp công khai Kết Quả {
+    hàm công khai khởi tạo(thành công, nội dung) {
+        mình.trạng thái = thành công;
+        mình.nội dung = nội dung;
+    };
+    hàm công khai thành công() { trả về mình.trạng thái; };
+    hàm công khai lấy() {
+        nếu (!mình.thành công()) { ném mình.nội dung; };
+        trả về mình.nội dung;
+    };
+    hàm công khai lấy lỗi() {
+        nếu (mình.thành công()) { ném "RESULT_SUCCESS"; };
+        trả về mình.nội dung;
+    };
+    hàm công khai ánh xạ(xử lý) {
+        nếu (mình.thành công()) { trả về Kết Quả(đúng, xử lý(mình.lấy())); };
+        trả về mình;
+    };
+    hàm công khai nối(xử lý) {
+        nếu (mình.thành công()) { trả về xử lý(mình.lấy()); };
+        trả về mình;
+    };
+    hàm công khai phân nhánh(khi đúng, khi lỗi) {
+        nếu (mình.thành công()) { trả về khi đúng(mình.lấy()); };
+        trả về khi lỗi(mình.lấy lỗi());
+    };
+};
+hàm công khai thành công(giá trị) { trả về Kết Quả(đúng, giá trị); };
+hàm công khai thất bại(lỗi) { trả về Kết Quả(sai, lỗi); };

@@ -1,0 +1,43 @@
+// View chỉ mục trên danh sách hoặc chuỗi; không sao chép nguồn.
+// Nếu danh sách bị thu ngắn dưới cuối view thì truy cập bị từ chối.
+hàm công khai lát cắt(nguồn, đầu, dài) {
+    biến kiểu = máy ảo lấy loại(nguồn);
+    nếu (kiểu != "danh sách" && kiểu != "chuỗi") { ném "SLICE_SOURCE"; };
+    nếu (máy ảo lấy loại(đầu) != "số nguyên" || máy ảo lấy loại(dài) != "số nguyên") { ném "SLICE_RANGE"; };
+    biến n = máy ảo lấy độ dài(nguồn);
+    nếu (đầu < 0 || dài < 0 || dài > n || đầu > n - dài) { ném "SLICE_RANGE"; };
+    trả về hàm(thao tác, chỉ số = 0, giá trị = rỗng) {
+        nếu (đầu > máy ảo lấy độ dài(nguồn) - dài) { ném "SLICE_INVALIDATED"; };
+        nếu (thao tác == "dài") { trả về dài; };
+        nếu (máy ảo lấy loại(chỉ số) != "số nguyên" || chỉ số < 0 || chỉ số >= dài) { ném "SLICE_BOUNDS"; };
+        nếu (thao tác == "đọc") { trả về nguồn[đầu + chỉ số]; };
+        nếu (thao tác == "ghi" && kiểu == "danh sách") {
+            nguồn[đầu + chỉ số] = giá trị;
+            trả về rỗng;
+        };
+        ném "SLICE_OPERATION";
+    };
+};
+
+// View mượn từ handle sở hữu, chỉ có hiệu lực trong callback.
+hàm công khai mượn lát cắt(chủ, đầu, dài, xử lý, ghi = sai) {
+    biến chế độ = "đọc";
+    nếu (ghi) { chế độ = "ghi"; };
+    trả về chủ(chế độ, hàm(nguồn) {
+        biến lát = lát cắt(nguồn, đầu, dài);
+        biến kết quả = rỗng;
+        biến xem = hàm(thao tác, chỉ số = 0, giá trị = rỗng) {
+            nếu (lát == rỗng) { ném "SLICE_BORROW_EXPIRED"; };
+            nếu (thao tác == "ghi" && !ghi) { ném "SLICE_READ_ONLY"; };
+            trả về lát(thao tác, chỉ số, giá trị);
+        };
+        thử {
+            kết quả = xử lý(xem);
+        } bắt lỗi(e) {
+            lát = rỗng;
+            ném e;
+        };
+        lát = rỗng;
+        trả về kết quả;
+    });
+};

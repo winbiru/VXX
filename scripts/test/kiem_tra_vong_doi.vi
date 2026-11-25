@@ -1,0 +1,97 @@
+nhập gói.lõi.vòng đời.*;
+nhập gói.lõi.kết quả.*;
+nhập gói.bộ sưu tập.lát cắt.*;
+nhập gói.lõi.sở hữu luồng.chuyển sang luồng;
+nhập gói.lõi.sở hữu luồng.dùng luồng;
+nhập gói.lõi.đồng thời.chờ luồng;
+nhập gói.lõi.đồng thời.trạng thái luồng;
+
+lớp công khai Tài Nguyên Thử {
+    hàm công khai khởi tạo() { mình.lần = 0; };
+    hàm công khai đóng() { mình.lần += 1; };
+};
+lớp công khai Tài Nguyên Lỗi {
+    hàm công khai khởi tạo() { mình.lần = 0; };
+    hàm công khai đóng() { mình.lần += 1; ném "lỗi đóng"; };
+};
+hàm chính() {
+    biến tài nguyên = Tài Nguyên Thử();
+    nếu (dùng tài nguyên(tài nguyên, hàm(x) { trả về 42; }) != 42 || tài nguyên.lần != 1) { ném "cleanup"; };
+    thử { dùng tài nguyên(tài nguyên, hàm(x) { ném "lỗi gốc"; }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "lỗi gốc" || tài nguyên.lần != 2) { ném e; }; };
+    biến tài nguyên lỗi = Tài Nguyên Lỗi();
+    thử { dùng tài nguyên(tài nguyên lỗi, hàm(x) { ném "lỗi gốc"; }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "lỗi gốc" || tài nguyên lỗi.lần != 1) { ném e; }; };
+    thử { dùng tài nguyên(tài nguyên lỗi, hàm(x) { trả về 42; }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "lỗi đóng" || tài nguyên lỗi.lần != 2) { ném e; }; };
+    biến chủ = sở hữu([1, 2, 3]);
+    biến khác = chủ("chuyển");
+    thử { chủ("đọc", hàm(x) { trả về x; }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "OWNERSHIP_MOVED") { ném e; }; };
+    khác("ghi", hàm(x) { x[0] = 9; });
+    nếu (khác("đọc", hàm(x) { trả về x[0]; }) != 9) { ném "move"; };
+    thử {
+        khác("đọc", hàm(x) { khác("ghi", hàm(y) { trả về y; }); });
+        ném "không lỗi";
+    } bắt lỗi(e) { nếu (e != "OWNERSHIP_BORROWED") { ném e; }; };
+    khác("ghi", hàm(x) { x[0] = 10; });
+    khác("bỏ");
+    biến có = một giá trị(rỗng);
+    nếu (!có.có() || có.lấy() != rỗng || không giá trị().có()) { ném "option"; };
+    nếu (có.phân nhánh(hàm(x) { trả về x == rỗng; }, hàm() { ném "không được gọi"; }) != đúng) { ném "option present"; };
+    nếu (không giá trị().phân nhánh(hàm(x) { ném "không được gọi"; }, hàm() { trả về 42; }) != 42) { ném "option empty"; };
+    nếu (thành công(21).ánh xạ(hàm(x) { trả về x * 2; }).lấy() != 42) { ném "result"; };
+    nếu (thất bại("lỗi").ánh xạ(hàm(x) { ném "không được gọi"; }).lấy lỗi() != "lỗi") { ném "result error"; };
+    nếu (thành công(42).phân nhánh(hàm(x) { trả về x; }, hàm(e) { ném e; }) != 42) { ném "result present"; };
+    nếu (thất bại("lỗi").phân nhánh(hàm(x) { ném "không được gọi"; }, hàm(e) { trả về e; }) != "lỗi") { ném "result failure"; };
+    biến nguồn = [1, 2, 3, 4];
+    biến lát = lát cắt(nguồn, 1, 2);
+    lát("ghi", 0, 8);
+    nếu (nguồn[1] != 8 || lát("đọc", 1) != 3 || lát("dài") != 2) { ném "slice"; };
+    thử { lát("đọc", 2); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "SLICE_BOUNDS") { ném e; }; };
+    biến chủ lát = sở hữu([1, 2, 3]);
+    biến lát thoát = mượn lát cắt(chủ lát, 1, 2, hàm(x) {
+        nếu (x("đọc", 0) != 2 || x("dài") != 2) { ném "borrow slice read"; };
+        thử { x("ghi", 0, 8); ném "không lỗi"; }
+        bắt lỗi(e) { nếu (e != "SLICE_READ_ONLY") { ném e; }; };
+        thử { chủ lát("chuyển"); ném "không lỗi"; }
+        bắt lỗi(e) { nếu (e != "OWNERSHIP_BORROWED") { ném e; }; };
+        trả về x;
+    });
+    thử { lát thoát("đọc", 0); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "SLICE_BORROW_EXPIRED") { ném e; }; };
+    thử {
+        mượn lát cắt(chủ lát, 1, 2, hàm(x) {
+            lát thoát = x;
+            x("ghi", 0, 8);
+            ném "lỗi lát cắt";
+        }, đúng);
+        ném "không lỗi";
+    } bắt lỗi(e) { nếu (e != "lỗi lát cắt") { ném e; }; };
+    thử { lát thoát("ghi", 0, 9); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "SLICE_BORROW_EXPIRED") { ném e; }; };
+    nếu (mượn lát cắt(chủ lát, 1, 2, hàm(x) { trả về x("đọc", 0); }) != 8) { ném "borrow slice cleanup"; };
+    chủ lát("bỏ");
+    biến nguồn chuyển = [41];
+    biến chuyển = sở hữu(nguồn chuyển);
+    thử { chuyển sang luồng(chuyển, rỗng); ném "không lỗi"; }
+    bắt lỗi(e) {
+        nếu (e != "thread_vm_spawn: callback hoặc đối số không hợp lệ") { ném e; };
+    };
+    nếu (chuyển("đọc", hàm(x) { trả về x[0]; }) != 41) { ném "failed transfer"; };
+    thử { chuyển("đọc", hàm(x) { chuyển sang luồng(chuyển, hàm(y) { trả về y; }); }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "OWNERSHIP_BORROWED") { ném e; }; };
+    biến mã = chuyển sang luồng(chuyển, hàm(x) { x[0] += 1; trả về x[0]; });
+    nếu (chờ luồng(mã) != 42 || nguồn chuyển[0] != 41) { ném "worker transfer"; };
+    thử { chuyển("đọc", hàm(x) { trả về x; }); ném "không lỗi"; }
+    bắt lỗi(e) { nếu (e != "OWNERSHIP_MOVED") { ném e; }; };
+    nếu (dùng luồng(hàm(x) { trả về x + 1; }, hàm(worker) { trả về worker.chờ(); }, [41]) != 42) { ném "worker scope"; };
+    biến mã phạm vi = 0;
+    thử {
+        dùng luồng(hàm() { luồng máy ảo nghỉ(60000); }, hàm(worker) { mã phạm vi = worker.mã; ném "lỗi phạm vi"; });
+        ném "không lỗi";
+    } bắt lỗi(e) { nếu (e != "lỗi phạm vi") { ném e; }; };
+    nếu (trạng thái luồng(mã phạm vi) != "đã hủy") { ném "worker scope cleanup"; };
+    in "vòng đời: PASS";
+};

@@ -1,0 +1,38 @@
+hàm phần đầu(x) { trả về x[0]; };
+hàm giữ danh sách(x) { trả về x; };
+hàm sửa danh sách(x) { x[0] = 23; trả về x[0]; };
+hàm giữ đóng bao(x) { trả về hàm() { trả về x[0]; }; };
+hàm hiệu ứng(x) { in "side effect"; trả về x; };
+hàm lỗi() { ném "argument exception"; };
+hàm che khuất() {
+    biến phần đầu = hàm(x) { trả về x[0] + 10; };
+    biến x = 5;
+    in phần đầu([x]);
+};
+
+hàm chính() {
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        tổng += phần đầu([i % 10]);
+    };
+    in tổng;
+    biến dữ liệu = [7];
+    biến tham chiếu = phần đầu([dữ liệu]);
+    tham chiếu[0] = 42;
+    in dữ liệu[0];
+    in phần đầu([hiệu ứng(9)]);
+    biến trống = rỗng;
+    in phần đầu([trống]) == rỗng;
+    thử { in phần đầu([lỗi()]); }
+    bắt lỗi(e) { in e; };
+    biến x = 8;
+    biến giữ = giữ danh sách([x]);
+    in giữ[0];
+    in sửa danh sách([x]);
+    biến đóng bao = giữ đóng bao([x]);
+    in đóng bao();
+    in phần đầu([x, hiệu ứng(11)]);
+    in phần đầu([12]);
+    in phần đầu(dữ liệu);
+    che khuất();
+};

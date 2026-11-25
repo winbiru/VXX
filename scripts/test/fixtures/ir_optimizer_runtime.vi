@@ -1,0 +1,19 @@
+hàm phụ() {
+    in "side effect";
+    trả về 99;
+};
+
+hàm chính() {
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        tổng += [1, 2, 3][1];
+    };
+    in tổng;
+    in 2 + 3 * 4;
+    in 2 - 5;
+    in [1, phụ()][0];
+    biến a = [1, 2];
+    biến b = a;
+    b[0] = 42;
+    in a[0];
+};

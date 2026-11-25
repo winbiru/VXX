@@ -26,10 +26,12 @@ Target `vpp-jit` được build cùng compiler. Có thể build riêng bằng
 `cmake --build build-pure-vpp --target vpp-jit`. Sau khi cài đặt, dùng
 `vpp jit hello.vi` hoặc chạy trực tiếp `vpp-jit hello.vi`.
 JIT sinh mã máy trong bộ nhớ, không cần assembler/linker hoặc tệp thực thi
-cho từng chương trình. Mặc định hỗ trợ tập i32. Dùng
-`vpp jit --dynamic "$PWD/hello.vi"` (đường dẫn tuyệt đối) để chạy kiểu động,
-chuỗi, bộ sưu tập, lớp, ngoại lệ và import module. Khi gọi `vpp-jit` trực tiếp,
-đặt `VPP_HOME` trỏ tới thư mục cài đặt `share/vpp`. `VPP_JIT_PROFILE=1` in thống
+cho từng chương trình. Khi gọi chương trình không có đối số, mặc định thử
+backend i32 và tự chọn backend động nếu backend i32 không biên dịch được.
+Dùng `vpp jit --dynamic "$PWD/hello.vi"` để chọn trực tiếp kiểu động,
+số thực, chuỗi, bộ sưu tập, lớp, ngoại lệ và import module. Chế độ gọi hàm
+`--function` và `--raw-program` giữ ABI i32. Khi gọi `vpp-jit` trực tiếp
+với import thư viện chuẩn, đặt `VPP_HOME` trỏ tới thư mục cài đặt `share/vpp`. `VPP_JIT_PROFILE=1` in thống
 kê hàm nóng ra stderr; ngưỡng hiện tại là 32 lần gọi i32 phù hợp.
 `VPP_JIT_TIER=0` tắt tầng thích ứng để so sánh baseline. Ảnh dynamic
 giới hạn 1 MiB, nên ưu tiên import module hẹp. macOS ARM64 đã được kiểm thử

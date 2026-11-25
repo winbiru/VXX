@@ -9,6 +9,7 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.có khóa;
 nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.lõi.bảng mã.mã điểm unicode;
 
@@ -409,18 +410,107 @@ lớp công khai Bộ Hạ IR {
         trả về sai;
     };
 
+    // Chỉ nhận hằng nguyên thập phân nhỏ, không bỏ qua lỗi literal lớn.
+    hàm riêng tư IR hằng nguyên nhỏ(nút) {
+        nếu (lấy từ điển(nút, "loại", "") != "hằng") { trả về rỗng; };
+        nếu (lấy từ điển(nút, "kiểu", "") != "số nguyên") { trả về rỗng; };
+        văn bản = nút["giá trị"];
+        n = máy ảo lấy độ dài(văn bản);
+        nếu (n < 1 || n > 5) { trả về rỗng; };
+        lặp(i = 0; i < n; i++) {
+            c = mã điểm unicode(văn bản[i]);
+            nếu (c < 48 || c > 57) { trả về rỗng; };
+        };
+        giá trị = thành số nguyên(văn bản);
+        nếu (giá trị > 32767) { trả về rỗng; };
+        trả về giá trị;
+    };
+
+    // Gấp biểu thức thuần trong miền nhỏ để không thay đổi kiểu hay overflow.
+    // Giới hạn độ sâu để chi phí thử tối ưu tuyến tính theo kích thước AST.
+    hàm riêng tư IR gấp số nguyên(nút, sâu) {
+        nếu (sâu == 0) { trả về rỗng; };
+        nếu (lấy từ điển(nút, "loại", "") != "hai ngôi") {
+            trả về mình.IR hằng nguyên nhỏ(nút);
+        };
+        toán tử = nút["toán tử"];
+        nếu (toán tử != "+" && toán tử != "-" && toán tử != "*") { trả về rỗng; };
+        a = mình.IR gấp số nguyên(nút["trái"], sâu - 1);
+        nếu (a == rỗng) { trả về rỗng; };
+        b = mình.IR gấp số nguyên(nút["phải"], sâu - 1);
+        nếu (b == rỗng) { trả về rỗng; };
+        kết quả = a + b;
+        nếu (toán tử == "-") { kết quả = a - b; };
+        nếu (toán tử == "*") { kết quả = a * b; };
+        nếu (kết quả < -32767 || kết quả > 32767) { trả về rỗng; };
+        trả về kết quả;
+    };
+
+    // Danh sách literal không thoát khỏi phép đọc chỉ số này. Chỉ bỏ
+    // những toán hạng không được chọn nếu chúng là hằng nguyên hợp lệ.
+    // Toán hạng động được chọn vẫn chạy đúng một lần, giữ nguyên tham chiếu.
+    hàm riêng tư IR thay vô hướng chỉ số(nút) {
+        đối tượng = nút["đối tượng"];
+        nếu (lấy từ điển(đối tượng, "loại", "") != "danh sách") { trả về rỗng; };
+        chỉ số = mình.IR hằng nguyên nhỏ(nút["chỉ số"]);
+        nếu (chỉ số == rỗng) { trả về rỗng; };
+        phần tử = đối tượng["phần tử"];
+        n = máy ảo lấy độ dài(phần tử);
+        nếu (chỉ số >= n) { trả về rỗng; };
+        lặp(i = 0; i < n; i++) {
+            nếu (i != chỉ số && mình.IR hằng nguyên nhỏ(phần tử[i]) == rỗng) { trả về rỗng; };
+        };
+        // Literal tĩnh dùng bộ giải mã riêng; chỉ thay hằng nhỏ đã được
+        // xác minh tương đương. Danh sách động hạ trực tiếp biểu thức con.
+        nếu (mình.biên dịch IR tập hợp tĩnh(đối tượng) && mình.IR hằng nguyên nhỏ(phần tử[chỉ số]) == rỗng) { trả về rỗng; };
+        trả về phần tử[chỉ số];
+    };
+
+    // Record element boundaries for scalar replacement at emission time.
+    hàm riêng tư IR hạ danh sách chiếu(nút, lệnh) {
+        độ dài phần tử = [];
+        phần tử = nút["phần tử"];
+        lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
+            đầu phần tử = máy ảo lấy độ dài(lệnh);
+            mình.biên dịch IR biểu thức(phần tử[i], lệnh);
+            n = máy ảo lấy độ dài(lệnh) - đầu phần tử;
+            nếu (n == 1 && mình.IR hằng nguyên nhỏ(phần tử[i]) != rỗng) { n = -1; };
+            máy ảo thêm cuối danh sách(độ dài phần tử, n);
+        };
+        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "danh sách động", máy ảo lấy độ dài(phần tử));
+        trả về độ dài phần tử;
+    };
+
     hàm riêng tư biên dịch IR biểu thức(nút, lệnh) {
         nếu (nút == rỗng) { ném "biên dịch IR: thiếu biểu thức"; };
         loại = lấy từ điển(nút, "loại", "");
+        nếu (mình.tối ưu IR) {
+            nếu (loại == "hai ngôi") {
+                hằng = mình.IR gấp số nguyên(nút, 8);
+                nếu (hằng != rỗng) {
+                    mình.biên dịch IR lệnh có vị trí(lệnh, "số nguyên", thành chuỗi(hằng), nút);
+                    trả về đúng;
+                };
+            } hoặc nếu (loại == "chỉ số") {
+                hằng = mình.IR thay vô hướng chỉ số(nút);
+                nếu (hằng != rỗng) {
+                    mình.biên dịch IR biểu thức(hằng, lệnh);
+                    trả về đúng;
+                };
+            };
+        };
         nếu (loại == "hàm ẩn danh") {
             thân = [];
             câu = nút["thân"]["câu lệnh"];
             lặp(i = 0; i < máy ảo lấy độ dài(câu); i++) { mình.biên dịch IR câu lệnh(câu[i], thân); };
             mặc định IR = [];
             mặc định = nút["mặc định tham số"];
+            tối ưu trước = mình.tối ưu IR;
+            mình.tối ưu IR = sai;
             lặp(i = 0; i < máy ảo lấy độ dài(mặc định); i++) {
                 nếu (mặc định[i] != rỗng) { mình.biên dịch IR biểu thức(mặc định[i], mặc định IR); };
             };
+            mình.tối ưu IR = tối ưu trước;
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "hàm ẩn danh",
                 {"tham số": nút["tham số"], "mặc định tham số": mặc định,
                  "mặc định IR": mặc định IR, "lệnh": thân});
@@ -510,8 +600,20 @@ lớp công khai Bộ Hạ IR {
             nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
             };
             đối số = lấy từ điển(nút, "đối số", []);
-            lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
-                mình.biên dịch IR biểu thức(đối số[i], lệnh);
+            đầu đối số = máy ảo lấy độ dài(lệnh);
+            độ dài phần tử = rỗng;
+            chiếu được = sai;
+            nếu (mình.tối ưu IR && thành viên == rỗng && máy ảo lấy độ dài(đối số) == 1) {
+                nếu (lấy từ điển(đối số[0], "loại", "") == "danh sách") {
+                    chiếu được = !mình.biên dịch IR tập hợp tĩnh(đối số[0]);
+                };
+            };
+            nếu (chiếu được) {
+                độ dài phần tử = mình.IR hạ danh sách chiếu(đối số[0], lệnh);
+            } hoặc {
+                lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+                    mình.biên dịch IR biểu thức(đối số[i], lệnh);
+                };
             };
             nếu (thành viên != rỗng) {
                 thành viên["số đối số"] = máy ảo lấy độ dài(đối số);
@@ -522,6 +624,11 @@ lớp công khai Bộ Hạ IR {
             nếu (lấy từ điển(nút, "tường minh", sai)) { mã gọi = "gọi tường minh"; };
             mình.biên dịch IR lệnh có vị trí(lệnh, mã gọi, {"tên": đích["giá trị"],
                                              "số đối số": máy ảo lấy độ dài(đối số)}, nút);
+            nếu (độ dài phần tử != rỗng) {
+                cuối đối số = máy ảo lấy độ dài(lệnh) - 1;
+                lệnh[cuối đối số]["chiếu danh sách tạm"] =
+                    [cuối đối số - đầu đối số, độ dài phần tử];
+            };
             nếu (mình.giữ nguồn) { mình.IR giữ tên cuối(lệnh, đích); };
             trả về đúng;
         };
@@ -628,8 +735,24 @@ lớp công khai Bộ Hạ IR {
             trả về đúng;
         };
         nếu (loại == "chỉ số") {
-            mình.biên dịch IR biểu thức(lấy từ điển(nút, "đối tượng", rỗng), lệnh);
-            mình.biên dịch IR biểu thức(lấy từ điển(nút, "chỉ số", rỗng), lệnh);
+            đối tượng = lấy từ điển(nút, "đối tượng", rỗng);
+            biểu thức chỉ số = lấy từ điển(nút, "chỉ số", rỗng);
+            nếu (mình.tối ưu IR && lấy từ điển(đối tượng, "loại", "") == "danh sách") {
+                chỉ số = mình.IR hằng nguyên nhỏ(biểu thức chỉ số);
+                nếu (chỉ số != rỗng) {
+                    nếu (chỉ số < máy ảo lấy độ dài(đối tượng["phần tử"]) && !mình.biên dịch IR tập hợp tĩnh(đối tượng)) {
+                        đầu = máy ảo lấy độ dài(lệnh);
+                        độ dài phần tử = mình.IR hạ danh sách chiếu(đối tượng, lệnh);
+                        mình.biên dịch IR biểu thức(biểu thức chỉ số, lệnh);
+                        mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "đọc chỉ số", "");
+                        cuối = máy ảo lấy độ dài(lệnh) - 1;
+                        lệnh[cuối]["chiếu danh sách tạm"] = [cuối - đầu, độ dài phần tử, chỉ số];
+                        trả về đúng;
+                    };
+                };
+            };
+            mình.biên dịch IR biểu thức(đối tượng, lệnh);
+            mình.biên dịch IR biểu thức(biểu thức chỉ số, lệnh);
             mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "đọc chỉ số", "");
             trả về đúng;
         };
@@ -788,11 +911,12 @@ lớp công khai Bộ Hạ IR {
 
     // Hạ AST đã được semantic kiểm tra. Module imports chỉ được bỏ qua ở
     // nhánh emitter đa mô-đun sau khi graph đã giải tất cả dependencies.
-    hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai) {
+    hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai, tối ưu = sai) {
         // Bộ chọn nhập đã kiểm tra toàn bộ AST, kể cả các khai báo sẽ bị loại.
         // Chỉ linker được truyền chứng nhận này; các lời gọi độc lập vẫn kiểm tra.
         nếu (!đã kiểm tra ngữ nghĩa) { biên dịch kiểm tra ngữ nghĩa thuần(cây); };
         mình.giữ nguồn = lấy từ điển(cây, "giữ nguồn", sai);
+        mình.tối ưu IR = tối ưu && !mình.giữ nguồn;
         câu lệnh = lấy từ điển(cây, "câu lệnh", []);
         đỉnh = [];
         các hàm = [];
@@ -916,9 +1040,9 @@ hàm công khai biên dịch IR tách thành viên(tên) {
     trả về bộ chuyển tiếp.biên dịch IR tách thành viên(tên);
 };
 
-hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai) {
+hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai, tối ưu = sai) {
     bộ chuyển tiếp = Bộ Hạ IR();
-    trả về bộ chuyển tiếp.biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa);
+    trả về bộ chuyển tiếp.biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa, tối ưu);
 };
 
 hàm công khai biên dịch hạ IR thuần(mã nguồn) {

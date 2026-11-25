@@ -991,6 +991,7 @@
       "id": "kiem_tra_ir_bytecode_tu_chu",
       "source": "scripts/test/kiem_tra_ir_bytecode_tu_chu.vi",
       "expected": "scripts/test/expected/kiem_tra_ir_bytecode_tu_chu.expected",
+      "env": {"VPP_OPTIMIZE_IR": "0"},
       "suite": "full"
     },
     {
@@ -1624,12 +1625,14 @@
       "id": "kiem_tra_oracle_chuoi_module",
       "source": "scripts/test/kiem_tra_oracle_chuoi_module.vi",
       "expected": "scripts/test/expected/kiem_tra_oracle_chuoi_module.expected",
+      "env": {"VPP_OPTIMIZE_IR": "0"},
       "suite": "full"
     },
     {
       "id": "kiem_tra_oracle_module_tu_chu",
       "source": "scripts/test/kiem_tra_oracle_module_tu_chu.vi",
       "expected": "scripts/test/expected/kiem_tra_oracle_module_tu_chu.expected",
+      "env": {"VPP_OPTIMIZE_IR": "0"},
       "suite": "full"
     },
     {
@@ -2467,6 +2470,116 @@
       "exit": 1,
       "stdout": "",
       "run_diagnostic_regex": "\\AV\\+\\+ AOT runtime: error=19 opcode=-?\\d+\\r?\\nChẩn đoán V\\+\\+: Không\\ có\\ quyền\\ truy\\ cập\\. \\[mã thao tác ghi nhận: (?:OP_[A-Z0-9_]+|UNKNOWN_OPCODE)\\]\\r?\\n\\Z"
+    },
+    {
+      "id": "kiem_tra_toi_uu_ir",
+      "source": "scripts/test/kiem_tra_toi_uu_ir.vi",
+      "expected": "scripts/test/expected/kiem_tra_toi_uu_ir.expected",
+      "suite": "full"
+    },
+    {
+      "id": "ir_optimizer_runtime",
+      "source": "scripts/test/fixtures/ir_optimizer_runtime.vi",
+      "expected": "scripts/test/expected/ir_optimizer_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "scoped_collection_runtime",
+      "source": "scripts/test/fixtures/scoped_collection_runtime.vi",
+      "expected": "scripts/test/expected/scoped_collection_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "scoped_args_runtime",
+      "source": "scripts/test/fixtures/scoped_args_runtime.vi",
+      "expected": "scripts/test/expected/scoped_args_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "scoped_dispatch_runtime",
+      "source": "scripts/test/fixtures/scoped_dispatch_runtime.vi",
+      "expected": "scripts/test/expected/scoped_dispatch_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "interprocedural_escape_runtime",
+      "source": "scripts/test/fixtures/interprocedural_escape_runtime.vi",
+      "expected": "scripts/test/expected/interprocedural_escape_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "interprocedural_projection_runtime",
+      "source": "scripts/test/fixtures/interprocedural_projection_runtime.vi",
+      "expected": "scripts/test/expected/interprocedural_projection_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "interprocedural_effect_projection_runtime",
+      "source": "scripts/test/fixtures/interprocedural_effect_projection_runtime.vi",
+      "expected": "scripts/test/expected/interprocedural_effect_projection_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "direct_effect_projection_runtime",
+      "source": "scripts/test/fixtures/direct_effect_projection_runtime.vi",
+      "expected": "scripts/test/expected/direct_effect_projection_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "i32_slot_runtime",
+      "source": "scripts/test/fixtures/i32_slot_runtime.vi",
+      "expected": "scripts/test/expected/i32_slot_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "numeric_types_runtime",
+      "source": "scripts/test/fixtures/numeric_types_runtime.vi",
+      "expected": "scripts/test/expected/numeric_types_runtime.expected",
+      "jit": true,
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_so_huu_tinh",
+      "source": "scripts/test/kiem_tra_so_huu_tinh.vi",
+      "expected": "scripts/test/expected/kiem_tra_so_huu_tinh.expected",
+      "suite": "full"
+    },
+    {
+      "id": "kiem_tra_vong_doi",
+      "source": "scripts/test/kiem_tra_vong_doi.vi",
+      "expected": "scripts/test/expected/kiem_tra_vong_doi.expected",
+      "suite": "full"
+    },
+    {
+      "id": "ownership-branch-invalid",
+      "source": "scripts/test/fixtures/ownership_branch_invalid.vi",
+      "suite": "full",
+      "diagnostic": "OWNERSHIP_USE_AFTER_MOVE: a",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "ownership-borrow-invalid",
+      "source": "scripts/test/fixtures/ownership_borrow_invalid.vi",
+      "suite": "full",
+      "diagnostic": "OWNERSHIP_BORROW_CONFLICT: a",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "ownership-valid",
+      "source": "scripts/test/fixtures/ownership_valid.vi",
+      "suite": "full",
+      "stdout": "1\n"
     },
     {
       "id": "standalone-vm-core",

@@ -1,0 +1,35 @@
+hàm đầu(x) { trả về x[0]; };
+hàm giữa(x) { trả về x[1]; };
+hàm cuối(x) { trả về x[2]; };
+hàm hiệu ứng(x) { in x; trả về x; };
+hàm lỗi(x) { ném x; };
+hàm chạm(x) { x[0] = 42; trả về 0; };
+
+hàm chính() {
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        tổng += đầu([i % 10, i % 11, i % 12]);
+        tổng += giữa([i % 11, i % 10, i % 12]);
+        tổng += cuối([i % 12, i % 11, i % 10]);
+    };
+    in tổng;
+    in đầu([hiệu ứng(1), hiệu ứng(2), hiệu ứng(3)]);
+    in giữa([hiệu ứng(4), hiệu ứng(5), hiệu ứng(6)]);
+    in cuối([hiệu ứng(7), hiệu ứng(8), hiệu ứng(9)]);
+    biến a = [10];
+    biến b = giữa([hiệu ứng(11), a, chạm(a)]);
+    in b[0];
+    b[0] = 43;
+    in a[0];
+    in đầu([hiệu ứng(12), giữa([hiệu ứng(13), hiệu ứng(14), hiệu ứng(15)]), hiệu ứng(16)]);
+    in giữa([hiệu ứng(17), 18, hiệu ứng(19)]);
+    thử { in cuối([hiệu ứng(20), lỗi("before"), hiệu ứng(21)]); }
+    bắt lỗi(e) { in e; };
+    thử { in đầu([hiệu ứng(22), lỗi("after"), hiệu ứng(23)]); }
+    bắt lỗi(e) { in e; };
+    thử { in giữa([hiệu ứng(24), lỗi("selected"), hiệu ứng(25)]); }
+    bắt lỗi(e) { in e; };
+    biến trống = rỗng;
+    in giữa([a, trống, b]) == rỗng;
+    in đầu([a[0], 32768, 2.5]);
+};

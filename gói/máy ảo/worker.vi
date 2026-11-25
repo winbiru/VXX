@@ -21,12 +21,17 @@ hàm vm_worker_spawn(state, callable, args) {
     biến id = vm_worker_callable(state, callable);
     nếu (id < 0 || id >= vm_get(vm_get(state, 1), 1) || vm_tag(args) != 4) { trả về vm_worker_error("thread_vm_spawn: callback hoặc đối số không hợp lệ"); };
     biến bundle = vm_vector(4);
+    nếu (bundle == 0) { trả về 0; };
     vm_append(bundle, vm_get(state, 0)); vm_append(bundle, vm_get(state, 1)); vm_append(bundle, vm_get(state, 2));
     vm_append(bundle, vm_get(state, 4)); vm_append(bundle, vm_get(state, 5));
     vm_append(bundle, callable); vm_append(bundle, args); vm_append(bundle, vm_get(4198464, 10));
     biến packet = vm_worker_graph_pack(bundle, 20);
-    nếu (packet == 0 || vm_worker_cancel_point()) { trả về 0; };
+    vm_release_owned_vector(bundle);
+    nếu (packet == 0) { trả về 0; };
+    nếu (vm_worker_cancel_point()) { vm_release_owned(packet); trả về 0; };
+    // ASM chờ worker sao chép xong snapshot trước khi trả về.
     biến handle = máy worker thô(1, packet, vm_get(packet, 1));
+    vm_release_owned(packet);
     nếu (handle <= 0) { trả về vm_worker_error("thread_vm_spawn: không thể tạo worker"); };
     trả về vm_int(handle);
 };
@@ -45,7 +50,7 @@ hàm vm_worker_prepare(packet, aot) {
     vm_set(state, 4, vm_at(bundle, 3)); vm_set(state, 5, vm_at(bundle, 4));
     vm_set(state, 6, vm_vector(4)); vm_set(state, 8, bundle);
     vm_set(state, 10, vm_alloc((vm_get(vm_get(state, 0), 1) + 1) * 4, 0));
-    nếu (aot) { vm_set(state, 16, vm_vector(4)); };
+    nếu (aot) { vm_init_frame_pool(state); };
     vm_set(4198464, 10, vm_at(bundle, 7));
     nếu (vm_get(4198464, 1) != 0) { trả về 0; };
     trả về state;
@@ -79,15 +84,23 @@ hàm vm_worker_remaining(start, now, duration) {
 hàm vm_worker_pause(ms) {
     nếu (vm_get(4198724, 0) == 0) { trả về vm_worker_error("thread_vm_park: chỉ worker được phép nghỉ"); };
     nếu (ms < 0) { trả về vm_worker_error("thread_vm_park: thời gian không hợp lệ"); };
+    nếu (ms == 0) { vm_worker_cancel_point(); trả về 0; };
     biến start = vm_alloc(16, 0); biến now = vm_alloc(16, 0);
-    nếu (start == 0 || now == 0) { trả về 0; };
-    nếu (máy đồng hồ thô(0, start) != 0) { trả về vm_error(20); };
+    nếu (start == 0 || now == 0) {
+        nếu (start != 0) { vm_release_owned(start); };
+        nếu (now != 0) { vm_release_owned(now); };
+        trả về 0;
+    };
+    nếu (máy đồng hồ thô(0, start) != 0) {
+        vm_release_owned(start); vm_release_owned(now); trả về vm_error(20);
+    };
     biến left = ms;
     khi (left > 0 && vm_get(4198464, 1) == 0) {
-        nếu (vm_worker_cancel_point()) { trả về 0; };
+        nếu (vm_worker_cancel_point()) { thoát; };
         biến slice = left; nếu (slice > 5) { slice = 5; };
         máy ngủ thô(slice); left = vm_worker_remaining(start, now, ms);
     };
+    vm_release_owned(start); vm_release_owned(now);
     vm_worker_cancel_point(); trả về 0;
 };
 hàm vm_worker_copy(handle, source, length, dest, descriptor) {
@@ -101,8 +114,12 @@ hàm vm_worker_wait(handle, timeout) {
     nếu (begin == -2) { trả về vm_worker_error("thread_vm_wait: phát hiện vòng đợi giữa các worker"); };
     nếu (begin != 0) { trả về vm_worker_error("thread_vm_wait: mã worker không hợp lệ"); };
     biến status = máy worker thô(2, handle, 0);
-    biến start = vm_alloc(16, 0); biến now = vm_alloc(16, 0);
-    nếu (start != 0 && now != 0 && timeout > 0 && máy đồng hồ thô(0, start) != 0) { vm_error(20); };
+    biến start = 0; biến now = 0;
+    // Chờ vô hạn, poll và worker đã kết thúc không cần bộ đệm đồng hồ.
+    nếu (status == 0 && timeout > 0) {
+        start = vm_alloc(16, 0); now = vm_alloc(16, 0);
+        nếu (start != 0 && now != 0 && máy đồng hồ thô(0, start) != 0) { vm_error(20); };
+    };
     biến left = timeout;
     khi (status == 0 && left != 0 && vm_get(4198464, 1) == 0) {
         nếu (vm_worker_cancel_point()) { thoát; };
@@ -112,6 +129,8 @@ hàm vm_worker_wait(handle, timeout) {
         nếu (timeout > 0) { left = vm_worker_remaining(start, now, timeout); };
     };
     máy worker thô(7, 0, 0);
+    nếu (start != 0) { vm_release_owned(start); };
+    nếu (now != 0) { vm_release_owned(now); };
     nếu (vm_worker_cancel_point() || vm_get(4198464, 1) != 0) { trả về 0; };
     nếu (status < 0) { trả về vm_worker_error("thread_vm_wait: mã worker không hợp lệ"); };
     biến result = 0; biến reason = vm_literal("");
@@ -120,13 +139,26 @@ hàm vm_worker_wait(handle, timeout) {
         nếu (status == 3 && source < -1) { source = 0 - source; };
         nếu (source >= 8388624 && source < 120000000) {
             biến descriptor = vm_alloc(12, 0); biến head = vm_alloc(16, 0);
-            nếu (descriptor == 0 || head == 0) { trả về 0; };
-            nếu (vm_worker_copy(handle, source, 16, head, descriptor) != 0) { trả về vm_error(22); };
+            nếu (descriptor == 0 || head == 0) {
+                nếu (descriptor != 0) { vm_release_owned(descriptor); };
+                nếu (head != 0) { vm_release_owned(head); };
+                trả về 0;
+            };
+            nếu (vm_worker_copy(handle, source, 16, head, descriptor) != 0) {
+                vm_release_owned(head); vm_release_owned(descriptor); trả về vm_error(22);
+            };
             biến length = vm_get(head, 1);
-            nếu (length < 16 || length > 31000000 || source > 120000000 - length) { trả về vm_error(22); };
-            biến packet = vm_alloc(length, 0); nếu (packet == 0) { trả về 0; };
-            nếu (vm_worker_copy(handle, source, length, packet, descriptor) != 0) { trả về vm_error(22); };
+            vm_release_owned(head);
+            nếu (length < 16 || length > 31000000 || source > 120000000 - length) {
+                vm_release_owned(descriptor); trả về vm_error(22);
+            };
+            biến packet = vm_alloc(length, 0);
+            nếu (packet == 0) { vm_release_owned(descriptor); trả về 0; };
+            nếu (vm_worker_copy(handle, source, length, packet, descriptor) != 0) {
+                vm_release_owned(packet); vm_release_owned(descriptor); trả về vm_error(22);
+            };
             biến value = vm_worker_graph_unpack(packet, length);
+            vm_release_owned(packet); vm_release_owned(descriptor);
             nếu (status == 1) { result = value; } hoặc { reason = value; };
         } hoặc nếu (status == 3) { reason = vm_literal("worker thất bại"); }
         hoặc { trả về vm_error(22); };

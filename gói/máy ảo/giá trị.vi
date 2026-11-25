@@ -30,13 +30,65 @@ hàm vm_uint32(bits) {
     biến v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; };
     vm_set(v, 0, 11); vm_set(v, 1, bits); trả về v;
 };
+// Tag 21 uses the same payload as f64, with a binary32-rounded value.
+// Round the binary64 significand in place, without temporary heap objects.
+hàm vm_round_f32(v) {
+    biến low = vm_get(v, 2); biến high = vm_get(v, 3);
+    biến sign = high & -2147483648;
+    biến exponent = (high >> 20) & 2047;
+    high = high & 2147483647;
+    nếu (exponent == 2047) {
+        // Preserve infinities and NaNs, including the sign.
+        vm_set(v, 0, 21); trả về v;
+    };
+    nếu (exponent < 873) { low = 0; high = 0; }
+    hoặc nếu (exponent == 873) {
+        // Exactly half of the smallest subnormal rounds to signed zero.
+        nếu ((high & 1048575) != 0 || low != 0) { high = 874 << 20; }
+        hoặc { high = 0; };
+        low = 0;
+    } hoặc nếu (exponent >= 1151) { low = 0; high = 2146435072; }
+    hoặc {
+        biến shift = 29;
+        nếu (exponent < 897) { shift = shift + 897 - exponent; };
+        nếu (shift < 32) {
+            biến unit = 1 << shift;
+            biến mask = unit - 1;
+            biến remainder = low & mask;
+            biến half = 1 << (shift - 1);
+            low = low & (0 - unit);
+            nếu (remainder > half || (remainder == half && (low & unit) != 0)) {
+                low = low + unit;
+                nếu (low == 0) { high = high + 1; };
+            };
+        } hoặc nếu (shift == 32) {
+            nếu ((low ^ -2147483648) > 0 || (low == -2147483648 && (high & 1) != 0)) {
+                high = high + 1;
+            };
+            low = 0;
+        } hoặc {
+            biến unit = 1 << (shift - 32);
+            biến half = unit >> 1;
+            biến remainder = high & (unit - 1);
+            high = high & (0 - unit);
+            nếu (remainder > half || (remainder == half && (low != 0 || shift == 52 || (high & unit) != 0))) {
+                high = high + unit;
+            };
+            low = 0;
+        };
+        nếu ((high >> 20) >= 1151) { high = 2146435072; low = 0; };
+    };
+    vm_set(v, 2, low); vm_set(v, 3, high | sign);
+    vm_set(v, 0, 21); trả về v;
+};
+hàm vm_is_real_tag(t) { trả về t == 2 || t == 21; };
 hàm vm_number(v) {
     nếu (vm_tag(v) == 1) { trả về vm_get(v, 1); };
-    nếu (vm_tag(v) == 2) { trả về máy thực sang nguyên(v); };
+    nếu (vm_is_real_tag(vm_tag(v))) { trả về máy thực sang nguyên(v); };
     vm_error(2); trả về 0;
 };
 hàm vm_real(v) {
-    nếu (vm_tag(v) == 2) { trả về v; };
+    nếu (vm_is_real_tag(vm_tag(v))) { trả về v; };
     biến r = vm_alloc(16, 0); nếu (r == 0) { trả về 0; };
     vm_set(r, 0, 2); máy thực từ nguyên(r, vm_number(v)); trả về r;
 };
@@ -79,7 +131,7 @@ hàm vm_equal(a, b) {
         trả về 0;
     };
     nếu (ta == 1 && tb == 1) { trả về vm_get(a, 1) == vm_get(b, 1); };
-    nếu ((ta == 1 || ta == 2) && (tb == 1 || tb == 2)) { trả về máy thực so sánh(vm_real(a), vm_real(b)) == 0; };
+    nếu ((ta == 1 || vm_is_real_tag(ta)) && (tb == 1 || vm_is_real_tag(tb))) { trả về máy thực so sánh(vm_real(a), vm_real(b)) == 0; };
     nếu (ta != tb) { trả về 0; };
     nếu (ta != 3) { trả về a == b; };
     biến n = vm_get(a, 1); nếu (n != vm_get(b, 1)) { trả về 0; };
@@ -99,7 +151,7 @@ hàm vm_equal(a, b) {
 hàm vm_truth(v) {
     biến t = vm_tag(v); nếu (t == 0) { trả về 0; };
     nếu (t == 1) { trả về vm_get(v, 1) != 0; };
-    nếu (t == 2) { trả về máy thực so sánh(v, vm_real(vm_int(0))) != 0; };
+    nếu (vm_is_real_tag(t)) { trả về máy thực so sánh(v, vm_real(vm_int(0))) != 0; };
     nếu ((t >= 3 && t <= 6) || t == 13) { trả về vm_get(v, 1) != 0; };
     trả về 1;
 };
@@ -149,6 +201,7 @@ hàm vm_append(v, item) {
             };
         };
         vm_set(v, 2, cap); vm_set(v, 3, raw);
+        nếu (dữ liệu cũ != inline_at) { vm_release_owned(dữ liệu cũ); };
     };
     vm_set(vm_get(v, 3), n, item); vm_set(v, 1, n + 1); trả về 0;
 };
@@ -332,7 +385,7 @@ hàm vm_text(v) {
     nếu (t == 0) { trả về vm_literal("rỗng"); };
     nếu (t == 1) { trả về vm_integer_text(vm_get(v, 1)); };
     nếu (t == 11) { trả về vm_unsigned_text(vm_get(v, 1)); };
-    nếu (t == 2) {
+    nếu (vm_is_real_tag(t)) {
         biến raw = vm_alloc(512, 0); nếu (raw == 0) { trả về 0; };
         biến n = máy thực văn bản(v, raw); biến s = vm_string(n);
         nếu (s == 0) { trả về 0; };
@@ -366,8 +419,7 @@ hàm vm_text(v) {
     nếu (t == 5) { trả về vm_concat(s, vm_literal("}")); }; nếu (t == 6 || t == 13) { trả về vm_concat(s, vm_literal(")")); };
     trả về vm_concat(s, vm_literal("]"));
 };
-hàm vm_binary(op, a, b) {
-    nếu (vm_get(4198464, 12) != 1) { trả về vm_binary_body(op, a, b); };
+hàm vm_profile_binary_count(op) {
     biến state = vm_get(4198464, 2);
     biến bộ đếm = 0;
     nếu (state != 0) { bộ đếm = vm_get(state, 17); };
@@ -384,6 +436,11 @@ hàm vm_binary(op, a, b) {
             };
         };
     };
+    trả về 0;
+};
+hàm vm_binary(op, a, b) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_binary_body(op, a, b); };
+    vm_profile_binary_count(op);
     vm_profile_begin(1);
     biến result = vm_binary_body(op, a, b);
     vm_profile_end(1);
@@ -445,13 +502,13 @@ hàm vm_binary_body(op, a, b) {
         };
         trả về vm_error(2);
     };
-    nếu (op == 0 && ((vm_tag(a) != 1 && vm_tag(a) != 2) || (vm_tag(b) != 1 && vm_tag(b) != 2))) { trả về vm_concat(vm_text(a), vm_text(b)); };
+    nếu (op == 0 && ((vm_tag(a) != 1 && !vm_is_real_tag(vm_tag(a))) || (vm_tag(b) != 1 && !vm_is_real_tag(vm_tag(b))))) { trả về vm_concat(vm_text(a), vm_text(b)); };
     nếu (op >= 9 && op <= 12 && vm_tag(a) == 3 && vm_tag(b) == 3) {
         biến cmp = vm_string_compare(a, b);
         nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
         nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
     };
-    nếu ((vm_tag(a) != 1 && vm_tag(a) != 2) || (vm_tag(b) != 1 && vm_tag(b) != 2)) { trả về vm_error(2); };
+    nếu ((vm_tag(a) != 1 && !vm_is_real_tag(vm_tag(a))) || (vm_tag(b) != 1 && !vm_is_real_tag(vm_tag(b)))) { trả về vm_error(2); };
     nếu (op >= 9 && op <= 12) {
         biến cmp = 0;
         nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
@@ -467,5 +524,15 @@ hàm vm_binary_body(op, a, b) {
         vm_set(4198464, 13, op);
         trả về vm_error(6);
     };
-    máy thực phép(r, vm_real(a), vm_real(b)); trả về r;
+    máy thực phép(r, vm_real(a), vm_real(b));
+    nếu ((vm_tag(a) == 21 || vm_tag(b) == 21) && vm_tag(a) != 2 && vm_tag(b) != 2) {
+        trả về vm_round_f32(r);
+    };
+    trả về r;
+};
+
+// Preserve the f32 type in ++/-- while retaining the existing f64 contract.
+hàm vm_increment_value(value, delta) {
+    nếu (vm_tag(value) == 21) { trả về vm_binary(0, value, vm_int(delta)); };
+    trả về vm_int(vm_number(value) + delta);
 };

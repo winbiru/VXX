@@ -1,0 +1,115 @@
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian từ IR thuần;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+
+hàm kiểm tra gấp(nguồn, giá trị, số lệnh) {
+    cây = biên dịch phân tích chương trình thuần(nguồn);
+    thô = biên dịch hạ IR từ cây thuần(cây, sai);
+    tối ưu = biên dịch hạ IR từ cây thuần(cây, sai, sai, đúng);
+    lệnh = tối ưu["lệnh"];
+    nếu (máy ảo lấy độ dài(thô["lệnh"]) != số lệnh) { ném "IR thô thay đổi"; };
+    nếu (máy ảo lấy độ dài(lệnh) != 2) { ném "IR chưa tối ưu"; };
+    nếu (lệnh[0]["mã"] != "số nguyên" || lệnh[0]["giá trị"] != giá trị) { ném "hằng sai"; };
+};
+
+hàm kiểm tra giữ(nguồn) {
+    cây = biên dịch phân tích chương trình thuần(nguồn);
+    thô = biên dịch hạ IR từ cây thuần(cây, sai)["lệnh"];
+    tối ưu = biên dịch hạ IR từ cây thuần(cây, sai, sai, đúng)["lệnh"];
+    nếu (máy ảo lấy độ dài(thô) != máy ảo lấy độ dài(tối ưu)) { ném "tối ưu không an toàn"; };
+    lặp(i = 0; i < máy ảo lấy độ dài(thô); i++) {
+        nếu (thô[i]["mã"] != tối ưu[i]["mã"]) { ném "mã IR thay đổi"; };
+    };
+};
+
+hàm kiểm tra chọn(nguồn, trực tiếp) {
+    cây = biên dịch phân tích chương trình thuần(nguồn);
+    chuẩn = biên dịch phân tích chương trình thuần(trực tiếp);
+    tối ưu = biên dịch hạ IR từ cây thuần(cây, sai, sai, đúng)["lệnh"];
+    mong đợi = biên dịch hạ IR từ cây thuần(chuẩn, sai, sai, đúng)["lệnh"];
+    nếu (máy ảo lấy độ dài(tối ưu) != máy ảo lấy độ dài(mong đợi)) { ném "literal động còn cấp phát"; };
+    lặp(i = 0; i < máy ảo lấy độ dài(mong đợi); i++) {
+        nếu (tối ưu[i]["mã"] != mong đợi[i]["mã"]) { ném "IR chọn sai"; };
+    };
+};
+
+hàm đếm lệnh chiếu(sản phẩm) {
+    các hàm = sản phẩm["hàm"];
+    lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+        nếu (các hàm[i]["tên"] != "chính") { bỏ qua; };
+        lệnh = các hàm[i]["bytecode"];
+        danh sách = 0;
+        lời gọi = 0;
+        lặp(j = 0; j < máy ảo lấy độ dài(lệnh); j++) {
+            nếu (lệnh[j]["op"] == biên dịch mã thao tác("OP_LIST_LITERAL")) { danh sách += 1; };
+            nếu (lệnh[j]["op"] == biên dịch mã thao tác("OP_GOI")) { lời gọi += 1; };
+        };
+        trả về [danh sách, lời gọi];
+    };
+    ném "thiếu hàm chính";
+};
+
+hàm kiểm tra chiếu(nguồn, giảm) {
+    cây = biên dịch phân tích chương trình thuần(nguồn);
+    trước = đếm lệnh chiếu(biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai)));
+    sau = đếm lệnh chiếu(biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai, sai, đúng)));
+    nếu (trước[0] - sau[0] != giảm || trước[1] - sau[1] != giảm) { ném "chiếu liên thủ tục sai: " + nguồn; };
+};
+
+hàm kiểm tra chiếu trực tiếp(nguồn, giảm) {
+    cây = biên dịch phân tích chương trình thuần(nguồn);
+    trước = đếm lệnh chiếu(biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai)));
+    sau = đếm lệnh chiếu(biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai, sai, đúng)));
+    nếu (trước[0] - sau[0] != giảm || trước[1] != sau[1]) { ném "chiếu trực tiếp sai: " + nguồn; };
+};
+
+hàm chính() {
+    kiểm tra gấp("in 2 + 3 * 4;", "14", 6);
+    kiểm tra gấp("in 2 - 5;", "-3", 4);
+    kiểm tra gấp("in 3 - 3;", "0", 4);
+    kiểm tra gấp("in [0, 20, 30][0];", "0", 4);
+    kiểm tra gấp("in [10, 20, 30][1];", "20", 4);
+    kiểm tra giữ("in [1, 2][2];");
+    kiểm tra giữ("in [1, 2147483648][0];");
+    kiểm tra giữ("in [1, 2.5][0];");
+    kiểm tra giữ("in [1, f()][0];");
+    kiểm tra giữ("in [f(), g()][1];");
+    kiểm tra giữ("in [1, 2.5][1];");
+    kiểm tra chọn("in [1, f(), 3][1];", "in f();");
+    kiểm tra chọn("in [x][0];", "in x;");
+    kiểm tra giữ("in 32767 * 32767;");
+    kiểm tra giữ("in 1 / 0;");
+    kiểm tra giữ("in 2 + \"3\";");
+    kiểm tra giữ("in 2147483648 + 1;");
+    kiểm tra giữ("[1, 2][0] = 3;");
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, a]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, 2, 3]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[1]; }; hàm chính() { biến a = 7; in f([1, a + 2, 3]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[2]; }; hàm chính() { biến a = 7; in f([1, 2, a]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[1]; }; hàm chính() { biến a = 7; in f([a, 2]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[2]; }; hàm chính() { biến a = 7; in f([1, a]); };", 0);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, 32768]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, 2.5]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, f([a])]); };", 2);
+    kiểm tra chiếu("hàm f(x) { trả về x[1]; }; hàm chính() { biến a = 7; in f([0, f([0, a, 2]), 2]); };", 2);
+    kiểm tra chiếu("hàm f(x) { trả về x[1]; }; hàm g(x) { trả về x; }; hàm chính() { biến a = 7; in f([g(a), g(a+1), g(a+2)]); };", 1);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến a = 7; in f([a, a = 9]); };", 0);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { in f([7]); };", 0);
+    kiểm tra chiếu("hàm f(x) { trả về x; }; hàm chính() { biến a = 7; in f([a]); };", 0);
+    kiểm tra chiếu("hàm f(x) { x[0] = 9; trả về x[0]; }; hàm chính() { biến a = 7; in f([a]); };", 0);
+    kiểm tra chiếu("hàm f(x) { trả về x[0]; }; hàm chính() { biến f = hàm(x) { trả về x; }; biến a = 7; in f([a]); };", 0);
+    kiểm tra chiếu trực tiếp("hàm g(x) { trả về x; }; hàm chính() { in [g(1), g(2), g(3)][0]; };", 1);
+    kiểm tra chiếu trực tiếp("hàm g(x) { trả về x; }; hàm chính() { in [g(1), g(2), g(3)][1]; };", 1);
+    kiểm tra chiếu trực tiếp("hàm g(x) { trả về x; }; hàm chính() { in [g(1), g(2), g(3)][2]; };", 1);
+    kiểm tra chiếu trực tiếp("hàm g(x) { trả về x; }; hàm chính() { in [[g(1), g(2)][0], [g(3), g(4)][1]][1]; };", 3);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, 32768, 2.5][0]; };", 1);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, a = 9][0]; };", 0);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, a + 1][a]; };", 0);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, a + 1][2]; };", 0);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, a + 1][-1]; };", 0);
+    kiểm tra chiếu trực tiếp("hàm chính() { biến a = 7; in [a, a + 1][32768]; };", 0);
+    kiểm tra chiếu trực tiếp("hàm chính() { in [1, 2.5][1]; };", 0);
+    in "IR optimizer OK";
+};

@@ -1,0 +1,7 @@
+// Chọn kiểm tra move tĩnh cục bộ bằng nhập đích danh hàm này.
+// Runtime vẫn kiểm tra vòng đời khi đường đi không thể chứng minh tĩnh.
+nhập gói.lõi.vòng đời.sở hữu;
+
+hàm công khai chủ sở hữu tĩnh(giá trị) {
+    trả về sở hữu(giá trị);
+};

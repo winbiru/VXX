@@ -1,0 +1,250 @@
+// Kiểm tra move và xung đột mượn chắc chắn theo các đoạn và nhánh điều kiện.
+// Chỉ áp dụng khi mô đun
+// nhập đích danh API opt-in; chương trình dynamic thông thường giữ nguyên.
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm riêng tư tên biểu thức(cây) {
+    nếu (cây == rỗng) { trả về ""; };
+    nếu (lấy từ điển(cây, "loại", "") == "tên") {
+        trả về cây["giá trị"];
+    };
+    trả về "";
+};
+
+hàm riêng tư tên gọi(cây) {
+    nếu (cây == rỗng) { trả về ""; };
+    nếu (lấy từ điển(cây, "loại", "") == "gọi") {
+        trả về tên biểu thức(cây["hàm"]);
+    };
+    trả về "";
+};
+
+// Chỉ những đối số không gọi hàm hoặc ghi binding mới giữ được fact cũ.
+hàm riêng tư giá trị thuần(cây) {
+    nếu (cây == rỗng) { trả về đúng; };
+    loại = lấy từ điển(cây, "loại", "");
+    nếu (loại == "tên" || loại == "hằng") { trả về đúng; };
+    nếu (loại == "danh sách") {
+        phần tử = cây["phần tử"];
+        lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
+            nếu (!giá trị thuần(phần tử[i])) { trả về sai; };
+        };
+        trả về đúng;
+    };
+    trả về sai;
+};
+
+// API opt-in dùng tên riêng. Nếu tên đó được gán hoặc khai báo lại
+// trong thân hàm, ngừng coi lời gọi ấy là constructor đã biết.
+hàm riêng tư có che tên(cây) {
+    kiểu = máy ảo lấy loại(cây);
+    nếu (kiểu == "danh sách") {
+        lặp(i = 0; i < máy ảo lấy độ dài(cây); i++) {
+            nếu (có che tên(cây[i])) { trả về đúng; };
+        };
+    } hoặc nếu (kiểu == "từ điển") {
+        loại = lấy từ điển(cây, "loại", "");
+        nếu (loại == "biến" || loại == "hàm" || loại == "ngoại hàm" || loại == "lớp") {
+            nếu (lấy từ điển(cây, "tên", "") == "chủ sở hữu tĩnh") { trả về đúng; };
+        };
+        nếu (loại == "hai ngôi") { nếu (tên biểu thức(cây["trái"]) == "chủ sở hữu tĩnh") { trả về đúng; }; };
+        nếu (loại == "cập nhật") { nếu (tên biểu thức(cây["đối tượng"]) == "chủ sở hữu tĩnh") { trả về đúng; }; };
+        nếu (loại == "thử" && lấy từ điển(cây, "biến lỗi", "") == "chủ sở hữu tĩnh") { trả về đúng; };
+        tham số = lấy từ điển(cây, "tham số", []);
+        lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
+            nếu (tham số[i] == "chủ sở hữu tĩnh") { trả về đúng; };
+        };
+        khóa = máy ảo liệt kê khóa từ điển(cây);
+        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
+            nếu (có che tên(cây[khóa[i]])) { trả về đúng; };
+        };
+    };
+    trả về sai;
+};
+
+hàm riêng tư sao trạng thái(trạng thái) {
+    bản sao = {};
+    khóa = máy ảo liệt kê khóa từ điển(trạng thái);
+    lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
+        bản sao[khóa[i]] = trạng thái[khóa[i]];
+    };
+    trả về bản sao;
+};
+
+hàm riêng tư hợp trạng thái(trái, phải) {
+    // rỗng biểu diễn nhánh đã kết thúc, không đi tới điểm hợp.
+    nếu (trái == rỗng) { trả về phải; };
+    nếu (phải == rỗng) { trả về trái; };
+    chung = {};
+    khóa = máy ảo liệt kê khóa từ điển(trái);
+    lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
+        tên = khóa[i];
+        nếu (trái[tên] != 0 && trái[tên] == lấy từ điển(phải, tên, 0)) {
+            chung[tên] = trái[tên];
+        };
+    };
+    trả về chung;
+};
+
+// 0: chưa biết; 1: chủ sống; 2: đã move/drop; 3: đang đọc; 4: đang ghi.
+hàm riêng tư thao tác sở hữu(đối số) {
+    nếu (máy ảo lấy độ dài(đối số) == 0) { trả về ""; };
+    đầu = đối số[0];
+    nếu (lấy từ điển(đầu, "loại", "") == "hằng" &&
+        lấy từ điển(đầu, "kiểu", "") == "chuỗi") {
+        trả về đầu["giá trị"];
+    };
+    trả về "";
+};
+
+hàm riêng tư báo lỗi sở hữu(mã, tên, cây) {
+    ném mã + ": " + tên + " tại dòng " +
+        thành chuỗi(lấy từ điển(cây, "dòng", 1)) + ", cột " +
+        thành chuỗi(lấy từ điển(cây, "cột", 1));
+};
+
+hàm riêng tư kiểm tra đoạn(khối, trạng thái) {
+    khai báo = [];
+    các lệnh = lấy từ điển(khối, "câu lệnh", []);
+    kết thúc = sai;
+    lặp(i = 0; i < máy ảo lấy độ dài(các lệnh) && !kết thúc; i++) {
+        nút = các lệnh[i];
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "nếu") {
+            nếu (!giá trị thuần(nút["điều kiện"])) { trạng thái = {}; };
+            trái = kiểm tra đoạn(nút["thân"], sao trạng thái(trạng thái));
+            phải = sao trạng thái(trạng thái);
+            khác = nút["nhánh khác"];
+            nếu (khác != rỗng) {
+                nếu (khác["loại"] == "nếu") {
+                    khác = {"loại": "khối", "câu lệnh": [khác]};
+                };
+                phải = kiểm tra đoạn(khác, phải);
+            };
+            trạng thái = hợp trạng thái(trái, phải);
+            nếu (trạng thái == rỗng) { trả về rỗng; };
+            bỏ qua;
+        };
+        nếu (loại == "khối") {
+            trạng thái = kiểm tra đoạn(nút, trạng thái);
+            nếu (trạng thái == rỗng) { trả về rỗng; };
+            bỏ qua;
+        };
+        đích = "";
+        cây = rỗng;
+        nếu (loại == "biến") {
+            đích = nút["tên"]; cây = nút["giá trị"];
+            // Khai báo lexical có thể che binding ngoài. Bỏ fact cũ.
+            trạng thái[đích] = 0;
+            máy ảo thêm cuối danh sách(khai báo, đích);
+        } hoặc nếu (loại == "biểu thức" || loại == "in" || loại == "trả về" || loại == "ném") {
+            nếu (loại == "trả về" || loại == "ném") { kết thúc = đúng; };
+            cây = lấy từ điển(nút, "biểu thức", rỗng);
+            nếu (cây != rỗng) {
+                nếu (lấy từ điển(cây, "loại", "") == "hai ngôi") {
+                    nếu (cây["toán tử"] == "=") {
+                        đích = tên biểu thức(cây["trái"]);
+                        nếu (đích != "") { cây = cây["phải"]; };
+                    };
+                };
+            };
+        } hoặc {
+            // Điểm nhập nhánh, vòng lặp, catch: chưa có CFG nên bỏ fact.
+            trạng thái = {};
+            bỏ qua;
+        };
+        tên = tên gọi(cây);
+        nếu (tên == "") {
+            nếu (đích != "" && giá trị thuần(cây)) { trạng thái[đích] = 0; }
+            hoặc { trạng thái = {}; };
+            bỏ qua;
+        };
+        hiện tại = lấy từ điển(trạng thái, tên, 0);
+        nếu (hiện tại == 2) {
+            báo lỗi sở hữu("OWNERSHIP_USE_AFTER_MOVE", tên, cây);
+        };
+        đối số = cây["đối số"];
+        số đối số = máy ảo lấy độ dài(đối số);
+        nếu (tên == "chủ sở hữu tĩnh" && đích != "" && số đối số == 1) {
+            nếu (!giá trị thuần(đối số[0])) { trạng thái = {}; };
+            trạng thái[đích] = 1;
+            bỏ qua;
+        };
+        thao tác = thao tác sở hữu(đối số);
+        kết thúc chủ = thao tác == "\"chuyển\"" || thao tác == "\"bỏ\"";
+        đọc = thao tác == "\"đọc\"";
+        ghi = thao tác == "\"ghi\"";
+        nếu (số đối số == 1 && kết thúc chủ) {
+            nếu (hiện tại == 3 || hiện tại == 4) {
+                báo lỗi sở hữu("OWNERSHIP_BORROW_CONFLICT", tên, cây);
+            };
+            nếu (hiện tại == 1) {
+                trạng thái[tên] = 2;
+                nếu (đích != "") {
+                    trạng thái[đích] = 0;
+                    nếu (thao tác == "\"chuyển\"") { trạng thái[đích] = 1; };
+                };
+                bỏ qua;
+            };
+        };
+        nếu (số đối số == 2 && (đọc || ghi) && hiện tại != 0) {
+            callback = đối số[1];
+            nếu (lấy từ điển(callback, "loại", "") == "hàm ẩn danh") {
+                nếu (hiện tại == 4 || (hiện tại == 3 && ghi)) {
+                    báo lỗi sở hữu("OWNERSHIP_BORROW_CONFLICT", tên, cây);
+                };
+                tham số = callback["tham số"];
+                // Chỉ suy luận callback nhận đúng một đối số. Tên trùng
+                // tham số có thể che ô capture, nên không mang fact vào.
+                nếu (máy ảo lấy độ dài(tham số) == 1) {
+                    nếu (tham số[0] != tên) {
+                        trong = {};
+                        trong[tên] = 3;
+                        nếu (ghi) { trong[tên] = 4; };
+                        kiểm tra đoạn(callback["thân"], trong);
+                    };
+                };
+            };
+        };
+        // Lời gọi tùy ý có thể đổi binding qua closure; không suy đoán.
+        trạng thái = {};
+    };
+    nếu (kết thúc) { trả về rỗng; };
+    // Khi rời block, không truyền fact của binding có thể đã che tên ngoài.
+    lặp(i = 0; i < máy ảo lấy độ dài(khai báo); i++) {
+        trạng thái[khai báo[i]] = 0;
+    };
+    trả về trạng thái;
+};
+
+hàm công khai biên dịch kiểm tra sở hữu(câu lệnh) {
+    bật = sai;
+    lặp(i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
+        mục = câu lệnh[i];
+        nếu (lấy từ điển(mục, "loại", "") == "nhập" &&
+            lấy từ điển(mục, "đích", "") == "gói/lõi/sở hữu tĩnh" &&
+            lấy từ điển(mục, "tên nhập", "") == "chủ sở hữu tĩnh" &&
+            lấy từ điển(mục, "bí danh", "") == "") { bật = đúng; };
+    };
+    nếu (!bật) { trả về đúng; };
+    lặp(i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
+        mục = câu lệnh[i];
+        nếu (lấy từ điển(mục, "loại", "") != "nhập") {
+            // Một mô đun có thể thay thế constructor qua binding toàn cục.
+            // Chỉ suy luận khi tên API không bị che hoặc ghi lại.
+            nếu (có che tên(mục)) { trả về đúng; };
+        } hoặc nếu (lấy từ điển(mục, "bí danh", "") == "chủ sở hữu tĩnh") {
+            trả về đúng;
+        } hoặc nếu (lấy từ điển(mục, "tên nhập", "") == "chủ sở hữu tĩnh") {
+            nếu (lấy từ điển(mục, "đích", "") != "gói/lõi/sở hữu tĩnh") { trả về đúng; };
+        };
+    };
+    lặp(i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
+        mục = câu lệnh[i];
+        nếu (lấy từ điển(mục, "loại", "") == "hàm") {
+            kiểm tra đoạn(mục["thân"], {});
+        };
+    };
+    trả về đúng;
+};

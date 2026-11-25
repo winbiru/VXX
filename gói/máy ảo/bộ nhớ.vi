@@ -190,6 +190,8 @@ hàm vm_init() {
     lặp(i = 0; i < 32; i++) { vm_set(4198592, i, 0); };
     // Linked roots for embedded bytecode calls (after the profiling scratch).
     vm_set(4198720, 0, 0); vm_set(4198724, 0, 0);
+    // Extra large-block free lists, after the embedded roots/worker flag.
+    lặp(i = 0; i < 8; i++) { vm_set(4198728, i, 0); };
     vm_set(4198464, 0, 8388608);
     vm_set(127000000, 0, 67000000);
     vm_set(127000000, 1, 1048576);
@@ -217,10 +219,23 @@ hàm vm_free_bucket(size) {
     nếu (size <= 256) { trả về 6; };
     nếu (size <= 512) { trả về 7; };
     nếu (size <= 1024) { trả về 8; };
-    trả về 9;
+    nếu (size <= 2048) { trả về 9; };
+    nếu (size <= 4096) { trả về 10; };
+    nếu (size <= 8192) { trả về 11; };
+    nếu (size <= 16384) { trả về 12; };
+    nếu (size <= 32768) { trả về 13; };
+    nếu (size <= 65536) { trả về 14; };
+    nếu (size <= 262144) { trả về 15; };
+    nếu (size <= 1048576) { trả về 16; };
+    trả về 17;
+};
+hàm vm_free_slot(bucket) {
+    nếu (bucket < 10) { trả về 19 + bucket; };
+    // Slots 29..31 belong to OS resource token counters.
+    trả về 66 + bucket - 10;
 };
 hàm vm_free_push(p) {
-    biến bucket = 19 + vm_free_bucket(vm_get(p, 0));
+    biến bucket = vm_free_slot(vm_free_bucket(vm_get(p, 0)));
     vm_set(p, 3, vm_get(4198464, bucket));
     vm_set(4198464, bucket, p);
     trả về 0;
@@ -240,8 +255,8 @@ hàm vm_alloc_body(bytes, scan) {
     // allocations, which should not traverse large fragmented free blocks.
     biến p = 0;
     biến bucket = vm_free_bucket(size);
-    khi (bucket < 10 && p == 0) {
-        biến slot = 19 + bucket;
+    khi (bucket < 18 && p == 0) {
+        biến slot = vm_free_slot(bucket);
         biến candidate = vm_get(4198464, slot);
         biến previous = 0;
         khi (candidate != 0) {
@@ -273,11 +288,28 @@ hàm vm_alloc_body(bytes, scan) {
     } hoặc {
         máy xóa vùng nhớ(p + 16, size - 16);
     };
-    vm_set(p, 0, size); vm_set(p, 1, scan); vm_set(p, 2, 0); vm_set(p, 3, 0);
+    vm_set(p, 0, size); vm_set(p, 1, scan); vm_set(p, 2, -1); vm_set(p, 3, 0);
     máy ghi byte(120000000 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 1);
     vm_set(4198464, 9, vm_get(4198464, 9) + size);
     nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 14, vm_get(4198464, 14) + 1); };
     trả về p + 16;
+};
+// Chỉ dùng với vùng dữ liệu nội bộ có đúng một chủ sở hữu, không thoát
+// ra mã khách. Tham chiếu tới phần tử vẫn do GC quản lý.
+// Epoch -1 đánh dấu cấp phát sau lần GC gần nhất; chỉ trừ phần đó khỏi
+// ngân sách để không bỏ qua áp lực của những đối tượng khác.
+hàm vm_release_owned(p) {
+    nếu (p < 8388624 || p >= vm_get(4198464, 0) || p % 16 != 0) { trả về vm_error(22); };
+    nếu (máy đọc byte(120000000 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16)) != 1) { trả về vm_error(22); };
+    biến header = p - 16;
+    biến size = vm_get(header, 0);
+    nếu (vm_get(header, 2) == -1) {
+        vm_set(4198464, 9, vm_get(4198464, 9) - size);
+    };
+    máy ghi byte(120000000 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16), 0);
+    vm_set(header, 1, -1); vm_set(header, 2, 0);
+    vm_free_push(header);
+    trả về 0;
 };
 hàm vm_mark(p, epoch) {
     nếu (p < 8388624 || p >= vm_get(4198464, 0)) { trả về 0; };
@@ -333,6 +365,7 @@ hàm vm_collect(root) {
     biến previous = 0;
     biến live = 0;
     lặp(i = 19; i < 29; i++) { vm_set(4198464, i, 0); };
+    lặp(i = 0; i < 8; i++) { vm_set(4198728, i, 0); };
     khi (p < end) {
         biến size = vm_get(p, 0);
         nếu (vm_get(p, 2) != epoch || vm_get(p, 1) == -1) {

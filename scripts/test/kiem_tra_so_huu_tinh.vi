@@ -1,0 +1,50 @@
+nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
+
+hàm kiểm tra lỗi(nguồn, mong đợi = "OWNERSHIP_USE_AFTER_MOVE: a tại dòng 1, cột 141") {
+    thử {
+        biên dịch phân tích ngữ nghĩa thuần(nguồn);
+    } bắt lỗi(e) {
+        // Chỉ nhận lỗi ownership, không chấp nhận lỗi parser bất kỳ.
+        nếu (máy ảo lấy loại(e) == "chuỗi") {
+            nếu (máy ảo lấy độ dài(e) >= máy ảo lấy độ dài(mong đợi)) {
+                lặp(i = 0; i < máy ảo lấy độ dài(mong đợi); i++) {
+                    nếu (e[i] != mong đợi[i]) { ném e; };
+                };
+                trả về đúng;
+            };
+        };
+        ném e;
+    };
+    trả về sai;
+};
+
+hàm chính() {
+    biến đầu = "nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh; hàm chính() { ";
+    biến x = đầu + "biến a = chủ sở hữu tĩnh([1]); biến b = a(\"chuyển\"); a(\"đọc\", hàm(x) { trả về x; }); };";
+    nếu (!kiểm tra lỗi(x)) { ném "missing ownership diagnostic"; };
+    biên dịch phân tích ngữ nghĩa thuần(đầu + "biến a = chủ sở hữu tĩnh([1]); biến b = a(\"chuyển\"); b(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần(đầu + "biến a = chủ sở hữu tĩnh([1]); a = a(\"chuyển\"); a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần("hàm chính() { biến a = chủ sở hữu tĩnh([1]); biến b = a(\"chuyển\"); a(\"bỏ\"); };");
+    biến nhánh = "nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh; hàm kiểm tra(cờ) { biến a = chủ sở hữu tĩnh([1]); ";
+    biến lỗi = "OWNERSHIP_USE_AFTER_MOVE: a tại dòng ";
+    nếu (!kiểm tra lỗi(nhánh + "nếu (cờ) { a(\"bỏ\"); } hoặc { a(\"bỏ\"); }; a(\"bỏ\"); };", lỗi)) { ném "missing merged move"; };
+    nếu (!kiểm tra lỗi(nhánh + "a(\"bỏ\"); nếu (cờ) { a(\"bỏ\"); }; };", lỗi)) { ném "missing branch move"; };
+    nếu (!kiểm tra lỗi(nhánh + "nếu (cờ) { a(\"bỏ\"); } hoặc nếu (cờ) { a(\"bỏ\"); } hoặc { a(\"bỏ\"); }; a(\"bỏ\"); };", lỗi)) { ném "missing nested branch move"; };
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "nếu (cờ) { a(\"bỏ\"); }; a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "nếu (cờ) { a(\"bỏ\"); } hoặc { a = chủ sở hữu tĩnh([2]); }; a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "a(\"bỏ\"); a = chủ sở hữu tĩnh([2]); a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "a(\"bỏ\"); trả về 0; a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "nếu (cờ) { a(\"bỏ\"); trả về 0; }; a(\"bỏ\"); };");
+    nếu (!kiểm tra lỗi(nhánh + "nếu (cờ) { trả về 0; } hoặc { a(\"bỏ\"); }; a(\"bỏ\"); };", lỗi)) { ném "missing surviving branch move"; };
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "nếu (cờ) { trả về 0; } hoặc { ném \"x\"; }; a(\"bỏ\"); a(\"bỏ\"); };");
+    biên dịch phân tích ngữ nghĩa thuần("nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh; hàm kiểm tra(chủ sở hữu tĩnh) { biến a = chủ sở hữu tĩnh([1]); a(\"bỏ\"); a(\"bỏ\"); };");
+    biến mượn = "OWNERSHIP_BORROW_CONFLICT: a tại dòng ";
+    nếu (!kiểm tra lỗi(nhánh + "a(\"đọc\", hàm(x) { a(\"bỏ\"); }); };", mượn)) { ném "missing drop while borrowed"; };
+    nếu (!kiểm tra lỗi(nhánh + "a(\"ghi\", hàm(x) { a(\"đọc\", hàm(y) { trả về y; }); }); };", mượn)) { ném "missing read while writing"; };
+    nếu (!kiểm tra lỗi(nhánh + "a(\"đọc\", hàm(x) { a(\"ghi\", hàm(y) { trả về y; }); }); };", mượn)) { ném "missing write while reading"; };
+    nếu (!kiểm tra lỗi(nhánh + "a(\"đọc\", hàm(x) { a(\"đọc\", hàm(y) { a(\"chuyển\"); }); }); };", mượn)) { ném "missing nested borrow"; };
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "a(\"đọc\", hàm(x) { a(\"đọc\", hàm(y) { trả về y; }); }); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "a(\"ghi\", hàm(a) { a(\"bỏ\"); }); };");
+    biên dịch phân tích ngữ nghĩa thuần(nhánh + "a(\"ghi\", hàm(x) { a = chủ sở hữu tĩnh([2]); a(\"bỏ\"); }); };");
+    in "sở hữu tĩnh: PASS";
+};

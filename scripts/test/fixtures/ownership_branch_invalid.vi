@@ -1,0 +1,7 @@
+nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh;
+hàm kiểm tra(cờ) {
+    biến a = chủ sở hữu tĩnh([1]);
+    nếu (cờ) { trả về rỗng; } hoặc { a("bỏ"); };
+    a("bỏ");
+};
+hàm chính() { kiểm tra(đúng); };

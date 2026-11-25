@@ -1,0 +1,236 @@
+// Decimal arithmetic with base-10 digits, without binary floating-point conversion.
+// Internal value: [sign, little-endian digits, decimal scale].
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+
+hàm riêng tư chuẩn hóa số(dấu, chữ, tỷ lệ) {
+    đầu = 0;
+    cuối = máy ảo lấy độ dài(chữ);
+    khi (cuối > 1 && chữ[cuối - 1] == 0) { cuối -= 1; };
+    khi (đầu < cuối - 1 && tỷ lệ > 0 && chữ[đầu] == 0) {
+        đầu += 1; tỷ lệ -= 1;
+    };
+    nếu (cuối == 1 && chữ[0] == 0) { trả về [1, [0], 0]; };
+    kết quả = [];
+    lặp(i = đầu; i < cuối; i++) { máy ảo thêm cuối danh sách(kết quả, chữ[i]); };
+    trả về [dấu, kết quả, tỷ lệ];
+};
+
+hàm riêng tư đọc số chính xác(văn bản) {
+    nếu (loại của(văn bản) == "số nguyên") { văn bản = thành chuỗi(văn bản); };
+    nếu (loại của(văn bản) != "chuỗi") { ném "Số chính xác: cần i32 hoặc chuỗi thập phân"; };
+    byte số = chuỗi thành byte máy ảo(văn bản);
+    n = máy ảo lấy độ dài(byte số);
+    đầu = 0; dấu = 1;
+    nếu (n > 0 && (byte số[0] == 43 || byte số[0] == 45)) {
+        nếu (byte số[0] == 45) { dấu = -1; };
+        đầu = 1;
+    };
+    chữ = []; tỷ lệ = 0; phần lẻ = sai;
+    lặp(i = n - 1; i >= đầu; i--) {
+        c = byte số[i];
+        nếu (c == 46 && !phần lẻ) {
+            phần lẻ = đúng; tỷ lệ = máy ảo lấy độ dài(chữ);
+        } hoặc nếu (c >= 48 && c <= 57) {
+            máy ảo thêm cuối danh sách(chữ, c - 48);
+        } hoặc { ném "Số chính xác: cú pháp không hợp lệ"; };
+    };
+    nếu (máy ảo lấy độ dài(chữ) == 0) { ném "Số chính xác: thiếu chữ số"; };
+    trả về chuẩn hóa số(dấu, chữ, tỷ lệ);
+};
+
+hàm riêng tư văn bản số chính xác(số) {
+    chữ = số[1]; tỷ lệ = số[2];
+    n = máy ảo lấy độ dài(chữ);
+    nếu (n <= tỷ lệ) { n = tỷ lệ + 1; };
+    byte số = [];
+    nếu (số[0] < 0) { máy ảo thêm cuối danh sách(byte số, 45); };
+    lặp(i = n - 1; i >= 0; i--) {
+        nếu (i == tỷ lệ - 1) { máy ảo thêm cuối danh sách(byte số, 46); };
+        c = 0;
+        nếu (i < máy ảo lấy độ dài(chữ)) { c = chữ[i]; };
+        máy ảo thêm cuối danh sách(byte số, c + 48);
+    };
+    trả về chuỗi từ byte máy ảo(byte số);
+};
+
+hàm riêng tư chữ số tại(số, i, tỷ lệ) {
+    j = i - tỷ lệ + số[2];
+    nếu (j < 0 || j >= máy ảo lấy độ dài(số[1])) { trả về 0; };
+    trả về số[1][j];
+};
+
+hàm riêng tư kích thước số(a, b, tỷ lệ) {
+    n = máy ảo lấy độ dài(a[1]) + tỷ lệ - a[2];
+    m = máy ảo lấy độ dài(b[1]) + tỷ lệ - b[2];
+    nếu (m > n) { n = m; };
+    trả về n;
+};
+
+hàm riêng tư so độ lớn(a, b, tỷ lệ) {
+    n = kích thước số(a, b, tỷ lệ);
+    lặp(i = n - 1; i >= 0; i--) {
+        x = chữ số tại(a, i, tỷ lệ); y = chữ số tại(b, i, tỷ lệ);
+        nếu (x < y) { trả về -1; };
+        nếu (x > y) { trả về 1; };
+    };
+    trả về 0;
+};
+
+hàm riêng tư cộng số chính xác(a, b) {
+    tỷ lệ = a[2];
+    nếu (b[2] > tỷ lệ) { tỷ lệ = b[2]; };
+    dấu = a[0];
+    cùng dấu = a[0] == b[0];
+    nếu (!cùng dấu && so độ lớn(a, b, tỷ lệ) < 0) {
+        t = a; a = b; b = t; dấu = a[0];
+    };
+    n = kích thước số(a, b, tỷ lệ);
+    chữ = []; nhớ = 0;
+    lặp(i = 0; i < n; i++) {
+        x = chữ số tại(a, i, tỷ lệ); y = chữ số tại(b, i, tỷ lệ);
+        nếu (cùng dấu) {
+            z = x + y + nhớ; nhớ = z / 10; z = z % 10;
+        } hoặc {
+            z = x - y - nhớ; nhớ = 0;
+            nếu (z < 0) { z += 10; nhớ = 1; };
+        };
+        máy ảo thêm cuối danh sách(chữ, z);
+    };
+    nếu (cùng dấu && nhớ > 0) { máy ảo thêm cuối danh sách(chữ, nhớ); };
+    trả về chuẩn hóa số(dấu, chữ, tỷ lệ);
+};
+
+hàm riêng tư nhân số chính xác(a, b) {
+    x = a[1]; y = b[1];
+    n = máy ảo lấy độ dài(x); m = máy ảo lấy độ dài(y);
+    chữ = [];
+    lặp(i = 0; i < n + m; i++) { máy ảo thêm cuối danh sách(chữ, 0); };
+    lặp(i = 0; i < n; i++) {
+        nhớ = 0;
+        lặp(j = 0; j < m; j++) {
+            z = chữ[i + j] + x[i] * y[j] + nhớ;
+            chữ[i + j] = z % 10; nhớ = z / 10;
+        };
+        chữ[i + m] = nhớ;
+    };
+    trả về chuẩn hóa số(a[0] * b[0], chữ, a[2] + b[2]);
+};
+
+// Long division on nonnegative integer coefficients. The trial digit
+// is at most nine, since the previous remainder is smaller than the divisor.
+hàm riêng tư dịch chữ số(chữ, n) {
+    kết quả = [];
+    lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(kết quả, 0); };
+    lặp(i = 0; i < máy ảo lấy độ dài(chữ); i++) {
+        máy ảo thêm cuối danh sách(kết quả, chữ[i]);
+    };
+    trả về chuẩn hóa số(1, kết quả, 0);
+};
+
+hàm riêng tư chia số chính xác(a, b, tỷ lệ) {
+    nếu (loại của(tỷ lệ) != "số nguyên" || tỷ lệ < 0 || tỷ lệ > 2147483647 - b[2]) {
+        ném "Số chính xác: tỷ lệ chia không hợp lệ";
+    };
+    nếu (máy ảo lấy độ dài(b[1]) == 1 && b[1][0] == 0) {
+        ném "Số chính xác: chia cho không";
+    };
+    dịch = tỷ lệ + b[2] - a[2];
+    x = [1, a[1], 0]; y = [1, b[1], 0];
+    nếu (dịch >= 0) { x = dịch chữ số(a[1], dịch); }
+    hoặc { y = dịch chữ số(b[1], -dịch); };
+    âm y = [-1, y[1], 0];
+    dư = [1, [0], 0];
+    thương đảo = [];
+    lặp(i = máy ảo lấy độ dài(x[1]) - 1; i >= 0; i--) {
+        chữ = [x[1][i]];
+        lặp(j = 0; j < máy ảo lấy độ dài(dư[1]); j++) {
+            máy ảo thêm cuối danh sách(chữ, dư[1][j]);
+        };
+        dư = chuẩn hóa số(1, chữ, 0);
+        q = 0;
+        khi (so độ lớn(dư, y, 0) >= 0) {
+            dư = cộng số chính xác(dư, âm y); q += 1;
+        };
+        máy ảo thêm cuối danh sách(thương đảo, q);
+    };
+    thương = [];
+    lặp(i = máy ảo lấy độ dài(thương đảo) - 1; i >= 0; i--) {
+        máy ảo thêm cuối danh sách(thương, thương đảo[i]);
+    };
+    trả về chuẩn hóa số(a[0] * b[0], thương, tỷ lệ);
+};
+
+lớp công khai Số Chính Xác {
+    hàm công khai khởi tạo(văn bản) { mình.số = đọc số chính xác(văn bản); };
+    hàm công khai chuỗi() { trả về văn bản số chính xác(mình.số); };
+    hàm công khai là nguyên() { trả về mình.số[2] == 0; };
+    hàm công khai cộng(khác) {
+        trả về Số Chính Xác(văn bản số chính xác(cộng số chính xác(mình.số, khác.số)));
+    };
+    hàm công khai trừ(khác) {
+        b = khác.số;
+        trả về Số Chính Xác(văn bản số chính xác(cộng số chính xác(mình.số, [-b[0], b[1], b[2]])));
+    };
+    hàm công khai nhân(khác) {
+        trả về Số Chính Xác(văn bản số chính xác(nhân số chính xác(mình.số, khác.số)));
+    };
+    hàm công khai chia(khác, tỷ lệ = 0) {
+        trả về Số Chính Xác(văn bản số chính xác(chia số chính xác(mình.số, khác.số, tỷ lệ)));
+    };
+    hàm công khai chia dư(khác) {
+        nếu (!mình.là nguyên() || !khác.là nguyên()) { ném "Số chính xác: chia dư cần số nguyên"; };
+        thương = chia số chính xác(mình.số, khác.số, 0);
+        tích = nhân số chính xác(thương, khác.số);
+        trả về Số Chính Xác(văn bản số chính xác(cộng số chính xác(mình.số, [-tích[0], tích[1], tích[2]])));
+    };
+    hàm công khai so sánh(khác) {
+        a = mình.số; b = khác.số;
+        nếu (a[0] != b[0]) { trả về a[0]; };
+        tỷ lệ = a[2];
+        nếu (b[2] > tỷ lệ) { tỷ lệ = b[2]; };
+        trả về a[0] * so độ lớn(a, b, tỷ lệ);
+    };
+};
+
+hàm công khai số nguyên lớn(văn bản) {
+    số = Số Chính Xác(văn bản);
+    nếu (!số.là nguyên()) { ném "Số nguyên lớn: không nhận phần lẻ"; };
+    trả về số;
+};
+
+hàm công khai số thập phân(văn bản) { trả về Số Chính Xác(văn bản); };
+
+hàm riêng tư giới hạn số nguyên(văn bản, nhỏ, lớn) {
+    số = số nguyên lớn(văn bản);
+    nếu (số.so sánh(số nguyên lớn(nhỏ)) < 0 || số.so sánh(số nguyên lớn(lớn)) > 0) {
+        ném "Số nguyên: vượt phạm vi";
+    };
+    trả về số;
+};
+
+hàm công khai i8(văn bản) { trả về thành số nguyên(giới hạn số nguyên(văn bản, "-128", "127").chuỗi()); };
+hàm công khai i16(văn bản) { trả về thành số nguyên(giới hạn số nguyên(văn bản, "-32768", "32767").chuỗi()); };
+hàm công khai i32(văn bản) { trả về thành số nguyên(giới hạn số nguyên(văn bản, "-2147483648", "2147483647").chuỗi()); };
+hàm công khai u8(văn bản) { trả về thành số nguyên(giới hạn số nguyên(văn bản, "0", "255").chuỗi()); };
+hàm công khai u16(văn bản) { trả về thành số nguyên(giới hạn số nguyên(văn bản, "0", "65535").chuỗi()); };
+hàm công khai u32(văn bản) { trả về giới hạn số nguyên(văn bản, "0", "4294967295"); };
+hàm công khai i64(văn bản) { trả về giới hạn số nguyên(văn bản, "-9223372036854775808", "9223372036854775807"); };
+hàm công khai u64(văn bản) { trả về giới hạn số nguyên(văn bản, "0", "18446744073709551615"); };
+
+// Preserve the existing numeric conversion rules and request the f32 tag
+// through the existing float-bit ABI. All subsequent f32 operations round
+// in the runtime, without decimal objects or repeated scaling loops.
+hàm công khai f64(giá trị) {
+    // Copy the binary64 payload without a floating-point operation, which
+    // could quiet a signaling NaN or otherwise change its representation.
+    trả về số thực từ bit máy ảo(bit số thực máy ảo(thành số thực(giá trị)));
+};
+
+hàm công khai f32(giá trị) {
+    bits = bit số thực máy ảo(thành số thực(giá trị));
+    máy ảo thêm cuối danh sách(bits, 32);
+    trả về số thực từ bit máy ảo(bits);
+};

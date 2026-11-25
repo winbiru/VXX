@@ -18,8 +18,8 @@ def main():
         source.write_text('hàm cộng(a,b) { trả về a+b; }; hàm chính() { in cộng(19,23); };', encoding='utf-8')
         bad = root / 'bad.vi'
         bad.write_text('hàm chính( {', encoding='utf-8')
-        unsupported = root / 'unsupported.vi'
-        unsupported.write_text('hàm chính() { in "abc"; };', encoding='utf-8')
+        string_source = root / 'string.vi'
+        string_source.write_text('hàm chính() { in "abc"; };', encoding='utf-8')
         script = root / 'script.vi'
         script.write_text('in "thông dịch"; lặp(i = 1; i <= 3; i++) { in i; };', encoding='utf-8')
         functions = root / 'functions.vi'
@@ -54,6 +54,9 @@ def main():
                  (['--interpret', methods], 0, b'42\n9\n'),
                  (['--interpret', class_entrypoint], 0, b'101\n'),
                  (['--interpret', increment], 0, b'2\n1\n'),
+                 ([increment], 0, b'2\n1\n'),
+                 (['jit', increment], 0, b'2\n1\n'),
+                 ([increment, '--function', 'chính'], 1, None),
                  (['--interpret', intrinsics], 0, b'(7, 8)\n1\n'),
                  (['--interpret', byte_intrinsics], 0, 'chào\ncde\n1\n8\n'.encode()),
                  (['--interpret', intrinsic_shadow], 0, b'(7, 8)\n[1, 2]\n'),
@@ -61,7 +64,7 @@ def main():
                  (['--interpret'], 1, None),
                  ([source, '--function', 'cộng', '--', '19', '23'], 42, b''),
                  ([], 2, None), (['--help'], 0, None),
-                 ([bad], 1, None), ([unsupported], 1, None),
+                 ([bad], 1, None), ([string_source], 0, b'abc\n'),
                  ([source, '--function', 'missing'], 1, None),
                  ([source, '--function', 'cộng', '--', 'abc', '23'], 1, None)]
         for args, status, expected in cases:

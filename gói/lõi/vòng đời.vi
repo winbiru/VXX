@@ -1,0 +1,48 @@
+// Phạm vi tài nguyên tường minh, giữ lỗi gốc khi cleanup cũng thất bại.
+hàm công khai dùng tài nguyên(tài nguyên, xử lý) {
+    biến kết quả = rỗng;
+    thử {
+        kết quả = xử lý(tài nguyên);
+    } bắt lỗi(e) {
+        thử { tài nguyên.đóng(); } bắt lỗi(lỗi đóng) {};
+        ném e;
+    };
+    tài nguyên.đóng();
+    trả về kết quả;
+};
+
+// Handle sở hữu động. Closure giữ trạng thái riêng, không công khai dữ liệu.
+// Callback phải tuân thủ hợp đồng không giữ alias sau khi mượn.
+hàm công khai sở hữu(giá trị) {
+    biến còn hiệu lực = đúng;
+    biến số mượn = 0;
+    biến đang ghi = sai;
+    trả về hàm(thao tác, xử lý = rỗng) {
+        nếu (!còn hiệu lực) { ném "OWNERSHIP_MOVED"; };
+        nếu (thao tác == "chuyển") {
+            nếu (số mượn != 0 || đang ghi) { ném "OWNERSHIP_BORROWED"; };
+            biến mới = sở hữu(giá trị);
+            giá trị = rỗng;
+            còn hiệu lực = sai;
+            trả về mới;
+        };
+        nếu (thao tác == "bỏ") {
+            nếu (số mượn != 0 || đang ghi) { ném "OWNERSHIP_BORROWED"; };
+            giá trị = rỗng;
+            còn hiệu lực = sai;
+            trả về rỗng;
+        };
+        nếu (thao tác != "đọc" && thao tác != "ghi") { ném "OWNERSHIP_OPERATION"; };
+        nếu (đang ghi || (thao tác == "ghi" && số mượn != 0)) { ném "OWNERSHIP_BORROWED"; };
+        nếu (thao tác == "ghi") { đang ghi = đúng; } hoặc { số mượn += 1; };
+        biến kết quả = rỗng;
+        thử {
+            kết quả = xử lý(giá trị);
+        } bắt lỗi(e) {
+            nếu (thao tác == "ghi") { đang ghi = sai; } hoặc { số mượn -= 1; };
+            ném e;
+        };
+        nếu (thao tác == "ghi") { đang ghi = sai; } hoặc { số mượn -= 1; };
+        trả về kết quả;
+    };
+};
