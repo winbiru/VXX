@@ -25,8 +25,12 @@ vpp_native_os_open:
     jmp 2f
 3:
     cmpl $521, %edx         // Darwin O_WRONLY|O_CREAT|O_APPEND
-    jne Lmo_loi
+    jne 4f
     movl $0x8109, %edx      // _O_BINARY|_O_CREAT|_O_APPEND|_O_WRONLY
+    jmp 2f
+4:  cmpl $514, %edx
+    jne Lmo_loi
+    movl $0x8102, %edx      // _O_BINARY|_O_CREAT|_O_RDWR
     jmp 2f
 1:  movl $0x8000, %edx      // _O_RDONLY|_O_BINARY
 2:  movl $0x180, %r8d       // _S_IREAD|_S_IWRITE

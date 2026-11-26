@@ -467,6 +467,15 @@ lớp công khai Bộ Thông Dịch {
         nếu (tên == "máy tệp đọc" && máy ảo lấy độ dài(đối số) == 3) {
             trả về máy tệp đọc(đối số[0], đối số[1], đối số[2]);
         };
+        nếu ((tên == "máy tệp ghi tại" || tên == "máy_tệp_ghi_tại") && máy ảo lấy độ dài(đối số) == 4) {
+            trả về máy tệp ghi tại(đối số[0], đối số[1], đối số[2], đối số[3]);
+        };
+        nếu ((tên == "máy tệp đồng bộ" || tên == "máy_tệp_đồng_bộ") && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy tệp đồng bộ(đối số[0]);
+        };
+        nếu ((tên == "máy thư mục đồng bộ" || tên == "máy_thư_mục_đồng_bộ") && máy ảo lấy độ dài(đối số) == 1) {
+            trả về máy thư mục đồng bộ(đối số[0]);
+        };
         nếu (tên == "máy tệp ghi" && máy ảo lấy độ dài(đối số) == 3) {
             trả về máy tệp ghi(đối số[0], đối số[1], đối số[2]);
         };

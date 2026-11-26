@@ -160,6 +160,9 @@ hàm công khai biên dịch tên mã thao tác(mã) {
         ca 229: { trả về "OP_VM_MACHINE_FILE_LOCK"; }
         ca 230: { trả về "OP_VM_STRING_BYTE_VIEW"; }
         ca 231: { trả về "OP_VM_STRING_UTF8_VALID"; }
+        ca 233: { trả về "OP_VM_MACHINE_FILE_PWRITE"; }
+        ca 234: { trả về "OP_VM_MACHINE_FILE_SYNC"; }
+        ca 235: { trả về "OP_VM_MACHINE_DIRECTORY_SYNC"; }
         ca 232: { trả về "OP_VM_SCAN_I32_RUN"; }
         ca 154: { trả về "OP_VM_STRING_FROM_BYTES"; }
         ca 155: { trả về "OP_VM_FLOAT_FROM_BITS"; }

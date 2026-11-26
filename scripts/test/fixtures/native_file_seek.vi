@@ -52,6 +52,38 @@ hàm chính() {
     khối = đọc.đọc các byte(8);
     nếu (độ dài(khối) != 4 || khối[0] != 0 || khối[1] != 255 || khối[2] != 65 || khối[3] != 66) { trả về 18; };
     bỏ kết quả = đọc.đóng();
+    // Open for in-place updates without truncating the existing contents.
+    t = tệp thô mở(đường, 3);
+    nếu (tệp thô dịch(t, 3, 0) != 3) { trả về 19; };
+    nếu (tệp thô ghi tại(t, [77, 78], 2, 1) != 2 || tệp thô mã lỗi() != 0) { trả về 20; };
+    nếu (tệp thô vị trí(t) != 3 || tệp thô ghi tại(t, [79], 1, [2, 0]) != 1) { trả về 21; };
+    nếu (tệp thô vị trí(t) != 3 || tệp thô đồng bộ(t) != 0 || tệp thô mã lỗi() != 0) { trả về 22; };
+    nếu (tệp thô dịch(t, 0, 0) != 0) { trả về 23; };
+    dữ liệu = [0, 0, 0, 0];
+    nếu (tệp thô đọc(t, dữ liệu, 4) != 4 || dữ liệu[0] != 0 || dữ liệu[1] != 77 || dữ liệu[2] != 79 || dữ liệu[3] != 66) { trả về 24; };
+    nếu (tệp thô ghi tại(t, [1], 1, -1) != -1 || tệp thô mã lỗi() == 0) { trả về 25; };
+    nếu (tệp thô đồng bộ(t) != 0 || tệp thô mã lỗi() != 0) { trả về 26; };
+    // Exercise an unsigned low word across the signed i32 boundary.
+    nếu (ten nền tảng máy ảo() != "windows") {
+        nếu (tệp thô ghi tại(t, [123], 1, [-2147483647 - 1, 0]) != 1 || tệp thô vị trí(t) != 4) { trả về 27; };
+        nếu (tệp thô dịch(t, 2147483647, 0) != 2147483647) { trả về 28; };
+        dữ liệu = [1, 0];
+        nếu (tệp thô đọc(t, dữ liệu, 2) != 2 || dữ liệu[0] != 0 || dữ liệu[1] != 123) { trả về 29; };
+        nếu (tệp thô đồng bộ(t) != 0) { trả về 30; };
+    };
+    nếu (tệp thô đóng(t) != 0 || tệp thô đồng bộ(t) != -1 || tệp thô mã lỗi() == 0) { trả về 31; };
+    t = tệp thô mở(đường, 2);
+    nếu (tệp thô ghi tại(t, [1], 1, 0) != -1 || tệp thô mã lỗi() == 0 || tệp thô đóng(t) != 0) { trả về 32; };
+    nếu (ten nền tảng máy ảo() == "windows") {
+        nếu (tệp thô đồng bộ thư mục(".") != -1 || tệp thô mã lỗi() != 129) { trả về 33; };
+    }
+    hoặc {
+        nếu (tệp thô đồng bộ thư mục(đường) != -1 || tệp thô mã lỗi() == 0) { trả về 34; };
+        nếu (tệp thô đồng bộ thư mục(".") != 0 || tệp thô mã lỗi() != 0) { trả về 35; };
+    };
     nếu (tệp thô xóa(đường) != 0) { trả về 15; };
+    nếu (ten nền tảng máy ảo() != "windows") {
+        nếu (tệp thô đồng bộ thư mục(".") != 0) { trả về 36; };
+    };
     in "Native file seek: PASS";
 };

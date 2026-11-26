@@ -58,6 +58,7 @@ hàm công khai biên dịch asm tên nội tại() {
         "OP_VM_STRING_BYTE_VIEW",
         "OP_VM_STRING_UTF8_VALID",
         "OP_VM_SCAN_I32_RUN",
+        "OP_VM_MACHINE_FILE_PWRITE", "OP_VM_MACHINE_FILE_SYNC", "OP_VM_MACHINE_DIRECTORY_SYNC",
         "OP_VM_STRING_SLICE", "OP_VM_STRING_REPLACE_EXACT", "OP_VM_STRING_BYTE_SLICE"
     ];
     // END native intrinsic opcodes.

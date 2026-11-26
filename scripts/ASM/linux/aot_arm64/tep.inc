@@ -61,6 +61,10 @@ vpp_native_os_open:
     b.ne 2f
     mov w1, #1089              // Linux O_WRONLY|O_CREAT|O_APPEND
 2:
+    cmp w1, #514
+    b.ne 3f
+    mov w1, #66
+3:
     mov w2, #438               // Quyền open(2) Linux: 0666
     mov x3, x2
     mov x2, x1

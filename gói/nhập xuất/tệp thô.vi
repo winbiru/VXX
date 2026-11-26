@@ -31,8 +31,8 @@ hàm riêng tư tệp thô kiểm tra đệm(đệm, đếm, ghi) {
 
 hàm công khai tệp thô mở(đường, chế độ) {
     đường = tệp thô kiểm tra đường(đường);
-    nếu (loại của(chế độ) != "số nguyên" || chế độ < 0 || chế độ > 2) {
-        ném "tệp thô: chế độ phải là 0 (đọc), 1 (ghi) hoặc 2 (nối)";
+    nếu (loại của(chế độ) != "số nguyên" || chế độ < 0 || chế độ > 3) {
+        ném "tệp thô: chế độ phải là 0 (đọc), 1 (ghi), 2 (nối) hoặc 3 (đọc/ghi không cắt tệp)";
     };
     trả về máy tệp mở(đường, chế độ);
 };
@@ -70,4 +70,20 @@ hàm công khai tệp thô lỗi gián đoạn() { trả về máy tệp lỗi(1
 
 hàm công khai tệp thô xóa(đường) {
     trả về máy tệp xóa(tệp thô kiểm tra đường(đường));
+};
+
+// Offset is a nonnegative i32 or [low i32 bits, nonnegative high i32] (signed 64-bit).
+// Returns the actual number of bytes written. The file cursor is unchanged.
+hàm công khai tệp thô ghi tại(tệp, đệm, đếm, lệch) {
+    tệp thô kiểm tra đệm(đệm, đếm, đúng);
+    trả về máy tệp ghi tại(tệp, đệm, đếm, lệch);
+};
+
+// Synchronize data and metadata through the OS. A failure returns -1.
+hàm công khai tệp thô đồng bộ(tệp) {
+    trả về máy tệp đồng bộ(tệp);
+};
+
+hàm công khai tệp thô đồng bộ thư mục(đường) {
+    trả về máy thư mục đồng bộ(tệp thô kiểm tra đường(đường));
 };

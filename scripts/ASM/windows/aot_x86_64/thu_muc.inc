@@ -4,6 +4,12 @@
 .globl vpp_native_os_directory
 vpp_native_os_directory:
     WIN_VAO
+    cmpl $9, %r12d
+    je .Lwin_pwrite
+    cmpl $10, %r12d
+    je .Lwin_fsync
+    cmpl $11, %r12d
+    je .Lwin_dirsync
     cmpl $8, %r12d
     ja .Lwin_khong_hop_le
     cmpl $6, %r12d
@@ -184,4 +190,93 @@ vpp_native_os_directory:
 
 .Lwin_thu_muc_da_dong:
     movl $-9, %eax
+    WIN_RA
+
+// Open an independent file handle so positional writes cannot move the
+// CRT descriptor's shared file pointer, even for concurrent callers.
+.Lwin_pwrite:
+    cmpl $(VPP_ARENA_SIZE-16), %r13d
+    ja .Lwin_khong_hop_le
+    leaq (%rbx,%r13), %r14
+    movl 4(%r14), %r12d
+    testl %r12d, %r12d
+    jz .Lwin_khong_hop_le
+    cmpl $65536, %r12d
+    ja .Lwin_khong_hop_le
+    movl $(VPP_ARENA_SIZE-16), %eax
+    subl %r13d, %eax
+    cmpl %eax, %r12d
+    ja .Lwin_khong_hop_le
+    cmpq $0, 8(%r14)
+    jl .Lwin_khong_hop_le
+    movl (%r14), %ecx
+    testl %ecx, %ecx
+    js .Lwin_durable_bad_fd
+    call _get_osfhandle
+    cmpq $-2, %rax
+    je .Lwin_durable_bad_fd
+    cmpq $-1, %rax
+    je .Lwin_durable_bad_fd
+    movq %rax, %rcx
+    movl $0x40000000, %edx      // GENERIC_WRITE
+    movl $7, %r8d              // FILE_SHARE_READ | WRITE | DELETE
+    xorl %r9d, %r9d
+    call ReOpenFile
+    cmpq $-1, %rax
+    je .Lwin_durable_api_error
+    movq %rax, %r15
+    movq %r15, %rcx
+    movq 8(%r14), %rdx
+    xorl %r8d, %r8d
+    xorl %r9d, %r9d            // FILE_BEGIN
+    call SetFilePointerEx
+    testl %eax, %eax
+    jz .Lwin_pwrite_error
+    movq %r15, %rcx
+    leaq 16(%r14), %rdx
+    movl %r12d, %r8d
+    leaq -64(%rbp), %r9
+    movl $0, -64(%rbp)
+    movq $0, 32(%rsp)          // synchronous WriteFile
+    call WriteFile
+    testl %eax, %eax
+    jz .Lwin_pwrite_error
+    movl -64(%rbp), %r12d
+    jmp .Lwin_pwrite_close
+.Lwin_pwrite_error:
+    call .Lwin_loi
+    movl %eax, %r12d
+.Lwin_pwrite_close:
+    movq %r15, %rcx
+    call CloseHandle
+    testl %eax, %eax
+    jnz 1f
+    testl %r12d, %r12d
+    jns .Lwin_durable_api_error
+1:  movl %r12d, %eax
+    WIN_RA
+.Lwin_fsync:
+    movl %r13d, %ecx
+    testl %ecx, %ecx
+    js .Lwin_durable_bad_fd
+    call _get_osfhandle
+    cmpq $-2, %rax
+    je .Lwin_durable_bad_fd
+    cmpq $-1, %rax
+    je .Lwin_durable_bad_fd
+    movq %rax, %rcx
+    call FlushFileBuffers
+    testl %eax, %eax
+    jz .Lwin_durable_api_error
+    xorl %eax, %eax
+    WIN_RA
+.Lwin_dirsync:
+    // Windows has no documented POSIX directory fsync guarantee.
+    movl $-129, %eax           // UCRT ENOTSUP
+    WIN_RA
+.Lwin_durable_bad_fd:
+    movl $-9, %eax
+    WIN_RA
+.Lwin_durable_api_error:
+    call .Lwin_loi
     WIN_RA

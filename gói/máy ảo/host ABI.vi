@@ -902,9 +902,9 @@ hàm vm_host(state, op, args) {
         nếu (vm_get(4198464, 8) == 1) { trả về vm_literal("linux"); }; trả về vm_literal("macos");
     };
     nếu (op == 159) {
-        biến chế_độ_tệp = vm_number(b); nếu (chế_độ_tệp < 0 || chế_độ_tệp > 2) { trả về vm_error(2); };
+        biến chế_độ_tệp = vm_number(b); nếu (chế_độ_tệp < 0 || chế_độ_tệp > 3) { trả về vm_error(2); };
         biến đường_tệp_mở = vm_path_handle(a); nếu (đường_tệp_mở < 0) { trả về 0; };
-        biến flags = 0; nếu (chế_độ_tệp == 1) { flags = 1537; }; nếu (chế_độ_tệp == 2) { flags = 521; };
+        biến flags = 0; nếu (chế_độ_tệp == 1) { flags = 1537; }; nếu (chế_độ_tệp == 2) { flags = 521; }; nếu (chế_độ_tệp == 3) { flags = 514; };
         biến token = thực thi tệp dữ liệu mở(đường_tệp_mở, flags);
         biến lỗi_mở = máy lỗi(); byte hủy(đường_tệp_mở);
         vm_set(state, 9, lỗi_mở);
@@ -920,6 +920,51 @@ hàm vm_host(state, op, args) {
         };
         nếu (vm_get(4198464, 1) != 0) { tệp đóng(token); trả về 0; };
         trả về value;
+    };
+    // Positional writes and sync return an OS error through the raw file API.
+    nếu (op == 233 || op == 234) {
+        nếu (vm_tag(a) != 1) { trả về vm_error(2); };
+        biến token_io = vm_number(a);
+        biến slot_io = thực thi tệp dữ liệu ô nhớ(token_io);
+        nếu (slot_io < 0 || !vm_embedded_file_allowed(state, token_io)) {
+            vm_set(state, 9, 9); trả về vm_int(-1);
+        };
+        biến fd_io = vm_get(2064 + slot_io * 16, 1);
+        biến got_io = 0;
+        nếu (op == 234) { got_io = máy thư mục thô(10, fd_io, 0); }
+        hoặc {
+            biến flags_io = vm_get(2064 + slot_io * 16, 2);
+            nếu (flags_io != 1537 && flags_io != 514) { vm_set(state, 9, 22); trả về vm_int(-1); };
+            biến count_io = vm_number(c);
+            biến low_io = 0; biến high_io = 0;
+            nếu (vm_tag(d) == 1) { low_io = vm_number(d); nếu (low_io < 0) { vm_set(state, 9, 22); trả về vm_int(-1); }; }
+            hoặc nếu (vm_tag(d) == 4 && vm_get(d, 1) == 2 && vm_tag(vm_at(d, 0)) == 1 && vm_tag(vm_at(d, 1)) == 1) {
+                low_io = vm_number(vm_at(d, 0)); high_io = vm_number(vm_at(d, 1));
+                nếu (high_io < 0) { vm_set(state, 9, 22); trả về vm_int(-1); };
+            }
+            hoặc { trả về vm_error(2); };
+            nếu (vm_tag(c) != 1 || vm_tag(b) != 4 || count_io < 1 || count_io > 65536 || vm_get(b, 1) != count_io) { trả về vm_error(2); };
+            biến control_io = vm_alloc(16 + count_io, 0); nếu (control_io == 0) { trả về 0; };
+            vm_set(control_io, 0, fd_io); vm_set(control_io, 1, count_io);
+            vm_set(control_io, 2, low_io); vm_set(control_io, 3, high_io);
+            lặp(i = 0; i < count_io; i++) {
+                biến item_io = vm_at(b, i); biến value_io = vm_number(item_io);
+                nếu (vm_tag(item_io) != 1 || value_io < 0 || value_io > 255) { trả về vm_error(2); };
+                máy ghi byte(control_io + 16 + i, value_io);
+            };
+            got_io = máy thư mục thô(9, control_io, 0);
+        };
+        nếu (got_io < 0) { vm_set(state, 9, -got_io); trả về vm_int(-1); };
+        vm_set(state, 9, 0); trả về vm_int(got_io);
+    };
+    nếu (op == 235) {
+        biến path_io = vm_dir_path(a);
+        nếu (path_io == -2) { vm_set(state, 9, vm_dir_long_path_error()); trả về vm_int(-1); };
+        nếu (path_io < 0) { trả về 0; };
+        biến sync_io = máy thư mục thô(11, thực thi nội dung đệm(thực thi các byte ô nhớ(path_io)), 0);
+        byte hủy(path_io);
+        nếu (sync_io < 0) { vm_set(state, 9, -sync_io); trả về vm_int(-1); };
+        vm_set(state, 9, 0); trả về vm_int(sync_io);
     };
     nếu (op == 160 || op == 161) {
         nếu (!vm_embedded_file_allowed(state, vm_number(a))) { trả về vm_int(-1); };
@@ -1132,6 +1177,9 @@ hàm vm_host_arity(op) {
     nếu (op == 228) { trả về 1; }; // OP_VM_MACHINE_PATH_EXECUTABLE
     nếu (op == 230) { trả về 1; }; // OP_VM_STRING_BYTE_VIEW
     nếu (op == 231) { trả về 1; }; // OP_VM_STRING_UTF8_VALID
+    nếu (op == 233) { trả về 4; }; // OP_VM_MACHINE_FILE_PWRITE
+    nếu (op == 234) { trả về 1; }; // OP_VM_MACHINE_FILE_SYNC
+    nếu (op == 235) { trả về 1; }; // OP_VM_MACHINE_DIRECTORY_SYNC
     nếu (op == 232) { trả về 4; }; // OP_VM_SCAN_I32_RUN
     nếu (op == 229) { trả về 1; }; // OP_VM_MACHINE_FILE_LOCK
     nếu (op == 185) { trả về 1; }; // OP_VM_MACHINE_SOCKET_KIND
@@ -1223,6 +1271,12 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("so_thuc_tu_bits_vm")) == 1) { trả về 155; };
     nếu (vm_equal(name, vm_literal("máy_tệp_mở")) == 1) { trả về 159; };
     nếu (vm_equal(name, vm_literal("máy_tệp_đọc")) == 1) { trả về 160; };
+    nếu (vm_equal(name, vm_literal("máy tệp ghi tại")) == 1) { trả về 233; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_ghi_tại")) == 1) { trả về 233; };
+    nếu (vm_equal(name, vm_literal("máy tệp đồng bộ")) == 1) { trả về 234; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_đồng_bộ")) == 1) { trả về 234; };
+    nếu (vm_equal(name, vm_literal("máy thư mục đồng bộ")) == 1) { trả về 235; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_đồng_bộ")) == 1) { trả về 235; };
     nếu (vm_equal(name, vm_literal("máy_tệp_ghi")) == 1) { trả về 161; };
     nếu (vm_equal(name, vm_literal("máy_tệp_đóng")) == 1) { trả về 162; };
     nếu (vm_equal(name, vm_literal("máy_tệp_dịch")) == 1) { trả về 163; };

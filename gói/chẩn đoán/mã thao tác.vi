@@ -216,10 +216,16 @@
 // 230: OP_VM_STRING_BYTE_VIEW
 // 231: OP_VM_STRING_UTF8_VALID
 // 232: OP_VM_SCAN_I32_RUN
+// 233: OP_VM_MACHINE_FILE_PWRITE
+// 234: OP_VM_MACHINE_FILE_SYNC
+// 235: OP_VM_MACHINE_DIRECTORY_SYNC
 nhập giải nén.*;
 
 hàm chẩn đoán tên mã thao tác(mã) {
     biến kết quả = -1;
+    nếu (mã == 233) { trả về "OP_VM_MACHINE_FILE_PWRITE"; };
+    nếu (mã == 234) { trả về "OP_VM_MACHINE_FILE_SYNC"; };
+    nếu (mã == 235) { trả về "OP_VM_MACHINE_DIRECTORY_SYNC"; };
     nếu (mã >= 0 && mã <= 232) {
     biến bảng = byte mới();
     nếu (bảng <= 0) { trả về -1; };

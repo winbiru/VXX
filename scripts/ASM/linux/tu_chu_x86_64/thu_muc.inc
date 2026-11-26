@@ -47,6 +47,12 @@ vpp_native_os_directory:
     movl -36(%rbp), %r15d
     movl -40(%rbp), %r13d
     movl -44(%rbp), %r14d
+    cmpl $9, %r15d
+    je Lvm_pwrite_x86
+    cmpl $10, %r15d
+    je Lvm_fsync_x86
+    cmpl $11, %r15d
+    je Lvm_dirsync_x86
     cmpl $6, %r15d
     ja Lvm_thu_muc_sai_x86
     jne 1f
@@ -99,6 +105,68 @@ Lvm_thu_muc_dong_x86:
     popq %r12
     leave
     ret
+// Durability commands share the validated arena and return negative errno.
+Lvm_pwrite_x86:
+    cmpl $(135271424 - 16), %r13d
+    ja Lvm_thu_muc_sai_x86
+    leaq (%r12,%r13), %r14
+    movl (%r14), %edi
+    movl 4(%r14), %edx
+    testl %edx, %edx
+    jz Lvm_thu_muc_sai_x86
+    cmpl $65536, %edx
+    ja Lvm_thu_muc_sai_x86
+    movl $(135271424 - 16), %eax
+    subl %r13d, %eax
+    cmpl %eax, %edx
+    ja Lvm_thu_muc_sai_x86
+    movq 8(%r14), %r10
+    testq %r10, %r10
+    js Lvm_thu_muc_sai_x86
+    leaq 16(%r14), %rsi
+    movl $18, %eax
+    syscall
+    jmp Lvm_thu_muc_tra_ve_x86
+Lvm_fsync_x86:
+    movl %r13d, %edi
+    movl $74, %eax
+    syscall
+    jmp Lvm_thu_muc_tra_ve_x86
+Lvm_dirsync_x86:
+    cmpl $(135271424 - 4096), %r13d
+    ja Lvm_thu_muc_sai_x86
+    leaq (%r12,%r13), %r13
+    movq %r13, %rax
+    movl $4096, %ecx
+1:  cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp Lvm_thu_muc_sai_x86
+2:
+    movq $-100, %rdi
+    movq %r13, %rsi
+    movl $0x90000, %edx
+    xorl %r10d, %r10d
+    movl $257, %eax
+    syscall
+    testq %rax, %rax
+    js 6f
+    movl %eax, %r14d
+    movl %eax, %edi
+    movl $74, %eax
+    syscall
+    movl %eax, %r15d
+    movl %r14d, %edi
+    movl $3, %eax
+    syscall
+    testl %r15d, %r15d
+    jz 6f
+    movl %r15d, %eax
+6:
+    jmp Lvm_thu_muc_tra_ve_x86
+
 Lvm_thu_muc_duong_x86:
     cmpl $(135271424 - 4096), %r13d
     ja Lvm_thu_muc_sai_x86

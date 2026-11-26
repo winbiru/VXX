@@ -242,6 +242,7 @@ hàm công khai biên dịch mã thao tác(tên) {
             }
             ca 23: {
                 chọn (tên) {
+                    ca "OP_VM_MACHINE_FILE_SYNC": { trả về 234; }
                     ca "OP_VM_DUONG_DAN_TON_TAI": { trả về 103; }
                     ca "OP_VM_STRING_BYTE_SLICE": { trả về 217; }
                     ca "OP_VM_STRING_FROM_BYTES": { trả về 154; }
@@ -277,6 +278,7 @@ hàm công khai biên dịch mã thao tác(tên) {
             }
             ca 25: {
                 chọn (tên) {
+                    ca "OP_VM_MACHINE_FILE_PWRITE": { trả về 233; }
                     ca "OP_VM_BIEN_DICH_PHAN_TICH": { trả về 98; }
                     ca "OP_VM_DOC_BIEN_MOI_TRUONG": { trả về 100; }
                     ca "OP_VM_SOCKET_TLS_NANG_CAP": { trả về 128; }
@@ -329,6 +331,7 @@ hàm công khai biên dịch mã thao tác(tên) {
             }
             ca 28: {
                 chọn (tên) {
+                    ca "OP_VM_MACHINE_DIRECTORY_SYNC": { trả về 235; }
                     ca "OP_VM_MACHINE_PATH_CANONICAL": { trả về 223; }
                     ca "OP_VM_MACHINE_TIME_MONOTONIC": { trả về 174; }
                     ca "OP_VM_MACHINE_SOCKET_TIMEOUT": { trả về 187; }
@@ -586,6 +589,9 @@ hàm công khai biên dịch có mã thao tác(mã) {
         ca 230: { trả về đúng; }
         ca 231: { trả về đúng; }
         ca 232: { trả về đúng; }
+        ca 233: { trả về đúng; }
+        ca 234: { trả về đúng; }
+        ca 235: { trả về đúng; }
         mặc định: { trả về sai; }
     }
 };
