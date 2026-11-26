@@ -1,0 +1,8 @@
+nhập gói.hằng.cơ sở dữ liệu.JDBC_MYSQL;
+nhập gói.hằng.lượng tử.* như Q;
+nhập hằng.CỔNG_POSTGRESQL;
+hàm chính() {
+    in JDBC_MYSQL;
+    in Q.SỐ_BƯỚC_NEWTON;
+    in CỔNG_POSTGRESQL;
+};

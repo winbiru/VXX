@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi văn bản.*;
 // Module: lõi.quét và tách chuỗi
 // Scanner/tokenizer thuần V++ trên nguồn chuỗi bất biến.
 // Regex chỉ dùng engine primitive; cursor, delimiter policy và tokenization
@@ -22,10 +23,10 @@ lớp riêng tư Máy Quét Nội Bộ {
 
     hàm riêng tư bộ quét yêu cầu hình dạng(s) {
         nếu (loại của(s) != "từ điển") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (lấy từ điển(s, "__vpp_scanner__", 0) != 1) {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         trả về đúng;
     };
@@ -33,7 +34,7 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm riêng tư bộ quét yêu cầu mở(s) {
         mình.bộ quét yêu cầu hình dạng(s);
         nếu (lấy từ điển(s, "trạng thái", "") == "đóng") {
-            ném "SCAN_CLOSED";
+            ném LỖI_SCAN_CLOSED;
         };
         trả về đúng;
     };
@@ -53,7 +54,7 @@ lớp riêng tư Máy Quét Nội Bộ {
             trả về mình.bộ quét ký tự trắng(ký tự);
         };
         nếu (loại của(phân cách) != "chuỗi") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
 
         tìm thấy = sai;
@@ -75,7 +76,7 @@ lớp riêng tư Máy Quét Nội Bộ {
 
     hàm riêng tư bộ quét biểu thức chính quy tại(nguồn, vị trí, mẫu) {
         nếu (loại của(mẫu) != "chuỗi" || mẫu == "") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         hậu tố = cắt chuỗi(nguồn, vị trí, máy ảo lấy độ dài(nguồn) - vị trí);
         dấu nhận diện = mình.bộ quét biểu thức chính quy dấu nhận diện(hậu tố);
@@ -86,7 +87,7 @@ lớp riêng tư Máy Quét Nội Bộ {
         };
         đã khớp = máy ảo lấy độ dài(hậu tố) + máy ảo lấy độ dài(dấu nhận diện) - máy ảo lấy độ dài(thay);
         nếu (đã khớp < 0) {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         trả về {"có": 1, "độ dài": đã khớp};
     };
@@ -107,18 +108,18 @@ lớp riêng tư Máy Quét Nội Bộ {
 
     hàm công khai bộ quét(nguồn, phân cách = rỗng, mức trần từ tố = 1048576) {
         nếu (loại của(nguồn) != "chuỗi") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (phân cách != rỗng) {
             nếu (loại của(phân cách) != "chuỗi") {
-                ném "SCAN_ARGUMENT";
+                ném LỖI_SCAN_ARGUMENT;
             };
         };
         nếu (loại của(mức trần từ tố) != "số nguyên") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (mức trần từ tố <= 0) {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
 
         trả về {
@@ -135,13 +136,13 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai bộ quét biểu thức chính quy(nguồn, mẫu phân cách, mức trần từ tố = 1048576) {
         nếu (loại của(nguồn) != "chuỗi" || loại của(mẫu phân cách) != "chuỗi" ||
             mẫu phân cách == "") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (loại của(mức trần từ tố) != "số nguyên" || mức trần từ tố <= 0) {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (biểu thức chính quy khớp("", mẫu phân cách)) {
-            ném "SCAN_REGEX_ZERO_LENGTH";
+            ném LỖI_SCAN_REGEX_ZERO_LENGTH;
         };
         biểu thức chính quy tìm("", mẫu phân cách);
         trả về {
@@ -175,7 +176,7 @@ lớp riêng tư Máy Quét Nội Bộ {
                 khớp = mình.bộ quét phân cách tại(nguồn, vị trí, phân cách, kiểu phân cách);
                 nếu (lấy từ điển(khớp, "có", 0) == 1) {
                     bước = lấy từ điển(khớp, "độ dài", 0);
-                    nếu (bước <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+                    nếu (bước <= 0) { ném LỖI_SCAN_REGEX_ZERO_LENGTH; };
                     vị trí += bước;
                 } hoặc {
                     đang bỏ phân cách = sai;
@@ -195,7 +196,7 @@ lớp riêng tư Máy Quét Nội Bộ {
             } hoặc {
                 khớp = mình.bộ quét phân cách tại(nguồn, vị trí, phân cách, kiểu phân cách);
                 nếu (lấy từ điển(khớp, "có", 0) == 1) {
-                    nếu (lấy từ điển(khớp, "độ dài", 0) <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+                    nếu (lấy từ điển(khớp, "độ dài", 0) <= 0) { ném LỖI_SCAN_REGEX_ZERO_LENGTH; };
                     đang đọc = sai;
                 } hoặc {
                     nếu (vị trí - bắt đầu >= mức trần) {
@@ -222,7 +223,7 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai từ tố(s) {
         thông tin = mình.bộ quét tìm từ tố(s);
         nếu (lấy từ điển(thông tin, "có", 0) != 1) {
-            ném "SCAN_END";
+            ném LỖI_SCAN_END;
         };
         đặt từ điển(s, "vị trí", lấy từ điển(thông tin, "kết thúc", 0));
         trả về lấy từ điển(thông tin, "giá trị", "");
@@ -242,10 +243,10 @@ lớp riêng tư Máy Quét Nội Bộ {
 
     hàm riêng tư bộ quét yêu cầu cơ số(cơ số) {
         nếu (loại của(cơ số) != "số nguyên") {
-            ném "SCAN_RADIX";
+            ném LỖI_SCAN_RADIX;
         };
         nếu (cơ số < 2 || cơ số > 36) {
-            ném "SCAN_RADIX";
+            ném LỖI_SCAN_RADIX;
         };
         trả về cơ số;
     };
@@ -316,11 +317,11 @@ lớp riêng tư Máy Quét Nội Bộ {
         mình.bộ quét yêu cầu cơ số(cơ số);
         thông tin = mình.bộ quét tìm từ tố(s);
         nếu (lấy từ điển(thông tin, "có", 0) != 1) {
-            ném "SCAN_END";
+            ném LỖI_SCAN_END;
         };
         phân tích = mình.bộ quét phân tích i32(lấy từ điển(thông tin, "giá trị", ""), cơ số);
         nếu (lấy từ điển(phân tích, "hợp lệ", 0) != 1) {
-            ném "SCAN_MISMATCH";
+            ném LỖI_SCAN_MISMATCH;
         };
         đặt từ điển(s, "vị trí", lấy từ điển(thông tin, "kết thúc", 0));
         trả về lấy từ điển(phân tích, "giá trị", 0);
@@ -426,11 +427,11 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai f64(s) {
         thông tin = mình.bộ quét tìm từ tố(s);
         nếu (lấy từ điển(thông tin, "có", 0) != 1) {
-            ném "SCAN_END";
+            ném LỖI_SCAN_END;
         };
         văn bản = lấy từ điển(thông tin, "giá trị", "");
         nếu (!mình.bộ quét f64 hợp lệ(văn bản)) {
-            ném "SCAN_MISMATCH";
+            ném LỖI_SCAN_MISMATCH;
         };
         giá trị = thành số thực(văn bản);
         đặt từ điển(s, "vị trí", lấy từ điển(thông tin, "kết thúc", 0));
@@ -440,10 +441,10 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai bộ quét bỏ hằng văn bản(s, mẫu) {
         mình.bộ quét yêu cầu mở(s);
         nếu (loại của(mẫu) != "chuỗi") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (máy ảo lấy độ dài(mẫu) == 0) {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
 
         nguồn = lấy từ điển(s, "nguồn", "");
@@ -451,10 +452,10 @@ lớp riêng tư Máy Quét Nội Bộ {
         n = máy ảo lấy độ dài(nguồn);
         m = máy ảo lấy độ dài(mẫu);
         nếu (vị trí + m > n) {
-            ném "SCAN_MISMATCH";
+            ném LỖI_SCAN_MISMATCH;
         };
         nếu (cắt chuỗi(nguồn, vị trí, m) != mẫu) {
-            ném "SCAN_MISMATCH";
+            ném LỖI_SCAN_MISMATCH;
         };
         đặt từ điển(s, "vị trí", vị trí + m);
         trả về s;
@@ -463,13 +464,13 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai bộ quét bỏ biểu thức chính quy(s, mẫu) {
         mình.bộ quét yêu cầu mở(s);
         nếu (loại của(mẫu) != "chuỗi" || mẫu == "") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nguồn = lấy từ điển(s, "nguồn", "");
         vị trí = lấy từ điển(s, "vị trí", 0);
         khớp = mình.bộ quét biểu thức chính quy tại(nguồn, vị trí, mẫu);
         nếu (lấy từ điển(khớp, "có", 0) != 1) {
-            ném "SCAN_MISMATCH";
+            ném LỖI_SCAN_MISMATCH;
         };
         đặt từ điển(s, "vị trí", vị trí + lấy từ điển(khớp, "độ dài", 0));
         trả về s;
@@ -485,11 +486,11 @@ lớp riêng tư Máy Quét Nội Bộ {
     // hai delimiter liên tiếp bị bỏ; khi giữ_phân_cách=true mỗi delimiter là một token.
     hàm công khai tách từ tố(văn bản, phân cách = rỗng, giữ phân cách = sai) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
         nếu (phân cách != rỗng) {
             nếu (loại của(phân cách) != "chuỗi") {
-                ném "SCAN_ARGUMENT";
+                ném LỖI_SCAN_ARGUMENT;
             };
         };
 
@@ -517,7 +518,7 @@ lớp riêng tư Máy Quét Nội Bộ {
     hàm công khai tách từ tố biểu thức chính quy(văn bản, mẫu phân cách, giữ phân cách = sai) {
         nếu (loại của(văn bản) != "chuỗi" || loại của(mẫu phân cách) != "chuỗi" ||
             mẫu phân cách == "") {
-            ném "SCAN_ARGUMENT";
+            ném LỖI_SCAN_ARGUMENT;
         };
 
         kiểm tra = mình.bộ quét biểu thức chính quy(văn bản, mẫu phân cách);
@@ -529,7 +530,7 @@ lớp riêng tư Máy Quét Nội Bộ {
             khớp = mình.bộ quét biểu thức chính quy tại(văn bản, vị trí, mẫu phân cách);
             nếu (lấy từ điển(khớp, "có", 0) == 1) {
                 bước = lấy từ điển(khớp, "độ dài", 0);
-                nếu (bước <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+                nếu (bước <= 0) { ném LỖI_SCAN_REGEX_ZERO_LENGTH; };
                 nếu (vị trí > bắt đầu) {
                     máy ảo thêm cuối danh sách(kết quả, cắt chuỗi(văn bản, bắt đầu, vị trí - bắt đầu));
                 };
@@ -633,7 +634,7 @@ lớp công khai Bộ Quét triển khai Đóng Được {
     hàm công khai bỏ hằng văn bản(mẫu) { bộ quét bỏ hằng văn bản(mình.bộ, mẫu); trả về mình; };
     hàm công khai bỏ biểu thức chính quy(mẫu) { bộ quét bỏ biểu thức chính quy(mình.bộ, mẫu); trả về mình; };
     hàm công khai vị trí() {
-        nếu (lấy từ điển(mình.bộ, "trạng thái", "") == "đóng") { ném "SCAN_CLOSED"; };
+        nếu (lấy từ điển(mình.bộ, "trạng thái", "") == "đóng") { ném LỖI_SCAN_CLOSED; };
         trả về lấy từ điển(mình.bộ, "vị trí", 0);
     };
     hàm công khai đóng() {

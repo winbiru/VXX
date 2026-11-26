@@ -1,3 +1,4 @@
+nhập hằng.chẩn đoán.*;
 nhập gói.chuẩn.chính.*;
 nhập feature_math như toán;
 nhập feature_model;
@@ -177,16 +178,14 @@ hàm kiểmTraStdlib() {
     yêuCầu(trị tuyệt đối(-9) == 9, "math stdlib");
     yêuCầu(lũy thừa(2, 8) == 256, "power stdlib");
 
-    đườngDẫn = ".feature-vpp.tmp";
-    ghi tệp(đườngDẫn, "dòng một\ndòng hai");
-    yêuCầu(đọc tệp(đườngDẫn) == "dòng một\ndòng hai", "file roundtrip");
-    yêuCầu(đường dẫn tồn tại(đườngDẫn), "path exists");
-    xóa đường dẫn(đườngDẫn);
+    ghi tệp(TỆP_CHẨN_ĐOÁN, "dòng một\ndòng hai");
+    yêuCầu(đọc tệp(TỆP_CHẨN_ĐOÁN) == "dòng một\ndòng hai", "file roundtrip");
+    yêuCầu(đường dẫn tồn tại(TỆP_CHẨN_ĐOÁN), "path exists");
+    xóa đường dẫn(TỆP_CHẨN_ĐOÁN);
 
-    cấuHình = ".feature-vpp.ini";
-    ghi tệp(cấuHình, "port=8088\nname=warehouse\n");
-    yêuCầu(đọc cấu hình khóa(cấuHình, "port", "") == "8088", "config read");
-    xóa đường dẫn(cấuHình);
+    ghi tệp(TỆP_CẤU_HÌNH, "port=8088\nname=warehouse\n");
+    yêuCầu(đọc cấu hình khóa(TỆP_CẤU_HÌNH, "port", "") == "8088", "config read");
+    xóa đường dẫn(TỆP_CẤU_HÌNH);
 
     yêuCầu(lấy thời gian hiện tại() != "", "local time");
     yêuCầu(lấy thời gian giờ quốc tế() != "", "utc time");

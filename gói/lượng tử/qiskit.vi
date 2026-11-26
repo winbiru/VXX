@@ -1,3 +1,4 @@
+nhập gói.hằng.lượng tử.*;
 // Mặc định mô phỏng ngay bằng V++; tiến trình SDK là lựa chọn tường minh.
 nhập gói.lượng tử.openqasm.*;
 nhập gói.lượng tử.nền.lượng tử yêu cầu nguyên;
@@ -22,15 +23,15 @@ lớp công khai Cầu Nối Qiskit {
         nếu (mình.cục bộ) {
             ném "qiskit: gửi/poll QPU cần cấu hình dịch vụ; backend V++ cục bộ chỉ mô phỏng";
         };
-        yêu cầu["protocol"] = 1;
+        yêu cầu[KHÓA_GIAO_THỨC] = PHIÊN_BẢN_GIAO_THỨC;
         văn bản = json tạo(yêu cầu);
         // Bounded argv để chạy được trên cả POSIX và Windows; không ghép shell.
-        nếu (máy ảo lấy độ dài(văn bản) > 24000) {
-            ném "qiskit: yêu cầu vượt giới hạn 24000 ký tự của cầu nối";
+        nếu (máy ảo lấy độ dài(văn bản) > GIỚI_HẠN_YÊU_CẦU) {
+            ném "qiskit: yêu cầu vượt giới hạn " + GIỚI_HẠN_YÊU_CẦU + " ký tự của cầu nối";
         };
         tiến trình = chạy tiến trình(mình.trình chạy, [mình.tệp, văn bản], {
         }
-        , 120000);
+        , THỜI_HẠN_MS);
         nếu (!tiến trình["khởi chạy"]) {
             ném "qiskit: không khởi chạy được trình chạy cầu nối";
         };
@@ -46,7 +47,7 @@ lớp công khai Cầu Nối Qiskit {
         nếu (loại của(phản hồi) != "từ điển") {
             ném "qiskit: phản hồi JSON không hợp lệ";
         };
-        nếu (lấy từ điển(phản hồi, "protocol", 0) != 1) {
+        nếu (lấy từ điển(phản hồi, KHÓA_GIAO_THỨC, 0) != PHIÊN_BẢN_GIAO_THỨC) {
             ném "qiskit: sai phiên bản giao thức";
         };
         nếu (lấy từ điển(phản hồi, "ok", sai) != đúng) {
@@ -63,7 +64,7 @@ lớp công khai Cầu Nối Qiskit {
         có đo = sai;
         lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
             mục = lệnh[i];
-            nếu (mục[0] == "measure") {
+            nếu (mục[0] == CỔNG_ĐO) {
                 có đo = đúng;
             };
         };

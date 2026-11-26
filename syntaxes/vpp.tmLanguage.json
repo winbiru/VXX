@@ -216,7 +216,7 @@
           "name": "storage.modifier.access.vietvm"
         },
         {
-          "match": "(?<![\\p{L}\\p{N}_])(biến)(?![\\p{L}\\p{N}_])",
+          "match": "(?<![\\p{L}\\p{N}_])(biến|hằng)(?![\\p{L}\\p{N}_])",
           "name": "storage.type.variable.vietvm"
         }
       ]

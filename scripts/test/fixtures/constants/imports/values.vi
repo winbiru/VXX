@@ -1,0 +1,11 @@
+hằng KEY_ROWS = "rows";
+hằng SQL_SELECT = "SELECT";
+hằng VALUE = 42;
+hằng ITEMS = [1];
+hằng COMPUTED = tạo giá trị();
+
+hàm riêng tư tạo giá trị() {
+    in "init";
+    trả về VALUE + 1;
+};
+hàm công khai đọc giá trị() { trả về VALUE; };

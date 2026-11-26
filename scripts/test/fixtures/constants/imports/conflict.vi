@@ -1,0 +1,3 @@
+nhập values.VALUE;
+nhập other.VALUE;
+hàm chính() { in VALUE; };

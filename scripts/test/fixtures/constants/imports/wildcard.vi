@@ -1,0 +1,5 @@
+nhập values.*;
+hàm chính() {
+    in VALUE;
+    in COMPUTED;
+};

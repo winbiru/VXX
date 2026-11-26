@@ -1,0 +1,7 @@
+nhập values.VALUE như SỐ;
+nhập values.* như DB;
+hàm chính() {
+    in SỐ;
+    in DB.SQL_SELECT;
+    in DB.VALUE;
+};

@@ -1,6 +1,241 @@
 {
   "cases": [
     {
+      "id": "constant_contexts",
+      "source": "scripts/test/fixtures/constants/contexts.vi",
+      "suite": "full",
+      "stdout": "1\n2\n3\n-12\n17\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_contexts",
+      "source": "scripts/test/fixtures/constants/imports/contexts.vi",
+      "suite": "full",
+      "stdout": "init\n-7\n7\n8\n9\n10\n11\nSELECT\n42\nexplicit\n3\nSELECT\n9\n19\n",
+      "jit": true
+    },
+    {
+      "id": "constant_context_bad_key",
+      "source": "scripts/test/fixtures/constants/imports/context_bad_key.vi",
+      "suite": "full",
+      "diagnostic": "hằng khóa từ điển phải là chuỗi",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_context_dynamic_default",
+      "source": "scripts/test/fixtures/constants/imports/context_dynamic_default.vi",
+      "suite": "full",
+      "diagnostic": "hằng 'COMPUTED' cần giá trị tĩnh",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_valid",
+      "source": "scripts/test/fixtures/constants/valid.vi",
+      "suite": "full",
+      "stdout": "SELECT rows\n5\n",
+      "jit": true
+    },
+    {
+      "id": "constant_assign",
+      "source": "scripts/test/fixtures/constants/assign.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_compound",
+      "source": "scripts/test/fixtures/constants/compound.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_increment",
+      "source": "scripts/test/fixtures/constants/increment.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_missing",
+      "source": "scripts/test/fixtures/constants/missing.vi",
+      "suite": "full",
+      "diagnostic": "hằng phải có giá trị khởi tạo",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_duplicate",
+      "source": "scripts/test/fixtures/constants/duplicate.vi",
+      "suite": "full",
+      "diagnostic": "trùng khai báo hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_global",
+      "source": "scripts/test/fixtures/constants/global.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_closure",
+      "source": "scripts/test/fixtures/constants/closure.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_nested",
+      "source": "scripts/test/fixtures/constants/nested.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_loop",
+      "source": "scripts/test/fixtures/constants/loop.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_class",
+      "source": "scripts/test/fixtures/constants/class.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_collection",
+      "source": "scripts/test/fixtures/constants/collection.vi",
+      "suite": "full",
+      "stdout": "2\n",
+      "jit": true
+    },
+    {
+      "id": "constant_shadow",
+      "source": "scripts/test/fixtures/constants/shadow.vi",
+      "suite": "full",
+      "stdout": "5\n1\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_selected",
+      "source": "scripts/test/fixtures/constants/imports/selected.vi",
+      "suite": "full",
+      "stdout": "init\nSELECT rows\n43\n42\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_wildcard",
+      "source": "scripts/test/fixtures/constants/imports/wildcard.vi",
+      "suite": "full",
+      "stdout": "init\n42\n43\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_alias",
+      "source": "scripts/test/fixtures/constants/imports/alias.vi",
+      "suite": "full",
+      "stdout": "init\n42\nSELECT\n42\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_shadow",
+      "source": "scripts/test/fixtures/constants/imports/shadow.vi",
+      "suite": "full",
+      "stdout": "init\n2\n42\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_collection",
+      "source": "scripts/test/fixtures/constants/imports/collection.vi",
+      "suite": "full",
+      "stdout": "init\n5\n5\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_reexport",
+      "source": "scripts/test/fixtures/constants/imports/reexport.vi",
+      "suite": "full",
+      "stdout": "init\n42\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_stdlib",
+      "source": "scripts/test/fixtures/constants/imports/stdlib.vi",
+      "suite": "full",
+      "stdout": "jdbc:mysql://\n64\n5432\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_mixed",
+      "source": "scripts/test/fixtures/constants/imports/mixed.vi",
+      "suite": "full",
+      "stdout": "init\n52\n3358\n42\n10\n",
+      "jit": true
+    },
+    {
+      "id": "constant_import_assign",
+      "source": "scripts/test/fixtures/constants/imports/assign.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_import_compound",
+      "source": "scripts/test/fixtures/constants/imports/compound.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_import_increment",
+      "source": "scripts/test/fixtures/constants/imports/increment.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_import_namespace_assign",
+      "source": "scripts/test/fixtures/constants/imports/namespace_assign.vi",
+      "suite": "full",
+      "diagnostic": "không thể gán lại hằng 'DB.VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_import_conflict",
+      "source": "scripts/test/fixtures/constants/imports/conflict.vi",
+      "suite": "full",
+      "diagnostic": "trùng tên hằng 'VALUE'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
+      "id": "constant_import_missing",
+      "source": "scripts/test/fixtures/constants/imports/missing.vi",
+      "suite": "full",
+      "diagnostic": "không có tên công khai 'ABSENT'",
+      "exit": 1,
+      "failure_phase": "build"
+    },
+    {
       "id": "anonymous_functions",
       "jit": true,
       "source": "scripts/test/fixtures/anonymous_functions/entry.vi",
@@ -2834,6 +3069,9 @@
     }
   ],
   "unregistered_sources": {
+    "scripts/test/fixtures/constants/imports/gói/package/chính.vi": "Imported constant support module",
+    "scripts/test/fixtures/constants/imports/other.vi": "Imported constant support module",
+    "scripts/test/fixtures/constants/imports/values.vi": "Imported constant support module",
     "scripts/test/fixtures/vm_tls_authenticated_handshake.vi": "TLS authenticated handshake CTest fixture",
     "scripts/test/fixtures/vm_tls_certificates.vi": "TLS X.509 parsing CTest fixture",
     "scripts/test/fixtures/vm_tls_client.vi": "TLS client API CTest fixture",

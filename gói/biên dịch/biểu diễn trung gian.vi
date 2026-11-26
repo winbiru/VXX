@@ -3,6 +3,7 @@
 // Những cú pháp chưa lower được phải thất bại ngay tại pass này.
 nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.chương trình.biên dịch hạ hằng độc lập;
 nhập gói.biên dịch.biểu thức.biên dịch biểu thức ưu tiên;
 nhập gói.biên dịch.biểu thức.biên dịch biểu thức là phép gán;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
@@ -914,6 +915,7 @@ lớp công khai Bộ Hạ IR {
     hàm công khai biên dịch hạ IR từ cây thuần(cây, số mục bỏ qua nhập, đã kiểm tra ngữ nghĩa = sai, tối ưu = sai) {
         // Bộ chọn nhập đã kiểm tra toàn bộ AST, kể cả các khai báo sẽ bị loại.
         // Chỉ linker được truyền chứng nhận này; các lời gọi độc lập vẫn kiểm tra.
+        nếu (!số mục bỏ qua nhập) { biên dịch hạ hằng độc lập(cây); };
         nếu (!đã kiểm tra ngữ nghĩa) { biên dịch kiểm tra ngữ nghĩa thuần(cây); };
         mình.giữ nguồn = lấy từ điển(cây, "giữ nguồn", sai);
         mình.tối ưu IR = tối ưu && !mình.giữ nguồn;

@@ -1,0 +1,1 @@
+hàm chính() { nếu (đúng) { hằng VALUE = 1; }; VALUE = 2; };

@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi thời gian.*;
 // UTC: machine primitive cung cấp 16 byte [seconds, nanoseconds] little-endian;
 // đổi Unix epoch -> Gregorian và kiểm tra dữ liệu ở V++.
 // Giới hạn năm 0000..9999, phép toán giây có độ chính xác nguyên binary64.
@@ -47,9 +48,9 @@ lớp công khai Đồng Hồ UTC {
     // Gregorian proleptic, gồm ngày âm trước epoch và ngày nhuận 2000/2400.
     hàm công khai thời gian giờ quốc tế từ mốc thời gian giây(giây mốc thời gian) {
         nếu (giây mốc thời gian < -62167219200.0 || giây mốc thời gian >= 253402300800.0) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
-        nếu (làm tròn xuống(giây mốc thời gian) != giây mốc thời gian) { ném "TIME_RANGE"; };
+        nếu (làm tròn xuống(giây mốc thời gian) != giây mốc thời gian) { ném LỖI_TIME_RANGE; };
         ngày mốc thời gian = mình.thời gian giờ quốc tế chia sàn(giây mốc thời gian, 86400);
         giây ngày = giây mốc thời gian - ngày mốc thời gian * 86400.0;
         giờ = mình.thời gian giờ quốc tế chia sàn(giây ngày, 3600);

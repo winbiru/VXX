@@ -1,0 +1,14 @@
+hằng KEY = "root";
+hằng DEFAULT = -12;
+hàm lấy(số = DEFAULT) { trả về số; };
+hàm chính() {
+    hằng LOCAL = "local";
+    dữ liệu = {KEY: 1, LOCAL: 2, ordinary: 3};
+    in dữ liệu["root"];
+    in dữ liệu["local"];
+    in dữ liệu["ordinary"];
+    in lấy();
+    hằng DEFAULT_LOCAL = 17;
+    f = hàm(x = DEFAULT_LOCAL) { trả về x; };
+    in f();
+};

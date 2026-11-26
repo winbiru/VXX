@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi thời gian.*;
 // vi.time — giá trị lịch ISO/Gregorian thuần V++.
 // Wall clock, epoch/tzdb và monotonic clock vẫn là primitive/runtime boundary.
 
@@ -13,7 +14,7 @@ lớp công khai Lịch {
 
     hàm công khai thời gian là năm nhuận(năm) {
         nếu (loại của(năm) != "số nguyên") {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (năm % 400 == 0) {
             trả về đúng;
@@ -26,10 +27,10 @@ lớp công khai Lịch {
 
     hàm công khai thời gian số ngày trong tháng(năm, tháng) {
         nếu (loại của(năm) != "số nguyên" || loại của(tháng) != "số nguyên") {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (năm < 0 || năm > 9999 || tháng < 1 || tháng > 12) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (tháng == 2) {
             nếu (mình.thời gian là năm nhuận(năm)) {
@@ -44,15 +45,15 @@ lớp công khai Lịch {
     };
 
     hàm công khai tạo ngày(năm, tháng, ngày) {
-        nếu (loại của(năm) != "số nguyên") { ném "TIME_RANGE"; };
-        nếu (loại của(tháng) != "số nguyên") { ném "TIME_RANGE"; };
-        nếu (loại của(ngày) != "số nguyên") { ném "TIME_RANGE"; };
+        nếu (loại của(năm) != "số nguyên") { ném LỖI_TIME_RANGE; };
+        nếu (loại của(tháng) != "số nguyên") { ném LỖI_TIME_RANGE; };
+        nếu (loại của(ngày) != "số nguyên") { ném LỖI_TIME_RANGE; };
         nếu (năm < 0 || năm > 9999 || tháng < 1 || tháng > 12) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         tối đa = mình.thời gian số ngày trong tháng(năm, tháng);
         nếu (ngày < 1 || ngày > tối đa) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         trả về {
             "__vpp_date__": 1,
@@ -63,13 +64,13 @@ lớp công khai Lịch {
     };
 
     hàm công khai tạo giờ(giờ, phút, giây = 0, nano = 0) {
-        nếu (loại của(giờ) != "số nguyên") { ném "TIME_RANGE"; };
-        nếu (loại của(phút) != "số nguyên") { ném "TIME_RANGE"; };
-        nếu (loại của(giây) != "số nguyên") { ném "TIME_RANGE"; };
-        nếu (loại của(nano) != "số nguyên") { ném "TIME_RANGE"; };
+        nếu (loại của(giờ) != "số nguyên") { ném LỖI_TIME_RANGE; };
+        nếu (loại của(phút) != "số nguyên") { ném LỖI_TIME_RANGE; };
+        nếu (loại của(giây) != "số nguyên") { ném LỖI_TIME_RANGE; };
+        nếu (loại của(nano) != "số nguyên") { ném LỖI_TIME_RANGE; };
         nếu (giờ < 0 || giờ > 23 || phút < 0 || phút > 59 ||
             giây < 0 || giây > 59 || nano < 0 || nano > 999999999) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         trả về {
             "__vpp_time__": 1,
@@ -82,20 +83,20 @@ lớp công khai Lịch {
 
     hàm riêng tư thời gian yêu cầu ngày(giá trị) {
         nếu (loại của(giá trị) != "từ điển") {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (lấy từ điển(giá trị, "__vpp_date__", 0) != 1) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         trả về giá trị;
     };
 
     hàm riêng tư thời gian yêu cầu giờ(giá trị) {
         nếu (loại của(giá trị) != "từ điển") {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (lấy từ điển(giá trị, "__vpp_time__", 0) != 1) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         trả về giá trị;
     };
@@ -112,10 +113,10 @@ lớp công khai Lịch {
 
     hàm riêng tư thời gian yêu cầu ngày giờ(giá trị) {
         nếu (loại của(giá trị) != "từ điển") {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         nếu (lấy từ điển(giá trị, "__vpp_datetime__", 0) != 1) {
-            ném "TIME_RANGE";
+            ném LỖI_TIME_RANGE;
         };
         mình.thời gian yêu cầu ngày(lấy từ điển(giá trị, "ngày", rỗng));
         mình.thời gian yêu cầu giờ(lấy từ điển(giá trị, "giờ", rỗng));
@@ -131,7 +132,7 @@ lớp công khai Lịch {
         lặp(i = 0; i < số lượng; i++) {
             c = văn bản[bắt đầu + i];
             nếu (!mình.thời gian là chữ số(c)) {
-                ném "TIME_PARSE";
+                ném LỖI_TIME_PARSE;
             };
             giá trị = giá trị * 10 + thành số nguyên(c);
         };
@@ -140,13 +141,13 @@ lớp công khai Lịch {
 
     hàm công khai phân tích ngày(văn bản) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
         nếu (máy ảo lấy độ dài(văn bản) != 10) {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
         nếu (văn bản[4] != "-" || văn bản[7] != "-") {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
         năm = mình.thời gian đọc số cố định(văn bản, 0, 4);
         tháng = mình.thời gian đọc số cố định(văn bản, 5, 2);
@@ -156,15 +157,15 @@ lớp công khai Lịch {
 
     hàm công khai phân tích ngày giờ(văn bản) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
         n = máy ảo lấy độ dài(văn bản);
         nếu (n < 19 || n > 29) {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
         nếu (văn bản[4] != "-" || văn bản[7] != "-" || văn bản[10] != "T" ||
             văn bản[13] != ":" || văn bản[16] != ":") {
-            ném "TIME_PARSE";
+            ném LỖI_TIME_PARSE;
         };
 
         ngày = mình.phân tích ngày(cắt chuỗi(văn bản, 0, 10));
@@ -175,11 +176,11 @@ lớp công khai Lịch {
 
         nếu (n > 19) {
             nếu (văn bản[19] != ".") {
-                ném "TIME_PARSE";
+                ném LỖI_TIME_PARSE;
             };
             chữ số = n - 20;
             nếu (chữ số < 1 || chữ số > 9) {
-                ném "TIME_PARSE";
+                ném LỖI_TIME_PARSE;
             };
             nano = mình.thời gian đọc số cố định(văn bản, 20, chữ số);
             lặp(i = chữ số; i < 9; i++) {

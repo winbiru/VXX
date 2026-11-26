@@ -1,0 +1,35 @@
+nhập context_owner.tạo dữ liệu chủ;
+nhập values.KEY_ROWS;
+nhập values.* như V;
+nhập package.VALUE như DEFAULT_VALUE;
+hằng LOCAL_KEY = "local";
+hằng NEGATIVE = -7;
+
+hàm lấy(kiểu = V.SQL_SELECT, số = DEFAULT_VALUE) {
+    in kiểu;
+    in số;
+};
+lớp Ví Dụ {
+    hàm khởi tạo(kiểu = V.SQL_SELECT) { mình.kiểu = kiểu; };
+    hàm đọc() { trả về mình.kiểu; };
+};
+hàm che tên(KEY_ROWS) {
+    dữ liệu = {KEY_ROWS: 9};
+    in dữ liệu["KEY_ROWS"];
+};
+hàm chính() {
+    hằng INNER_KEY = "inner";
+    dữ liệu = {KEY_ROWS: 7, LOCAL_KEY: 8, INNER_KEY: 9, V.SQL_SELECT: 10, thường: 11};
+    in dữ liệu["rows"];
+    in dữ liệu["local"];
+    in dữ liệu["inner"];
+    in dữ liệu["SELECT"];
+    in dữ liệu["thường"];
+    lấy();
+    lấy("explicit", 3);
+    in Ví Dụ().đọc();
+    che tên("shadow");
+    in tạo dữ liệu chủ()["owner"];
+};
+hàm số âm(số = NEGATIVE) { trả về số; };
+in số âm();

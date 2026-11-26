@@ -1,3 +1,4 @@
+nhập gói.hằng.http.*;
 // vi.net.http.server — bề mặt server V++ trên socket primitives của hệ điều hành.
 nhập gói.mạng.ổ cắm.*;
 nhập gói.mạng.http.máy khách.*;
@@ -38,7 +39,7 @@ lớp công khai Máy Chủ HTTP {
         trả về mạng truy vấn tham số yêu cầu(mã yêu cầu, khóa);
     };
 
-    hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = "application/json") {
+    hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = MIME_JSON) {
         trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung, kiểu nội dung);
     };
 
@@ -88,7 +89,7 @@ hàm công khai yêu cầu http tham số(mã yêu cầu, khóa) {
     trả về bộ chuyển tiếp.yêu cầu http tham số(mã yêu cầu, khóa);
 };
 
-hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = "application/json") {
+hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung = MIME_JSON) {
     bộ chuyển tiếp = Máy Chủ HTTP();
     trả về bộ chuyển tiếp.máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung, kiểu nội dung);
 };

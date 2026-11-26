@@ -1,0 +1,16 @@
+hằng NGHỊCH_ĐẢO_CĂN_HAI = 0.7071067811865475244;
+hằng SỐ_BƯỚC_NEWTON = 64;
+hằng ĐẦU_OPENQASM = "OPENQASM 3.0;\ninclude \"stdgates.inc\";\n";
+hằng KHÓA_GIAO_THỨC = "protocol";
+hằng PHIÊN_BẢN_GIAO_THỨC = 1;
+hằng GIỚI_HẠN_YÊU_CẦU = 24000;
+hằng THỜI_HẠN_MS = 120000;
+hằng CỔNG_H = "h";
+hằng CỔNG_X = "x";
+hằng CỔNG_Y = "y";
+hằng CỔNG_Z = "z";
+hằng CỔNG_S = "s";
+hằng CỔNG_T = "t";
+hằng CỔNG_CX = "cx";
+hằng CỔNG_ĐO = "measure";
+hằng CỔNG_RESET = "reset";

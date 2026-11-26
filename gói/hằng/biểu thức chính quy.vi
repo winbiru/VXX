@@ -1,0 +1,10 @@
+hằng REGEX_KHÓA_VỊ_TRÍ = "vị trí";
+hằng REGEX_KHÓA_NHÓM = "nhóm";
+hằng REGEX_KHÓA_LOẠI = "loại";
+hằng REGEX_KHÓA_CON = "con";
+hằng REGEX_KHÓA_MẪU = "mẫu";
+hằng REGEX_KHÓA_CHỮ = "chữ";
+hằng REGEX_KHÓA_GIÁ_TRỊ = "giá trị";
+hằng REGEX_KHÓA_CÂY = "cây";
+hằng REGEX_LỖI_VĂN_BẢN = "regex: văn bản phải là chuỗi";
+hằng REGEX_LỖI_THAY_THẾ = "regex thay: giá trị thay thế phải là chuỗi";

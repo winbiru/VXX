@@ -1,7 +1,11 @@
 // Thực thi AST trực tiếp trong tiến trình V++ đang chạy.
 // Parser là bước duy nhất trước khi chạy. Không sinh IR, bytecode hoặc mã máy.
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.chương trình.biên dịch hạ hằng độc lập;
 nhập gói.biên dịch.nguồn tệp.Bộ Nạp Nguồn;
+nhập gói.biên dịch.hằng mô đun.biên dịch hạ hằng đồ thị;
+nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
+nhập gói.biên dịch.kiểu mô đun.Bộ Đăng Ký Kiểu;
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
 nhập gói.lõi.chuyển kiểu.thành số thực;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
@@ -15,7 +19,7 @@ lớp công khai Bộ Thông Dịch {
     };
 
     hàm riêng tư phạm vi mới(cha, ranh giới hàm = sai) {
-        trả về {"giá trị": {}, "cha": cha, "ranh giới hàm": ranh giới hàm};
+        trả về {"giá trị": {}, "bất biến": {}, "cha": cha, "ranh giới hàm": ranh giới hàm};
     };
 
     hàm riêng tư phạm vi tìm(môi trường, tên) {
@@ -34,7 +38,7 @@ lớp công khai Bộ Thông Dịch {
         trả về phạm vi["giá trị"][tên];
     };
 
-    hàm riêng tư đặt biến(môi trường, tên, giá trị, khai báo = sai) {
+    hàm riêng tư đặt biến(môi trường, tên, giá trị, khai báo = sai, bất biến = sai) {
         phạm vi = môi trường;
         nếu (!khai báo) {
             tìm = mình.phạm vi tìm(môi trường, tên);
@@ -49,7 +53,11 @@ lớp công khai Bộ Thông Dịch {
                 };
             };
         };
+        nếu (máy ảo có khóa từ điển(phạm vi["bất biến"], tên)) {
+            ném "thông dịch: không thể gán lại hằng '" + tên + "'";
+        };
         phạm vi["giá trị"][tên] = giá trị;
+        nếu (bất biến) { phạm vi["bất biến"][tên] = đúng; };
         trả về giá trị;
     };
 
@@ -775,7 +783,8 @@ lớp công khai Bộ Thông Dịch {
         nếu (loại == "trống" || loại == "hàm" || loại == "lớp" ||
             loại == "giao diện" || loại == "nhập") { trả về mình.bình thường(); };
         nếu (loại == "biến") {
-            mình.đặt biến(môi trường, nút["tên"], mình.biểu thức(nút["giá trị"], môi trường), đúng);
+            mình.đặt biến(môi trường, nút["tên"], mình.biểu thức(nút["giá trị"], môi trường), đúng,
+                lấy từ điển(nút, "bất biến", sai));
             trả về mình.bình thường();
         };
         nếu (loại == "biểu thức") { mình.biểu thức(nút["biểu thức"], môi trường); trả về mình.bình thường(); };
@@ -841,17 +850,18 @@ lớp công khai Bộ Thông Dịch {
             nếu (mục["nguồn"] != đường) { bỏ qua; };
             xuất = phạm vi mô đun[mục["đích"]]["giá trị"];
             bí danh = mục["bí danh"];
-            nếu (bí danh != "") {
+            tên nhập = lấy từ điển(mục, "tên nhập", "*");
+            nếu (bí danh != "" && (tên nhập == "" || tên nhập == "*")) {
                 mình.đặt biến(môi trường, bí danh, xuất, đúng);
                 bỏ qua;
             };
-            tên nhập = "*";
-            nếu (máy ảo có khóa từ điển(mục, "tên nhập")) { tên nhập = mục["tên nhập"]; };
             nếu (tên nhập != "" && tên nhập != "*") {
                 nếu (!máy ảo có khóa từ điển(xuất, tên nhập)) {
                     ném "thông dịch: không có tên nhập '" + tên nhập + "'";
                 };
-                mình.đặt biến(môi trường, tên nhập, xuất[tên nhập], đúng);
+                tên đích = tên nhập;
+                nếu (bí danh != "") { tên đích = bí danh; };
+                mình.đặt biến(môi trường, tên đích, xuất[tên nhập], đúng);
             } hoặc {
                 các tên = máy ảo liệt kê khóa từ điển(xuất);
                 lặp(j = 0; j < máy ảo lấy độ dài(các tên); j++) {
@@ -866,6 +876,12 @@ lớp công khai Bộ Thông Dịch {
         cây = biên dịch phân tích chương trình thuần(nguồn);
         nếu (tệp != "") {
             đồ thị = Bộ Nạp Nguồn(thư viện).đồ thị(tệp, nguồn, cây);
+            biên dịch hạ hằng đồ thị(đồ thị);
+            nếu (máy ảo lấy độ dài(đồ thị["ô nhớ hằng"]) > 0) {
+                sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+                Bộ Đăng Ký Kiểu(sổ, đồ thị).đăng ký();
+            };
+            cây = đồ thị["cây điểm vào"];
             các mô đun = đồ thị["mô đun"];
             các phạm vi = {};
             các cây = {};
@@ -883,6 +899,8 @@ lớp công khai Bộ Thông Dịch {
                 mình.câu lệnh(các cây[đường], các phạm vi[đường]);
             };
             mình.nhập từ đồ thị(đồ thị, gốc, mình.toàn cục, các phạm vi);
+        } hoặc {
+            biên dịch hạ hằng độc lập(cây);
         };
         mình.câu lệnh(cây, mình.toàn cục);
         phạm vi chính = mình.phạm vi tìm(mình.toàn cục, "chính");

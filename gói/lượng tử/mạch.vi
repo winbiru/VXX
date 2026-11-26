@@ -1,3 +1,4 @@
+nhập gói.hằng.lượng tử.*;
 nhập gói . lượng tử . nền.lượng tử yêu cầu nguyên;
 nhập gói . bộ sưu tập . danh sách.thêm;
 // Mạch lưu chỉ dẫn, không lưu bản sao trạng thái vật lý của từng qubit.
@@ -31,27 +32,27 @@ lớp công khai Mạch Lượng Tử {
     }
     ;
     hàm công khai h(q) {
-        trả về mình.thêm cổng("h", q);
+        trả về mình.thêm cổng(CỔNG_H, q);
     }
     ;
     hàm công khai x(q) {
-        trả về mình.thêm cổng("x", q);
+        trả về mình.thêm cổng(CỔNG_X, q);
     }
     ;
     hàm công khai y(q) {
-        trả về mình.thêm cổng("y", q);
+        trả về mình.thêm cổng(CỔNG_Y, q);
     }
     ;
     hàm công khai z(q) {
-        trả về mình.thêm cổng("z", q);
+        trả về mình.thêm cổng(CỔNG_Z, q);
     }
     ;
     hàm công khai s(q) {
-        trả về mình.thêm cổng("s", q);
+        trả về mình.thêm cổng(CỔNG_S, q);
     }
     ;
     hàm công khai t(q) {
-        trả về mình.thêm cổng("t", q);
+        trả về mình.thêm cổng(CỔNG_T, q);
     }
     ;
     hàm công khai cx(điều khiển, đích) {
@@ -61,14 +62,14 @@ lớp công khai Mạch Lượng Tử {
             ném "lượng tử: qubit điều khiển và đích phải khác nhau";
         }
         ;
-        máy ảo thêm cuối danh sách(mình.lệnh, ["cx", điều khiển, đích]);
+        máy ảo thêm cuối danh sách(mình.lệnh, [CỔNG_CX, điều khiển, đích]);
         trả về mình;
     }
     ;
     hàm công khai đo(q, bit) {
         mình.kiểm tra qubit(q);
         lượng tử yêu cầu nguyên(bit, "chỉ số bit", 0, mình.bit - 1);
-        máy ảo thêm cuối danh sách(mình.lệnh, ["measure", q, bit]);
+        máy ảo thêm cuối danh sách(mình.lệnh, [CỔNG_ĐO, q, bit]);
         trả về mình;
     }
     ;
@@ -85,7 +86,7 @@ lớp công khai Mạch Lượng Tử {
     }
     ;
     hàm công khai đặt lại(q) {
-        trả về mình.thêm cổng("reset", q);
+        trả về mình.thêm cổng(CỔNG_RESET, q);
     }
     ;
     // Snapshot sâu để caller không thay đổi mạch qua kết quả trả về.

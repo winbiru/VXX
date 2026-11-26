@@ -1,3 +1,4 @@
+nhập gói.hằng.http.*;
 // Client HTTP hướng đối tượng. Dùng chung parser, transport và API hàm hiện có.
 // Mỗi instance giữ URL gốc; không sở hữu kết nối socket dùng lâu dài.
 nhập gói.mạng.http.máy khách.mạng http phân tích địa chỉ tài nguyên;
@@ -23,7 +24,7 @@ lớp công khai Khách HTTP triển khai Đóng Được {
         nếu (mình.đã đóng) { ném "khách HTTP: đã đóng"; };
         nếu (loại của(đường) != "chuỗi") { ném "khách HTTP: đường phải là chuỗi"; };
         nếu (đường == "") { trả về mình.địa chỉ tài nguyên gốc; };
-        nếu (bắt đầu bằng(đường, "http://") || bắt đầu bằng(đường, "https://")) {
+        nếu (bắt đầu bằng(đường, URL_HTTP) || bắt đầu bằng(đường, URL_HTTPS)) {
             ném "khách HTTP: đường tương đối không được là URL tuyệt đối";
         };
         gốc dữ liệu = mình.địa chỉ tài nguyên gốc;
@@ -45,8 +46,8 @@ lớp công khai Khách HTTP triển khai Đóng Được {
     };
 
     hàm công khai yêu cầu(phương thức, đường, dữ liệu = "") {
-        nếu (phương thức != "GET" && phương thức != "POST" &&
-            phương thức != "PUT" && phương thức != "DELETE") {
+        nếu (phương thức != HTTP_GET && phương thức != HTTP_POST &&
+            phương thức != HTTP_PUT && phương thức != HTTP_DELETE) {
             ném "khách HTTP: phương thức không hợp lệ";
         };
         trả về mình.thực thi(phương thức, mình.tạo URL(đường), dữ liệu);
@@ -59,18 +60,18 @@ lớp công khai Khách HTTP triển khai Đóng Được {
     hàm công khai đóng() { mình.đã đóng = đúng; trả về đúng; };
 
     hàm công khai lấy(đường) {
-        trả về mình.yêu cầu("GET", đường);
+        trả về mình.yêu cầu(HTTP_GET, đường);
     };
 
     hàm công khai gửi(đường, dữ liệu) {
-        trả về mình.yêu cầu("POST", đường, dữ liệu);
+        trả về mình.yêu cầu(HTTP_POST, đường, dữ liệu);
     };
 
     hàm công khai cập nhật(đường, dữ liệu) {
-        trả về mình.yêu cầu("PUT", đường, dữ liệu);
+        trả về mình.yêu cầu(HTTP_PUT, đường, dữ liệu);
     };
 
     hàm công khai xóa(đường) {
-        trả về mình.yêu cầu("DELETE", đường);
+        trả về mình.yêu cầu(HTTP_DELETE, đường);
     };
 };

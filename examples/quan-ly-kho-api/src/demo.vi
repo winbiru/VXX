@@ -1,3 +1,5 @@
+nhập hằng.trường dữ liệu.*;
+nhập hằng.cấu hình.*;
 nhập lõi;
 nhập mạng;
 nhập nhập xuất;
@@ -10,13 +12,13 @@ hàm ghi dữ liệu demo() {
     };
 
     sảnPhẩm = [
-        {"id": "SP-1", "ten": "Ca phe hat", "gia": 180000, "tonKho": 10, "daBan": 0, "phienBan": 1},
-        {"id": "SP-2", "ten": "Tra o long", "gia": 120000, "tonKho": 8, "daBan": 0, "phienBan": 1},
-        {"id": "SP-3", "ten": "Banh quy bo", "gia": 65000, "tonKho": 20, "daBan": 0, "phienBan": 1}
+        {KHÓA_ID: "SP-1", KHÓA_TÊN: "Ca phe hat", KHÓA_GIÁ: 180000, KHÓA_TỒN_KHO: 10, KHÓA_ĐÃ_BÁN: 0, KHÓA_PHIÊN_BẢN: 1},
+        {KHÓA_ID: "SP-2", KHÓA_TÊN: "Tra o long", KHÓA_GIÁ: 120000, KHÓA_TỒN_KHO: 8, KHÓA_ĐÃ_BÁN: 0, KHÓA_PHIÊN_BẢN: 1},
+        {KHÓA_ID: "SP-3", KHÓA_TÊN: "Banh quy bo", KHÓA_GIÁ: 65000, KHÓA_TỒN_KHO: 20, KHÓA_ĐÃ_BÁN: 0, KHÓA_PHIÊN_BẢN: 1}
     ];
 
-    ghi tệp("data/demo-san-pham.json", json tạo(sảnPhẩm));
-    ghi tệp("data/demo-don-hang.json", "[]");
+    ghi tệp(TỆP_DEMO_SẢN_PHẨM, json tạo(sảnPhẩm));
+    ghi tệp(TỆP_DEMO_ĐƠN_HÀNG, "[]");
 };
 
 hàm chính() {
@@ -24,7 +26,7 @@ hàm chính() {
     in json tạo(báo cáo tính năng());
 
     ghi dữ liệu demo();
-    ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
+    ứngDụng = tạo ngữ cảnh ứng dụng(TỆP_DEMO_SẢN_PHẨM, TỆP_DEMO_ĐƠN_HÀNG);
     dịchVụKho = lấy từ điển(ứngDụng, "dichVuKho", rỗng);
     dịchVụĐơnHàng = lấy từ điển(ứngDụng, "dichVuDonHang", rỗng);
     dịchVụBáoCáo = lấy từ điển(ứngDụng, "dichVuBaoCao", rỗng);
@@ -38,9 +40,9 @@ hàm chính() {
 
     in "=== TAO DON HANG ===";
     mục = [
-        {"maSanPham": "SP-1", "soLuong": 2},
-        {"maSanPham": "SP-2", "soLuong": 3},
-        {"maSanPham": "SP-1", "soLuong": 1}
+        {KHÓA_MÃ_SẢN_PHẨM: "SP-1", KHÓA_SỐ_LƯỢNG: 2},
+        {KHÓA_MÃ_SẢN_PHẨM: "SP-2", KHÓA_SỐ_LƯỢNG: 3},
+        {KHÓA_MÃ_SẢN_PHẨM: "SP-1", KHÓA_SỐ_LƯỢNG: 1}
     ];
     đơn = dịchVụĐơnHàng.đặtHàng("Cong ty Minh Anh", mục);
     in json tạo(đơn.thànhMap());
@@ -48,7 +50,7 @@ hàm chính() {
     in "=== THU DAT QUA TON KHO, BAT EXCEPTION NGHIEP VU ===";
     thử {
         dịchVụĐơnHàng.đặtHàng("Khach loi", [
-            {"maSanPham": "SP-3", "soLuong": 9999}
+            {KHÓA_MÃ_SẢN_PHẨM: "SP-3", KHÓA_SỐ_LƯỢNG: 9999}
         ]);
         in "LOI: nhanh nay khong duoc chay";
     } bắt lỗi (e) {
@@ -66,6 +68,6 @@ hàm chính() {
     in json tạo(dịchVụBáoCáo.tổngQuan());
 
     in "=== FILE JSON DA GHI ===";
-    in đọc tệp("data/demo-san-pham.json");
-    in đọc tệp("data/demo-don-hang.json");
+    in đọc tệp(TỆP_DEMO_SẢN_PHẨM);
+    in đọc tệp(TỆP_DEMO_ĐƠN_HÀNG);
 };

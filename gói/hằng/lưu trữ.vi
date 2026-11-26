@@ -1,0 +1,15 @@
+hằng ZIP_LỖI_TÊN_MỤC = "lưu trữ: tên mục ZIP không an toàn";
+hằng ZIP_LỖI_HEADER = "lưu trữ: header ZIP bị cắt ngắn";
+hằng ZIP_LỖI_CẮT_NGẮN = "lưu trữ: ZIP bị cắt ngắn";
+hằng ZIP_LỖI_GIỚI_HẠN = "lưu trữ: ZIP vượt giới hạn 2 GiB của runtime hiện tại";
+hằng ZIP_KHÓA_CRC = "crc";
+hằng ZIP_KHÓA_PHƯƠNG_THỨC = "phương thức";
+hằng ZIP_KHÓA_KÍCH_THƯỚC_NÉN = "kích thước nén";
+hằng ZIP_KHÓA_KÍCH_THƯỚC_GỐC = "kích thước gốc";
+hằng ZIP_KHÓA_VỊ_TRÍ_DỮ_LIỆU = "vị trí dữ liệu";
+hằng ZIP_KHÓA_TÊN_BYTES = "tên bytes";
+hằng ZIP_U16_TỐI_ĐA = 65535;
+hằng ZIP_U32_GIỚI_HẠN_RUNTIME = 2147483647;
+hằng ZIP_CHỮ_KÝ_HEADER_CỤC_BỘ = 67324752;
+hằng ZIP_CHỮ_KÝ_THƯ_MỤC_TRUNG_TÂM = 33639248;
+hằng ZIP_CHỮ_KÝ_KẾT_THÚC = 101010256;

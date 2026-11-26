@@ -1,0 +1,1 @@
+hàm chính() { hằng VALUE = [1]; VALUE[0] = 2; in VALUE[0]; };

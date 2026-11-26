@@ -1,3 +1,4 @@
+nhập hằng.chung.*;
 nhập lượng tử;
 nhập gói.lượng tử.qiskit.*;
 nhập gói.hệ thống.môi trường.*;
@@ -8,9 +9,9 @@ hàm chính() {
     nếu (trình chạy != "" || cầu nối != "") {
         sdk = Cầu Nối Qiskit(trình chạy, cầu nối);
     };
-    mạch = Mạch Lượng Tử(2);
+    mạch = Mạch Lượng Tử(SỐ_QUBIT_BELL);
     mạch.h(0) .cx(0, 1) .đo tất cả();
-    kết quả = sdk.mô phỏng(mạch, 1024, 42);
+    kết quả = sdk.mô phỏng(mạch, SỐ_LẦN_ĐO, HẠT_NGẪU_NHIÊN);
     in kết quả["đếm"];
 }
 ;

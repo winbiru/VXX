@@ -1,0 +1,1 @@
+hàm chính() { hằng VALUE = 1; f = hàm() { VALUE = 2; }; f(); };

@@ -123,6 +123,9 @@ lớp công khai Bộ Phát Bytecode {
     // IR đã phân giải binding; một SymbolId dùng đúng một VM slot dù cùng tên
     // với function ID, local của hàm khác hoặc biến của catch lồng nhau.
     hàm riêng tư biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, tên, mục ký hiệu) {
+        // Các hằng cấp mô-đun dùng slot thống nhất trong toàn phiên.
+        ô hằng = lấy từ điển(trạng thái, "ô nhớ hằng", rỗng);
+        nếu (ô hằng != rỗng && máy ảo có khóa từ điển(ô hằng, tên)) { trả về ô hằng[tên]; };
         nếu (mục ký hiệu < 0) { trả về mình.biên dịch phát mã ô nhớ(trạng thái, tên); };
         // Các SymbolId trong một phiên là duy nhất. Tra trực tiếp ID đã
         // phân giải để tránh quét lại toàn bộ slots ở mỗi LOAD/STORE của IR.
@@ -1521,6 +1524,26 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo thêm cuối danh sách(các hàm, {"tên": tên hàm, "id": mã định danh, "tên index": tên chỉ mục,
                             "bytecode": []});
         };
+        // Mọi mô-đun dành cùng vùng slot cho hằng, kể cả khi không nhập hằng.
+        // Slot biến thông thường nằm sau vùng này, tránh ghi đè khi khởi tạo.
+        ô hằng = {};
+        nếu (đồ thị != rỗng) {
+            danh sách hằng = lấy từ điển(đồ thị, "ô nhớ hằng", []);
+            nếu (máy ảo lấy độ dài(danh sách hằng) > 0) {
+                nếu (!máy ảo có khóa từ điển(phiên, "bắt đầu ô hằng")) {
+                    phiên["bắt đầu ô hằng"] = máy ảo lấy độ dài(sổ["hàm"]);
+                };
+                bắt đầu hằng = phiên["bắt đầu ô hằng"];
+                lặp(i = máy ảo lấy độ dài(các ô nhớ); i < bắt đầu hằng; i++) {
+                    máy ảo thêm cuối danh sách(các ô nhớ, "");
+                };
+                lặp(i = 0; i < máy ảo lấy độ dài(danh sách hằng); i++) {
+                    tên hằng = danh sách hằng[i];
+                    ô hằng[tên hằng] = bắt đầu hằng + i;
+                    máy ảo thêm cuối danh sách(các ô nhớ, tên hằng);
+                };
+            };
+        };
         kiểu lớp đã khai = [];
         lặp(i = 0; i < máy ảo lấy độ dài(lấy từ điển(biểu diễn trung gian, "lớp", [])); i++) {
             máy ảo thêm cuối danh sách(kiểu lớp đã khai, biểu diễn trung gian["lớp"][i]["tên"]);
@@ -1547,7 +1570,7 @@ lớp công khai Bộ Phát Bytecode {
                 chỉ mục hàm nhìn thấy[tên hàm] = danh sách nhìn thấy[i]["id"];
             };
         };
-        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chỉ mục symbol slots": {},
+        trạng thái = {"slots": các ô nhớ, "ô nhớ hằng": ô hằng, "khóa slots": [], "chỉ mục symbol slots": {},
                       "chỉ mục khóa slots": {}, "số khóa đã tra": 0, "chuỗi": sổ["chuỗi"],
                       "chỉ mục receiver": {}, "số receiver đã tra": 0,
                       "sổ hàm": sổ, "hàm ẩn danh": [],

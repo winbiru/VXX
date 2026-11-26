@@ -1,3 +1,5 @@
+nhập gói.hằng.cơ sở dữ liệu.*;
+nhập gói.hằng.http.*;
 // Legacy API-project adapter. It is intentionally excluded from gói/ứng dụng/chính.vi
 // because its routes, users schema, and JSON contracts are project-specific.
 
@@ -134,7 +136,7 @@ lớp công khai Bộ Cầu Nối API {
             mật khẩu,
             "CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(120) UNIQUE, first_names VARCHAR(255), last_name VARCHAR(255), email VARCHAR(255), phone_number VARCHAR(50), city VARCHAR(100), country VARCHAR(100), is_active INT DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);"
         );
-        nếu (kết quả tạo == "DB_ERR|not-connected") {
+        nếu (kết quả tạo == DB_CHƯA_KẾT_NỐI) {
             trả về kết quả tạo;
         };
 
@@ -147,7 +149,7 @@ lớp công khai Bộ Cầu Nối API {
                 mật khẩu,
                 "INSERT INTO users(username, first_names, last_name, email, phone_number, city, country, is_active) VALUES ('an','An','Nguyen','an@example.com','0900000001','HCM','VN',1),('binh','Binh','Tran','binh@example.com','0900000002','HN','VN',1),('chi','Chi','Le','chi@example.com','0900000003','DN','VN',1);"
             );
-            nếu (kết quả khởi tạo == "DB_ERR|not-connected") {
+            nếu (kết quả khởi tạo == DB_CHƯA_KẾT_NỐI) {
                 trả về kết quả khởi tạo;
             };
         };
@@ -158,7 +160,7 @@ lớp công khai Bộ Cầu Nối API {
     // Ghi chú hàm: chạy server HTTP V++ trên socket primitives cho API project.
     hàm công khai ứng dụng chạy máy chủ giao diện lập trình(cổng, trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, mã xác thực, mã làm mới, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị) {
         kết quả chuẩn bị = mình.ứng dụng chuẩn bị dữ liệu giao diện lập trình(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu);
-        nếu (kết quả chuẩn bị == "DB_ERR|not-connected") {
+        nếu (kết quả chuẩn bị == DB_CHƯA_KẾT_NỐI) {
             trả về kết quả chuẩn bị;
         };
 
@@ -174,14 +176,14 @@ lớp công khai Bộ Cầu Nối API {
             mã trạng thái = 200;
             phản hồi = mình.ứng dụng json phủ định đã tìm thấy(mã yêu cầu);
 
-            nếu (phương thức == "GET") {
+            nếu (phương thức == HTTP_GET) {
                 nếu (đường tệp == đường tình trạng) {
                     mã trạng thái = 200;
                     phản hồi = mình.ứng dụng json tình trạng();
                 };
             };
 
-            nếu (phương thức == "POST") {
+            nếu (phương thức == HTTP_POST) {
                 nếu (đường tệp == đường đăng nhập) {
                     nội dung tên đăng nhập = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "username");
                     nội dung mật khẩu = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "password");
@@ -225,7 +227,7 @@ lớp công khai Bộ Cầu Nối API {
             };
 
             nếu (mã trạng thái == 200) {
-                nếu (phương thức == "GET") {
+                nếu (phương thức == HTTP_GET) {
                     nếu (đường tệp == đường người dùng quản trị) {
                         các hàng = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT username FROM users ORDER BY username;");
                         dữ liệu người dùng json = "[]";
@@ -250,7 +252,7 @@ lớp công khai Bộ Cầu Nối API {
                         nếu (các hàng == "DB_OK|chi") {
                             dữ liệu người dùng json = "[\"chi\"]";
                         };
-                        nếu (các hàng == "DB_ERR|not-connected") {
+                        nếu (các hàng == DB_CHƯA_KẾT_NỐI) {
                             mã trạng thái = 500;
                             phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
                         } hoặc {
@@ -282,7 +284,7 @@ lớp công khai Bộ Cầu Nối API {
                             nếu (các hàng == "DB_OK|binh chi") {
                                 dữ liệu người dùng json = "[\"binh\",\"chi\"]";
                             };
-                            nếu (các hàng == "DB_ERR|not-connected") {
+                            nếu (các hàng == DB_CHƯA_KẾT_NỐI) {
                                 mã trạng thái = 500;
                                 phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
                             } hoặc {
@@ -294,7 +296,7 @@ lớp công khai Bộ Cầu Nối API {
             };
 
             nếu (mã trạng thái == 200) {
-                nếu (phương thức == "POST") {
+                nếu (phương thức == HTTP_POST) {
                     nếu (đường tệp == đường người dùng quản trị) {
                         tên đăng nhập mới = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "username");
                         nếu (tên đăng nhập mới == "") {
@@ -306,7 +308,7 @@ lớp công khai Bộ Cầu Nối API {
                             thư điện tử = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "email");
                             sql = "INSERT INTO users(username, first_names, last_name, email, phone_number, city, country, is_active) VALUES ('" + tên đăng nhập mới + "','" + các tên gọi + "','" + họ + "','" + thư điện tử + "','','','',1);";
                             kết quả cơ sở dữ liệu = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql);
-                            nếu (kết quả cơ sở dữ liệu == "DB_ERR|not-connected") {
+                            nếu (kết quả cơ sở dữ liệu == DB_CHƯA_KẾT_NỐI) {
                                 mã trạng thái = 500;
                                 phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
                             } hoặc {
@@ -321,14 +323,14 @@ lớp công khai Bộ Cầu Nối API {
             hậu tố định danh = mạng đường tệp hậu tố yêu cầu(mã yêu cầu, tiền tố định danh người dùng quản trị);
             nếu (mã trạng thái == 200) {
                 nếu (hậu tố định danh != "") {
-                    nếu (phương thức == "DELETE") {
+                    nếu (phương thức == HTTP_DELETE) {
                         kết quả đếm = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT COUNT(*) FROM users WHERE id=" + hậu tố định danh + ";");
                         nếu (kết quả đếm == "DB_OK|0") {
                             mã trạng thái = 404;
                             phản hồi = mình.ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu);
                         } hoặc {
                             kết quả xóa = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "DELETE FROM users WHERE id=" + hậu tố định danh + ";");
-                            nếu (kết quả xóa == "DB_ERR|not-connected") {
+                            nếu (kết quả xóa == DB_CHƯA_KẾT_NỐI) {
                                 mã trạng thái = 500;
                                 phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
                             } hoặc {
@@ -338,7 +340,7 @@ lớp công khai Bộ Cầu Nối API {
                         };
                     };
 
-                    nếu (phương thức == "PUT") {
+                    nếu (phương thức == HTTP_PUT) {
                         kết quả đếm = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT COUNT(*) FROM users WHERE id=" + hậu tố định danh + ";");
                         nếu (kết quả đếm == "DB_OK|0") {
                             mã trạng thái = 404;
@@ -350,7 +352,7 @@ lớp công khai Bộ Cầu Nối API {
                             thư điện tử = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "email");
                             sql = "UPDATE users SET username=IF('" + tên đăng nhập mới + "'='',username,'" + tên đăng nhập mới + "'),first_names=IF('" + các tên gọi + "'='',first_names,'" + các tên gọi + "'),last_name=IF('" + họ + "'='',last_name,'" + họ + "'),email=IF('" + thư điện tử + "'='',email,'" + thư điện tử + "') WHERE id=" + hậu tố định danh + ";";
                             kết quả cập nhật = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql);
-                            nếu (kết quả cập nhật == "DB_ERR|not-connected") {
+                            nếu (kết quả cập nhật == DB_CHƯA_KẾT_NỐI) {
                                 mã trạng thái = 500;
                                 phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
                             } hoặc {

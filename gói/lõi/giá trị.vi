@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Module: lõi.giá trị
 // Các helper tương ứng nhóm java.util.Objects nhưng giữ semantics V++:
 // rỗng là null, collection/object mutable dùng equality/hash theo identity.
@@ -94,10 +95,10 @@ hàm công khai yêu cầu có giá trị(giá trị, thông điệp = "VALUE_NU
 hàm công khai chỉ mục hợp lệ(chỉ số, kích thước) {
     nếu (loại của(chỉ số) != "số nguyên" ||
         loại của(kích thước) != "số nguyên") {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     nếu (kích thước < 0 || chỉ số < 0 || chỉ số >= kích thước) {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     trả về chỉ số;
 };
@@ -107,11 +108,11 @@ hàm công khai khoảng chỉ mục hợp lệ(bắt đầu, kết thúc, kích
     nếu (loại của(bắt đầu) != "số nguyên" ||
         loại của(kết thúc) != "số nguyên" ||
         loại của(kích thước) != "số nguyên") {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     nếu (kích thước < 0 || bắt đầu < 0 || kết thúc < bắt đầu ||
         kết thúc > kích thước) {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     trả về bắt đầu;
 };
@@ -122,11 +123,11 @@ hàm công khai vùng chỉ mục hợp lệ(bắt đầu, số lượng, kích 
     nếu (loại của(bắt đầu) != "số nguyên" ||
         loại của(số lượng) != "số nguyên" ||
         loại của(kích thước) != "số nguyên") {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     nếu (kích thước < 0 || bắt đầu < 0 || số lượng < 0 ||
         bắt đầu > kích thước || số lượng > kích thước - bắt đầu) {
-        ném "VALUE_INDEX";
+        ném LỖI_VALUE_INDEX;
     };
     trả về bắt đầu;
 };

@@ -1,3 +1,5 @@
+nhập hằng.trường dữ liệu.*;
+nhập hằng.đơn hàng.*;
 nhập lõi;
 
 lớp công khai DòngĐơnHàng {
@@ -27,10 +29,10 @@ lớp công khai DòngĐơnHàng {
 
     hàm thànhMap() {
         trả về {
-            "maSanPham": mình.mãSảnPhẩm,
-            "tenSanPham": mình.tênSảnPhẩm,
-            "donGia": mình.đơnGiá,
-            "soLuong": mình.sốLượng,
+            KHÓA_MÃ_SẢN_PHẨM: mình.mãSảnPhẩm,
+            KHÓA_TÊN_SẢN_PHẨM: mình.tênSảnPhẩm,
+            KHÓA_ĐƠN_GIÁ: mình.đơnGiá,
+            KHÓA_SỐ_LƯỢNG: mình.sốLượng,
             "thanhTien": mình.thànhTiền()
         };
     }
@@ -38,17 +40,17 @@ lớp công khai DòngĐơnHàng {
 
 hàm công khai dòng đơn hàng từ map(dữLiệu) {
     dòng = DòngĐơnHàng(
-        lấy từ điển(dữLiệu, "maSanPham", ""),
-        lấy từ điển(dữLiệu, "tenSanPham", ""),
-        lấy từ điển(dữLiệu, "donGia", 0),
-        lấy từ điển(dữLiệu, "soLuong", 0)
+        lấy từ điển(dữLiệu, KHÓA_MÃ_SẢN_PHẨM, ""),
+        lấy từ điển(dữLiệu, KHÓA_TÊN_SẢN_PHẨM, ""),
+        lấy từ điển(dữLiệu, KHÓA_ĐƠN_GIÁ, 0),
+        lấy từ điển(dữLiệu, KHÓA_SỐ_LƯỢNG, 0)
     );
     dòng.kiểmTraHợpLệ();
     trả về dòng;
 };
 
 lớp công khai ĐơnHàng {
-    hàm khởi tạo(id, kháchHàng, cácDòng, trạngThái = "MOI") {
+    hàm khởi tạo(id, kháchHàng, cácDòng, trạngThái = ĐƠN_MỚI) {
         mình.id = id;
         mình.kháchHàng = kháchHàng;
         mình.cácDòng = cácDòng;
@@ -79,18 +81,18 @@ lớp công khai ĐơnHàng {
     }
 
     hàm hủy() {
-        nếu (mình.trạngThái == "DA_HUY") {
+        nếu (mình.trạngThái == ĐƠN_ĐÃ_HỦY) {
             ném "Đơn hàng " + mình.id + ": đã hủy trước đó";
         };
-        mình.trạngThái = "DA_HUY";
+        mình.trạngThái = ĐƠN_ĐÃ_HỦY;
         trả về mình.trạngThái;
     }
 
     hàm xácNhận() {
-        nếu (mình.trạngThái != "MOI") {
+        nếu (mình.trạngThái != ĐƠN_MỚI) {
             ném "Đơn hàng " + mình.id + ": trạng thái không cho phép xác nhận";
         };
-        mình.trạngThái = "DA_XAC_NHAN";
+        mình.trạngThái = ĐƠN_ĐÃ_XÁC_NHẬN;
         trả về mình.trạngThái;
     }
 
@@ -102,9 +104,9 @@ lớp công khai ĐơnHàng {
             thêm(cácDòngMap, dòng.thànhMap());
         };
         trả về {
-            "id": mình.id,
-            "khachHang": mình.kháchHàng,
-            "trangThai": mình.trạngThái,
+            KHÓA_ID: mình.id,
+            KHÓA_KHÁCH_HÀNG: mình.kháchHàng,
+            KHÓA_TRẠNG_THÁI: mình.trạngThái,
             "tongTien": mình.tổngTiền(),
             "cacDong": cácDòngMap
         };
@@ -118,10 +120,10 @@ hàm công khai đơn hàng từ map(dữLiệu) {
         thêm(cácDòng, dòng đơn hàng từ map(cácDòngMap[i]));
     };
     đơn = ĐơnHàng(
-        lấy từ điển(dữLiệu, "id", ""),
-        lấy từ điển(dữLiệu, "khachHang", ""),
+        lấy từ điển(dữLiệu, KHÓA_ID, ""),
+        lấy từ điển(dữLiệu, KHÓA_KHÁCH_HÀNG, ""),
         cácDòng,
-        lấy từ điển(dữLiệu, "trangThai", "MOI")
+        lấy từ điển(dữLiệu, KHÓA_TRẠNG_THÁI, ĐƠN_MỚI)
     );
     đơn.kiểmTraHợpLệ();
     trả về đơn;

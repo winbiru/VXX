@@ -1,0 +1,2 @@
+hằng VALUE = 1;
+hàm chính() { VALUE = 2; };

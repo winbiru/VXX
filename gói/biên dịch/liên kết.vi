@@ -5,6 +5,7 @@ nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian IR đồ th
 nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian từ IR thuần;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
 nhập gói.biên dịch.nhập chọn lọc.*;
+nhập gói.biên dịch.hằng mô đun.biên dịch hạ hằng đồ thị;
 nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
 nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tìm mô đun;
 nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
@@ -377,6 +378,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         };
         đường hồ sơ = biên dịch hồ sơ đường();
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        biên dịch hạ hằng đồ thị(đồ thị);
         sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
         biên dịch hồ sơ ghi(đường hồ sơ, "link.registry", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);

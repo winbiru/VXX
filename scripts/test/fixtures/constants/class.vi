@@ -1,0 +1,2 @@
+lớp Ví Dụ { hàm công khai chạy() { hằng VALUE = 1; VALUE = 2; }; };
+hàm chính() { Ví Dụ().chạy(); };

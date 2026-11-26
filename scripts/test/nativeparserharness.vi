@@ -175,6 +175,17 @@ hàm test_parser_precedence() {
     trả về 0;
 };
 
+hàm test_constants() {
+    nếu (run_case("hàm chính() { hằng VALUE = 40; trả về VALUE + 2; };", 42) != 0) { trả về 127; };
+    nếu (expect_reject("hàm chính() { hằng VALUE = 1; VALUE = 2; trả về VALUE; };") != 0) { trả về 128; };
+    nếu (expect_reject("hàm chính() { hằng VALUE = 1; VALUE += 2; trả về VALUE; };") != 0) { trả về 129; };
+    nếu (expect_reject("hàm chính() { hằng VALUE = 1; VALUE++; trả về VALUE; };") != 0) { trả về 130; };
+    nếu (expect_reject("hàm chính() { hằng VALUE; trả về 0; };") != 0) { trả về 131; };
+    nếu (expect_reject("hàm chính() { hằng VALUE = 1; lặp (VALUE = 0; VALUE < 3; VALUE++) {}; trả về VALUE; };") != 0) { trả về 132; };
+    nếu (expect_reject("hàm chính() { hằng VALUE = 1; biến x = (VALUE = 2); trả về x; };") != 0) { trả về 133; };
+    trả về 0;
+};
+
 hàm test_token_errors() {
     biến src = byte mới();
     biến tokens = byte mới();
@@ -255,6 +266,8 @@ hàm chính() {
     code = test_parser_precedence();
     nếu (code != 0) { in (code); trả về code; };
     code = test_division_by_zero_ir();
+    nếu (code != 0) { in (code); trả về code; };
+    code = test_constants();
     nếu (code != 0) { in (code); trả về code; };
     code = test_token_errors();
     nếu (code != 0) { in (code); trả về code; };

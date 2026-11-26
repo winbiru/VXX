@@ -1,3 +1,4 @@
+nhập gói.hằng.cấu hình.*;
 // Module: cấu hình
 // Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
 // File I/O vẫn là VM primitive; toàn bộ parsing và chuyển kiểu nằm ở V++.
@@ -65,7 +66,7 @@ hàm riêng tư cấu hình phân tích dòng(dòng) {
     giá trị = cấu hình cắt khoảng trắng(
         cắt chuỗi(dòng, vị trí + 1, máy ảo lấy độ dài(dòng) - vị trí - 1)
     );
-    trả về {"khóa": khóa, "giá trị": giá trị};
+    trả về {CẤU_HÌNH_KHÓA_TÊN: khóa, CẤU_HÌNH_KHÓA_GIÁ_TRỊ: giá trị};
 };
 
 hàm riêng tư cấu hình là chữ số(c) {
@@ -153,8 +154,8 @@ hàm công khai đọc cấu hình(đường dẫn) {
         nếu (c == "\n") {
             mục = cấu hình phân tích dòng(dòng);
             nếu (mục != rỗng) {
-                khóa = lấy từ điển(mục, "khóa", "");
-                giá trị = lấy từ điển(mục, "giá trị", "");
+                khóa = lấy từ điển(mục, CẤU_HÌNH_KHÓA_TÊN, "");
+                giá trị = lấy từ điển(mục, CẤU_HÌNH_KHÓA_GIÁ_TRỊ, "");
                 đặt từ điển(kết quả, khóa, cấu hình chuyển giá trị(giá trị));
             };
             dòng = "";
@@ -185,8 +186,8 @@ hàm công khai đọc cấu hình khóa(đường dẫn, khóa, giá trị mặ
         nếu (c == "\n") {
             mục = cấu hình phân tích dòng(dòng);
             nếu (mục != rỗng) {
-                nếu (lấy từ điển(mục, "khóa", "") == khóa) {
-                    kết quả = lấy từ điển(mục, "giá trị", "");
+                nếu (lấy từ điển(mục, CẤU_HÌNH_KHÓA_TÊN, "") == khóa) {
+                    kết quả = lấy từ điển(mục, CẤU_HÌNH_KHÓA_GIÁ_TRỊ, "");
                     tìm thấy = đúng;
                 };
             };

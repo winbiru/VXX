@@ -1,3 +1,4 @@
+nhập gói.hằng.http.*;
 
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
@@ -30,7 +31,7 @@ lớp công khai Bộ Kiểm Thử API {
             trả về "ERR|missing-url";
         };
 
-        nếu (phương thức == "GET" || phương thức == "DELETE") {
+        nếu (phương thức == HTTP_GET || phương thức == HTTP_DELETE) {
             trả về phương thức + "|" + đường dẫn yêu cầu;
         };
 
@@ -39,22 +40,22 @@ lớp công khai Bộ Kiểm Thử API {
 
     // Ghi chú hàm: api get.
     hàm công khai giao diện lập trình lấy(đường dẫn yêu cầu) {
-        trả về mình.giao diện lập trình tạo yêu cầu("GET", đường dẫn yêu cầu, "");
+        trả về mình.giao diện lập trình tạo yêu cầu(HTTP_GET, đường dẫn yêu cầu, "");
     };
 
     // Ghi chú hàm: api post.
     hàm công khai giao diện lập trình post(đường dẫn yêu cầu, nội dung đệm) {
-        trả về mình.giao diện lập trình tạo yêu cầu("POST", đường dẫn yêu cầu, nội dung đệm);
+        trả về mình.giao diện lập trình tạo yêu cầu(HTTP_POST, đường dẫn yêu cầu, nội dung đệm);
     };
 
     // Ghi chú hàm: api put.
     hàm công khai giao diện lập trình put(đường dẫn yêu cầu, nội dung đệm) {
-        trả về mình.giao diện lập trình tạo yêu cầu("PUT", đường dẫn yêu cầu, nội dung đệm);
+        trả về mình.giao diện lập trình tạo yêu cầu(HTTP_PUT, đường dẫn yêu cầu, nội dung đệm);
     };
 
     // Ghi chú hàm: api delete.
     hàm công khai giao diện lập trình xóa(đường dẫn yêu cầu) {
-        trả về mình.giao diện lập trình tạo yêu cầu("DELETE", đường dẫn yêu cầu, "");
+        trả về mình.giao diện lập trình tạo yêu cầu(HTTP_DELETE, đường dẫn yêu cầu, "");
     };
 
     // Ghi chú hàm: api post json.

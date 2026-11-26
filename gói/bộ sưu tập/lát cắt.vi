@@ -1,11 +1,12 @@
+nhập gói.hằng.lỗi bộ sưu tập.*;
 // View chỉ mục trên danh sách hoặc chuỗi; không sao chép nguồn.
 // Nếu danh sách bị thu ngắn dưới cuối view thì truy cập bị từ chối.
 hàm công khai lát cắt(nguồn, đầu, dài) {
     biến kiểu = máy ảo lấy loại(nguồn);
     nếu (kiểu != "danh sách" && kiểu != "chuỗi") { ném "SLICE_SOURCE"; };
-    nếu (máy ảo lấy loại(đầu) != "số nguyên" || máy ảo lấy loại(dài) != "số nguyên") { ném "SLICE_RANGE"; };
+    nếu (máy ảo lấy loại(đầu) != "số nguyên" || máy ảo lấy loại(dài) != "số nguyên") { ném LỖI_SLICE_RANGE; };
     biến n = máy ảo lấy độ dài(nguồn);
-    nếu (đầu < 0 || dài < 0 || dài > n || đầu > n - dài) { ném "SLICE_RANGE"; };
+    nếu (đầu < 0 || dài < 0 || dài > n || đầu > n - dài) { ném LỖI_SLICE_RANGE; };
     trả về hàm(thao tác, chỉ số = 0, giá trị = rỗng) {
         nếu (đầu > máy ảo lấy độ dài(nguồn) - dài) { ném "SLICE_INVALIDATED"; };
         nếu (thao tác == "dài") { trả về dài; };
