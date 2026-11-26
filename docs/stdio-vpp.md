@@ -80,3 +80,44 @@ seek tương đối sau read-ahead, EOF/reset, append sau seek, i64, validation 
 `vpp-file-io-hardening` kiểm tra capability/descriptor, ownership token, extent,
 byte sai, short read/write, lỗi syscall và thu hồi tài nguyên. macOS ARM64 đã
 chạy thực; các nhánh Linux/Windows và chạy thực macOS x86-64 cần CI tương ứng.
+
+## Ghi ngẫu nhiên và đồng bộ bền vững
+
+API `gói.nhập xuất.tệp thô` cung cấp các thao tác trực tiếp cho cơ sở dữ liệu
+và nhật ký WAL. Chế độ mở 3 đọc/ghi, tạo tệp nếu chưa có và giữ nguyên nội dung
+nếu đã có.
+
+```vi
+nhập gói.nhập xuất.tệp thô.*;
+
+hàm chính() {
+    t = tệp thô mở("dữ liệu.bin", 3);
+    nếu (t == rỗng) { trả về 1; };
+    n = tệp thô ghi tại(t, [10, 20, 30], 3, 4096);
+    nếu (n != 3 || tệp thô đồng bộ(t) != 0) {
+        bỏ kết quả = tệp thô đóng(t);
+        trả về 1;
+    };
+    nếu (tệp thô đóng(t) != 0) { trả về 1; };
+    nếu (tệp thô đồng bộ thư mục(".") != 0) { trả về 1; };
+    trả về 0;
+};
+```
+
+- `tệp thô ghi tại(tệp, đệm, đếm, lệch)` ghi tối đa 65536 byte tại offset
+  tuyệt đối mà không thay đổi con trỏ đọc/ghi. Chế độ 1 và 3 hỗ trợ thao tác này.
+  Offset là i32 không âm hoặc danh sách `[low, high]` gồm hai i32, với
+  low là mẫu bit 32 bit thấp (có thể âm), high không âm. Ví dụ
+  `[0, 1]` biểu diễn 4 GiB. Kết quả là số byte thực ghi hoặc -1;
+  caller phải xử lý partial write và EINTR nếu cần.
+- `tệp thô đồng bộ(tệp)` gọi fsync trên POSIX hoặc FlushFileBuffers trên
+  Windows. Trả 0 khi thành công và -1 khi OS báo lỗi.
+- `tệp thô đồng bộ thư mục(đường)` mở đúng thư mục, gọi fsync và đóng handle
+  trên POSIX. Dùng sau các thay đổi tên/tạo/xóa để yêu cầu lưu metadata
+  thư mục. Windows trả -1 với ENOTSUP (129) vì chưa có cam kết tương đương.
+- `tệp thô mã lỗi()` trả mã lỗi OS của thao tác trên, 0 khi thành công.
+
+Các primitive không tự đẩy dữ liệu còn trong Bộ Đệm Tệp. Dùng API tệp thô
+cho WAL hoặc gọi `đẩy đệm()` trước khi đồng bộ handle tương ứng.
+Trên macOS, fsync là fsync tiêu chuẩn, không yêu cầu F_FULLFSYNC.
+Cam kết cuối cùng phụ thuộc hệ thống tệp và thiết bị lưu trữ.

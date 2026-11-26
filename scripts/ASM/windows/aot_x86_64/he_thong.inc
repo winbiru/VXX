@@ -48,6 +48,8 @@
     cmpl $80, %eax
     je 1f
     movl $13, %edx
+    cmpl $33, %eax
+    je 1f
     cmpl $5, %eax
     je 1f
     movl $36, %edx

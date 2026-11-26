@@ -16,6 +16,10 @@ PUBLIC(vpp_native_os_open):
     jne 2f
     movl $1089, %esi            // Linux O_WRONLY|O_CREAT|O_APPEND
 2:
+    cmpl $514, %esi
+    jne 3f
+    movl $66, %esi              // O_RDWR | O_CREAT
+3:
 #endif
     movl $438, %edx             // 0666, chịu ảnh hưởng umask của tiến trình
 #ifdef __APPLE__

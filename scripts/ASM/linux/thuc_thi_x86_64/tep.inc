@@ -73,6 +73,10 @@ vpp_native_os_open:
     jne .Lmo_co
     movl $1089, %edx            // Linux O_WRONLY|O_CREAT|O_APPEND
 .Lmo_co:
+    cmpl $514, %edx
+    jne 1f
+    movl $66, %edx
+1:
     movq $-100, %rdi            // AT_FDCWD
     movl $438, %ecx             // 0666, chịu ảnh hưởng umask
     call vpp_sys_openat

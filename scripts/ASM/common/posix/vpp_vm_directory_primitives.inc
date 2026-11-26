@@ -79,6 +79,16 @@ Lvm_dinh_danh_sai_bat:
 .globl VM_DIR_SYM(vpp_native_os_directory)
 VM_DIR_SYM(vpp_native_os_directory):
     VM_VAO_THU_MUC
+    cmp w19, #9
+    b.eq Lvm_pwrite_arm
+    cmp w19, #10
+    b.eq Lvm_fsync_arm
+    cmp w19, #11
+    b.eq Lvm_dirsync_arm
+    cmp w19, #12
+    b.eq Lvm_lock_arm
+    cmp w19, #13
+    b.eq Lvm_link_arm
     cmp w19, #7
     b.hi Lvm_thu_muc_sai_bat
     cmp w19, #6
@@ -159,6 +169,166 @@ Lvm_thu_muc_dong_bat:
     svc #0
 #endif
     VM_TRA_THU_MUC
+// Durability commands: 9 pwrite([fd,count,offset64,bytes]), 10 fsync(fd),
+// 11 fsync an opened directory. Return bytes/status or negative OS errno.
+Lvm_pwrite_arm:
+    mov w10, #0x13f0
+    movk w10, #0x810, lsl #16
+    cmp w20, w10
+    b.hi Lvm_thu_muc_sai_bat
+    add x23, x21, w20, uxtw
+    ldr w0, [x23]
+    ldr w2, [x23, #4]
+    cbz w2, Lvm_thu_muc_sai_bat
+    cmp w2, #16, lsl #12
+    b.hi Lvm_thu_muc_sai_bat
+    sub w10, w10, w20
+    cmp w2, w10
+    b.hi Lvm_thu_muc_sai_bat
+    ldr x3, [x23, #8]
+    tbnz x3, #63, Lvm_thu_muc_sai_bat
+    add x1, x23, #16
+#if defined(__APPLE__)
+    mov x16, #154
+    svc #0x80
+    b.cc 1f
+    neg w0, w0
+1:
+#else
+    mov x8, #68
+    svc #0
+#endif
+    VM_TRA_THU_MUC
+Lvm_fsync_arm:
+    mov w0, w20
+#if defined(__APPLE__)
+    mov x16, #95
+    svc #0x80
+    b.cc 1f
+    neg w0, w0
+1:
+#else
+    mov x8, #82
+    svc #0
+#endif
+    VM_TRA_THU_MUC
+Lvm_dirsync_arm:
+    mov w10, #0x400
+    movk w10, #0x810, lsl #16
+    cmp w20, w10
+    b.hi Lvm_thu_muc_sai_bat
+    add x20, x21, w20, uxtw
+    mov x9, x20
+    mov w10, #4096
+1:  ldrb w11, [x9], #1
+    cbz w11, 2f
+    subs w10, w10, #1
+    b.ne 1b
+    b Lvm_thu_muc_sai_bat
+2:
+#if defined(__APPLE__)
+    mov x0, x20
+    mov x1, #0x1100000        // O_DIRECTORY | O_CLOEXEC
+    mov x2, #0
+    mov x16, #5
+    svc #0x80
+    b.cs 3f
+    mov w23, w0
+    mov x16, #95
+    svc #0x80
+    b.cc 4f
+    neg w0, w0
+4:  mov w20, w0
+    mov w0, w23
+    mov x16, #6
+    svc #0x80
+    b.cc 5f
+    neg w0, w0
+5:  cbz w20, 6f
+    mov w0, w20
+6:  VM_TRA_THU_MUC
+3:  neg w0, w0
+#else
+    mov x0, #-100
+    mov x1, x20
+    mov x2, #0x80000          // ARM64 O_DIRECTORY | O_CLOEXEC
+    orr x2, x2, #0x4000
+    mov x3, #0
+    mov x8, #56
+    svc #0
+    tbnz x0, #63, 6f
+    mov w23, w0
+    mov x8, #82
+    svc #0
+    mov w20, w0
+    mov w0, w23
+    mov x8, #57
+    svc #0
+    cbz w20, 6f
+    mov w0, w20
+6:
+#endif
+    VM_TRA_THU_MUC
+
+// Exclusive, nonblocking lock on the original open file description.
+Lvm_lock_arm:
+    mov w0, w20
+    mov w1, #6
+#if defined(__APPLE__)
+    mov x16, #131
+    svc #0x80
+    b.cc 1f
+    neg w0, w0
+1:
+#else
+    mov x8, #32
+    svc #0
+#endif
+    VM_TRA_THU_MUC
+// Validate both NUL-terminated paths before passing them to the OS.
+Lvm_link_arm:
+    mov w10, #0x400
+    movk w10, #0x810, lsl #16
+    cmp w20, w10
+    b.hi Lvm_thu_muc_sai_bat
+    cmp w22, w10
+    b.hi Lvm_thu_muc_sai_bat
+    add x20, x21, w20, uxtw
+    add x22, x21, w22, uxtw
+    mov x9, x20
+    mov w10, #4096
+1:  ldrb w11, [x9], #1
+    cbz w11, 2f
+    subs w10, w10, #1
+    b.ne 1b
+    b Lvm_thu_muc_sai_bat
+2:  mov x9, x22
+    mov w10, #4096
+3:  ldrb w11, [x9], #1
+    cbz w11, 4f
+    subs w10, w10, #1
+    b.ne 3b
+    b Lvm_thu_muc_sai_bat
+4:
+#if defined(__APPLE__)
+    mov x0, x20
+    mov x1, x22
+    mov x16, #9
+    svc #0x80
+    b.cc 5f
+    neg w0, w0
+5:
+#else
+    mov x0, #-100
+    mov x1, x20
+    mov x2, #-100
+    mov x3, x22
+    mov x4, #0
+    mov x8, #37
+    svc #0
+#endif
+    VM_TRA_THU_MUC
+
 Lvm_thu_muc_duong_bat:
     tbnz w20, #31, Lvm_thu_muc_sai_bat
     mov w10, #0x400
@@ -379,6 +549,16 @@ Lvm_dinh_danh_sai_x86:
 .globl VM_DIR_SYM(vpp_native_os_directory)
 VM_DIR_SYM(vpp_native_os_directory):
     VM_VAO_THU_MUC
+    cmpl $9, %r15d
+    je Lvm_pwrite_x86
+    cmpl $10, %r15d
+    je Lvm_fsync_x86
+    cmpl $11, %r15d
+    je Lvm_dirsync_x86
+    cmpl $12, %r15d
+    je Lvm_lock_x86
+    cmpl $13, %r15d
+    je Lvm_link_x86
     cmpl $7, %r15d
     ja Lvm_thu_muc_sai_x86
     cmpl $6, %r15d
@@ -449,6 +629,165 @@ Lvm_thu_muc_dong_x86:
     syscall
 #endif
     VM_TRA_THU_MUC
+// Durability commands share the validated arena and return negative errno.
+Lvm_pwrite_x86:
+    cmpl $(135271424 - 16), %r13d
+    ja Lvm_thu_muc_sai_x86
+    leaq (%r12,%r13), %r14
+    movl (%r14), %edi
+    movl 4(%r14), %edx
+    testl %edx, %edx
+    jz Lvm_thu_muc_sai_x86
+    cmpl $65536, %edx
+    ja Lvm_thu_muc_sai_x86
+    movl $(135271424 - 16), %eax
+    subl %r13d, %eax
+    cmpl %eax, %edx
+    ja Lvm_thu_muc_sai_x86
+    movq 8(%r14), %r10
+    testq %r10, %r10
+    js Lvm_thu_muc_sai_x86
+    leaq 16(%r14), %rsi
+#if defined(__APPLE__)
+    movl $0x200009a, %eax
+    syscall
+    jnc 1f
+    negl %eax
+1:
+#else
+    movl $18, %eax
+    syscall
+#endif
+    VM_TRA_THU_MUC
+Lvm_fsync_x86:
+    movl %r13d, %edi
+#if defined(__APPLE__)
+    movl $0x200005f, %eax
+    syscall
+    jnc 1f
+    negl %eax
+1:
+#else
+    movl $74, %eax
+    syscall
+#endif
+    VM_TRA_THU_MUC
+Lvm_dirsync_x86:
+    cmpl $(135271424 - 4096), %r13d
+    ja Lvm_thu_muc_sai_x86
+    leaq (%r12,%r13), %r13
+    movq %r13, %rax
+    movl $4096, %ecx
+1:  cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp Lvm_thu_muc_sai_x86
+2:
+#if defined(__APPLE__)
+    movq %r13, %rdi
+    movl $0x1100000, %esi
+    xorl %edx, %edx
+    movl $0x2000005, %eax
+    syscall
+    jc 3f
+    movl %eax, %r14d
+    movl %eax, %edi
+    movl $0x200005f, %eax
+    syscall
+    jnc 4f
+    negl %eax
+4:  movl %eax, %r15d
+    movl %r14d, %edi
+    movl $0x2000006, %eax
+    syscall
+    jnc 5f
+    negl %eax
+5:  testl %r15d, %r15d
+    jz 6f
+    movl %r15d, %eax
+6:  VM_TRA_THU_MUC
+3:  negl %eax
+#else
+    movq $-100, %rdi
+    movq %r13, %rsi
+    movl $0x90000, %edx
+    xorl %r10d, %r10d
+    movl $257, %eax
+    syscall
+    testq %rax, %rax
+    js 6f
+    movl %eax, %r14d
+    movl %eax, %edi
+    movl $74, %eax
+    syscall
+    movl %eax, %r15d
+    movl %r14d, %edi
+    movl $3, %eax
+    syscall
+    testl %r15d, %r15d
+    jz 6f
+    movl %r15d, %eax
+6:
+#endif
+    VM_TRA_THU_MUC
+
+Lvm_lock_x86:
+    movl %r13d, %edi
+    movl $6, %esi
+#if defined(__APPLE__)
+    movl $0x2000083, %eax
+    syscall
+    jnc 1f
+    negl %eax
+1:
+#else
+    movl $73, %eax
+    syscall
+#endif
+    VM_TRA_THU_MUC
+Lvm_link_x86:
+    cmpl $(135271424 - 4096), %r13d
+    ja Lvm_thu_muc_sai_x86
+    cmpl $(135271424 - 4096), %r14d
+    ja Lvm_thu_muc_sai_x86
+    addq %r12, %r13
+    addq %r12, %r14
+    movq %r13, %rax
+    movl $4096, %ecx
+1:
+    cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp Lvm_thu_muc_sai_x86
+2:
+    movq %r14, %rax
+    movl $4096, %ecx
+3:
+    cmpb $0, (%rax)
+    je 4f
+    incq %rax
+    decl %ecx
+    jnz 3b
+    jmp Lvm_thu_muc_sai_x86
+4:
+    movq %r13, %rdi
+    movq %r14, %rsi
+#if defined(__APPLE__)
+    movl $0x2000009, %eax
+    syscall
+    jnc 5f
+    negl %eax
+5:
+#else
+    movl $86, %eax
+    syscall
+#endif
+    VM_TRA_THU_MUC
+
 Lvm_thu_muc_duong_x86:
     cmpl $(VM_DIR_X86_ARENA - 4096), %r13d
     ja Lvm_thu_muc_sai_x86

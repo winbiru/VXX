@@ -6,7 +6,7 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 // 131..134) và OP_FFI_CALL (156) không nằm trong bảng intrinsic.
 // Chỉ gọi kiểm tra này khi lệnh có immediate khác 0, như verifier C++.
 hàm công khai biên dịch là mã nội tại(mã) {
-    nếu (mã == 214 || mã == 216 || mã == 217 || (mã >= 218 && mã <= 232)) { trả về đúng; };
+    nếu (mã == 214 || mã == 216 || mã == 217 || (mã >= 218 && mã <= 235)) { trả về đúng; };
     nếu (mã < 98 || mã > 208) { trả về sai; };
     trả về mã != 110 && mã != 115 && mã != 119 &&
         (mã < 131 || mã > 134) && mã != 156;
@@ -136,6 +136,10 @@ hàm công khai biên dịch nội tại(tên) {
         }
         ca 15: {
             chọn (tên) {
+                ca "máy_tệp_đồng_bộ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_SYNC"), 1, đúng]; }
+                ca "máy tệp đồng bộ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_SYNC"), 1, đúng]; }
+                ca "máy_tệp_ghi_tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_PWRITE"), 4, đúng]; }
+                ca "máy tệp ghi tại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_PWRITE"), 4, đúng]; }
                 ca "máy ảo lấy loại": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }
                 ca "io_doc_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_DOC_BYTES"), 1, đúng]; }
                 ca "io_ghi_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_BYTES"), 2, đúng]; }
@@ -238,6 +242,8 @@ hàm công khai biên dịch nội tại(tên) {
         }
         ca 19: {
             chọn (tên) {
+                ca "máy_thư_mục_đồng_bộ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIRECTORY_SYNC"), 1, đúng]; }
+                ca "máy thư mục đồng bộ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIRECTORY_SYNC"), 1, đúng]; }
                 ca "io_ghi_tiep_file_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_TIEP_FILE"), 2, đúng]; }
                 ca "socket_chap_nhan_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_CHAP_NHAN"), 1, đúng]; }
                 ca "socket_phan_giai_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_PHAN_GIAI"), 3, đúng]; }
