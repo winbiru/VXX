@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi văn bản.*;
 nhập gói.lõi.chuyển kiểu.thành số nguyên;
 nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.văn bản.chuỗi.cắt chuỗi;
@@ -36,13 +37,13 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         kiểu = loại của(các byte);
         nếu (kiểu != "danh sách") {
             nếu (kiểu != "tuple") {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
         };
         mình.bộ mã hóa kiểm tra giới hạn(máy ảo lấy độ dài(các byte));
         lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
             nếu (!mình.bộ mã hóa byte hợp lệ(các byte[i])) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
         };
         trả về đúng;
@@ -50,7 +51,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
 
     hàm riêng tư bộ mã hóa yêu cầu chuỗi(văn bản) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "CODEC_INVALID";
+            ném LỖI_CODEC_INVALID;
         };
         trả về đúng;
     };
@@ -62,7 +63,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         nếu (dạng biến thể == "URL_AN_TOÀN") {
             trả về "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         };
-        ném "CODEC_INVALID";
+        ném LỖI_CODEC_INVALID;
     };
 
     hàm riêng tư base64 chỉ số(bảng chữ cái, ký tự) {
@@ -154,7 +155,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
                     nếu (số mục bỏ qua khoảng trắng && mình.base64 là khoảng trắng(c)) {
                         // Bỏ whitespace explicit.
                     } hoặc {
-                        ném "CODEC_INVALID";
+                        ném LỖI_CODEC_INVALID;
                     };
                 };
             };
@@ -172,11 +173,11 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             trả về [];
         };
         nếu (n % 4 == 1) {
-            ném "CODEC_INVALID";
+            ném LỖI_CODEC_INVALID;
         };
         nếu (chứa chuỗi(sạch, "=")) {
             nếu (n % 4 != 0) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
         };
 
@@ -186,7 +187,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             p = g * 4;
             còn = n - p;
             nếu (còn < 2) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
 
             c0 = sạch[p];
@@ -201,42 +202,42 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             };
 
             nếu (c0 == "=" || c1 == "=") {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
             nếu (c2 == "=" && c3 != "=") {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
             nếu ((c2 == "=" || c3 == "=") && g + 1 < nhóm) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
 
             s0 = mình.base64 chỉ số(bảng chữ cái, c0);
             s1 = mình.base64 chỉ số(bảng chữ cái, c1);
             nếu (s0 < 0 || s1 < 0) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
 
             máy ảo thêm cuối danh sách(kết quả, s0 * 4 + thành số nguyên(s1 / 16));
 
             nếu (c2 == "=") {
                 nếu (s1 % 16 != 0) {
-                    ném "CODEC_INVALID";
+                    ném LỖI_CODEC_INVALID;
                 };
             } hoặc {
                 s2 = mình.base64 chỉ số(bảng chữ cái, c2);
                 nếu (s2 < 0) {
-                    ném "CODEC_INVALID";
+                    ném LỖI_CODEC_INVALID;
                 };
                 máy ảo thêm cuối danh sách(kết quả, (s1 % 16) * 16 + thành số nguyên(s2 / 4));
 
                 nếu (c3 == "=") {
                     nếu (s2 % 4 != 0) {
-                        ném "CODEC_INVALID";
+                        ném LỖI_CODEC_INVALID;
                     };
                 } hoặc {
                     s3 = mình.base64 chỉ số(bảng chữ cái, c3);
                     nếu (s3 < 0) {
-                        ném "CODEC_INVALID";
+                        ném LỖI_CODEC_INVALID;
                     };
                     máy ảo thêm cuối danh sách(kết quả, (s2 % 4) * 64 + s3);
                 };
@@ -287,14 +288,14 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         sep số ký tự = máy ảo lấy độ dài(phân cách);
         nếu (sep số ký tự == 0) {
             nếu (n % 2 != 0) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
             số byte = thành số nguyên(n / 2);
         } hoặc {
             tử = n + sep số ký tự;
             mẫu = 2 + sep số ký tự;
             nếu (tử % mẫu != 0) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
             số byte = thành số nguyên(tử / mẫu);
         };
@@ -305,13 +306,13 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             nếu (i > 0 && sep số ký tự > 0) {
                 sep vị trí hiện tại = vị trí - sep số ký tự;
                 nếu (cắt chuỗi(văn bản, sep vị trí hiện tại, sep số ký tự) != phân cách) {
-                    ném "CODEC_INVALID";
+                    ném LỖI_CODEC_INVALID;
                 };
             };
             cao = mình.thập lục phân chỉ số(văn bản[vị trí]);
             thấp = mình.thập lục phân chỉ số(văn bản[vị trí + 1]);
             nếu (cao < 0 || thấp < 0) {
-                ném "CODEC_INVALID";
+                ném LỖI_CODEC_INVALID;
             };
             máy ảo thêm cuối danh sách(kết quả, cao * 16 + thấp);
         };
@@ -348,21 +349,21 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
 
     hàm công khai uuid phân tích(văn bản) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "UUID_INVALID";
+            ném LỖI_UUID_INVALID;
         };
         nếu (máy ảo lấy độ dài(văn bản) != 36) {
-            ném "UUID_INVALID";
+            ném LỖI_UUID_INVALID;
         };
         lặp(i = 0; i < 36; i++) {
             c = văn bản[i];
             là gạch = i == 8 || i == 13 || i == 18 || i == 23;
             nếu (là gạch) {
                 nếu (c != "-") {
-                    ném "UUID_INVALID";
+                    ném LỖI_UUID_INVALID;
                 };
             } hoặc {
                 nếu (mình.thập lục phân chỉ số(c) < 0) {
-                    ném "UUID_INVALID";
+                    ném LỖI_UUID_INVALID;
                 };
             };
         };
@@ -379,23 +380,23 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
 
     hàm riêng tư bit yêu cầu tập(tập) {
         nếu (loại của(tập) != "từ điển") {
-            ném "BITSET_INDEX";
+            ném LỖI_BITSET_INDEX;
         };
         nếu (lấy từ điển(tập, "__vpp_bitset__", 0) != 1) {
-            ném "BITSET_INDEX";
+            ném LỖI_BITSET_INDEX;
         };
         trả về lấy từ điển(tập, "bits", []);
     };
 
     hàm riêng tư bit yêu cầu chỉ số(chỉ mục) {
         nếu (loại của(chỉ mục) != "số nguyên") {
-            ném "BITSET_INDEX";
+            ném LỖI_BITSET_INDEX;
         };
         nếu (chỉ mục < 0) {
-            ném "BITSET_INDEX";
+            ném LỖI_BITSET_INDEX;
         };
         nếu (chỉ mục > 1000000000) {
-            ném "BITSET_RESOURCE_LIMIT";
+            ném LỖI_BITSET_RESOURCE_LIMIT;
         };
         trả về chỉ mục;
     };
@@ -405,7 +406,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         các bit = mình.bit yêu cầu tập(tập);
         nếu (tìm chỉ số(các bit, chỉ mục) < 0) {
             nếu (máy ảo lấy độ dài(các bit) >= 1000000) {
-                ném "BITSET_RESOURCE_LIMIT";
+                ném LỖI_BITSET_RESOURCE_LIMIT;
             };
             máy ảo thêm cuối danh sách(các bit, chỉ mục);
             sắp xếp(các bit);

@@ -70,6 +70,58 @@ danhSách[0] += 10;
 dữLiệu["phiên bản"] += 1;
 ```
 
+### Kiểu số và số học chính xác
+
+Giá trị số nguyên mặc định là i32, số thực mặc định là IEEE-754 binary64 (f64).
+VM, AOT và JIT động dùng cùng ngữ nghĩa số. Khi gọi `vpp jit tệp.vi` không
+kèm đối số, CLI thử backend i32 trước, rồi chọn backend động nếu backend i32
+không biên dịch được. Chế độ `--function` và `--raw-program` giữ ABI i32.
+
+Mô-đun `gói.lõi.số chính xác` bổ sung các hàm chuyển đổi:
+
+| API | Biểu diễn kết quả |
+| --- | --- |
+| `i8`, `i16`, `i32`, `u8`, `u16` | i32 với kiểm tra phạm vi lúc chuyển đổi |
+| `u32`, `i64`, `u64` | Đối tượng số chính xác, kiểm tra phạm vi lúc chuyển đổi |
+| `số nguyên lớn` | Số nguyên độ dài tùy ý, giới hạn bởi bộ nhớ |
+| `số thập phân` | Số thập phân độ chính xác tùy ý, giới hạn bởi bộ nhớ |
+| `f32` | Giá trị scalar có tag riêng, làm tròn theo binary32 (nearest ties-to-even) |
+| `f64` | Giá trị f64 (chuyển đổi số hoặc chuỗi) |
+
+Các hàm số nguyên có kiểm tra phạm vi và số chính xác nhận i32 hoặc chuỗi
+thập phân (có thể có dấu). Số thập phân hỗ trợ dấu chấm; đầu vào sai cú pháp bị từ chối.
+Đối tượng số chính xác hỗ trợ `cộng`, `trừ`, `nhân`, `so sánh` (−1, 0, 1),
+`là nguyên`, `chuỗi`, `chia(khác, tỷ lệ = 0)` và `chia dư(khác)`.
+Phép chia cắt về phía 0 với số chữ số thập phân được chỉ định (mặc định 0);
+chia dư chỉ nhận hai số nguyên. Chia cho 0 bị từ chối. Kết quả được chuẩn hóa, không giữ các số 0
+dư ở phần lẻ. Phép toán dùng chữ số nguyên, không mất độ chính xác do f64.
+
+```vi
+nhập gói.lõi.số chính xác.*;
+
+hàm chính() {
+    a = u64("18446744073709551615");
+    in a.chuỗi();
+    in a.cộng(số nguyên lớn("1")).chuỗi();
+    in số thập phân("0.1").cộng(số thập phân("0.2")).chuỗi(); // 0.3
+    in f32(16777217) == 16777216.0; // 1
+    in f64("1.25e2"); // 125.0
+};
+```
+
+Các hàm chuyển đổi số nguyên có giới hạn hiện là API thư viện: phép toán
+tiếp theo không tự kiểm tra phạm vi ban đầu. Số chính xác dùng phương thức,
+chưa có toán tử số học trực tiếp. Chưa có kiểu primitive i64/u64 hoặc hậu tố literal.
+
+`f32` lưu giá trị binary32 dưới dạng payload tương thích f64 trong một ô
+16 byte có tag riêng. Các phép `+`, `-`, `*`, `/` giữa f32 và f32 hoặc
+f32 và i32 làm tròn kết quả về binary32; i32 được đưa vào phép toán chính xác
+trước khi làm tròn. Nếu có toán hạng f64, kết quả là f64. So sánh theo giá trị,
+`++`/`--` giữ kiểu f32. `loại của` trả về tên nhóm “số thực” như trước.
+Phép chia cho 0 báo lỗi runtime. `f64(x)` chuyển f32 sang f64 bằng cách sao chép
+payload bit, giữ cả dấu của số 0 và payload NaN.
+Dùng chuỗi với hàm chuyển đổi khi cần ký pháp khoa học, ví dụ `f32("1e-30")`.
+
 ## Điều kiện và vòng lặp
 
 ```vi
@@ -395,8 +447,78 @@ Hai giao diện AST được khai báo tại `gói/biên dịch/giao diện cú 
 được `Luồng Tệp`, `Bộ Ghi Nhật Ký`, `Khách HTTP`, `Kết Nối Cơ Sở Dữ Liệu`
 và `Ổ Cắm TCP`, `Bộ Phát Sự Kiện`, `Luồng Truy Vấn` triển khai.
 `đóng()` gọi nhiều lần an toàn, nhưng mỗi lớp
-giữ kiểu kết quả cũ để tương thích. Người dùng cần chủ động gọi `đóng()`;
-hiện chưa có destructor/finalizer theo vòng đời instance V++.
+giữ kiểu kết quả cũ để tương thích. Có thể chủ động gọi `đóng()` hoặc
+dùng hàm `dùng tài nguyên` để giới hạn vòng đời trong callback.
+Hiện chưa có destructor/finalizer tự động theo vòng đời instance V++.
+
+### Quyền sở hữu, vòng đời tài nguyên và giá trị có kiểu kết quả
+
+Các API sau giữ mô hình kiểu động của V++ 1.0. Ví dụ:
+
+```vi
+nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh;
+nhập gói.lõi.vòng đời.dùng tài nguyên;
+nhập gói.lõi.kết quả.*;
+nhập gói.bộ sưu tập.lát cắt.lát cắt;
+nhập gói.nhập xuất.chính.*;
+
+hàm chính() {
+    biến a = chủ sở hữu tĩnh([1, 2, 3]);
+    biến b = a("chuyển");
+    b("ghi", hàm(x) { x[0] = 42; });
+    in b("đọc", hàm(x) { trả về x[0]; });
+    b("bỏ");
+    biến có = một giá trị(rỗng);
+    in có.có();
+    biến nguồn = [1, 2, 3];
+    biến lát = lát cắt(nguồn, 1, 2);
+    lát("ghi", 0, 8);
+    in nguồn[1];
+};
+```
+
+- `dùng tài nguyên(tài nguyên, xử lý)` gọi `đóng()` sau callback,
+  kể cả khi callback ném lỗi thông thường. Nếu cả callback và `đóng()`
+  đều lỗi, giữ lỗi của callback. Ví dụ `dùng tài nguyên(Luồng Tệp(đường,
+  "đọc"), hàm(tệp) { trả về tệp.đọc hết(); })`.
+- `sở hữu(giá trị)` trong `gói.lõi.vòng đời` tạo handle động. `chuyển`
+  tạo handle mới, vô hiệu hóa handle cũ; `bỏ` xóa tham chiếu của handle.
+  `đọc` cho phép nhiều lượt mượn lồng nhau, `ghi` yêu cầu độc quyền.
+  Handle cũ ném `OWNERSHIP_MOVED`, xung đột ném `OWNERSHIP_BORROWED`.
+  Callback phải tự tuân thủ hợp đồng không giữ alias và không sửa dữ liệu
+  khi mượn đọc. `bỏ` không trực tiếp gọi destructor của giá trị.
+- Import đích danh `gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh` bật kiểm tra
+  tĩnh bổ sung cho các lời gọi trực tiếp trong thân hàm. Compiler báo
+  `OWNERSHIP_USE_AFTER_MOVE` và `OWNERSHIP_BORROW_CONFLICT` khi suy luận
+  được vi phạm, gồm hợp nhánh điều kiện và callback mượn trực tiếp.
+  Đây là phân tích cục bộ, bỏ fact khi không biết hiệu ứng của lời gọi;
+  chưa bao phủ alias, lifetime tổng quát, vòng lặp hay mọi kiểu callback.
+- `Tùy Chọn` biểu diễn có/vắng giá trị (`một giá trị`, `không giá trị`);
+  `một giá trị(rỗng)` vẫn hiện diện. `Kết Quả` biểu diễn thành công/lỗi
+  (`thành công`, `thất bại`). Cả hai có `ánh xạ`, `nối`, `lấy`;
+  `Kết Quả` có `lấy lỗi`; cả hai có `phân nhánh` nhận hai callback
+  bắt buộc, chỉ gọi nhánh tương ứng với tag. Nhánh vắng của `Tùy Chọn`
+  không nhận đối số. Đây là phân nhánh qua thư viện động, chưa có cú pháp
+  pattern matching hoặc kiểm tra đầy đủ kiểu tại thời điểm biên dịch.
+- `lát cắt(nguồn, đầu, dài)` giữ tham chiếu tới danh sách/chuỗi,
+  không sao chép dữ liệu nguồn. Chỉ số bắt đầu từ 0; `đọc`, `ghi`, `dài`
+  kiểm tra phạm vi, `ghi` chỉ hỗ trợ danh sách. Nếu nguồn bị thu ngắn
+  vượt phạm vi view, truy cập ném `SLICE_INVALIDATED`.
+- `mượn lát cắt(chủ, đầu, dài, xử lý, ghi = sai)` giữ lượt mượn trên
+  handle sở hữu trong callback. Mặc định view chỉ đọc (`SLICE_READ_ONLY`);
+  truyền `đúng` để mượn ghi độc quyền. Khi callback trả về hoặc ném lỗi,
+  view mất hiệu lực (`SLICE_BORROW_EXPIRED`) và bỏ tham chiếu nguồn.
+  Các phần tử là đối tượng mutable vẫn có thể tạo alias bên ngoài view.
+
+GC vẫn thu hồi giá trị guest chia sẻ hoặc có chu trình. Worker chuyển
+đồ thị giá trị qua heap riêng. Module `gói.lõi.sở hữu luồng` cung cấp
+`chuyển sang luồng(chủ, công việc)`: yêu cầu mượn độc quyền handle,
+khởi chạy worker nhận snapshot của giá trị rồi vô hiệu hóa handle nguồn.
+Lỗi khởi chạy thông thường giữ handle nguồn còn hiệu lực. Alias bên ngoài
+handle vẫn có thể tồn tại; snapshot vẫn cần sao chép, và V++ chưa có
+ràng buộc kiểu `Send`/`Sync`. `dùng luồng(công việc, xử lý, đối số = rỗng)`
+chuyển `Luồng Công Việc` cho callback và đóng (hủy nếu cần, rồi join) khi
+callback trả về hoặc ném lỗi thông thường.
 
 `Vòng Đời Ứng Dụng` được khai báo trong `gói/ứng dụng/giao diện.vi`,
 phần hiện thực ở `gói/ứng dụng/bộ điều khiển.vi`. Lớp bảo vệ trạng thái

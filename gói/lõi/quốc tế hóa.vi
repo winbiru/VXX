@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Module: lõi.quốc tế hóa
 // Locale/resource/properties semantics thuần V++.
 // Không đọc process-global locale và không phụ thuộc native i18n APIs.
@@ -67,7 +68,7 @@ hàm riêng tư quốc tế tiêu đề mã ký tự cơ bản(s) {
 
 hàm riêng tư quốc tế tách nhãn(thô) {
     nếu (loại của(thô) != "chuỗi" || thô == "") {
-        ném "LOCALE_INVALID";
+        ném LỖI_LOCALE_INVALID;
     };
     phần = [];
     hiện tại = "";
@@ -76,11 +77,11 @@ hàm riêng tư quốc tế tách nhãn(thô) {
         c = "-";
         nếu (!hết) { c = thô[i]; };
         nếu (c == "-") {
-            nếu (hiện tại == "") { ném "LOCALE_INVALID"; };
+            nếu (hiện tại == "") { ném LỖI_LOCALE_INVALID; };
             máy ảo thêm cuối danh sách(phần, hiện tại);
             hiện tại = "";
         } hoặc {
-            nếu (!quốc tế là chữ số mã ký tự cơ bản(c)) { ném "LOCALE_INVALID"; };
+            nếu (!quốc tế là chữ số mã ký tự cơ bản(c)) { ném LỖI_LOCALE_INVALID; };
             hiện tại = hiện tại + c;
         };
     };
@@ -94,7 +95,7 @@ hàm công khai vùng ngôn ngữ(thô) {
     ngôn ngữ thô = phần[0];
     nếu (máy ảo lấy độ dài(ngôn ngữ thô) < 2 || máy ảo lấy độ dài(ngôn ngữ thô) > 8 ||
         !quốc tế toàn bộ chữ(ngôn ngữ thô)) {
-        ném "LOCALE_INVALID";
+        ném LỖI_LOCALE_INVALID;
     };
 
     ngôn ngữ = chuỗi thường(ngôn ngữ thô);
@@ -124,7 +125,7 @@ hàm công khai vùng ngôn ngữ(thô) {
         p = phần[k];
         nếu (máy ảo lấy độ dài(p) < 1 || máy ảo lấy độ dài(p) > 8 ||
             !quốc tế toàn bộ chữ số(p)) {
-            ném "LOCALE_INVALID";
+            ném LỖI_LOCALE_INVALID;
         };
         máy ảo thêm cuối danh sách(phụ, chuỗi thường(p));
     };
@@ -148,10 +149,10 @@ hàm công khai vùng ngôn ngữ(thô) {
 
 hàm công khai nhãn vùng ngôn ngữ(vùng vùng ngôn ngữ) {
     nếu (loại của(vùng vùng ngôn ngữ) != "từ điển") {
-        ném "LOCALE_INVALID";
+        ném LỖI_LOCALE_INVALID;
     };
     nếu (lấy từ điển(vùng vùng ngôn ngữ, "__vpp_locale__", 0) != 1) {
-        ném "LOCALE_INVALID";
+        ném LỖI_LOCALE_INVALID;
     };
     trả về lấy từ điển(vùng vùng ngôn ngữ, "tag", "");
 };
@@ -195,7 +196,7 @@ hàm công khai dự phòng vùng ngôn ngữ(vùng vùng ngôn ngữ) {
 hàm công khai gói tài nguyên(tên cơ sở, vùng vùng ngôn ngữ, nguồn) {
     nếu (loại của(tên cơ sở) != "chuỗi" || tên cơ sở == "" ||
         loại của(nguồn) != "từ điển") {
-        ném "RESOURCE_INVALID";
+        ném LỖI_RESOURCE_INVALID;
     };
     nếu (loại của(vùng vùng ngôn ngữ) == "chuỗi") {
         vùng vùng ngôn ngữ = vùng ngôn ngữ(vùng vùng ngôn ngữ);
@@ -210,13 +211,13 @@ hàm công khai gói tài nguyên(tên cơ sở, vùng vùng ngôn ngữ, nguồ
         nếu (máy ảo có khóa từ điển(nguồn, khóa tra cứu)) {
             dữ liệu = lấy từ điển(nguồn, khóa tra cứu, rỗng);
             nếu (loại của(dữ liệu) != "từ điển") {
-                ném "RESOURCE_INVALID";
+                ném LỖI_RESOURCE_INVALID;
             };
             đã chọn = khóa tra cứu;
             tìm thấy = đúng;
         };
     };
-    nếu (!tìm thấy) { ném "RESOURCE_MISSING"; };
+    nếu (!tìm thấy) { ném LỖI_RESOURCE_MISSING; };
 
     trả về {
         "__vpp_resource_bundle__": 1,
@@ -229,16 +230,16 @@ hàm công khai gói tài nguyên(tên cơ sở, vùng vùng ngôn ngữ, nguồ
 
 hàm công khai lấy tài nguyên(gói tài nguyên, khóa) {
     nếu (loại của(gói tài nguyên) != "từ điển") {
-        ném "RESOURCE_INVALID";
+        ném LỖI_RESOURCE_INVALID;
     };
     nếu (lấy từ điển(gói tài nguyên, "__vpp_resource_bundle__", 0) != 1) {
-        ném "RESOURCE_INVALID";
+        ném LỖI_RESOURCE_INVALID;
     };
     nếu (loại của(khóa) != "chuỗi") {
-        ném "RESOURCE_INVALID";
+        ném LỖI_RESOURCE_INVALID;
     };
     dữ liệu = lấy từ điển(gói tài nguyên, "dữ liệu", {});
-    nếu (!máy ảo có khóa từ điển(dữ liệu, khóa)) { ném "RESOURCE_MISSING"; };
+    nếu (!máy ảo có khóa từ điển(dữ liệu, khóa)) { ném LỖI_RESOURCE_MISSING; };
     trả về lấy từ điển(dữ liệu, khóa, rỗng);
 };
 
@@ -258,7 +259,7 @@ hàm riêng tư quốc tế thập lục phân nửa byte(c) {
 
 hàm riêng tư quốc tế ký tự mã(mã) {
     nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
-        ném "PROPERTIES_INVALID";
+        ném LỖI_PROPERTIES_INVALID;
     };
     các byte = [];
     nếu (mã <= 127) {
@@ -293,7 +294,7 @@ hàm riêng tư quốc tế giải ký tự thoát các thuộc tính(s) {
             i += 1;
         } hoặc {
             i += 1;
-            nếu (i >= máy ảo lấy độ dài(s)) { ném "PROPERTIES_INVALID"; };
+            nếu (i >= máy ảo lấy độ dài(s)) { ném LỖI_PROPERTIES_INVALID; };
             e = s[i];
             nếu (e == "t") { kết quả = kết quả + "\t"; i += 1; }
             hoặc {
@@ -304,11 +305,11 @@ hàm riêng tư quốc tế giải ký tự thoát các thuộc tính(s) {
                         nếu (e == "f") { kết quả = kết quả + "\f"; i += 1; }
                         hoặc {
                             nếu (e == "u") {
-                                nếu (i + 4 >= máy ảo lấy độ dài(s)) { ném "PROPERTIES_INVALID"; };
+                                nếu (i + 4 >= máy ảo lấy độ dài(s)) { ném LỖI_PROPERTIES_INVALID; };
                                 mã = 0;
                                 lặp(k = 1; k <= 4; k++) {
                                     nửa byte = quốc tế thập lục phân nửa byte(s[i + k]);
-                                    nếu (nửa byte < 0) { ném "PROPERTIES_INVALID"; };
+                                    nếu (nửa byte < 0) { ném LỖI_PROPERTIES_INVALID; };
                                     mã = mã * 16 + nửa byte;
                                 };
                                 kết quả = kết quả + quốc tế ký tự mã(mã);
@@ -441,15 +442,15 @@ hàm công khai các thuộc tính(văn bản, mặc định = rỗng,
     nếu (loại của(văn bản) != "chuỗi" ||
         loại của(mức trần mục) != "số nguyên" || mức trần mục <= 0 ||
         loại của(mức trần ký tự) != "số nguyên" || mức trần ký tự <= 0) {
-        ném "PROPERTIES_INVALID";
+        ném LỖI_PROPERTIES_INVALID;
     };
-    nếu (máy ảo lấy độ dài(văn bản) > mức trần ký tự) { ném "I18N_RESOURCE_LIMIT"; };
+    nếu (máy ảo lấy độ dài(văn bản) > mức trần ký tự) { ném LỖI_I18N_RESOURCE_LIMIT; };
     nếu (mặc định != rỗng) {
         nếu (loại của(mặc định) != "từ điển") {
-            ném "PROPERTIES_INVALID";
+            ném LỖI_PROPERTIES_INVALID;
         };
         nếu (lấy từ điển(mặc định, "__vpp_properties__", 0) != 1) {
-            ném "PROPERTIES_INVALID";
+            ném LỖI_PROPERTIES_INVALID;
         };
     };
 
@@ -484,7 +485,7 @@ hàm công khai các thuộc tính(văn bản, mặc định = rỗng,
                         khóa = lấy từ điển(mục, "khóa", "");
                         nếu (!máy ảo có khóa từ điển(dữ liệu, khóa)) {
                             số mục += 1;
-                            nếu (số mục > mức trần mục) { ném "I18N_RESOURCE_LIMIT"; };
+                            nếu (số mục > mức trần mục) { ném LỖI_I18N_RESOURCE_LIMIT; };
                         };
                         đặt từ điển(dữ liệu, khóa, lấy từ điển(mục, "giá trị", ""));
                     };
@@ -495,7 +496,7 @@ hàm công khai các thuộc tính(văn bản, mặc định = rỗng,
             };
         };
     };
-    nếu (tiếp diễn) { ném "PROPERTIES_INVALID"; };
+    nếu (tiếp diễn) { ném LỖI_PROPERTIES_INVALID; };
 
     trả về {
         "__vpp_properties__": 1,
@@ -506,13 +507,13 @@ hàm công khai các thuộc tính(văn bản, mặc định = rỗng,
 
 hàm công khai lấy thuộc tính(cấu hình, khóa, dự phòng = rỗng) {
     nếu (loại của(cấu hình) != "từ điển") {
-        ném "PROPERTIES_INVALID";
+        ném LỖI_PROPERTIES_INVALID;
     };
     nếu (lấy từ điển(cấu hình, "__vpp_properties__", 0) != 1) {
-        ném "PROPERTIES_INVALID";
+        ném LỖI_PROPERTIES_INVALID;
     };
     nếu (loại của(khóa) != "chuỗi") {
-        ném "PROPERTIES_INVALID";
+        ném LỖI_PROPERTIES_INVALID;
     };
     dữ liệu = lấy từ điển(cấu hình, "dữ liệu", {});
     nếu (máy ảo có khóa từ điển(dữ liệu, khóa)) {

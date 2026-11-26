@@ -411,7 +411,7 @@ function completionKind(kind) {
 // and when the user deliberately disables the language server.
 const VPP_KEYWORDS = [
   'nhập', 'như', 'công khai', 'riêng tư', 'bảo vệ', 'hàm', 'lớp',
-  'giao diện', 'biến', 'nếu', 'nếu không', 'lặp', 'khi', 'chọn', 'ca',
+  'giao diện', 'biến', 'hằng', 'nếu', 'nếu không', 'lặp', 'khi', 'chọn', 'ca',
   'mặc định', 'trả về', 'thoát', 'dừng', 'thử', 'bắt lỗi', 'ném',
   'gọi', 'mình', 'gốc', 'kế thừa', 'triển khai', 'ngoại thư viện',
   'ngoại hàm', 'ký hiệu', 'khả năng', 'abi', 'từ', 'đúng', 'sai',
@@ -548,13 +548,14 @@ function vppImportCompletionItems(document, position, prefix, context) {
         }
         try {
           const source = fs.readFileSync(moduleFile, 'utf8');
-          const declarations = /^(hàm|lớp|giao diện)\s+(?:(công khai|riêng tư|bảo vệ)\s+)?([\p{L}_][\p{L}\p{N}_ ]*?)(?=\s*(?:\(|\{|kế thừa\b|triển khai\b))/gmu;
+          const declarations = /^(hàm|lớp|giao diện|hằng)\s+(?:(công khai|riêng tư|bảo vệ)\s+)?([\p{L}_][\p{L}\p{N}_ ]*?)(?=\s*(?:\(|\{|=|kế thừa\b|triển khai\b))/gmu;
           for (const declaration of source.matchAll(declarations)) {
             if (declaration[2] === 'riêng tư' || declaration[2] === 'bảo vệ') continue;
             const name = declaration[3].trim();
             if (!foldVietnamese(name).startsWith(foldVietnamese(segment))) continue;
             addImportItem(`${directory}${name}`,
-              declaration[1] === 'hàm' ? vscode.CompletionItemKind.Function : vscode.CompletionItemKind.Class,
+              declaration[1] === 'hằng' ? vscode.CompletionItemKind.Constant :
+                declaration[1] === 'hàm' ? vscode.CompletionItemKind.Function : vscode.CompletionItemKind.Class,
               `Tên công khai trong ${moduleName}`, '1');
           }
         } catch (_) {
@@ -652,13 +653,14 @@ function symbolKind(keyword) {
   if (keyword === 'giao diện') return vscode.SymbolKind.Interface;
   if (keyword === 'hàm' || keyword === 'ngoại hàm') return vscode.SymbolKind.Function;
   if (keyword === 'ngoại thư viện') return vscode.SymbolKind.Module;
+  if (keyword === 'hằng') return vscode.SymbolKind.Constant;
   return vscode.SymbolKind.Variable;
 }
 
 function documentSymbols(document) {
   const text = document.getText();
   const symbols = [];
-  const pattern = /(^|\n)[\t ]*(?:(công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?(lớp|giao\s+diện|hàm|ngoại\s+hàm|ngoại\s+thư\s+viện|biến)\s+(?:(?:công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*?)(?=\s*(?:\(|\{|:|=|;|kế\s+thừa\b|triển\s+khai\b))/gu;
+  const pattern = /(^|\n)[\t ]*(?:(công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?(lớp|giao\s+diện|hàm|ngoại\s+hàm|ngoại\s+thư\s+viện|biến|hằng)\s+(?:(?:công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*?)(?=\s*(?:\(|\{|:|=|;|kế\s+thừa\b|triển\s+khai\b))/gu;
   let match;
   while ((match = pattern.exec(text)) !== null) {
     const keyword = match[3].replace(/\s+/gu, ' ');

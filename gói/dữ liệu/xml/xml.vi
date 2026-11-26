@@ -1,3 +1,4 @@
+nhập gói.hằng.xml.*;
 // vi.xml — XML cây đơn giản, không tải DOCTYPE/thực thể ngoài.
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.đặt từ điển;
@@ -65,7 +66,7 @@ lớp riêng tư Bộ Xử Lý XML {
     // nhưng thuộc tính đặt trong dấu " nên phải giữ cả quote/apostrophe an toàn.
     hàm riêng tư xml thoát thuộc tính(văn bản) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "xml tạo: thuộc tính không hợp lệ";
+            ném XML_LỖI_THUỘC_TÍNH;
         };
 
         kết quả = "";
@@ -127,13 +128,13 @@ lớp riêng tư Bộ Xử Lý XML {
     };
 
     hàm riêng tư xml lỗi(trạng thái, thông báo) {
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         ném "xml: " + thông báo + " tại vị trí " + thành chuỗi(vị trí);
     };
 
     hàm riêng tư xml bỏ khoảng trắng(trạng thái) {
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         n = máy ảo lấy độ dài(nội dung);
         đang bỏ = đúng;
         khi (vị trí < n && đang bỏ) {
@@ -143,12 +144,12 @@ lớp riêng tư Bộ Xử Lý XML {
                 đang bỏ = sai;
             };
         };
-        đặt từ điển(trạng thái, "vị trí", vị trí);
+        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí);
     };
 
     hàm riêng tư xml bắt đầu tại(trạng thái, từ tố) {
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         m = máy ảo lấy độ dài(từ tố);
         nếu (vị trí + m > máy ảo lấy độ dài(nội dung)) {
             trả về sai;
@@ -157,8 +158,8 @@ lớp riêng tư Bộ Xử Lý XML {
     };
 
     hàm riêng tư xml đọc tên(trạng thái) {
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         n = máy ảo lấy độ dài(nội dung);
         bắt đầu = vị trí;
         đang đọc = đúng;
@@ -173,7 +174,7 @@ lớp riêng tư Bộ Xử Lý XML {
         nếu (vị trí == bắt đầu) {
             mình.xml lỗi(trạng thái, "thiếu tên");
         };
-        đặt từ điển(trạng thái, "vị trí", vị trí);
+        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí);
         trả về cắt chuỗi(nội dung, bắt đầu, vị trí - bắt đầu);
     };
 
@@ -219,7 +220,7 @@ lớp riêng tư Bộ Xử Lý XML {
     hàm riêng tư xml thực thể số(thực thể) {
         n = máy ảo lấy độ dài(thực thể);
         nếu (n < 2 || thực thể[0] != "#") {
-            ném "xml: thực thể số không hợp lệ";
+            ném XML_LỖI_THỰC_THỂ_SỐ;
         };
         i = 1;
         cơ số = 10;
@@ -230,7 +231,7 @@ lớp riêng tư Bộ Xử Lý XML {
             };
         };
         nếu (i >= n) {
-            ném "xml: thực thể số không hợp lệ";
+            ném XML_LỖI_THỰC_THỂ_SỐ;
         };
         giá trị = 0;
         hợp lệ = đúng;
@@ -254,7 +255,7 @@ lớp riêng tư Bộ Xử Lý XML {
             i = i + 1;
         };
         nếu (!hợp lệ) {
-            ném "xml: thực thể số không hợp lệ";
+            ném XML_LỖI_THỰC_THỂ_SỐ;
         };
         trả về mình.xml ký tự mã(giá trị);
     };
@@ -309,8 +310,8 @@ lớp riêng tư Bộ Xử Lý XML {
     };
 
     hàm riêng tư xml đọc thuộc tính có nháy(trạng thái) {
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         n = máy ảo lấy độ dài(nội dung);
         nếu (vị trí >= n) {
             mình.xml lỗi(trạng thái, "giá trị thuộc tính phải đặt trong dấu nháy");
@@ -330,39 +331,39 @@ lớp riêng tư Bộ Xử Lý XML {
             };
         };
         nếu (vị trí >= n) {
-            đặt từ điển(trạng thái, "vị trí", vị trí);
+            đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí);
             mình.xml lỗi(trạng thái, "thuộc tính chưa kết thúc");
         };
         đã mã hóa = cắt chuỗi(nội dung, bắt đầu, vị trí - bắt đầu);
-        đặt từ điển(trạng thái, "vị trí", vị trí + 1);
+        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 1);
         trả về mình.xml giải thực thể(đã mã hóa);
     };
 
     hàm riêng tư xml bỏ chú thích(trạng thái) {
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         kết thúc = tìm chuỗi chính xác(nội dung, "-->", vị trí + 4);
         nếu (kết thúc == rỗng) {
             mình.xml lỗi(trạng thái, "comment chưa kết thúc");
         };
-        đặt từ điển(trạng thái, "vị trí", kết thúc + 3);
+        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, kết thúc + 3);
     };
 
     hàm riêng tư xml tạo nút phân tích cú pháp(tên, thuộc tính, nội dung, con) {
         trả về {
-            "tên": tên,
-            "thuộc tính": thuộc tính,
-            "nội dung": nội dung,
-            "con": con
+            XML_KHÓA_TÊN: tên,
+            XML_KHÓA_THUỘC_TÍNH: thuộc tính,
+            XML_KHÓA_NỘI_DUNG: nội dung,
+            XML_KHÓA_CON: con
         };
     };
 
     hàm riêng tư xml đọc phần tử(trạng thái, độ sâu) {
         nếu (độ sâu > 256) {
-            ném "xml: cây vượt quá độ sâu 256";
+            ném XML_LỖI_ĐỘ_SÂU;
         };
-        nội dung = lấy từ điển(trạng thái, "nội dung", "");
-        vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+        nội dung = lấy từ điển(trạng thái, XML_KHÓA_NỘI_DUNG, "");
+        vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
         n = máy ảo lấy độ dài(nội dung);
         nếu (vị trí >= n) {
             mình.xml lỗi(trạng thái, "thiếu dấu <");
@@ -371,7 +372,7 @@ lớp riêng tư Bộ Xử Lý XML {
             mình.xml lỗi(trạng thái, "thiếu dấu <");
         };
         vị trí = vị trí + 1;
-        đặt từ điển(trạng thái, "vị trí", vị trí);
+        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí);
         nếu (vị trí >= n) {
             mình.xml lỗi(trạng thái, "phần tử bắt đầu không hợp lệ");
         };
@@ -386,28 +387,28 @@ lớp riêng tư Bộ Xử Lý XML {
         tự đóng = sai;
         khi (!đã mở && !tự đóng) {
             mình.xml bỏ khoảng trắng(trạng thái);
-            vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+            vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
             nếu (vị trí >= n) {
                 mình.xml lỗi(trạng thái, "phần tử chưa kết thúc");
             };
             nếu (mình.xml bắt đầu tại(trạng thái, "/>")) {
-                đặt từ điển(trạng thái, "vị trí", vị trí + 2);
+                đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 2);
                 tự đóng = đúng;
             } hoặc {
                 nếu (nội dung[vị trí] == ">") {
-                    đặt từ điển(trạng thái, "vị trí", vị trí + 1);
+                    đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 1);
                     đã mở = đúng;
                 } hoặc {
                     khóa = mình.xml đọc tên(trạng thái);
                     mình.xml bỏ khoảng trắng(trạng thái);
-                    vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+                    vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
                     nếu (vị trí >= n) {
                         mình.xml lỗi(trạng thái, "thiếu = sau thuộc tính");
                     };
                     nếu (nội dung[vị trí] != "=") {
                         mình.xml lỗi(trạng thái, "thiếu = sau thuộc tính");
                     };
-                    đặt từ điển(trạng thái, "vị trí", vị trí + 1);
+                    đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 1);
                     mình.xml bỏ khoảng trắng(trạng thái);
                     giá trị = mình.xml đọc thuộc tính có nháy(trạng thái);
                     đặt từ điển(thuộc tính, khóa, giá trị);
@@ -423,23 +424,23 @@ lớp riêng tư Bộ Xử Lý XML {
         con = [];
         hoàn tất = sai;
         khi (!hoàn tất) {
-            vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+            vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
             nếu (vị trí >= n) {
                 mình.xml lỗi(trạng thái, "phần tử chưa đóng: " + tên);
             };
 
             nếu (mình.xml bắt đầu tại(trạng thái, "</")) {
-                đặt từ điển(trạng thái, "vị trí", vị trí + 2);
+                đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 2);
                 đóng = mình.xml đọc tên(trạng thái);
                 mình.xml bỏ khoảng trắng(trạng thái);
-                vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+                vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
                 nếu (vị trí >= n) {
                     mình.xml lỗi(trạng thái, "thẻ đóng không hợp lệ");
                 };
                 nếu (nội dung[vị trí] != ">") {
                     mình.xml lỗi(trạng thái, "thẻ đóng không hợp lệ");
                 };
-                đặt từ điển(trạng thái, "vị trí", vị trí + 1);
+                đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí + 1);
                 nếu (đóng != tên) {
                     mình.xml lỗi(trạng thái, "thẻ đóng không khớp " + tên);
                 };
@@ -455,7 +456,7 @@ lớp riêng tư Bộ Xử Lý XML {
                         };
                         văn bản = văn bản +
                             cắt chuỗi(nội dung, vị trí + 9, kết thúc - vị trí - 9);
-                        đặt từ điển(trạng thái, "vị trí", kết thúc + 3);
+                        đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, kết thúc + 3);
                     } hoặc {
                         nếu (nội dung[vị trí] == "<") {
                             máy ảo thêm cuối danh sách(con, mình.xml đọc phần tử(trạng thái, độ sâu + 1));
@@ -471,7 +472,7 @@ lớp riêng tư Bộ Xử Lý XML {
                             };
                             đã mã hóa = cắt chuỗi(nội dung, bắt đầu, vị trí - bắt đầu);
                             văn bản = văn bản + mình.xml giải thực thể(đã mã hóa);
-                            đặt từ điển(trạng thái, "vị trí", vị trí);
+                            đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, vị trí);
                         };
                     };
                 };
@@ -482,13 +483,13 @@ lớp riêng tư Bộ Xử Lý XML {
 
     hàm riêng tư xml tạo nội bộ(nút, độ sâu) {
         nếu (độ sâu > 256) {
-            ném "xml: cây vượt quá độ sâu 256";
+            ném XML_LỖI_ĐỘ_SÂU;
         };
         nếu (loại của(nút) != "từ điển") {
             ném "xml tạo: node phải là map";
         };
 
-        tên = lấy từ điển(nút, "tên", rỗng);
+        tên = lấy từ điển(nút, XML_KHÓA_TÊN, rỗng);
         nếu (loại của(tên) != "chuỗi") {
             ném "xml tạo: node thiếu trường tên";
         };
@@ -497,7 +498,7 @@ lớp riêng tư Bộ Xử Lý XML {
         };
 
         kết quả = "<" + tên;
-        thuộc tính = lấy từ điển(nút, "thuộc tính", rỗng);
+        thuộc tính = lấy từ điển(nút, XML_KHÓA_THUỘC_TÍNH, rỗng);
         nếu (thuộc tính != rỗng) {
             nếu (loại của(thuộc tính) != "từ điển") {
                 ném "xml tạo: thuộc tính phải là map";
@@ -507,14 +508,14 @@ lớp riêng tư Bộ Xử Lý XML {
                 tên thuộc tính = khóa[i];
                 giá trị = lấy từ điển(thuộc tính, tên thuộc tính, rỗng);
                 nếu (!mình.xml tên hợp lệ(tên thuộc tính) || loại của(giá trị) != "chuỗi") {
-                    ném "xml tạo: thuộc tính không hợp lệ";
+                    ném XML_LỖI_THUỘC_TÍNH;
                 };
                 kết quả = kết quả + " " + tên thuộc tính + "=\"" +
                     mình.xml thoát thuộc tính(giá trị) + "\"";
             };
         };
 
-        nội dung = lấy từ điển(nút, "nội dung", rỗng);
+        nội dung = lấy từ điển(nút, XML_KHÓA_NỘI_DUNG, rỗng);
         nếu (nội dung == rỗng) {
             nội dung = "";
         } hoặc {
@@ -523,7 +524,7 @@ lớp riêng tư Bộ Xử Lý XML {
             };
         };
 
-        con = lấy từ điển(nút, "con", rỗng);
+        con = lấy từ điển(nút, XML_KHÓA_CON, rỗng);
         nếu (con == rỗng) {
             con = [];
         } hoặc {
@@ -553,20 +554,20 @@ lớp riêng tư Bộ Xử Lý XML {
             ném "xml: DOCTYPE/thực thể ngoài bị vô hiệu hóa";
         };
 
-        trạng thái = {"nội dung": nội dung, "vị trí": 0};
+        trạng thái = {XML_KHÓA_NỘI_DUNG: nội dung, XML_KHÓA_VỊ_TRÍ: 0};
         mình.xml bỏ khoảng trắng(trạng thái);
         nếu (mình.xml bắt đầu tại(trạng thái, "<?xml")) {
-            vị trí = lấy từ điển(trạng thái, "vị trí", 0);
+            vị trí = lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0);
             kết thúc = tìm chuỗi chính xác(nội dung, "?>", vị trí + 5);
             nếu (kết thúc == rỗng) {
                 mình.xml lỗi(trạng thái, "khai báo XML chưa kết thúc");
             };
-            đặt từ điển(trạng thái, "vị trí", kết thúc + 2);
+            đặt từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, kết thúc + 2);
             mình.xml bỏ khoảng trắng(trạng thái);
         };
         kết quả = mình.xml đọc phần tử(trạng thái, 0);
         mình.xml bỏ khoảng trắng(trạng thái);
-        nếu (lấy từ điển(trạng thái, "vị trí", 0) != máy ảo lấy độ dài(nội dung)) {
+        nếu (lấy từ điển(trạng thái, XML_KHÓA_VỊ_TRÍ, 0) != máy ảo lấy độ dài(nội dung)) {
             mình.xml lỗi(trạng thái, "dữ liệu dư sau phần tử gốc");
         };
         trả về kết quả;

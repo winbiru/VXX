@@ -1,0 +1,8 @@
+hằng XML_KHÓA_TÊN = "tên";
+hằng XML_KHÓA_THUỘC_TÍNH = "thuộc tính";
+hằng XML_KHÓA_NỘI_DUNG = "nội dung";
+hằng XML_KHÓA_CON = "con";
+hằng XML_KHÓA_VỊ_TRÍ = "vị trí";
+hằng XML_LỖI_THỰC_THỂ_SỐ = "xml: thực thể số không hợp lệ";
+hằng XML_LỖI_THUỘC_TÍNH = "xml tạo: thuộc tính không hợp lệ";
+hằng XML_LỖI_ĐỘ_SÂU = "xml: cây vượt quá độ sâu 256";

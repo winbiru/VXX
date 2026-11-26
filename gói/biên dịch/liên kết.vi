@@ -5,6 +5,7 @@ nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian IR đồ th
 nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian từ IR thuần;
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
 nhập gói.biên dịch.nhập chọn lọc.*;
+nhập gói.biên dịch.hằng mô đun.biên dịch hạ hằng đồ thị;
 nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
 nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tìm mô đun;
 nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
@@ -113,11 +114,11 @@ hàm riêng tư biên dịch điểm vào thêm(cây, mục) {
 
 // Mỗi worker hạ một nhóm AST liên tiếp, dùng chung runtime snapshot.
 // IR vẫn độc lập theo module; registry, StringPool và emitter ở luồng chính.
-hàm riêng tư biên dịch worker hạ IR(các cây, đã kiểm tra ngữ nghĩa) {
+hàm riêng tư biên dịch worker hạ IR(các cây, đã kiểm tra ngữ nghĩa, tối ưu) {
     kết quả = [];
     lặp(i = 0; i < máy ảo lấy độ dài(các cây); i++) {
         máy ảo thêm cuối danh sách(kết quả,
-            biên dịch hạ IR từ cây thuần(các cây[i], đúng, đã kiểm tra ngữ nghĩa));
+            biên dịch hạ IR từ cây thuần(các cây[i], đúng, đã kiểm tra ngữ nghĩa, tối ưu));
     };
     trả về kết quả;
 };
@@ -147,7 +148,7 @@ hàm riêng tư biên dịch worker nhận IR(cache, mục) {
     };
 };
 
-hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, giới hạn, đã kiểm tra ngữ nghĩa) {
+hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, giới hạn, đã kiểm tra ngữ nghĩa, tối ưu) {
     các tên = [đồ thị["điểm vào"]];
     phụ thuộc = đồ thị["mô đun"];
     lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
@@ -170,7 +171,7 @@ hàm riêng tư biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, gi
                 máy ảo thêm cuối danh sách(nhóm tên, tên);
                 máy ảo thêm cuối danh sách(nhóm cây, bộ kiểu.cây hạ IR(tên, đã kiểm tra ngữ nghĩa));
             };
-            mã luồng = chạy luồng(biên dịch worker hạ IR, [nhóm cây, đã kiểm tra ngữ nghĩa]);
+            mã luồng = chạy luồng(biên dịch worker hạ IR, [nhóm cây, đã kiểm tra ngữ nghĩa, tối ưu]);
             máy ảo thêm cuối danh sách(đang chạy, {"tên": nhóm tên, "mã": mã luồng});
             số đang chờ = máy ảo lấy độ dài(đang chạy) - đã nhận;
             nếu (số đang chờ > đỉnh) { đỉnh = số đang chờ; };
@@ -332,7 +333,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         mục = biên dịch điểm vào lớp(cây);
         nếu (mục != rỗng) { cây = biên dịch điểm vào thêm(cây, mục); };
         trả về mình.biên dịch liên kết mã trung gian thuần(
-            biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai)));
+            biên dịch phát mã trung gian từ IR thuần(biên dịch hạ IR từ cây thuần(cây, sai, sai, đọc biến môi trường("VPP_OPTIMIZE_IR", "1") != "0")));
     };
 
     // Phát mã trung gian đầy đủ trước khi bỏ khai báo không dùng trong JIT.
@@ -377,6 +378,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         };
         đường hồ sơ = biên dịch hồ sơ đường();
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
+        biên dịch hạ hằng đồ thị(đồ thị);
         sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
         biên dịch hồ sơ ghi(đường hồ sơ, "link.registry", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
@@ -433,21 +435,22 @@ lớp công khai Bộ Liên Kết Bytecode {
                  "cạnh theo nguồn": cạnh theo nguồn,
                  "đã phát": [], "đã phát theo tên": {},
                  "id tối đa": -1, "ngoại": [],
-                 "ngữ nghĩa đã kiểm tra": dùng lại ngữ nghĩa};
+                 "ngữ nghĩa đã kiểm tra": dùng lại ngữ nghĩa,
+                 "tối ưu IR": đọc biến môi trường("VPP_OPTIMIZE_IR", "1") != "0"};
         biên dịch hồ sơ ghi(đường hồ sơ, "link.edge_index", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);
         tên gốc = đồ thị["điểm vào"];
         // Một module vẫn phải xác nhận hỗ trợ worker khi yêu cầu tường minh.
         // Đồ thị có một phụ thuộc có hai job: root + dependency.
         nếu (số worker > 1) {
-            phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker, dùng lại ngữ nghĩa);
+            phiên["IR đã chuẩn bị"] = biên dịch worker chuẩn bị IR(đồ thị, bộ kiểu, số worker, dùng lại ngữ nghĩa, phiên["tối ưu IR"]);
             nếu (!máy ảo có khóa từ điển(phiên["IR đã chuẩn bị"], tên gốc)) {
                 ném "biên dịch worker: thiếu IR của mô-đun gốc";
             };
             biểu diễn trung gian gốc = phiên["IR đã chuẩn bị"][tên gốc];
         } hoặc {
             cây gốc = bộ kiểu.cây hạ IR(tên gốc, dùng lại ngữ nghĩa);
-            biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng, dùng lại ngữ nghĩa);
+            biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng, dùng lại ngữ nghĩa, phiên["tối ưu IR"]);
         };
         biên dịch hồ sơ ghi(đường hồ sơ, "link.prepare_ir", bắt đầu);
         bắt đầu = biên dịch hồ sơ bắt đầu(đường hồ sơ);

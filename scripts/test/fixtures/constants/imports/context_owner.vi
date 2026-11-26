@@ -1,0 +1,5 @@
+hằng OWNER_KEY = "owner";
+hằng OWNER_DEFAULT = 19;
+hàm công khai tạo dữ liệu chủ(số = OWNER_DEFAULT) {
+    trả về {OWNER_KEY: số};
+};

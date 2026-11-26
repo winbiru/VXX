@@ -1,0 +1,38 @@
+hàm giữa(x) { trả về x[1]; };
+hàm hiệu ứng(x) { in x; trả về x; };
+hàm lỗi(x) { ném x; };
+hàm chạm(x) { x[0] = 42; trả về 0; };
+
+hàm chính() {
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        tổng += [i % 10, i % 11, i % 12][0];
+        tổng += [i % 11, i % 10, i % 12][1];
+        tổng += [i % 12, i % 11, i % 10][2];
+    };
+    in tổng;
+    in [hiệu ứng(1), hiệu ứng(2), hiệu ứng(3)][0];
+    in [hiệu ứng(4), hiệu ứng(5), hiệu ứng(6)][1];
+    in [hiệu ứng(7), hiệu ứng(8), hiệu ứng(9)][2];
+    biến a = [10];
+    biến b = [hiệu ứng(11), a, chạm(a)][1];
+    in b[0];
+    b[0] = 43;
+    in a[0];
+    in [hiệu ứng(12), giữa([hiệu ứng(13), hiệu ứng(14), hiệu ứng(15)]), hiệu ứng(16)][0];
+    in [hiệu ứng(17), 18, hiệu ứng(19)][1];
+    thử { in [hiệu ứng(20), lỗi("before"), hiệu ứng(21)][2]; }
+    bắt lỗi(e) { in e; };
+    thử { in [hiệu ứng(22), lỗi("after"), hiệu ứng(23)][0]; }
+    bắt lỗi(e) { in e; };
+    thử { in [hiệu ứng(24), lỗi("selected"), hiệu ứng(25)][1]; }
+    bắt lỗi(e) { in e; };
+    biến trống = rỗng;
+    in [a, trống, b][1] == rỗng;
+    in [a[0], 32768, 2.5][0];
+    biến chỉ số = 1;
+    in [hiệu ứng(26), hiệu ứng(27)][chỉ số];
+    in giữa([[hiệu ứng(28), hiệu ứng(29)][1], 30, hiệu ứng(31)]);
+    in [[hiệu ứng(32), hiệu ứng(33)][0], [hiệu ứng(34), hiệu ứng(35)][1]][1];
+    in [1, 2.5][1];
+};

@@ -1,3 +1,4 @@
+nhập hằng.trường dữ liệu.*;
 nhập lõi;
 nhập ma-don-hang;
 nhập ..domain.san_pham.*;
@@ -115,10 +116,10 @@ lớp công khai DịchVụKho {
         };
 
         trả về {
-            "duLieu": kếtQuả,
+            KHÓA_DỮ_LIỆU: kếtQuả,
             "tong": độ dài(đãLọc),
-            "trang": trang,
-            "kichThuoc": kíchThước
+            KHÓA_TRANG: trang,
+            KHÓA_KÍCH_THƯỚC: kíchThước
         };
     }
 

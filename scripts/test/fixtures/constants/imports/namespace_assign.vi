@@ -1,0 +1,2 @@
+nhập values.* như DB;
+hàm chính() { DB.VALUE = 0; };

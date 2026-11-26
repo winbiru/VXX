@@ -1,0 +1,9 @@
+hằng KEY_ROWS = "rows";
+hằng SQL_SELECT = "SELECT";
+hàm đọc hàng() { trả về KEY_ROWS; };
+hàm chính() {
+    hằng GIỚI_HẠN = 2 + 3;
+    hằng tên nhiều từ = SQL_SELECT + " " + đọc hàng();
+    in tên nhiều từ;
+    in GIỚI_HẠN;
+};

@@ -1,0 +1,169 @@
+// Fixed-upstream HTTP/1.x reverse proxy with TLS termination.
+// One request per connection. Reject ambiguous framing and protocol upgrades.
+nhập gói.bảo mật.lắng nghe TLS.Bộ Lắng Nghe TLS VPP;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.mạng.http.máy khách.mạng http phân tích địa chỉ tài nguyên;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.giao diện tài nguyên.Đóng Được;
+
+lớp công khai Proxy TLS VPP triển khai Đóng Được {
+    hàm công khai khởi tạo(chain, seed, upstream, timeout = 20000) {
+        destination = mạng http phân tích địa chỉ tài nguyên(upstream);
+        nếu (destination[2] != "/") { ném "TLS proxy: upstream must be an origin"; };
+        mình.listener = Bộ Lắng Nghe TLS VPP(chain, seed);
+        mình.destination = destination;
+        mình.timeout = đầu nối yêu cầu thời gian chờ(timeout, "TLS proxy");
+    };
+
+    hàm công khai mở(cổng, hàng đợi = 64) {
+        listener = mình.listener;
+        trả về listener.mở(cổng, hàng đợi);
+    };
+
+    hàm riêng tư token(text) {
+        bytes = chuỗi thành byte máy ảo(text);
+        nếu (độ dài(bytes) == 0) { trả về sai; };
+        lặp(i = 0; i < độ dài(bytes); i++) {
+            c = bytes[i];
+            nếu (!((c >= 48 && c <= 57) || (c >= 65 && c <= 90) ||
+                (c >= 97 && c <= 122) || c == 96 || chứa chính xác("!#$%&'*+-.^_|~", chuỗi từ byte máy ảo([c])))) {
+                trả về sai;
+            };
+        };
+        trả về đúng;
+    };
+
+    // Read and rebuild request headers. Only canonical, bounded Content-Length
+    // framing is forwarded; no pipelining, CONNECT, chunked requests or upgrades.
+    hàm riêng tư đọc yêu cầu(client) {
+        data = [];
+        boundary = -1;
+        khi (boundary < 0) {
+            part = client.nhận();
+            nếu (độ dài(part) == 0) { ném "TLS proxy: incomplete request"; };
+            start = độ dài(data) - 3;
+            nếu (start < 0) { start = 0; };
+            lặp(i = 0; i < độ dài(part); i++) { thêm(data, part[i]); };
+            lặp(i = start; i + 3 < độ dài(data); i++) {
+                nếu (data[i] == 13 && data[i+1] == 10 && data[i+2] == 13 && data[i+3] == 10) {
+                    boundary = i; thoát;
+                };
+            };
+            nếu (boundary > 65536 || (boundary < 0 && độ dài(data) > 65536)) {
+                ném "TLS proxy: headers too large";
+            };
+        };
+        header = [];
+        lặp(i = 0; i < boundary; i++) {
+            c = data[i];
+            nếu (c != 13 && c != 10 && (c < 32 || c > 126)) { ném "TLS proxy: invalid header byte"; };
+            nếu ((c == 13 && (i + 1 >= boundary || data[i+1] != 10)) ||
+                (c == 10 && (i == 0 || data[i-1] != 13))) { ném "TLS proxy: invalid line ending"; };
+            thêm(header, c);
+        };
+        lines = tách hằng văn bản(chuỗi từ byte máy ảo(header), "\r\n");
+        first = tách hằng văn bản(lines[0], " ");
+        nếu (độ dài(first) != 3 || !mình.token(first[0]) || !bắt đầu bằng(first[1], "/") ||
+            first[0] == "CONNECT" || (first[2] != "HTTP/1.0" && first[2] != "HTTP/1.1")) {
+            ném "TLS proxy: unsupported request line";
+        };
+        request = first[0] + " " + first[1] + " HTTP/1.1\r\nHost: " + mình.destination[3] + "\r\n";
+        length = 0; seen length = sai; seen host = sai;
+        lặp(i = 1; i < độ dài(lines); i++) {
+            line = lines[i];
+            colon = tìm chuỗi chính xác(line, ":", 0);
+            nếu (colon == rỗng || colon == 0) { ném "TLS proxy: invalid header"; };
+            name = con chuỗi(line, 0, colon);
+            nếu (!mình.token(name)) { ném "TLS proxy: invalid header name"; };
+            name = chuỗi thường(name);
+            value = bỏ khoảng trắng(con chuỗi(line, colon + 1, độ dài(line)));
+            nếu (name == "content-length") {
+                nếu (seen length || value == "") { ném "TLS proxy: duplicate or empty Content-Length"; };
+                seen length = đúng;
+                bytes = chuỗi thành byte máy ảo(value);
+                lặp(j = 0; j < độ dài(bytes); j++) {
+                    c = bytes[j];
+                    nếu (c < 48 || c > 57) { ném "TLS proxy: invalid Content-Length"; };
+                    length = length * 10 + c - 48;
+                    nếu (length > 16777216) { ném "TLS proxy: body too large"; };
+                };
+            } hoặc nếu (name == "host") {
+                nếu (seen host || value == "") { ném "TLS proxy: invalid Host"; };
+                seen host = đúng;
+            } hoặc nếu (name == "connection") {
+                lower = chuỗi thường(value);
+                nếu (lower != "close" && lower != "keep-alive") {
+                    ném "TLS proxy: unsupported Connection options";
+                };
+            } hoặc nếu (name == "transfer-encoding" || name == "upgrade" || name == "expect" ||
+                name == "trailer" || name == "te") {
+                ném "TLS proxy: unsupported request framing or upgrade";
+            } hoặc nếu (name != "keep-alive" && name != "proxy-connection" &&
+                name != "proxy-authorization" && name != "proxy-authenticate") {
+                request = request + name + ": " + value + "\r\n";
+            };
+        };
+        nếu (first[2] == "HTTP/1.1" && !seen host) { ném "TLS proxy: Host required"; };
+        nếu (seen length) { request = request + "Content-Length: " + thành chuỗi(length) + "\r\n"; };
+        request = request + "Connection: close\r\n\r\n";
+        body = [];
+        lặp(i = boundary + 4; i < độ dài(data); i++) { thêm(body, data[i]); };
+        nếu (độ dài(body) > length) { ném "TLS proxy: excess request data"; };
+        trả về [request, body, length];
+    };
+
+    // Serve one TLS client and stream its bounded request/response to the
+    // configured backend. The OS TLS provider validates HTTPS backend identity.
+    hàm công khai chuyển tiếp() {
+        listener = mình.listener;
+        client = listener.chấp nhận(mình.timeout);
+        upstream = 0;
+        tried response = sai;
+        thử {
+            request = mình.đọc yêu cầu(client);
+            destination = mình.destination;
+            nếu (destination[4]) {
+                upstream = đầu nối tls mở(destination[0], destination[1], mình.timeout);
+            } hoặc {
+                upstream = đầu nối giao vận tin cậy mở(destination[0], destination[1], mình.timeout);
+            };
+            đầu nối gửi(upstream, request[0]);
+            sent = độ dài(request[1]);
+            nếu (sent > 0) { đầu nối gửi(upstream, chuỗi từ byte máy ảo(request[1])); };
+            khi (sent < request[2]) {
+                part = client.nhận();
+                n = độ dài(part);
+                nếu (n == 0 || sent + n > request[2]) { ném "TLS proxy: invalid request body length"; };
+                đầu nối gửi(upstream, chuỗi từ byte máy ảo(part));
+                sent = sent + n;
+            };
+            tried response = đúng;
+            total = 0;
+            khi (đúng) {
+                part = đầu nối nhận(upstream, 16384);
+                bytes = chuỗi thành byte máy ảo(part);
+                nếu (độ dài(bytes) == 0) { thoát; };
+                client.gửi(bytes);
+                total = total + độ dài(bytes);
+            };
+            đầu nối đóng(upstream);
+            upstream = 0;
+            client.đóng();
+            trả về total;
+        } bắt lỗi(e) {
+            nếu (upstream != 0) { thử { đầu nối đóng(upstream); } bắt lỗi(ignored) {}; };
+            // Never append an HTTP error to a potentially partial response.
+            nếu (!tried response) {
+                thử { client.gửi(chuỗi thành byte máy ảo("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n")); } bắt lỗi(ignored) {};
+            };
+            thử { client.đóng(); } bắt lỗi(ignored) {};
+            ném e;
+        };
+    };
+
+    hàm công khai đóng() {
+        listener = mình.listener;
+        trả về listener.đóng();
+    };
+};

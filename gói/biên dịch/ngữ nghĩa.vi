@@ -2,6 +2,7 @@
 // Chưa suy luận kiểu hoặc phân giải tên ngoài phạm vi khai báo cục bộ.
 nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
 nhập gói.biên dịch.biểu thức.biên dịch biểu thức là phép gán;
+nhập gói.biên dịch.kiểm tra sở hữu.biên dịch kiểm tra sở hữu;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.lõi.bảng mã.mã điểm unicode;
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
@@ -823,6 +824,7 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
             };
         };
         mình.biên dịch ngữ nghĩa kiểm tra bí danh danh sách(câu lệnh);
+        biên dịch kiểm tra sở hữu(câu lệnh);
         trả về đúng;
     };
 

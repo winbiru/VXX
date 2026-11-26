@@ -1,0 +1,96 @@
+// Hằng cấp mô-đun dùng ô nhớ riêng, được khởi tạo đúng một lần.
+// Hàm đọc tổng hợp đi qua sổ hàm và các quy tắc nhập hiện có.
+nhập gói.biên dịch.chương trình.Bộ Phân Tích Cú Pháp;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ cây mô đun;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ nhận nhập;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tên nhập;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm riêng tư biên dịch hằng mô đun thêm(bảng, tên, mục) {
+    nếu (máy ảo có khóa từ điển(bảng, tên)) {
+        nếu (bảng[tên]["ô nhớ"] != mục["ô nhớ"]) {
+            ném "biên dịch ngữ nghĩa: trùng tên hằng '" + tên + "'";
+        };
+    };
+    bảng[tên] = mục;
+};
+
+hàm công khai biên dịch hạ hằng đồ thị(đồ thị) {
+    nếu (lấy từ điển(đồ thị, "đã hạ hằng", sai)) { trả về đúng; };
+    thứ tự = [];
+    phụ thuộc = đồ thị["thứ tự khởi tạo"];
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        máy ảo thêm cuối danh sách(thứ tự, phụ thuộc[i]);
+    };
+    máy ảo thêm cuối danh sách(thứ tự, đồ thị["điểm vào"]);
+    các xuất = {};
+    số thứ tự = 0;
+    ô nhớ hằng = [];
+    bộ = Bộ Phân Tích Cú Pháp("", []);
+    cạnh = đồ thị["cạnh"];
+    lặp(i = 0; i < máy ảo lấy độ dài(thứ tự); i++) {
+        định danh = thứ tự[i];
+        cây = biên dịch sổ cây mô đun(đồ thị, định danh);
+        câu = cây["câu lệnh"];
+        xuất = {};
+        thấy = {};
+        lặp(j = 0; j < máy ảo lấy độ dài(cạnh); j++) {
+            e = cạnh[j];
+            nếu (e["nguồn"] != định danh) { bỏ qua; };
+            nguồn = các xuất[e["đích"]];
+            tên xuất = máy ảo liệt kê khóa từ điển(nguồn);
+            lặp(k = 0; k < máy ảo lấy độ dài(tên xuất); k++) {
+                tên = tên xuất[k];
+                nếu (!biên dịch sổ nhận nhập(e, tên)) { bỏ qua; };
+                tên nhập = biên dịch sổ tên nhập(e, tên);
+                mục = {"ô nhớ": nguồn[tên]["ô nhớ"], "nội bộ": sai,
+                    "giá trị tĩnh": nguồn[tên]["giá trị tĩnh"]};
+                biên dịch hằng mô đun thêm(thấy, tên nhập, mục);
+                nếu (lấy từ điển(e, "tái xuất", sai)) {
+                    biên dịch hằng mô đun thêm(xuất, tên nhập, mục);
+                };
+            };
+        };
+        các hàm đọc = [];
+        lặp(j = 0; j < máy ảo lấy độ dài(câu); j++) {
+            nút = câu[j];
+            loại = lấy từ điển(nút, "loại", "");
+            nếu (loại != "biến" && loại != "hàm" && loại != "lớp" && loại != "giao diện") { bỏ qua; };
+            tên = nút["tên"];
+            nếu (máy ảo có khóa từ điển(thấy, tên)) {
+                ném "biên dịch ngữ nghĩa: trùng khai báo hằng '" + tên + "'";
+            };
+            nếu (loại != "biến" || !lấy từ điển(nút, "bất biến", sai)) { bỏ qua; };
+            giá trị tĩnh = bộ.giá trị hằng tĩnh(nút["giá trị"]);
+            nếu (định danh == đồ thị["điểm vào"]) {
+                biên dịch hằng mô đun thêm(thấy, tên, {"ô nhớ": tên, "nội bộ": đúng,
+                    "giữ tên": đúng, "giá trị tĩnh": giá trị tĩnh});
+                bỏ qua;
+            };
+            // Dấu @ không thuộc cú pháp định danh, nên ô nhớ không thể trùng tên nguồn.
+            ô nhớ = "@vpp_const_" + thành chuỗi(số thứ tự);
+            số thứ tự++;
+            máy ảo thêm cuối danh sách(ô nhớ hằng, ô nhớ);
+            mục = {"ô nhớ": ô nhớ, "nội bộ": đúng, "giá trị tĩnh": giá trị tĩnh};
+            biên dịch hằng mô đun thêm(thấy, tên, mục);
+            biên dịch hằng mô đun thêm(xuất, tên, mục);
+            nút["tên"] = ô nhớ;
+            thân = {"loại": "khối", "câu lệnh": [{"loại": "trả về",
+                "biểu thức": {"loại": "tên", "giá trị": ô nhớ, "vị trí": 0}}]};
+            máy ảo thêm cuối danh sách(các hàm đọc, {"loại": "hàm", "tên": tên,
+                "tham số": [], "mặc định tham số": [], "thân": thân,
+                "phạm vi": "công khai", "chữ ký": sai});
+        };
+        nếu (máy ảo lấy độ dài(máy ảo liệt kê khóa từ điển(thấy)) > 0 || lấy từ điển(cây, "có bất biến", sai)) {
+            bộ.hạ hằng mô đun(cây, thấy);
+            lặp(j = 0; j < máy ảo lấy độ dài(các hàm đọc); j++) {
+                máy ảo thêm cuối danh sách(câu, các hàm đọc[j]);
+            };
+        };
+        các xuất[định danh] = xuất;
+    };
+    đồ thị["ô nhớ hằng"] = ô nhớ hằng;
+    đồ thị["đã hạ hằng"] = đúng;
+    trả về đúng;
+};

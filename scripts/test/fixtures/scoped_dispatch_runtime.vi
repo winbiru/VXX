@@ -1,0 +1,28 @@
+lớp Hộp Điều Phối {
+    hàm công khai khởi tạo(a, b, c, d, e) {
+        nếu (a < 0) { ném e; };
+        mình.x = a + b + c + d + e;
+    };
+    hàm công khai lấy(a, b, c, d, e) { trả về mình.x + a + b + c + d + e; };
+    hàm công khai lỗi(a, b, c, d, e) { ném e; };
+};
+hàm chính() {
+    biến dữ liệu = [1];
+    biến gọi = hàm(a, b, c, d, e = 5) { trả về dữ liệu[0] + a + b + c + d + e; };
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        biến hộp = Hộp Điều Phối(1, 2, 3, 4, 5);
+        tổng += gọi(1, 2, 3, 4, 5) + hộp.lấy(1, 2, 3, 4, 5);
+    };
+    in tổng;
+    dữ liệu[0] = 10;
+    in gọi(1, 2, 3, 4);
+    thử { biến lỗi = Hộp Điều Phối(-1, 2, 3, 4, "constructor exception"); }
+    bắt lỗi(e) { in e; };
+    biến hộp mới = Hộp Điều Phối(2, 3, 4, 5, 6);
+    thử { hộp mới.lỗi(1, 2, 3, 4, "method exception"); }
+    bắt lỗi(e) { in e; };
+    in hộp mới.lấy(1, 2, 3, 4, 5);
+    biến lồng = hàm(a, b, c, d, e) { trả về gọi(a, b, c, d, e); };
+    in lồng(1, 2, 3, 4, 5);
+};

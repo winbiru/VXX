@@ -38,6 +38,121 @@ hàm vm_take(stack, count) {
     vm_set(stack, 1, start);
     trả về args;
 };
+// Vùng toán hạng chỉ được mượn trong lúc dựng tập hợp. Không có safepoint
+// trong vm_alloc/vm_append; giữ các phần tử trên stack tới khi đã chuyển xong.
+// Chỉ vỏ tập hợp kết quả được cấp phát, không tạo vector vm_take trung gian.
+hàm vm_collection_from_stack(stack, count, tag) {
+    biến n = vm_get(stack, 1);
+    nếu (count < 0 || count > n) { trả về vm_error(5); };
+    nếu (count > 2000000) { trả về vm_capacity_error(3, count, 2000000); };
+    biến start = n - count;
+    biến data = vm_get(stack, 3);
+    biến value = vm_vector(tag);
+    nếu (value != 0) {
+        nếu (tag == 4) {
+            // Biết trước kích thước: cấp phát đúng một vùng dữ liệu nếu
+            // hai ô nội tuyến không đủ. Không sao chép qua vector tạm.
+            nếu (count > 2) {
+                biến raw = vm_alloc(count * 4, 1);
+                nếu (raw != 0) { vm_set(value, 2, count); vm_set(value, 3, raw); };
+            };
+            nếu (vm_get(4198464, 1) == 0 && count > 0) {
+                nếu (máy sao chép vùng nhớ(vm_get(value, 3), data + start * 4, count * 4) != 0) { vm_error(4); }
+                hoặc { vm_set(value, 1, count); };
+            };
+        } hoặc {
+            // Duy trì thứ tự chèn, kiểm tra kiểu khóa và quy tắc trùng khóa.
+            lặp(i = start; i < n; i += 2) {
+                biến key = vm_get(data, i);
+                nếu (vm_tag(key) != 3 || i + 1 >= n) { vm_error(2); thoát; };
+                vm_map_put(value, key, vm_get(data, i + 1));
+                nếu (vm_get(4198464, 1) != 0) { thoát; };
+            };
+        };
+    };
+    lặp(i = start; i < n; i++) { vm_set(data, i, 0); };
+    vm_set(stack, 1, start);
+    nếu (vm_get(4198464, 1) != 0) {
+        vm_release_owned_vector(value);
+        trả về 0;
+    };
+    trả về value;
+};
+// Lời gọi trực tiếp dùng lại bốn ô đối số nằm trong khung của hàm gọi.
+// Khi hàm con đang chạy, khung cha vẫn được giữ trên ngăn xếp khung GC.
+hàm vm_take_call_args(frame, count) {
+    nếu (count == 0 || count > 4 || count < 0) { trả về vm_take(vm_get(frame, 2), count); };
+    biến stack = vm_get(frame, 2);
+    biến n = vm_get(stack, 1);
+    nếu (count > n) { vm_error(5); trả về 0; };
+    biến args = frame + 96;
+    biến data = vm_get(stack, 3);
+    biến start = n - count;
+    // Chuyển tham chiếu, không đóng hộp và không cấp phát danh sách mới.
+    máy ghi số nguyên ba mươi hai bit(args, 4);
+    máy ghi số nguyên ba mươi hai bit(args + 4, count);
+    máy ghi số nguyên ba mươi hai bit(args + 8, 4);
+    máy ghi số nguyên ba mươi hai bit(args + 12, args + 16);
+    lặp(i = 0; i < count; i++) {
+        máy ghi số nguyên ba mươi hai bit(args + 16 + i * 4, vm_get(data, start + i));
+        vm_set(data, start + i, 0);
+    };
+    // Xóa ô từ lời gọi trước, tránh GC giữ tham chiếu không còn sống.
+    lặp (i = count; i < 4; i++) { máy ghi số nguyên ba mươi hai bit(args + 16 + i * 4, 0); };
+    vm_set(stack, 1, start);
+    trả về args;
+};
+hàm vm_release_call_args(frame) {
+    biến args = frame + 96;
+    máy ghi số nguyên ba mươi hai bit(args + 4, 0);
+    máy ghi số nguyên ba mươi hai bit(args + 8, 4);
+    máy ghi số nguyên ba mươi hai bit(args + 16, 0);
+    máy ghi số nguyên ba mươi hai bit(args + 20, 0);
+    máy ghi số nguyên ba mươi hai bit(args + 24, 0);
+    máy ghi số nguyên ba mươi hai bit(args + 28, 0);
+    trả về 0;
+};
+// Arena đối số riêng của khung gọi. Tối đa 64 tham chiếu được cấp
+// phát cùng header trong một block GC; tái dùng cho các lời gọi tuần tự.
+// Khung con chỉ mượn vector đối số khi chạy, các giá trị khách vẫn do GC giữ.
+hàm vm_take_guest_args(frame, count) {
+    nếu (count <= 4 || count > 64) { trả về vm_take_call_args(frame, count); };
+    biến stack = vm_get(frame, 2);
+    biến n = vm_get(stack, 1);
+    nếu (count > n) { trả về vm_error(5); };
+    biến arena = vm_get(frame, 84);
+    nếu (arena == 0) {
+        arena = vm_alloc(272, 1);
+        nếu (arena == 0) { trả về 0; };
+        vm_set(arena, 0, 4); vm_set(arena, 2, 64); vm_set(arena, 3, arena + 16);
+        vm_set(frame, 84, arena);
+    };
+    // Một khung đang gọi hàm con không thể gọi thêm từ cùng khung.
+    nếu (vm_get(arena, 1) != 0) { trả về vm_error(22); };
+    biến start = n - count;
+    biến data = vm_get(stack, 3);
+    nếu (máy sao chép vùng nhớ(arena + 16, data + start * 4, count * 4) != 0) { trả về vm_error(4); };
+    vm_set(arena, 1, count);
+    máy xóa vùng nhớ(data + start * 4, count * 4);
+    vm_set(stack, 1, start);
+    trả về arena;
+};
+hàm vm_clear_guest_arena(frame) {
+    biến arena = vm_get(frame, 84);
+    nếu (arena != 0) {
+        biến count = vm_get(arena, 1);
+        nếu (count > 0) {
+            máy xóa vùng nhớ(arena + 16, count * 4);
+            vm_set(arena, 1, 0);
+        };
+    };
+    trả về 0;
+};
+hàm vm_release_guest_args(frame, count) {
+    nếu (count >= 1 && count <= 4) { vm_release_call_args(frame); }
+    hoặc nếu (count > 4 && count <= 64) { vm_clear_guest_arena(frame); };
+    trả về 0;
+};
 hàm vm_frame_init(frame, code, args, receiver, owner, captures, global) {
     // Ô 10, 12, 13, 14 giữ bốn ô biến; ô 32..35 giữ khóa của từng khung.
     // Không ghi khóa vào ô biến: closure có thể dùng chung ô giữa các khung.
@@ -47,8 +162,9 @@ hàm vm_frame_init(frame, code, args, receiver, owner, captures, global) {
     // [36..37], [38..39] và [41..42] giữ kiểu và giá trị từng ô.
     // Tách hẳn khỏi dữ liệu ngăn xếp [20..23] và đối số [28..31].
     // [44..46] là khóa, kiểu và giá trị ô cục bộ thứ tư.
-    // Khung 336 byte được GC quét, kể cả khi tái sử dụng. Mười sáu ô nội tuyến
+    // Khung 352 byte được GC quét, kể cả khi tái sử dụng. Mười sáu ô nội tuyến
     // giữ biến cục bộ nóng trên khung thay vì tạo scope/cell heap.
+    // Ô 84 giữ arena đối số cấp phát lười, riêng của khung gọi.
     biến stack = frame + 64;
     biến direct_args = frame + 96;
     // [20..23] nằm trọn trong khung. Tránh cấp phát bộ đệm khi biểu thức
@@ -77,13 +193,13 @@ hàm vm_frame_init(frame, code, args, receiver, owner, captures, global) {
     trả về frame;
 };
 hàm vm_frame(code, args, receiver, owner, captures, global) {
-    biến frame = vm_alloc(336, 1); nếu (frame == 0) { trả về 0; };
+    biến frame = vm_alloc(352, 1); nếu (frame == 0) { trả về 0; };
     trả về vm_frame_init(frame, code, args, receiver, owner, captures, global);
 };
 // Xóa toàn bộ khung tái sử dụng, kể cả tham chiếu cũ mà GC có thể quét.
 // Một lần xóa vùng nhớ tránh hàng chục lời gọi ghi i32 ở đường gọi nóng.
 hàm vm_frame_reuse(frame, code, args, receiver, owner, captures) {
-    máy xóa vùng nhớ(frame, 336);
+    máy xóa vùng nhớ(frame, 352);
     trả về vm_frame_init(frame, code, args, receiver, owner, captures, 0);
 };
 hàm vm_slot_cache_put(frame, slot, cell) {
@@ -526,7 +642,7 @@ hàm vm_invoke_body(state, id, args, receiver, owner, closure) {
     biến captures = 0;
     nếu (closure != 0) { captures = vm_get(closure, 2); owner = vm_get(closure, 3); };
     biến frames = vm_get(state, 6); nếu (vm_get(frames, 1) >= 4096) { trả về vm_error(15); };
-    // AOT giữ các khung rảnh trong state[16]. Giữ khung trong kho đến
+    // VM và AOT giữ các khung rảnh trong state[16]. Giữ khung trong kho đến
     // khi đã thêm vào ngăn xếp, kể cả khi khởi tạo scope gây thu gom GC.
     biến pool = vm_get(state, 16);
     biến frame = 0;
@@ -554,6 +670,56 @@ hàm vm_invoke_body(state, id, args, receiver, owner, closure) {
     vm_set(frame, 11, id);
     vm_append(frames, frame); trả về 0;
 };
+// Kho khung dùng chung VM/AOT, giới hạn 64 khung mỗi state.
+hàm vm_init_frame_pool(state) {
+    nếu (vm_get(state, 16) != 0) { trả về 0; };
+    biến pool = vm_vector(4); nếu (pool == 0) { trả về 0; };
+    biến data = vm_alloc(64 * 4, 1); nếu (data == 0) { trả về 0; };
+    vm_set(pool, 2, 64); vm_set(pool, 3, data);
+    vm_set(state, 16, pool);
+    trả về 0;
+};
+// Chỉ giải phóng vỏ danh sách/map nội bộ. Các phần tử có thể thoát
+// khỏi khung (đặc biệt là cell của closure), vẫn thuộc GC.
+hàm vm_release_owned_vector(v) {
+    nếu (v == 0) { trả về 0; };
+    biến inline_at = v + 16; nếu (vm_get(v, 0) == 5) { inline_at = v + 20; };
+    biến data = vm_get(v, 3);
+    nếu (data != inline_at) { vm_release_owned(data); };
+    vm_release_owned(v);
+    trả về 0;
+};
+// Handler và switch là bản ghi riêng của khung, không thoát ra mã khách.
+hàm vm_release_frame_records(records) {
+    nếu (records == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(records, 1); i++) { vm_release_owned(vm_at(records, i)); };
+    trả về vm_release_owned_vector(records);
+};
+// Kho khung có giới hạn, chỉ giữ khung đã xóa hết tham chiếu.
+// Không cấp phát khi trả về hoặc tháo ngăn xếp vì ngoại lệ.
+hàm vm_retire_frame(state, frame) {
+    biến frames = vm_get(state, 6);
+    nếu (vm_get(frames, 1) > 0) {
+        biến caller = vm_at(frames, vm_get(frames, 1) - 1);
+        biến args = vm_get(frame, 4);
+        nếu (args == caller + 96) { vm_release_call_args(caller); }
+        hoặc nếu (args != 0 && args == vm_get(caller, 84)) { vm_clear_guest_arena(caller); };
+    };
+    biến arena = vm_get(frame, 84);
+    nếu (arena != 0) { vm_release_owned(arena); };
+    biến stack = vm_get(frame, 2);
+    biến data = vm_get(stack, 3);
+    nếu (data != stack + 16) { vm_release_owned(data); };
+    vm_release_owned_vector(vm_get(frame, 3));
+    vm_release_frame_records(vm_get(frame, 7));
+    vm_release_frame_records(vm_get(frame, 8));
+    biến pool = vm_get(state, 16);
+    nếu (pool != 0 && vm_get(pool, 1) < vm_get(pool, 2)) {
+        máy xóa vùng nhớ(frame, 352);
+        vm_append(pool, frame);
+    } hoặc { vm_release_owned(frame); };
+    trả về 0;
+};
 hàm vm_return(state, result) {
     biến frames = vm_get(state, 6); biến frame = vm_pop(frames);
     // A constructor returns the allocated instance, including when its
@@ -561,6 +727,7 @@ hàm vm_return(state, result) {
     nếu (vm_get(frame, 9) == 2) { result = vm_get(frame, 10); };
     nếu (vm_get(frames, 1) == 0) { vm_set(state, 7, result); }
     hoặc { vm_append(vm_get(vm_at(frames, vm_get(frames, 1) - 1), 2), result); };
+    vm_retire_frame(state, frame);
     trả về 0;
 };
 hàm vm_subclass(child, parent) {
@@ -587,11 +754,13 @@ hàm vm_throw(state, value) {
             biến handler = vm_pop(handlers); biến stack = vm_get(frame, 2); biến switches = vm_get(frame, 8);
             khi (vm_get(stack, 1) > vm_get(handler, 1)) { vm_pop(stack); };
             nếu (switches != 0) {
-                khi (vm_get(switches, 1) > vm_get(handler, 2)) { vm_pop(switches); };
+                khi (vm_get(switches, 1) > vm_get(handler, 2)) { vm_release_owned(vm_pop(switches)); };
             };
-            vm_append(stack, value); vm_set(frame, 1, vm_get(handler, 0)); trả về 0;
+            vm_append(stack, value); vm_set(frame, 1, vm_get(handler, 0));
+            vm_release_owned(handler); trả về 0;
         };
         vm_pop(frames);
+        vm_retire_frame(state, frame);
     };
     vm_set(4198464, 3, value); trả về vm_error(16);
 };

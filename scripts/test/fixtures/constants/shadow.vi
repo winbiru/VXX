@@ -1,0 +1,3 @@
+hằng VALUE = 1;
+hàm đổi(VALUE) { VALUE += 2; trả về VALUE; };
+hàm chính() { in đổi(3); in VALUE; };

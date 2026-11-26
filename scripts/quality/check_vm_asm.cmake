@@ -134,6 +134,73 @@ execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/gc.vmb"
 if (NOT status STREQUAL "0" OR NOT output STREQUAL "9\n2000\n")
     message(FATAL_ERROR "GC failed to preserve roots/reclaim cycles: ${status}\n${output}\n${errors}")
 endif()
+# Exercise frame retirement past the bounded pool, escape promotion and
+# replacement of backing storage while guest references remain shared.
+file(WRITE "${VPP_OUTPUT_DIR}/memory-lifetime.vi" [=[
+hàm giữ(n, a, b, c, d) {
+    nếu (n == 0) {
+        biến captured = a;
+        trả về hàm(x) { thêm(captured, x); trả về độ dài(captured); };
+    };
+    trả về giữ(n - 1, a, b, c, d);
+};
+hàm lỗi_sâu(n, a) {
+    nếu (n == 0) { ném a; };
+    trả về lỗi_sâu(n - 1, a);
+};
+hàm chính() {
+    biến list = [0]; biến alias = list;
+    biến f = giữ(80, list, 2, 3, 4);
+    lặp(i = 0; i < 5000; i++) { thêm(alias, i); };
+    in f(99); in list[5001];
+    lặp(i = 0; i < 20; i++) {
+        thử { lỗi_sâu(80, alias); } bắt lỗi(e) { nếu (e[5001] != 99) { ném "lỗi tham chiếu"; }; };
+    };
+    in f(100); in alias[5002];
+};
+]=])
+execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND} "${VPP_OUTPUT_DIR}/memory-lifetime.vi" -o "${VPP_OUTPUT_DIR}/memory-lifetime.vmb"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "Memory lifetime fixture compilation failed: ${status}\n${output}\n${errors}")
+endif()
+execute_process(COMMAND "${vm}" "${VPP_OUTPUT_DIR}/memory-lifetime.vmb"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if (NOT status STREQUAL "0" OR NOT output STREQUAL "5002\n99\n5003\n100\n")
+    message(FATAL_ERROR "Memory lifetime regression: ${status}\n${output}\n${errors}")
+endif()
+# Public ownership, resource cleanup and zero-copy slice contracts.
+foreach(name IN ITEMS kiem_tra_vong_doi kiem_tra_so_huu_tinh)
+    set(probe "${VPP_OUTPUT_DIR}/${name}.vmb")
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
+        "${VPP_ROOT}/scripts/test/${name}.vi" -o "${probe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "VM ownership fixture ${name}: ${status}\n${output}\n${errors}")
+    endif()
+    file(READ "${VPP_ROOT}/scripts/test/expected/${name}.expected" expected)
+    execute_process(COMMAND "${vm}" "${probe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+    if(NOT status STREQUAL "0" OR NOT output STREQUAL expected)
+        message(FATAL_ERROR "VM ownership regression ${name}: ${status}\n${output}\n${errors}")
+    endif()
+endforeach()
+# Scoped collection and argument arena regressions on the standalone VM.
+foreach(name IN ITEMS scoped_collection_runtime scoped_args_runtime scoped_dispatch_runtime interprocedural_escape_runtime interprocedural_projection_runtime interprocedural_effect_projection_runtime direct_effect_projection_runtime i32_slot_runtime numeric_types_runtime)
+    set(probe "${VPP_OUTPUT_DIR}/${name}.vmb")
+    execute_process(COMMAND ${VPP_VM_IMAGE_COMMAND}
+        "${VPP_ROOT}/scripts/test/fixtures/${name}.vi" -o "${probe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+    if(NOT status STREQUAL "0")
+        message(FATAL_ERROR "VM scoped allocation fixture ${name}: ${status}\n${output}\n${errors}")
+    endif()
+    file(READ "${VPP_ROOT}/scripts/test/expected/${name}.expected" expected)
+    execute_process(COMMAND "${vm}" "${probe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+    if(NOT status STREQUAL "0" OR NOT output STREQUAL expected)
+        message(FATAL_ERROR "VM scoped allocation regression ${name}: ${status}\n${output}\n${errors}")
+    endif()
+endforeach()
 # Resolve each static host name once. Exercise both direct host calls and
 # aliases, so a stale/wrong StringPool cache entry changes observable output.
 file(WRITE "${VPP_OUTPUT_DIR}/host-cache.vi" [=[hàm chính() {

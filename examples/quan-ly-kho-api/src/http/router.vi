@@ -1,3 +1,4 @@
+nhập hằng.tuyến api.*;
 nhập lõi;
 nhập mạng;
 
@@ -14,23 +15,23 @@ lớp công khai RouterApi {
     hàm xửLý(requestId) {
         path = mạng đường tệp yêu cầu(requestId);
 
-        nếu (path == "/health") {
+        nếu (path == API_HEALTH) {
             controller = mình.healthController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/features") {
+        nếu (path == API_FEATURES) {
             controller = mình.featuresController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/san-pham" || path == "/san-pham/thong-ke" || path == "/san-pham/nhap-kho" || path == "/san-pham/chi-tiet" || path == "/san-pham/tim-kiem") {
+        nếu (path == API_SẢN_PHẨM || path == API_THỐNG_KÊ || path == API_NHẬP_KHO || path == API_CHI_TIẾT_SẢN_PHẨM || path == API_TÌM_SẢN_PHẨM) {
             controller = mình.sảnPhẩmController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/don-hang" || path == "/don-hang/huy" || path == "/don-hang/chi-tiet") {
+        nếu (path == API_ĐƠN_HÀNG || path == API_HỦY_ĐƠN || path == API_CHI_TIẾT_ĐƠN) {
             controller = mình.đơnHàngController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/bao-cao") {
+        nếu (path == API_BÁO_CÁO) {
             controller = mình.báoCáoController;
             trả về controller.xửLý(requestId);
         };

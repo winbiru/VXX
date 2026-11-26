@@ -1,0 +1,7 @@
+nhập values.ITEMS;
+nhập values.* như DB;
+hàm chính() {
+    ITEMS[0] = 5;
+    in DB.ITEMS[0];
+    in ITEMS[0];
+};

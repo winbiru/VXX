@@ -1,0 +1,1 @@
+hàm chính() { hằng VALUE = 1; lặp (VALUE = 0; VALUE < 3; VALUE++) {}; };

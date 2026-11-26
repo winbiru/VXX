@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi kiểm thử.*;
 // Chạy nhiều Ca Kiểm Thử và thu thập báo cáo, không thay đổi vòng đời từng ca.
 nhập gói.kiểm thử.ca kiểm thử.*;
 
@@ -10,7 +11,7 @@ lớp công khai Bộ Kiểm Thử {
 
     hàm công khai đăng ký(tên, ca) {
         nếu (loại của(tên) != "chuỗi" || tên == "" || ca == rỗng) {
-            ném "TEST_ARGUMENT";
+            ném LỖI_TEST_ARGUMENT;
         };
         máy ảo thêm cuối danh sách(mình.các ca, {"tên": tên, "ca": ca});
         trả về mình;

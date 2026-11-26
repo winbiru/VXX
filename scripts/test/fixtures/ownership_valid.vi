@@ -1,0 +1,17 @@
+nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh;
+hàm kiểm tra(cờ) {
+    biến a = chủ sở hữu tĩnh([1]);
+    nếu (cờ) { a = a("chuyển"); } hoặc { a = chủ sở hữu tĩnh([2]); };
+    in a("đọc", hàm(x) { trả về a("đọc", hàm(y) { trả về y[0]; }); });
+    a("bỏ");
+};
+hàm kiểm tra thoát(cờ) {
+    biến a = chủ sở hữu tĩnh([1]);
+    nếu (cờ) { a("bỏ"); trả về 1; a("bỏ"); };
+    a("bỏ");
+    trả về 2;
+};
+hàm chính() {
+    nếu (kiểm tra thoát(đúng) != 1 || kiểm tra thoát(sai) != 2) { ném "ownership branch"; };
+    kiểm tra(đúng);
+};

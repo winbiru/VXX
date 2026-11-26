@@ -1,9 +1,10 @@
+nhập hằng.chung.*;
 nhập lượng tử;
 hàm chính() {
-    mạch = Mạch Lượng Tử(3);
+    mạch = Mạch Lượng Tử(SỐ_QUBIT_GHZ);
     mạch.h(0) .cx(0, 1) .cx(1, 2) .đo tất cả();
     máy = Bộ Mô Phỏng Lượng Tử();
-    kết quả = máy.chạy(mạch, 1024, 42);
+    kết quả = máy.chạy(mạch, SỐ_LẦN_ĐO, HẠT_NGẪU_NHIÊN);
     in kết quả["đếm"];
 }
 ;

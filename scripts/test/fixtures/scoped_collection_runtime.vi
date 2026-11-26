@@ -1,0 +1,37 @@
+hàm ghi(log, x) {
+    log[máy ảo lấy độ dài(log) - 1] = log[máy ảo lấy độ dài(log) - 1] * 10 + x;
+    trả về x;
+};
+hàm chính() {
+    biến log = [0];
+    biến a = [ghi(log, 1), ghi(log, 2), ghi(log, 3), ghi(log, 4), ghi(log, 5)];
+    in log[0];
+    in a[4];
+    biến b = [0, a, 2][1];
+    b[0] = 42;
+    in a[0];
+    in [0, ghi(log, 6), 2][1];
+    in log[0];
+    biến m = {"z": a, "a": ghi(log, 7), "z": b};
+    in m["a"];
+    in m["z"][0];
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        biến t = [i, i + 1, i + 2, i + 3, i + 4];
+        biến d = {"b": t, "a": i};
+        tổng += d["b"][0] % 10 + [1, d["a"], 3][1] % 10;
+    };
+    in tổng;
+    biến một = [a];
+    biến hai = [a, rỗng];
+    biến ba = [a, b, log];
+    máy ảo thêm cuối danh sách(ba, m);
+    in một[0][0];
+    in hai[1] == rỗng;
+    in ba[3]["a"];
+    biến tham chiếu động = [a, b][0];
+    tham chiếu động[1] = 88;
+    in b[1];
+    thử { biến lỗi thử = [1, hàm() { ném "lỗi"; }(), 3][1]; in lỗi thử; }
+    bắt lỗi(e) { in e; };
+};

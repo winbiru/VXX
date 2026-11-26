@@ -1,4 +1,5 @@
 nhập gói.lõi.đồng thời.*;
+nhập gói.lõi.số chính xác.f32;
 nhập gói.kiểm thử.chính.*;
 nhập gói.hệ thống.nền tảng.ngủ mili giây;
 
@@ -26,6 +27,13 @@ hàm chính() {
     khẳng định bằng(chờ luồng(mã)[0], 15);
     khẳng định bằng(trạng thái luồng(mã), "hoàn tất");
     khẳng định sai(hủy luồng(mã));
+
+    // The f32 scalar tag must survive both directions across a worker.
+    mã_số_thực = chạy luồng(hàm(a) { trả về a + f32(1); }, [f32(16777216)]);
+    kết_quả_thực = chờ luồng(mã_số_thực);
+    khẳng định bằng(kết_quả_thực, 16777216.0);
+    khẳng định bằng(kết_quả_thực + 1, 16777216.0);
+    khẳng định bằng(kết_quả_thực + 1.0, 16777217.0);
 
     số = 40;
     khép = hàm(x) { trả về số + x; };

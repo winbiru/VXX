@@ -1,3 +1,5 @@
+nhập gói.hằng.định danh tài nguyên.*;
+nhập gói.hằng.http.*;
 // vi.net.uri — URI parser, normalization, resolution và form encoding thuần V++.
 // URI là dữ liệu; không phát sinh DNS/network I/O khi parse/normalize/resolve.
 nhập gói.lõi.bảng mã.mã điểm unicode;
@@ -21,7 +23,7 @@ lớp công khai Bộ Xử Lý URI {
     hàm công khai khởi tạo() {};
 
     hàm riêng tư định danh tài nguyên thập lục phân(chữ số) {
-        bảng = "0123456789ABCDEF";
+        bảng = URI_BẢNG_THẬP_LỤC_PHÂN;
         c = chuỗi thường(chữ số);
         lặp(i = 0; i < 16; i++) {
             nếu (chuỗi thường(bảng[i]) == c) {
@@ -32,7 +34,7 @@ lớp công khai Bộ Xử Lý URI {
     };
 
     hàm riêng tư định danh tài nguyên thập lục phân ký tự(giá trị) {
-        bảng = "0123456789ABCDEF";
+        bảng = URI_BẢNG_THẬP_LỤC_PHÂN;
         trả về bảng[giá trị];
     };
 
@@ -154,11 +156,11 @@ lớp công khai Bộ Xử Lý URI {
     };
 
     hàm công khai định danh tài nguyên ghép(định danh tài nguyên giá trị đang xét) {
-        lược đồ = lấy từ điển(định danh tài nguyên giá trị đang xét, "scheme", "");
-        thẩm quyền = lấy từ điển(định danh tài nguyên giá trị đang xét, "authority", "");
-        đường tệp = lấy từ điển(định danh tài nguyên giá trị đang xét, "đường_dẫn_thô", lấy từ điển(định danh tài nguyên giá trị đang xét, "đường_dẫn", ""));
-        truy vấn = lấy từ điển(định danh tài nguyên giá trị đang xét, "truy_vấn_thô", rỗng);
-        phân đoạn = lấy từ điển(định danh tài nguyên giá trị đang xét, "mảnh_thô", rỗng);
+        lược đồ = lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_LƯỢC_ĐỒ, "");
+        thẩm quyền = lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_THẨM_QUYỀN, "");
+        đường tệp = lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_ĐƯỜNG_DẪN_THÔ, lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_ĐƯỜNG_DẪN, ""));
+        truy vấn = lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_TRUY_VẤN_THÔ, rỗng);
+        phân đoạn = lấy từ điển(định danh tài nguyên giá trị đang xét, URI_KHÓA_MẢNH_THÔ, rỗng);
         kết quả = "";
         nếu (lược đồ != "") { kết quả = kết quả + lược đồ + ":"; };
         nếu (thẩm quyền != "") { kết quả = kết quả + "//" + thẩm quyền; };
@@ -298,21 +300,21 @@ lớp công khai Bộ Xử Lý URI {
         };
 
         dạng chuẩn = {
-            "scheme": lược đồ,
-            "authority": dạng chuẩn thẩm quyền,
-            "userinfo": thông tin người dùng,
-            "host": máy đích,
-            "port": cổng mạng,
-            "đường_dẫn": đường tệp,
-            "đường_dẫn_thô": đường tệp thô,
-            "truy_vấn": truy vấn,
-            "truy_vấn_thô": truy vấn thô,
-            "mảnh": phân đoạn,
-            "mảnh_thô": phân đoạn thô,
-            "có_authority": có thẩm quyền,
-            "raw": văn bản
+            URI_KHÓA_LƯỢC_ĐỒ: lược đồ,
+            URI_KHÓA_THẨM_QUYỀN: dạng chuẩn thẩm quyền,
+            URI_KHÓA_NGƯỜI_DÙNG: thông tin người dùng,
+            URI_KHÓA_MÁY_ĐÍCH: máy đích,
+            URI_KHÓA_CỔNG: cổng mạng,
+            URI_KHÓA_ĐƯỜNG_DẪN: đường tệp,
+            URI_KHÓA_ĐƯỜNG_DẪN_THÔ: đường tệp thô,
+            URI_KHÓA_TRUY_VẤN: truy vấn,
+            URI_KHÓA_TRUY_VẤN_THÔ: truy vấn thô,
+            URI_KHÓA_MẢNH: phân đoạn,
+            URI_KHÓA_MẢNH_THÔ: phân đoạn thô,
+            URI_KHÓA_CÓ_THẨM_QUYỀN: có thẩm quyền,
+            URI_KHÓA_THÔ: văn bản
         };
-        đặt từ điển(dạng chuẩn, "canonical", mình.định danh tài nguyên ghép(dạng chuẩn));
+        đặt từ điển(dạng chuẩn, URI_KHÓA_CHUẨN, mình.định danh tài nguyên ghép(dạng chuẩn));
         trả về dạng chuẩn;
     };
 
@@ -359,36 +361,36 @@ lớp công khai Bộ Xử Lý URI {
         } hoặc {
             đã phân tích = mình.định danh tài nguyên phân tích(mình.định danh tài nguyên ghép(giá trị đang xét));
         };
-        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, "scheme", ""));
-        máy đích = chuỗi thường(lấy từ điển(đã phân tích, "host", ""));
-        đường tệp thô = lấy từ điển(đã phân tích, "đường_dẫn_thô", "");
+        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, URI_KHÓA_LƯỢC_ĐỒ, ""));
+        máy đích = chuỗi thường(lấy từ điển(đã phân tích, URI_KHÓA_MÁY_ĐÍCH, ""));
+        đường tệp thô = lấy từ điển(đã phân tích, URI_KHÓA_ĐƯỜNG_DẪN_THÔ, "");
         đường tệp thô = mình.định danh tài nguyên bỏ chấm(đường tệp thô);
-        thẩm quyền = lấy từ điển(đã phân tích, "authority", "");
-        cổng mạng = lấy từ điển(đã phân tích, "port", rỗng);
-        nếu ((lược đồ == "http" && cổng mạng == 80) || (lược đồ == "https" && cổng mạng == 443)) { cổng mạng = rỗng; };
+        thẩm quyền = lấy từ điển(đã phân tích, URI_KHÓA_THẨM_QUYỀN, "");
+        cổng mạng = lấy từ điển(đã phân tích, URI_KHÓA_CỔNG, rỗng);
+        nếu ((lược đồ == URI_LƯỢC_ĐỒ_HTTP && cổng mạng == 80) || (lược đồ == URI_LƯỢC_ĐỒ_HTTPS && cổng mạng == 443)) { cổng mạng = rỗng; };
         nếu (máy đích != "") {
             thẩm quyền = máy đích;
             nếu (chứa chính xác(máy đích, ":")) { thẩm quyền = "[" + máy đích + "]"; };
-            thông tin người dùng = lấy từ điển(đã phân tích, "userinfo", "");
+            thông tin người dùng = lấy từ điển(đã phân tích, URI_KHÓA_NGƯỜI_DÙNG, "");
             nếu (thông tin người dùng != "") { thẩm quyền = mình.định danh tài nguyên phần trăm mã hóa(thông tin người dùng, đúng) + "@" + thẩm quyền; };
             nếu (cổng mạng != rỗng) { thẩm quyền = thẩm quyền + ":" + thành chuỗi(cổng mạng); };
         };
         kết quả trả về = {
-            "scheme": lược đồ,
-            "authority": thẩm quyền,
-            "userinfo": lấy từ điển(đã phân tích, "userinfo", ""),
-            "host": máy đích,
-            "port": cổng mạng,
-            "đường_dẫn": mình.định danh tài nguyên phần trăm giải mã(đường tệp thô),
-            "đường_dẫn_thô": đường tệp thô,
-            "truy_vấn": lấy từ điển(đã phân tích, "truy_vấn", rỗng),
-            "truy_vấn_thô": lấy từ điển(đã phân tích, "truy_vấn_thô", rỗng),
-            "mảnh": lấy từ điển(đã phân tích, "mảnh", rỗng),
-            "mảnh_thô": lấy từ điển(đã phân tích, "mảnh_thô", rỗng),
-            "có_authority": lấy từ điển(đã phân tích, "có_authority", sai),
-            "raw": lấy từ điển(đã phân tích, "raw", "")
+            URI_KHÓA_LƯỢC_ĐỒ: lược đồ,
+            URI_KHÓA_THẨM_QUYỀN: thẩm quyền,
+            URI_KHÓA_NGƯỜI_DÙNG: lấy từ điển(đã phân tích, URI_KHÓA_NGƯỜI_DÙNG, ""),
+            URI_KHÓA_MÁY_ĐÍCH: máy đích,
+            URI_KHÓA_CỔNG: cổng mạng,
+            URI_KHÓA_ĐƯỜNG_DẪN: mình.định danh tài nguyên phần trăm giải mã(đường tệp thô),
+            URI_KHÓA_ĐƯỜNG_DẪN_THÔ: đường tệp thô,
+            URI_KHÓA_TRUY_VẤN: lấy từ điển(đã phân tích, URI_KHÓA_TRUY_VẤN, rỗng),
+            URI_KHÓA_TRUY_VẤN_THÔ: lấy từ điển(đã phân tích, URI_KHÓA_TRUY_VẤN_THÔ, rỗng),
+            URI_KHÓA_MẢNH: lấy từ điển(đã phân tích, URI_KHÓA_MẢNH, rỗng),
+            URI_KHÓA_MẢNH_THÔ: lấy từ điển(đã phân tích, URI_KHÓA_MẢNH_THÔ, rỗng),
+            URI_KHÓA_CÓ_THẨM_QUYỀN: lấy từ điển(đã phân tích, URI_KHÓA_CÓ_THẨM_QUYỀN, sai),
+            URI_KHÓA_THÔ: lấy từ điển(đã phân tích, URI_KHÓA_THÔ, "")
         };
-        đặt từ điển(kết quả trả về, "canonical", mình.định danh tài nguyên ghép(kết quả trả về));
+        đặt từ điển(kết quả trả về, URI_KHÓA_CHUẨN, mình.định danh tài nguyên ghép(kết quả trả về));
         trả về kết quả trả về;
     };
 
@@ -397,15 +399,15 @@ lớp công khai Bộ Xử Lý URI {
         r = tương đối;
         nếu (loại của(base) == "chuỗi") { b = mình.định danh tài nguyên phân tích(base); };
         nếu (loại của(tương đối) == "chuỗi") { r = mình.định danh tài nguyên phân tích(tương đối); };
-        rs = lấy từ điển(r, "scheme", "");
-        ra = lấy từ điển(r, "authority", "");
-        rp = lấy từ điển(r, "đường_dẫn_thô", "");
-        rq = lấy từ điển(r, "truy_vấn_thô", rỗng);
-        tệp tham chiếu = lấy từ điển(r, "mảnh_thô", rỗng);
-        bs = lấy từ điển(b, "scheme", "");
-        ba = lấy từ điển(b, "authority", "");
-        bp = lấy từ điển(b, "đường_dẫn_thô", "");
-        bq = lấy từ điển(b, "truy_vấn_thô", rỗng);
+        rs = lấy từ điển(r, URI_KHÓA_LƯỢC_ĐỒ, "");
+        ra = lấy từ điển(r, URI_KHÓA_THẨM_QUYỀN, "");
+        rp = lấy từ điển(r, URI_KHÓA_ĐƯỜNG_DẪN_THÔ, "");
+        rq = lấy từ điển(r, URI_KHÓA_TRUY_VẤN_THÔ, rỗng);
+        tệp tham chiếu = lấy từ điển(r, URI_KHÓA_MẢNH_THÔ, rỗng);
+        bs = lấy từ điển(b, URI_KHÓA_LƯỢC_ĐỒ, "");
+        ba = lấy từ điển(b, URI_KHÓA_THẨM_QUYỀN, "");
+        bp = lấy từ điển(b, URI_KHÓA_ĐƯỜNG_DẪN_THÔ, "");
+        bq = lấy từ điển(b, URI_KHÓA_TRUY_VẤN_THÔ, rỗng);
         ta = ba;
         tp = "";
         tq = rq;
@@ -432,23 +434,23 @@ lớp công khai Bộ Xử Lý URI {
             };
         };
         kết quả trả về = {
-            "scheme": bs,
-            "authority": ta,
-            "userinfo": lấy từ điển(r, "userinfo", lấy từ điển(b, "userinfo", "")),
-            "host": lấy từ điển(r, "host", lấy từ điển(b, "host", "")),
-            "port": lấy từ điển(r, "port", lấy từ điển(b, "port", rỗng)),
-            "đường_dẫn": mình.định danh tài nguyên phần trăm giải mã(tp),
-            "đường_dẫn_thô": tp,
-            "truy_vấn": rỗng,
-            "truy_vấn_thô": tq,
-            "mảnh": rỗng,
-            "mảnh_thô": tệp tham chiếu,
-            "có_authority": ta != "",
-            "raw": ""
+            URI_KHÓA_LƯỢC_ĐỒ: bs,
+            URI_KHÓA_THẨM_QUYỀN: ta,
+            URI_KHÓA_NGƯỜI_DÙNG: lấy từ điển(r, URI_KHÓA_NGƯỜI_DÙNG, lấy từ điển(b, URI_KHÓA_NGƯỜI_DÙNG, "")),
+            URI_KHÓA_MÁY_ĐÍCH: lấy từ điển(r, URI_KHÓA_MÁY_ĐÍCH, lấy từ điển(b, URI_KHÓA_MÁY_ĐÍCH, "")),
+            URI_KHÓA_CỔNG: lấy từ điển(r, URI_KHÓA_CỔNG, lấy từ điển(b, URI_KHÓA_CỔNG, rỗng)),
+            URI_KHÓA_ĐƯỜNG_DẪN: mình.định danh tài nguyên phần trăm giải mã(tp),
+            URI_KHÓA_ĐƯỜNG_DẪN_THÔ: tp,
+            URI_KHÓA_TRUY_VẤN: rỗng,
+            URI_KHÓA_TRUY_VẤN_THÔ: tq,
+            URI_KHÓA_MẢNH: rỗng,
+            URI_KHÓA_MẢNH_THÔ: tệp tham chiếu,
+            URI_KHÓA_CÓ_THẨM_QUYỀN: ta != "",
+            URI_KHÓA_THÔ: ""
         };
-        nếu (tq != rỗng) { đặt từ điển(kết quả trả về, "truy_vấn", mình.định danh tài nguyên phần trăm giải mã(tq)); };
-        nếu (tệp tham chiếu != rỗng) { đặt từ điển(kết quả trả về, "mảnh", mình.định danh tài nguyên phần trăm giải mã(tệp tham chiếu)); };
-        đặt từ điển(kết quả trả về, "canonical", mình.định danh tài nguyên ghép(kết quả trả về));
+        nếu (tq != rỗng) { đặt từ điển(kết quả trả về, URI_KHÓA_TRUY_VẤN, mình.định danh tài nguyên phần trăm giải mã(tq)); };
+        nếu (tệp tham chiếu != rỗng) { đặt từ điển(kết quả trả về, URI_KHÓA_MẢNH, mình.định danh tài nguyên phần trăm giải mã(tệp tham chiếu)); };
+        đặt từ điển(kết quả trả về, URI_KHÓA_CHUẨN, mình.định danh tài nguyên ghép(kết quả trả về));
         trả về kết quả trả về;
     };
 
@@ -506,9 +508,9 @@ lớp công khai Bộ Xử Lý URI {
     hàm công khai địa chỉ tài nguyên(giá trị đang xét) {
         đã phân tích = giá trị đang xét;
         nếu (loại của(giá trị đang xét) == "chuỗi") { đã phân tích = mình.định danh tài nguyên phân tích(giá trị đang xét); };
-        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, "scheme", ""));
+        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, URI_KHÓA_LƯỢC_ĐỒ, ""));
         nếu (lược đồ == "") { ném "NET_URL_MALFORMED: URL cần scheme"; };
-        nếu (lược đồ != "file" && lược đồ != "http" && lược đồ != "https") {
+        nếu (lược đồ != URI_LƯỢC_ĐỒ_FILE && lược đồ != URI_LƯỢC_ĐỒ_HTTP && lược đồ != URI_LƯỢC_ĐỒ_HTTPS) {
             ném "NET_SCHEME_UNKNOWN: scheme chưa có resource handler: " + lược đồ;
         };
         đặt từ điển(đã phân tích, "resource_type", "url");
@@ -520,12 +522,12 @@ lớp công khai Bộ Xử Lý URI {
         dấu = mình.định danh tài nguyên chỉ số cuối(tên, ".");
         nếu (dấu == rỗng || dấu == máy ảo lấy độ dài(tên) - 1) { trả về rỗng; };
         ext = cắt chuỗi(tên, dấu + 1, máy ảo lấy độ dài(tên) - dấu - 1);
-        nếu (ext == "html" || ext == "htm") { trả về "text/html"; };
+        nếu (ext == "html" || ext == "htm") { trả về MIME_HTML; };
         nếu (ext == "css") { trả về "text/css"; };
         nếu (ext == "js" || ext == "mjs") { trả về "text/javascript"; };
-        nếu (ext == "json") { trả về "application/json"; };
+        nếu (ext == "json") { trả về MIME_JSON; };
         nếu (ext == "xml") { trả về "application/xml"; };
-        nếu (ext == "txt" || ext == "log") { trả về "text/plain"; };
+        nếu (ext == "txt" || ext == "log") { trả về MIME_VĂN_BẢN; };
         nếu (ext == "csv") { trả về "text/csv"; };
         nếu (ext == "pdf") { trả về "application/pdf"; };
         nếu (ext == "zip") { trả về "application/zip"; };
@@ -533,7 +535,7 @@ lớp công khai Bộ Xử Lý URI {
         nếu (ext == "png") { trả về "image/png"; };
         nếu (ext == "jpg" || ext == "jpeg") { trả về "image/jpeg"; };
         nếu (ext == "gif") { trả về "image/gif"; };
-        nếu (ext == "svg") { trả về "image/svg+xml"; };
+        nếu (ext == "svg") { trả về MIME_SVG; };
         nếu (ext == "wasm") { trả về "application/wasm"; };
         trả về rỗng;
     };
@@ -542,15 +544,15 @@ lớp công khai Bộ Xử Lý URI {
     // từ HTTP client; file trả nội dung tệp. Archive/unknown scheme không giả lập.
     hàm công khai mở tài nguyên(giá trị đang xét, tùy chọn = rỗng) {
         đã phân tích = mình.địa chỉ tài nguyên(giá trị đang xét);
-        lược đồ = lấy từ điển(đã phân tích, "scheme", "");
-        nếu (lược đồ == "file") {
-            đường tệp = lấy từ điển(đã phân tích, "đường_dẫn", "");
+        lược đồ = lấy từ điển(đã phân tích, URI_KHÓA_LƯỢC_ĐỒ, "");
+        nếu (lược đồ == URI_LƯỢC_ĐỒ_FILE) {
+            đường tệp = lấy từ điển(đã phân tích, URI_KHÓA_ĐƯỜNG_DẪN, "");
             nếu (đường tệp == "") { ném "NET_RESOURCE_UNSUPPORTED: file URL thiếu path"; };
-            trả về {"scheme": "file", "url": lấy từ điển(đã phân tích, "canonical", ""), "nội_dung": đọc tệp(đường tệp), "kiểu": mình.kiểu nội dung(đường tệp)};
+            trả về {URI_KHÓA_LƯỢC_ĐỒ: URI_LƯỢC_ĐỒ_FILE, "url": lấy từ điển(đã phân tích, URI_KHÓA_CHUẨN, ""), "nội_dung": đọc tệp(đường tệp), "kiểu": mình.kiểu nội dung(đường tệp)};
         };
-        nếu (lược đồ == "http" || lược đồ == "https") {
-            phản hồi = mạng lấy(lấy từ điển(đã phân tích, "canonical", ""));
-            trả về {"scheme": lược đồ, "url": lấy từ điển(đã phân tích, "canonical", ""), "nội_dung": phản hồi, "kiểu": mình.kiểu nội dung(lấy từ điển(đã phân tích, "đường_dẫn", ""))};
+        nếu (lược đồ == URI_LƯỢC_ĐỒ_HTTP || lược đồ == URI_LƯỢC_ĐỒ_HTTPS) {
+            phản hồi = mạng lấy(lấy từ điển(đã phân tích, URI_KHÓA_CHUẨN, ""));
+            trả về {URI_KHÓA_LƯỢC_ĐỒ: lược đồ, "url": lấy từ điển(đã phân tích, URI_KHÓA_CHUẨN, ""), "nội_dung": phản hồi, "kiểu": mình.kiểu nội dung(lấy từ điển(đã phân tích, URI_KHÓA_ĐƯỜNG_DẪN, ""))};
         };
         ném "NET_RESOURCE_UNSUPPORTED: resource handler chưa có";
     };

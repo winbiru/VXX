@@ -1,3 +1,4 @@
+nhập gói.hằng.http.*;
 // Module: mạng
 // HTTP method wrappers và HTTP/1.1 nằm ở V++; VM chỉ giữ socket/TLS primitive I/O.
 // HTTP client chỉ nhận URL UTF-8 hợp lệ dùng http:// hoặc https://, có host và
@@ -58,10 +59,10 @@ lớp công khai Bộ Giao Thức HTTP {
         n = máy ảo lấy độ dài(đường dẫn);
         thẩm quyền bắt đầu = 0;
         cổng mặc định = 80;
-        nếu (bắt đầu bằng(đường dẫn, "http://")) {
+        nếu (bắt đầu bằng(đường dẫn, URL_HTTP)) {
             thẩm quyền bắt đầu = 7;
         } hoặc {
-            nếu (bắt đầu bằng(đường dẫn, "https://")) {
+            nếu (bắt đầu bằng(đường dẫn, URL_HTTPS)) {
                 thẩm quyền bắt đầu = 8;
                 cổng mặc định = 443;
                 dùng tls = đúng;
@@ -303,18 +304,18 @@ lớp công khai Bộ Giao Thức HTTP {
         };
 
         nếu (cần thêm) {
-            trả về {"hoàn tất": sai, "body": "", "đã dùng": vị trí};
+            trả về {"hoàn tất": sai, HTTP_KHÓA_BODY: "", "đã dùng": vị trí};
         };
         trả về {
             "hoàn tất": đúng,
-            "body": chuỗi từ các byte(kết quả, "UTF-8", "BÁO_LỖI"),
+            HTTP_KHÓA_BODY: chuỗi từ các byte(kết quả, "UTF-8", "BÁO_LỖI"),
             "đã dùng": vị trí
         };
     };
 
     hàm riêng tư mạng http giải chia khối(thân khối) {
         quét = mình.mạng http quét chia khối(thân khối);
-        trả về lấy từ điển(quét, "body", "");
+        trả về lấy từ điển(quét, HTTP_KHÓA_BODY, "");
     };
 
     hàm công khai mạng http phân tích phản hồi(phản hồi) {
@@ -358,11 +359,11 @@ lớp công khai Bộ Giao Thức HTTP {
         };
 
         thân khối = con chuỗi(phản hồi, ngăn + 4, máy ảo lấy độ dài(phản hồi));
-        chuyển = chuỗi thường(lấy từ điển(các phần đầu, "transfer-encoding", ""));
-        nếu (chứa chính xác(chuyển, "chunked")) {
+        chuyển = chuỗi thường(lấy từ điển(các phần đầu, HTTP_HEADER_TRANSFER_ENCODING, ""));
+        nếu (chứa chính xác(chuyển, HTTP_MÃ_HÓA_CHUNKED)) {
             thân khối = mình.mạng http giải chia khối(thân khối);
         } hoặc {
-            nội dung chiều dài văn bản = lấy từ điển(các phần đầu, "content-length", "");
+            nội dung chiều dài văn bản = lấy từ điển(các phần đầu, HTTP_HEADER_CONTENT_LENGTH, "");
             nếu (nội dung chiều dài văn bản != "") {
                 thử {
                     nội dung chiều dài = thành số nguyên(nội dung chiều dài văn bản);
@@ -376,12 +377,12 @@ lớp công khai Bộ Giao Thức HTTP {
             };
         };
 
-        trả về {"status": mã trạng thái, "headers": các phần đầu, "body": thân khối};
+        trả về {HTTP_KHÓA_STATUS: mã trạng thái, HTTP_KHÓA_HEADERS: các phần đầu, HTTP_KHÓA_BODY: thân khối};
     };
 
     hàm công khai mạng http tách thân khối(phản hồi) {
         phản hồi = mình.mạng http phân tích phản hồi(phản hồi);
-        trả về lấy từ điển(phản hồi, "body", "");
+        trả về lấy từ điển(phản hồi, HTTP_KHÓA_BODY, "");
     };
 
     hàm riêng tư mạng http thực thi phản hồi qua đầu nối(phương thức, đường dẫn, dữ liệu, có thân khối) {
@@ -425,7 +426,7 @@ lớp công khai Bộ Giao Thức HTTP {
         phản hồi = mình.mạng http thực thi phản hồi qua đầu nối(
             phương thức, đường dẫn, dữ liệu, có thân khối
         );
-        trả về lấy từ điển(phản hồi, "body", "");
+        trả về lấy từ điển(phản hồi, HTTP_KHÓA_BODY, "");
     };
 
     hàm riêng tư mạng http là redirect(mã trạng thái) {
@@ -482,12 +483,12 @@ lớp công khai Bộ Giao Thức HTTP {
     };
 
     hàm công khai mạng http địa chỉ tài nguyên redirect(gốc dữ liệu, location) {
-        nếu (bắt đầu bằng(location, "http://") || bắt đầu bằng(location, "https://")) {
+        nếu (bắt đầu bằng(location, URL_HTTP) || bắt đầu bằng(location, URL_HTTPS)) {
             trả về location;
         };
         base = mình.mạng http phân tích địa chỉ tài nguyên(gốc dữ liệu);
-        lược đồ = "http://";
-        nếu (base[4]) { lược đồ = "https://"; };
+        lược đồ = URL_HTTP;
+        nếu (base[4]) { lược đồ = URL_HTTPS; };
         nguồn gốc = lược đồ + base[3];
         nếu (bắt đầu bằng(location, "//")) {
             trả về con chuỗi(lược đồ, 0, máy ảo lấy độ dài(lược đồ) - 2) + location;
@@ -513,30 +514,30 @@ lớp công khai Bộ Giao Thức HTTP {
     };
 
     hàm công khai mạng thực thi yêu cầu(phương thức, đường dẫn, dữ liệu = "") {
-        nếu (phương thức != "GET" && phương thức != "POST" && phương thức != "PUT" && phương thức != "DELETE") {
+        nếu (phương thức != HTTP_GET && phương thức != HTTP_POST && phương thức != HTTP_PUT && phương thức != HTTP_DELETE) {
             ném "mạng http: phương thức HTTP không được hỗ trợ";
         };
         phương thức hiện tại = phương thức;
         địa chỉ tài nguyên hiện tại = đường dẫn;
         dữ liệu hiện tại = dữ liệu;
         lặp(lần = 0; lần <= 8; lần++) {
-            có thân khối = phương thức hiện tại == "POST" || phương thức hiện tại == "PUT";
+            có thân khối = phương thức hiện tại == HTTP_POST || phương thức hiện tại == HTTP_PUT;
             phản hồi = mình.mạng http thực thi phản hồi qua đầu nối(
                 phương thức hiện tại, địa chỉ tài nguyên hiện tại, dữ liệu hiện tại, có thân khối
             );
-            mã trạng thái = lấy từ điển(phản hồi, "status", 0);
-            các phần đầu = lấy từ điển(phản hồi, "headers", {});
+            mã trạng thái = lấy từ điển(phản hồi, HTTP_KHÓA_STATUS, 0);
+            các phần đầu = lấy từ điển(phản hồi, HTTP_KHÓA_HEADERS, {});
             location = lấy từ điển(các phần đầu, "location", "");
             nếu (!mình.mạng http là redirect(mã trạng thái) || location == "") {
-                trả về lấy từ điển(phản hồi, "body", "");
+                trả về lấy từ điển(phản hồi, HTTP_KHÓA_BODY, "");
             };
             nếu (lần == 8) {
                 ném "mạng http: vượt quá 8 lần redirect";
             };
             địa chỉ tài nguyên hiện tại = mình.mạng http địa chỉ tài nguyên redirect(địa chỉ tài nguyên hiện tại, location);
             nếu (mã trạng thái == 303 ||
-                ((mã trạng thái == 301 || mã trạng thái == 302) && phương thức hiện tại == "POST")) {
-                phương thức hiện tại = "GET";
+                ((mã trạng thái == 301 || mã trạng thái == 302) && phương thức hiện tại == HTTP_POST)) {
+                phương thức hiện tại = HTTP_GET;
                 dữ liệu hiện tại = "";
             };
         };
@@ -544,19 +545,19 @@ lớp công khai Bộ Giao Thức HTTP {
     };
 
     hàm công khai mạng lấy(đường dẫn) {
-        trả về mình.mạng thực thi yêu cầu("GET", đường dẫn, "");
+        trả về mình.mạng thực thi yêu cầu(HTTP_GET, đường dẫn, "");
     };
 
     hàm công khai mạng gửi(đường dẫn, dữ liệu) {
-        trả về mình.mạng thực thi yêu cầu("POST", đường dẫn, dữ liệu);
+        trả về mình.mạng thực thi yêu cầu(HTTP_POST, đường dẫn, dữ liệu);
     };
 
     hàm công khai mạng cập nhật(đường dẫn, dữ liệu) {
-        trả về mình.mạng thực thi yêu cầu("PUT", đường dẫn, dữ liệu);
+        trả về mình.mạng thực thi yêu cầu(HTTP_PUT, đường dẫn, dữ liệu);
     };
 
     hàm công khai mạng xóa(đường dẫn) {
-        trả về mình.mạng thực thi yêu cầu("DELETE", đường dẫn, "");
+        trả về mình.mạng thực thi yêu cầu(HTTP_DELETE, đường dẫn, "");
     };
 
     // Tương thích API cũ. HTTP server được triển khai ở V++; VM chỉ cung cấp
@@ -621,10 +622,10 @@ lớp công khai Bộ Giao Thức HTTP {
             };
         };
 
-        chuyển = chuỗi thường(lấy từ điển(các phần đầu, "transfer-encoding", ""));
-        chia khối = chứa chính xác(chuyển, "chunked");
+        chuyển = chuỗi thường(lấy từ điển(các phần đầu, HTTP_HEADER_TRANSFER_ENCODING, ""));
+        chia khối = chứa chính xác(chuyển, HTTP_MÃ_HÓA_CHUNKED);
         nội dung chiều dài = 0;
-        nội dung chiều dài văn bản = lấy từ điển(các phần đầu, "content-length", "");
+        nội dung chiều dài văn bản = lấy từ điển(các phần đầu, HTTP_HEADER_CONTENT_LENGTH, "");
         // Content-Length và chunked cùng xuất hiện tạo ambiguity framing. Server
         // đóng connection sau response, nhưng vẫn từ chối message này ngay ở V++.
         nếu (chia khối && nội dung chiều dài văn bản != "") {
@@ -642,12 +643,12 @@ lớp công khai Bộ Giao Thức HTTP {
         };
 
         trả về {
-            "method": phương thức,
-            "path": đường tệp,
-            "query": truy vấn,
-            "headers": các phần đầu,
+            HTTP_KHÓA_METHOD: phương thức,
+            HTTP_KHÓA_PATH: đường tệp,
+            HTTP_KHÓA_QUERY: truy vấn,
+            HTTP_KHÓA_HEADERS: các phần đầu,
             "content length": nội dung chiều dài,
-            "chunked": chia khối
+            HTTP_MÃ_HÓA_CHUNKED: chia khối
         };
     };
 
@@ -688,7 +689,7 @@ lớp công khai Bộ Giao Thức HTTP {
         nội dung chiều dài = lấy từ điển(yêu cầu, "content length", 0);
         thân khối = con chuỗi(dữ liệu, vị trí ngăn + 4, máy ảo lấy độ dài(dữ liệu));
 
-        nếu (lấy từ điển(yêu cầu, "chunked", sai)) {
+        nếu (lấy từ điển(yêu cầu, HTTP_MÃ_HÓA_CHUNKED, sai)) {
             quét = mình.mạng http quét chia khối(
                 thân khối,
                 đúng,
@@ -711,7 +712,7 @@ lớp công khai Bộ Giao Thức HTTP {
                     "request"
                 );
             };
-            đặt từ điển(yêu cầu, "body", lấy từ điển(quét, "body", ""));
+            đặt từ điển(yêu cầu, HTTP_KHÓA_BODY, lấy từ điển(quét, HTTP_KHÓA_BODY, ""));
         } hoặc {
             khi (máy ảo lấy độ dài(chuỗi thành các byte(thân khối, "UTF-8")) < nội dung chiều dài) {
                 phần = đầu nối nhận(mã đầu nối, 65536);
@@ -723,7 +724,7 @@ lớp công khai Bộ Giao Thức HTTP {
                     ném "mạng http server: body vượt giới hạn";
                 };
             };
-            đặt từ điển(yêu cầu, "body", mình.mạng http cắt thân khối theo byte(thân khối, nội dung chiều dài));
+            đặt từ điển(yêu cầu, HTTP_KHÓA_BODY, mình.mạng http cắt thân khối theo byte(thân khối, nội dung chiều dài));
         };
         đặt từ điển(yêu cầu, "socket", mã đầu nối);
         trả về yêu cầu;
@@ -755,30 +756,30 @@ lớp công khai Bộ Giao Thức HTTP {
             ném "mạng http server: request handle không hợp lệ";
         };
         nếu (trường == "header") {
-            các phần đầu = lấy từ điển(mã yêu cầu, "headers", {});
+            các phần đầu = lấy từ điển(mã yêu cầu, HTTP_KHÓA_HEADERS, {});
             trả về lấy từ điển(các phần đầu, chuỗi thường(khóa), "");
         };
-        nếu (trường == "method" || trường == "path" ||
-            trường == "query" || trường == "body") {
+        nếu (trường == HTTP_KHÓA_METHOD || trường == HTTP_KHÓA_PATH ||
+            trường == HTTP_KHÓA_QUERY || trường == HTTP_KHÓA_BODY) {
             trả về lấy từ điển(mã yêu cầu, trường, "");
         };
         ném "mạng http server: trường yêu cầu không hợp lệ";
     };
 
     hàm công khai mạng phương thức yêu cầu(mã yêu cầu) {
-        trả về mình.mạng trường yêu cầu(mã yêu cầu, "method", "");
+        trả về mình.mạng trường yêu cầu(mã yêu cầu, HTTP_KHÓA_METHOD, "");
     };
 
     hàm công khai mạng đường tệp yêu cầu(mã yêu cầu) {
-        trả về mình.mạng trường yêu cầu(mã yêu cầu, "path", "");
+        trả về mình.mạng trường yêu cầu(mã yêu cầu, HTTP_KHÓA_PATH, "");
     };
 
     hàm công khai mạng truy vấn yêu cầu(mã yêu cầu) {
-        trả về mình.mạng trường yêu cầu(mã yêu cầu, "query", "");
+        trả về mình.mạng trường yêu cầu(mã yêu cầu, HTTP_KHÓA_QUERY, "");
     };
 
     hàm công khai mạng thân khối yêu cầu(mã yêu cầu) {
-        trả về mình.mạng trường yêu cầu(mã yêu cầu, "body", "");
+        trả về mình.mạng trường yêu cầu(mã yêu cầu, HTTP_KHÓA_BODY, "");
     };
 
     hàm công khai mạng phần đầu yêu cầu(mã yêu cầu, khóa tra cứu) {
@@ -886,9 +887,9 @@ lớp công khai Bộ Giao Thức HTTP {
         trả về "OK";
     };
 
-    hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = "application/json") {
-        nếu (kiểu nội dung != "application/json" && kiểu nội dung != "text/html" &&
-            kiểu nội dung != "text/plain" && kiểu nội dung != "image/svg+xml") {
+    hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = MIME_JSON) {
+        nếu (kiểu nội dung != MIME_JSON && kiểu nội dung != MIME_HTML &&
+            kiểu nội dung != MIME_VĂN_BẢN && kiểu nội dung != MIME_SVG) {
             ném "mạng http server: kiểu nội dung không hỗ trợ";
         };
         số byte = máy ảo lấy độ dài(chuỗi thành các byte(thân khối, "UTF-8"));
@@ -900,7 +901,7 @@ lớp công khai Bộ Giao Thức HTTP {
     };
 
     // Gửi response bằng socket primitive rồi đóng connection theo contract cũ.
-    hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = "application/json") {
+    hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = MIME_JSON) {
         nếu (loại của(mã yêu cầu) != "từ điển") {
             ném "mạng http server: request handle không hợp lệ";
         };
@@ -1047,12 +1048,12 @@ hàm công khai mạng đường tệp hậu tố yêu cầu(mã yêu cầu, ti�
     trả về bộ chuyển tiếp.mạng đường tệp hậu tố yêu cầu(mã yêu cầu, tiền tố);
 };
 
-hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = "application/json") {
+hàm công khai mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung = MIME_JSON) {
     bộ chuyển tiếp = Bộ Giao Thức HTTP();
     trả về bộ chuyển tiếp.mạng http dựng phản hồi(mã trạng thái, thân khối, kiểu nội dung);
 };
 
-hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = "application/json") {
+hàm công khai mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung = MIME_JSON) {
     bộ chuyển tiếp = Bộ Giao Thức HTTP();
     trả về bộ chuyển tiếp.mạng trả phản hồi(mã yêu cầu, mã trạng thái, thân khối, kiểu nội dung);
 };

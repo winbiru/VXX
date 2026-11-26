@@ -1,3 +1,4 @@
+nhập gói.hằng.cơ sở dữ liệu.*;
 // Module: dữ liệu.kết nối cơ sở dữ liệu
 // Mục đích: cung cấp API cấu hình và thực thi truy vấn cho nhiều engine DB.
 // Hỗ trợ hiện tại: MySQL, PostgreSQL, SQLite qua JDBC URL + driver class.
@@ -9,17 +10,18 @@ nhập gói.hệ thống.tiến trình.chạy tiến trình;
 nhập gói.hệ thống.nền tảng.tên nền tảng;
 nhập gói.hệ thống.môi trường.đọc biến môi trường;
 
+
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
     hàm công khai khởi tạo() {};
 
     hàm riêng tư cơ sở dữ liệu lỗi cấu hình(lý độ) {
-        trả về {"ok": sai, "reason": lý độ};
+        trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: lý độ};
     };
 
     hàm riêng tư cơ sở dữ liệu đọc số nguyên thập phân(văn bản) {
         nếu (văn bản == "") {
-            trả về {"ok": sai, "value": 0};
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_GIÁ_TRỊ: 0};
         };
         dấu = 1;
         bắt đầu = 0;
@@ -32,23 +34,23 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
             };
         };
         nếu (bắt đầu >= máy ảo lấy độ dài(văn bản)) {
-            trả về {"ok": sai, "value": 0};
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_GIÁ_TRỊ: 0};
         };
         giá trị = 0;
         chữ số = "0123456789";
         lặp(i = bắt đầu; i < máy ảo lấy độ dài(văn bản); i++) {
             số = tìm chuỗi chính xác(chữ số, văn bản[i], 0);
             nếu (số == rỗng) {
-                trả về {"ok": sai, "value": 0};
+                trả về {DB_KHÓA_OK: sai, DB_KHÓA_GIÁ_TRỊ: 0};
             };
             giá trị = giá trị * 10 + số;
         };
-        trả về {"ok": đúng, "value": giá trị * dấu};
+        trả về {DB_KHÓA_OK: đúng, DB_KHÓA_GIÁ_TRỊ: giá trị * dấu};
     };
 
     hàm riêng tư cơ sở dữ liệu cấu hình giao vận tin cậy(địa chỉ kết nối cơ sở dữ liệu, tiền tố, bộ máy, cổng mặc định) {
         nếu (!bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, tiền tố)) {
-            trả về mình.cơ sở dữ liệu lỗi cấu hình("invalid-jdbc-prefix");
+            trả về mình.cơ sở dữ liệu lỗi cấu hình(DB_LỖI_JDBC_PREFIX);
         };
         phần còn lại = con chuỗi(địa chỉ kết nối cơ sở dữ liệu, máy ảo lấy độ dài(tiền tố), máy ảo lấy độ dài(địa chỉ kết nối cơ sở dữ liệu));
         vị trí gạch = tìm chuỗi chính xác(phần còn lại, "/", 0);
@@ -69,13 +71,13 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
                 máy ảo lấy độ dài(máy đích cổng mạng)
             ));
             nếu (chữ cổng == "") {
-                trả về mình.cơ sở dữ liệu lỗi cấu hình("invalid-port");
+                trả về mình.cơ sở dữ liệu lỗi cấu hình(DB_LỖI_CỔNG);
             };
             cổng đã đọc = mình.cơ sở dữ liệu đọc số nguyên thập phân(chữ cổng);
-            nếu (!lấy từ điển(cổng đã đọc, "ok", sai)) {
-                trả về mình.cơ sở dữ liệu lỗi cấu hình("invalid-port");
+            nếu (!lấy từ điển(cổng đã đọc, DB_KHÓA_OK, sai)) {
+                trả về mình.cơ sở dữ liệu lỗi cấu hình(DB_LỖI_CỔNG);
             };
-            cổng = lấy từ điển(cổng đã đọc, "value", 0);
+            cổng = lấy từ điển(cổng đã đọc, DB_KHÓA_GIÁ_TRỊ, 0);
         };
         nếu (máy đích == "") {
             trả về mình.cơ sở dữ liệu lỗi cấu hình("missing-host");
@@ -93,46 +95,45 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
             trả về mình.cơ sở dữ liệu lỗi cấu hình("missing-database");
         };
         trả về {
-            "ok": đúng,
-            "engine": bộ máy,
-            "host": máy đích,
-            "port": cổng,
-            "database": cơ sở dữ liệu,
-            "path": "",
-            "create": chứa chính xác(truy vấn, "createDatabaseIfNotExist=true")
+            DB_KHÓA_OK: đúng,
+            DB_KHÓA_ENGINE: bộ máy,
+            DB_KHÓA_HOST: máy đích,
+            DB_KHÓA_PORT: cổng,
+            DB_KHÓA_DATABASE: cơ sở dữ liệu,
+            DB_KHÓA_PATH: "",
+            DB_KHÓA_CREATE: chứa chính xác(truy vấn, "createDatabaseIfNotExist=true")
         };
     };
 
     hàm công khai cơ sở dữ liệu phân tích cấu hình(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu) {
-        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, "jdbc:mysql://") ||
-            chứa chính xác(tên lớp điều khiển, "mysql")) {
-            trả về mình.cơ sở dữ liệu cấu hình giao vận tin cậy(địa chỉ kết nối cơ sở dữ liệu, "jdbc:mysql://", "mysql", 3306);
+        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, JDBC_MYSQL) ||
+            chứa chính xác(tên lớp điều khiển, DB_MYSQL)) {
+            trả về mình.cơ sở dữ liệu cấu hình giao vận tin cậy(địa chỉ kết nối cơ sở dữ liệu, JDBC_MYSQL, DB_MYSQL, CỔNG_MYSQL);
         };
-        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, "jdbc:postgresql://") ||
-            chứa chính xác(tên lớp điều khiển, "postgresql")) {
-            trả về mình.cơ sở dữ liệu cấu hình giao vận tin cậy(địa chỉ kết nối cơ sở dữ liệu, "jdbc:postgresql://", "postgresql", 5432);
+        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, JDBC_POSTGRESQL) ||
+            chứa chính xác(tên lớp điều khiển, DB_POSTGRESQL)) {
+            trả về mình.cơ sở dữ liệu cấu hình giao vận tin cậy(địa chỉ kết nối cơ sở dữ liệu, JDBC_POSTGRESQL, DB_POSTGRESQL, CỔNG_POSTGRESQL);
         };
-        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, "jdbc:sqlite:") ||
-            chứa chính xác(tên lớp điều khiển, "sqlite")) {
-            tiền tố = "jdbc:sqlite:";
-            nếu (!bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, tiền tố)) {
-                trả về mình.cơ sở dữ liệu lỗi cấu hình("invalid-jdbc-prefix");
+        nếu (bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, JDBC_SQLITE) ||
+            chứa chính xác(tên lớp điều khiển, DB_SQLITE)) {
+            nếu (!bắt đầu bằng(địa chỉ kết nối cơ sở dữ liệu, JDBC_SQLITE)) {
+                trả về mình.cơ sở dữ liệu lỗi cấu hình(DB_LỖI_JDBC_PREFIX);
             };
-            đường tệp = bỏ khoảng trắng(con chuỗi(địa chỉ kết nối cơ sở dữ liệu, máy ảo lấy độ dài(tiền tố), máy ảo lấy độ dài(địa chỉ kết nối cơ sở dữ liệu)));
+            đường tệp = bỏ khoảng trắng(con chuỗi(địa chỉ kết nối cơ sở dữ liệu, máy ảo lấy độ dài(JDBC_SQLITE), máy ảo lấy độ dài(địa chỉ kết nối cơ sở dữ liệu)));
             nếu (đường tệp == "") {
                 trả về mình.cơ sở dữ liệu lỗi cấu hình("missing-sqlite-path");
             };
             trả về {
-                "ok": đúng,
-                "engine": "sqlite",
-                "host": "",
-                "port": 0,
-                "database": "",
-                "path": đường tệp,
-                "create": sai
+                DB_KHÓA_OK: đúng,
+                DB_KHÓA_ENGINE: DB_SQLITE,
+                DB_KHÓA_HOST: "",
+                DB_KHÓA_PORT: 0,
+                DB_KHÓA_DATABASE: "",
+                DB_KHÓA_PATH: đường tệp,
+                DB_KHÓA_CREATE: sai
             };
         };
-        trả về mình.cơ sở dữ liệu lỗi cấu hình("unsupported-driver");
+        trả về mình.cơ sở dữ liệu lỗi cấu hình(DB_LỖI_DRIVER);
     };
 
     hàm công khai cơ sở dữ liệu định danh an toàn(tên) {
@@ -151,7 +152,7 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
     hàm riêng tư cơ sở dữ liệu chuẩn hóa từ tố(thô, báo lỗi khi rỗng = đúng) {
         văn bản = bỏ khoảng trắng(thô);
         nếu (văn bản == "" && báo lỗi khi rỗng) {
-            trả về "db-command-failed";
+            trả về DB_LỆNH_THẤT_BẠI;
         };
         kết quả = "";
         lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
@@ -173,49 +174,49 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
         tên đăng nhập = thành chuỗi(tên đăng nhập);
         mật khẩu = thành chuỗi(mật khẩu);
         sql = thành chuỗi(sql);
-        bộ máy = lấy từ điển(cấu hình, "engine", "");
-        nếu (bộ máy != "sqlite" && tên đăng nhập == "") {
-            trả về {"ok": sai, "reason": "missing-username"};
+        bộ máy = lấy từ điển(cấu hình, DB_KHÓA_ENGINE, "");
+        nếu (bộ máy != DB_SQLITE && tên đăng nhập == "") {
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: DB_LỖI_THIẾU_TÊN_ĐĂNG_NHẬP};
         };
-        máy đích = lấy từ điển(cấu hình, "host", "");
-        cổng mạng = thành chuỗi(lấy từ điển(cấu hình, "port", 0));
-        cơ sở dữ liệu = lấy từ điển(cấu hình, "database", "");
-        nếu (bộ máy == "mysql") {
+        máy đích = lấy từ điển(cấu hình, DB_KHÓA_HOST, "");
+        cổng mạng = thành chuỗi(lấy từ điển(cấu hình, DB_KHÓA_PORT, 0));
+        cơ sở dữ liệu = lấy từ điển(cấu hình, DB_KHÓA_DATABASE, "");
+        nếu (bộ máy == DB_MYSQL) {
             đối số dòng lệnh = ["--protocol=TCP", "--batch", "--skip-column-names",
                 "-h", máy đích, "-P", cổng mạng, "-u", tên đăng nhập];
             nếu (dùng cơ sở dữ liệu) {
                 máy ảo thêm cuối danh sách(đối số dòng lệnh, "-D"); máy ảo thêm cuối danh sách(đối số dòng lệnh, cơ sở dữ liệu);
             };
             máy ảo thêm cuối danh sách(đối số dòng lệnh, "-e"); máy ảo thêm cuối danh sách(đối số dòng lệnh, sql);
-            trả về {"ok": đúng, "chương trình": "mysql", "đối số": đối số dòng lệnh,
+            trả về {DB_KHÓA_OK: đúng, "chương trình": DB_MYSQL, "đối số": đối số dòng lệnh,
                 "môi trường": {"MYSQL_PWD": mật khẩu},
                 "dự phòng": "/opt/homebrew/opt/mysql-client/bin/mysql",
                 "lỗi mở": "cannot-open-mysql-process"};
         };
-        nếu (bộ máy == "postgresql") {
+        nếu (bộ máy == DB_POSTGRESQL) {
             nếu (!dùng cơ sở dữ liệu) { cơ sở dữ liệu = "postgres"; };
-            trả về {"ok": đúng, "chương trình": "psql",
+            trả về {DB_KHÓA_OK: đúng, "chương trình": "psql",
                 "đối số": ["-h", máy đích, "-p", cổng mạng, "-U", tên đăng nhập,
                     "-d", cơ sở dữ liệu, "-At", "-c", sql],
                 "môi trường": {"PGPASSWORD": mật khẩu},
                 "dự phòng": "/opt/homebrew/bin/psql", "lỗi mở": "cannot-open-psql-process"};
         };
-        nếu (bộ máy == "sqlite") {
+        nếu (bộ máy == DB_SQLITE) {
             chương trình = "sqlite3";
             nếu (tên nền tảng() == "windows") { chương trình = "sqlite3.exe"; };
             chương trình = đọc biến môi trường("VPP_SQLITE3", chương trình);
-            trả về {"ok": đúng, "chương trình": chương trình,
-                "đối số": [lấy từ điển(cấu hình, "path", ""), sql],
+            trả về {DB_KHÓA_OK: đúng, "chương trình": chương trình,
+                "đối số": [lấy từ điển(cấu hình, DB_KHÓA_PATH, ""), sql],
                 "môi trường": {}, "dự phòng": "", "lỗi mở": "cannot-open-sqlite-process"};
         };
-        trả về {"ok": sai, "reason": "unsupported-driver"};
+        trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: DB_LỖI_DRIVER};
     };
 
     // Chọn client, dựng argv/environment, dự phòng và diễn giải exit status đều ở V++.
     hàm riêng tư cơ sở dữ liệu chạy primitive(cấu hình, tên đăng nhập, mật khẩu, sql, dùng cơ sở dữ liệu) {
         lệnh = mình.cơ sở dữ liệu lệnh máy khách(cấu hình, tên đăng nhập, mật khẩu, sql, dùng cơ sở dữ liệu);
-        nếu (!lấy từ điển(lệnh, "ok", sai)) {
-            trả về {"ok": sai, "reason": lấy từ điển(lệnh, "reason", "db-command-failed"), "output": ""};
+        nếu (!lấy từ điển(lệnh, DB_KHÓA_OK, sai)) {
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: lấy từ điển(lệnh, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI), DB_KHÓA_KẾT_QUẢ: ""};
         };
         đối số dòng lệnh = lấy từ điển(lệnh, "đối số", []);
         giá trị môi trường = lấy từ điển(lệnh, "môi trường", {});
@@ -227,34 +228,34 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
             };
         };
         nếu (!lấy từ điển(thô, "khởi chạy", sai)) {
-            trả về {"ok": sai, "reason": lấy từ điển(lệnh, "lỗi mở", "db-command-failed"), "output": ""};
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: lấy từ điển(lệnh, "lỗi mở", DB_LỆNH_THẤT_BẠI), DB_KHÓA_KẾT_QUẢ: ""};
         };
         nếu (lấy từ điển(thô, "mã thoát", -1) != 0 || lấy từ điển(thô, "lỗi", "") != "") {
             lý độ = lấy từ điển(thô, "đầu ra", "");
             nếu (lý độ == "") { lý độ = lấy từ điển(thô, "lỗi", ""); };
             trả về {
-                "ok": sai,
-                "reason": mình.cơ sở dữ liệu chuẩn hóa từ tố(lý độ),
-                "output": ""
+                DB_KHÓA_OK: sai,
+                DB_KHÓA_LÝ_DO: mình.cơ sở dữ liệu chuẩn hóa từ tố(lý độ),
+                DB_KHÓA_KẾT_QUẢ: ""
             };
         };
         trả về {
-            "ok": đúng,
-            "reason": "",
-            "output": mình.cơ sở dữ liệu chuẩn hóa từ tố(lấy từ điển(thô, "đầu ra", ""), sai)
+            DB_KHÓA_OK: đúng,
+            DB_KHÓA_LÝ_DO: "",
+            DB_KHÓA_KẾT_QUẢ: mình.cơ sở dữ liệu chuẩn hóa từ tố(lấy từ điển(thô, "đầu ra", ""), sai)
         };
     };
 
     hàm riêng tư cơ sở dữ liệu chuẩn bị cơ sở dữ liệu(cấu hình, tên đăng nhập, mật khẩu) {
-        bộ máy = lấy từ điển(cấu hình, "engine", "");
-        nếu (bộ máy == "sqlite" || !lấy từ điển(cấu hình, "create", sai)) {
-            trả về {"ok": đúng, "reason": "", "output": ""};
+        bộ máy = lấy từ điển(cấu hình, DB_KHÓA_ENGINE, "");
+        nếu (bộ máy == DB_SQLITE || !lấy từ điển(cấu hình, DB_KHÓA_CREATE, sai)) {
+            trả về {DB_KHÓA_OK: đúng, DB_KHÓA_LÝ_DO: "", DB_KHÓA_KẾT_QUẢ: ""};
         };
-        cơ sở dữ liệu = lấy từ điển(cấu hình, "database", "");
+        cơ sở dữ liệu = lấy từ điển(cấu hình, DB_KHÓA_DATABASE, "");
         nếu (!mình.cơ sở dữ liệu định danh an toàn(cơ sở dữ liệu)) {
-            trả về {"ok": sai, "reason": "unsafe-database-name", "output": ""};
+            trả về {DB_KHÓA_OK: sai, DB_KHÓA_LÝ_DO: "unsafe-database-name", DB_KHÓA_KẾT_QUẢ: ""};
         };
-        nếu (bộ máy == "mysql") {
+        nếu (bộ máy == DB_MYSQL) {
             trả về mình.cơ sở dữ liệu chạy primitive(
                 cấu hình,
                 tên đăng nhập,
@@ -270,8 +271,8 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
             "SELECT 1 FROM pg_database WHERE datname='" + cơ sở dữ liệu + "';",
             sai
         );
-        nếu (!lấy từ điển(kiểm tra, "ok", sai)) { trả về kiểm tra; };
-        nếu (lấy từ điển(kiểm tra, "output", "") == "1") { trả về kiểm tra; };
+        nếu (!lấy từ điển(kiểm tra, DB_KHÓA_OK, sai)) { trả về kiểm tra; };
+        nếu (lấy từ điển(kiểm tra, DB_KHÓA_KẾT_QUẢ, "") == "1") { trả về kiểm tra; };
         trả về mình.cơ sở dữ liệu chạy primitive(
             cấu hình,
             tên đăng nhập,
@@ -282,59 +283,59 @@ lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {
     };
 
     hàm riêng tư cơ sở dữ liệu lỗi kết quả(lý độ) {
-        trả về "DB_ERR|" + lý độ;
+        trả về DB_LỖI + lý độ;
     };
 
     // JDBC, lựa chọn client, argv và policy kết nối ở V++; VM chỉ spawn executable.
     hàm công khai kết nối cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu) {
         cấu hình = mình.cơ sở dữ liệu phân tích cấu hình(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu);
-        nếu (!lấy từ điển(cấu hình, "ok", sai)) {
-            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(cấu hình, "reason", "db-command-failed"));
+        nếu (!lấy từ điển(cấu hình, DB_KHÓA_OK, sai)) {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(cấu hình, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI));
         };
-        bộ máy = lấy từ điển(cấu hình, "engine", "");
-        nếu (bộ máy != "sqlite" && tên đăng nhập == "") {
-            trả về mình.cơ sở dữ liệu lỗi kết quả("missing-username");
+        bộ máy = lấy từ điển(cấu hình, DB_KHÓA_ENGINE, "");
+        nếu (bộ máy != DB_SQLITE && tên đăng nhập == "") {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(DB_LỖI_THIẾU_TÊN_ĐĂNG_NHẬP);
         };
         chuẩn bị = mình.cơ sở dữ liệu chuẩn bị cơ sở dữ liệu(cấu hình, tên đăng nhập, mật khẩu);
-        nếu (!lấy từ điển(chuẩn bị, "ok", sai)) {
-            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(chuẩn bị, "reason", "db-command-failed"));
+        nếu (!lấy từ điển(chuẩn bị, DB_KHÓA_OK, sai)) {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(chuẩn bị, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI));
         };
-        kết quả = mình.cơ sở dữ liệu chạy primitive(cấu hình, tên đăng nhập, mật khẩu, "SELECT 1;", đúng);
-        nếu (!lấy từ điển(kết quả, "ok", sai)) {
-            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(kết quả, "reason", "db-command-failed"));
+        kết quả = mình.cơ sở dữ liệu chạy primitive(cấu hình, tên đăng nhập, mật khẩu, SQL_KIỂM_TRA, đúng);
+        nếu (!lấy từ điển(kết quả, DB_KHÓA_OK, sai)) {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(kết quả, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI));
         };
-        trả về "DB_OK|connected";
+        trả về DB_ĐÃ_KẾT_NỐI;
     };
 
     // SQL result contract cũng được dựng ở V++.
     hàm công khai truy vấn cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql) {
         cấu hình = mình.cơ sở dữ liệu phân tích cấu hình(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu);
-        nếu (!lấy từ điển(cấu hình, "ok", sai)) {
-            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(cấu hình, "reason", "db-command-failed"));
+        nếu (!lấy từ điển(cấu hình, DB_KHÓA_OK, sai)) {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(cấu hình, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI));
         };
-        bộ máy = lấy từ điển(cấu hình, "engine", "");
-        nếu (bộ máy != "sqlite" && tên đăng nhập == "") {
-            trả về mình.cơ sở dữ liệu lỗi kết quả("missing-username");
+        bộ máy = lấy từ điển(cấu hình, DB_KHÓA_ENGINE, "");
+        nếu (bộ máy != DB_SQLITE && tên đăng nhập == "") {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(DB_LỖI_THIẾU_TÊN_ĐĂNG_NHẬP);
         };
         kết quả = mình.cơ sở dữ liệu chạy primitive(cấu hình, tên đăng nhập, mật khẩu, sql, đúng);
-        nếu (!lấy từ điển(kết quả, "ok", sai)) {
-            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(kết quả, "reason", "db-command-failed"));
+        nếu (!lấy từ điển(kết quả, DB_KHÓA_OK, sai)) {
+            trả về mình.cơ sở dữ liệu lỗi kết quả(lấy từ điển(kết quả, DB_KHÓA_LÝ_DO, DB_LỆNH_THẤT_BẠI));
         };
-        kết xuất = lấy từ điển(kết quả, "output", "");
+        kết xuất = lấy từ điển(kết quả, DB_KHÓA_KẾT_QUẢ, "");
         nếu (kết xuất == "") {
             trả về "DB_OK|affected=1";
         };
-        trả về "DB_OK|" + kết xuất;
+        trả về DB_THÀNH_CÔNG + kết xuất;
     };
 
     // Ghi chú hàm: ngắt kết nối logic ở tầng gói.
     hàm công khai ngắt kết nối cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu) {
-        trả về "DB_OK|disconnected";
+        trả về DB_ĐÃ_NGẮT;
     };
 
     // Ghi chú hàm: kiểm tra nhanh kết nối bằng SELECT 1.
     hàm công khai kiểm tra kết nối cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu) {
-        trả về mình.truy vấn cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT 1;");
+        trả về mình.truy vấn cơ sở dữ liệu(tên lớp điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, SQL_KIỂM_TRA);
     };
 
     // Ghi chú hàm: wrapper tên đa từ để giữ cú pháp thân thiện.

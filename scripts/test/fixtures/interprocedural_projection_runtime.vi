@@ -1,0 +1,39 @@
+hàm phần đầu(x) { trả về x[0]; };
+hàm phần giữa(x) { trả về x[1]; };
+hàm phần cuối(x) { trả về x[2]; };
+hàm hiệu ứng(x) { in x; trả về x; };
+hàm lỗi() { ném "projection exception"; };
+hàm giữ(x) { trả về x; };
+hàm sửa(x) { x[1] = 42; trả về x[1]; };
+hàm che khuất() {
+    biến phần giữa = hàm(x) { trả về x[1] + 100; };
+    biến x = 7;
+    in phần giữa([1, x, 3]);
+};
+
+hàm chính() {
+    biến tổng = 0;
+    lặp(i = 0; i < 100000; i++) {
+        tổng += phần đầu([i % 10, 2, 3]);
+        tổng += phần giữa([1, i % 10, 3]);
+        tổng += phần cuối([1, 2, i % 10]);
+    };
+    in tổng;
+    biến x = 7;
+    in phần giữa([1, phần cuối([1, 2, x]), 3]);
+    biến dữ liệu = [9];
+    biến tham chiếu = phần giữa([1, dữ liệu, 3]);
+    tham chiếu[0] = 23;
+    in dữ liệu[0];
+    in phần giữa([1, hiệu ứng(12), 3]);
+    in phần giữa([hiệu ứng(13), hiệu ứng(14), hiệu ứng(15)]);
+    biến trống = rỗng;
+    in phần giữa([1, trống, 3]) == rỗng;
+    thử { in phần giữa([1, lỗi(), 3]); }
+    bắt lỗi(e) { in e; };
+    in phần giữa([x, 2, 3]);
+    in phần giữa([1, 2, 3]);
+    in phần giữa(giữ([1, x, 3]));
+    in sửa([1, x, 3]);
+    che khuất();
+};

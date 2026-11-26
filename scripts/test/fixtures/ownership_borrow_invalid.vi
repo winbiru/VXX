@@ -1,0 +1,5 @@
+nhập gói.lõi.sở hữu tĩnh.chủ sở hữu tĩnh;
+hàm chính() {
+    biến a = chủ sở hữu tĩnh([1]);
+    a("đọc", hàm(x) { a("chuyển"); });
+};

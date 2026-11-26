@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Hai đối tượng có trạng thái cho event emitter và service registry.
 // Dùng lại implementation hàm để giữ tương thích với chương trình cũ.
 nhập gói.lõi.giao diện tài nguyên.*;
@@ -13,7 +14,7 @@ lớp công khai Bộ Phát Sự Kiện triển khai Đóng Được {
     };
 
     hàm riêng tư yêu cầu mở() {
-        nếu (mình.đã đóng) { ném "LISTENER_STATE"; };
+        nếu (mình.đã đóng) { ném LỖI_LISTENER_STATE; };
     };
 
     hàm công khai đăng ký(bộ lắng nghe, một lần = sai) {
@@ -29,7 +30,7 @@ lớp công khai Bộ Phát Sự Kiện triển khai Đóng Được {
         lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
             nếu (danh sách[i] == đăng ký) { tìm thấy = đúng; };
         };
-        nếu (!tìm thấy) { ném "LISTENER_STATE"; };
+        nếu (!tìm thấy) { ném LỖI_LISTENER_STATE; };
         trả về hủy đăng ký(đăng ký);
     };
 
@@ -59,7 +60,7 @@ lớp công khai Bộ Phát Sự Kiện triển khai Đóng Được {
 lớp công khai Bộ Nạp Dịch Vụ {
     hàm công khai khởi tạo(mức trần = 1024) {
         nếu (loại của(mức trần) != "số nguyên" || mức trần <= 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         mình.mức trần = mức trần;
         mình.nhà cung cấp = [];
@@ -67,14 +68,14 @@ lớp công khai Bộ Nạp Dịch Vụ {
 
     hàm công khai đăng ký(nhà cung cấp) {
         mình.kiểm tra nhà cung cấp(nhà cung cấp);
-        nếu (máy ảo lấy độ dài(mình.nhà cung cấp) >= mình.mức trần) { ném "SERVICE_CONFIGURATION"; };
+        nếu (máy ảo lấy độ dài(mình.nhà cung cấp) >= mình.mức trần) { ném LỖI_SERVICE_CONFIGURATION; };
         danh sách = mình.nhà cung cấp;
         lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
             hiện tại = danh sách[i];
             nếu (lấy từ điển(hiện tại, "interface_id", "") == lấy từ điển(nhà cung cấp, "interface_id", "") &&
                 lấy từ điển(hiện tại, "implementation_id", "") == lấy từ điển(nhà cung cấp, "implementation_id", "") &&
                 lấy từ điển(hiện tại, "module_id", "") == lấy từ điển(nhà cung cấp, "module_id", "")) {
-                ném "SERVICE_CONFIGURATION";
+                ném LỖI_SERVICE_CONFIGURATION;
             };
         };
         máy ảo thêm cuối danh sách(danh sách, nhà cung cấp);
@@ -83,7 +84,7 @@ lớp công khai Bộ Nạp Dịch Vụ {
 
     hàm công khai tìm(mã định danh giao diện) {
         nếu (loại của(mã định danh giao diện) != "chuỗi" || máy ảo lấy độ dài(mã định danh giao diện) == 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         kết quả = [];
         danh sách = mình.nhà cung cấp;
@@ -91,7 +92,7 @@ lớp công khai Bộ Nạp Dịch Vụ {
             nhà cung cấp = danh sách[i];
             nếu (lấy từ điển(nhà cung cấp, "interface_id", "") == mã định danh giao diện) { máy ảo thêm cuối danh sách(kết quả, nhà cung cấp); };
         };
-        nếu (máy ảo lấy độ dài(kết quả) == 0) { ném "SERVICE_NOT_FOUND"; };
+        nếu (máy ảo lấy độ dài(kết quả) == 0) { ném LỖI_SERVICE_NOT_FOUND; };
         trả về kết quả;
     };
 
@@ -111,7 +112,7 @@ lớp công khai Bộ Nạp Dịch Vụ {
 
     hàm riêng tư kiểm tra nhà cung cấp(nhà cung cấp) {
         nếu (loại của(nhà cung cấp) != "từ điển" || lấy từ điển(nhà cung cấp, "__vpp_service_provider__", 0) != 1) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
     };
 
@@ -121,16 +122,16 @@ lớp công khai Bộ Nạp Dịch Vụ {
         lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
             nếu (danh sách[i] == nhà cung cấp) { trả về đúng; };
         };
-        ném "SERVICE_NOT_FOUND";
+        ném LỖI_SERVICE_NOT_FOUND;
     };
 
     hàm riêng tư tạo thể hiện(nhà cung cấp) {
         bộ tạo = lấy từ điển(nhà cung cấp, "factory", rỗng);
-        thử { thể hiện = bộ tạo(); } bắt lỗi(e) { ném "SERVICE_CONFIGURATION"; };
+        thử { thể hiện = bộ tạo(); } bắt lỗi(e) { ném LỖI_SERVICE_CONFIGURATION; };
         validator = lấy từ điển(nhà cung cấp, "validator", rỗng);
         nếu (validator != rỗng) {
-            thử { hợp lệ = validator(thể hiện); } bắt lỗi(e) { ném "SERVICE_CONFIGURATION"; };
-            nếu (!hợp lệ) { ném "SERVICE_CONFIGURATION"; };
+            thử { hợp lệ = validator(thể hiện); } bắt lỗi(e) { ném LỖI_SERVICE_CONFIGURATION; };
+            nếu (!hợp lệ) { ném LỖI_SERVICE_CONFIGURATION; };
         };
         trả về thể hiện;
     };

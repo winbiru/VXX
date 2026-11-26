@@ -1,0 +1,2 @@
+nhập values.VALUE;
+hàm chính() { VALUE++; };

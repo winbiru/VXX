@@ -1,0 +1,17 @@
+// Worker sở hữu snapshot riêng; chỉ bỏ handle nguồn sau khi khởi chạy thành công.
+nhập gói.lõi.đồng thời.chạy luồng;
+nhập gói.lõi.đồng thời.Luồng Công Việc;
+nhập gói.lõi.vòng đời.dùng tài nguyên;
+
+hàm công khai chuyển sang luồng(chủ, công việc) {
+    biến mã = chủ("ghi", hàm(giá trị) {
+        trả về chạy luồng(công việc, [giá trị]);
+    });
+    chủ("bỏ");
+    trả về mã;
+};
+
+// Callback nhận worker đang mở. Đóng sẽ hủy (nếu cần) và join khi ra phạm vi.
+hàm công khai dùng luồng(công việc, xử lý, đối số = rỗng) {
+    trả về dùng tài nguyên(Luồng Công Việc(công việc, đối số), xử lý);
+};

@@ -1,0 +1,4 @@
+hằng TỆP_DEMO_SẢN_PHẨM = "data/demo-san-pham.json";
+hằng TỆP_DEMO_ĐƠN_HÀNG = "data/demo-don-hang.json";
+hằng BIẾN_CỔNG_KHO = "VPP_WAREHOUSE_PORT";
+hằng CỔNG_KHO_MẶC_ĐỊNH = "8088";

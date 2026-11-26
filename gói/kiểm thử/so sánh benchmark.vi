@@ -1,3 +1,4 @@
+nhập gói.hằng.benchmark.*;
 // Same-host benchmark evidence validation and statistical decisions in V++.
 nhập gói.bộ sưu tập.từ điển.có khóa;
 nhập gói.bộ sưu tập.từ điển.khóa từ điển;
@@ -100,8 +101,8 @@ hàm riêng tư bench_describe(values) {
     mad = benchmark percentile(deviations, 0.5);
     noise = 0;
     nếu (median != 0) { noise = mad / median; };
-    trả về {"median": median, "p95": benchmark percentile(values), "mad": mad,
-        "mad_over_median": noise, "min": minimum, "max": maximum, "samples": độ dài(values)};
+    trả về {BENCHMARK_KHÓA_TRUNG_VỊ: median, "p95": benchmark percentile(values), "mad": mad,
+        BENCHMARK_KHÓA_MAD_TRÊN_TRUNG_VỊ: noise, "min": minimum, "max": maximum, "samples": độ dài(values)};
 };
 hàm riêng tư bench_gc(name) {
     nếu (độ dài(name) < 9) { trả về sai; };
@@ -117,13 +118,13 @@ hàm công khai so sánh benchmark(report) {
     bench_require(độ dài(khóa từ điển(report["environment"])) > 0, "missing environment");
     bench_require(loại của(report["harness_sha256"]) == "chuỗi", "harness fingerprint");
     bench_require(report["harness_sha256"] != "", "empty harness fingerprint");
-    budget = report["budget"];
-    fields = ["time", "rss", "gc_p95", "allocations", "noise"];
+    budget = report[BENCHMARK_KHÓA_NGÂN_SÁCH];
+    fields = ["time", "rss", BENCHMARK_KHÓA_GC_P95, "allocations", BENCHMARK_KHÓA_NHIỄU];
     lặp(i = 0; i < độ dài(fields); i++) { bench_number(budget[fields[i]], đúng); };
     count = report["sample_count"]; warmups = report["warmup_count"];
     bench_require(loại của(count) == "số nguyên" && count >= 10, "need 10 independent samples");
     bench_require(loại của(warmups) == "số nguyên" && warmups >= 3, "need 3 warmups");
-    sides = ["baseline", "candidate"];
+    sides = [BENCHMARK_BẢN_CƠ_SỞ, BENCHMARK_BẢN_ỨNG_VIÊN];
     builds = report["builds"];
     lặp(i = 0; i < 2; i++) {
         side = sides[i]; source = report["sources"][side]; build = builds[side];
@@ -134,40 +135,40 @@ hàm công khai so sánh benchmark(report) {
         };
         bench_require(loại của(build["binary_sha256"]) == "chuỗi", "binary identity");
         bench_require(build["binary_sha256"] != "", "empty binary identity");
-        bench_require(build["meta"]["build"] == "Release" && build["meta"]["coverage"] == "OFF", "build configuration");
-        bench_flags(build["meta"]["flags"]);
-        cmake = build["cmake"]; keys = khóa từ điển(cmake);
+        bench_require(build[BENCHMARK_KHÓA_META]["build"] == "Release" && build[BENCHMARK_KHÓA_META]["coverage"] == "OFF", "build configuration");
+        bench_flags(build[BENCHMARK_KHÓA_META]["flags"]);
+        cmake = build[BENCHMARK_KHÓA_CMAKE]; keys = khóa từ điển(cmake);
         lặp(j = 0; j < độ dài(keys); j++) {
             nếu (bench_contains(keys[j], "FLAGS")) { bench_flags(cmake[keys[j]]); };
         };
     };
-    bench_require(bench_equal(builds["baseline"]["meta"], builds["candidate"]["meta"]), "metadata mismatch");
-    bench_require(bench_equal(builds["baseline"]["cmake"], builds["candidate"]["cmake"]), "CMake mismatch");
+    bench_require(bench_equal(builds[BENCHMARK_BẢN_CƠ_SỞ][BENCHMARK_KHÓA_META], builds[BENCHMARK_BẢN_ỨNG_VIÊN][BENCHMARK_KHÓA_META]), "metadata mismatch");
+    bench_require(bench_equal(builds[BENCHMARK_BẢN_CƠ_SỞ][BENCHMARK_KHÓA_CMAKE], builds[BENCHMARK_BẢN_ỨNG_VIÊN][BENCHMARK_KHÓA_CMAKE]), "CMake mismatch");
     plan = report["plan"];
     bench_require(loại của(plan) == "danh sách", "case plan must be list");
     bench_require(độ dài(plan) > 0, "empty case plan");
     groups = {}; iterations = {}; checksums = {}; seen = {};
     lặp(i = 0; i < độ dài(plan); i++) {
-        name = plan[i]["case"];
+        name = plan[i][BENCHMARK_KHÓA_CA];
         bench_require(loại của(name) == "chuỗi" && name != "", "case name");
         bench_require(!có khóa(iterations, name), "duplicate case plan");
         n = plan[i]["iterations"];
         bench_require(loại của(n) == "số nguyên" && n > 0, "iteration plan");
         iterations[name] = n;
-        groups[name] = {"baseline": [], "candidate": []};
+        groups[name] = {BENCHMARK_BẢN_CƠ_SỞ: [], BENCHMARK_BẢN_ỨNG_VIÊN: []};
     };
     samples = report["samples"];
     bench_require(loại của(samples) == "danh sách", "samples must be list");
     lặp(i = 0; i < độ dài(samples); i++) {
         sample = samples[i]; side = sample["side"]; phase = sample["phase"];
-        pair = sample["pair"]; record = sample["record"]; name = record["case"];
-        bench_require(side == "baseline" || side == "candidate", "sample side");
+        pair = sample["pair"]; record = sample["record"]; name = record[BENCHMARK_KHÓA_CA];
+        bench_require(side == BENCHMARK_BẢN_CƠ_SỞ || side == BENCHMARK_BẢN_ỨNG_VIÊN, "sample side");
         bench_require(có khóa(iterations, name), "unexpected case");
         bench_require(phase == "warmup" || phase == "measure", "sample phase");
         limit = count; nếu (phase == "warmup") { limit = warmups; };
         bench_require(loại của(pair) == "số nguyên" && pair >= 0 && pair < limit, "sample index");
         order = pair % 2;
-        nếu (side == "candidate") { order = 1 - order; };
+        nếu (side == BENCHMARK_BẢN_ỨNG_VIÊN) { order = 1 - order; };
         bench_require(loại của(sample["order"]) == "số nguyên" && sample["order"] == order, "process order");
         // Nested maps avoid separator collisions in user-provided case names.
         nếu (!có khóa(seen, name)) { seen[name] = {}; };
@@ -199,10 +200,10 @@ hàm công khai so sánh benchmark(report) {
         nếu (phase == "measure") { máy ảo thêm cuối danh sách(groups[name][side], record); };
     };
     bench_require(độ dài(samples) == độ dài(plan) * 2 * (count + warmups), "missing samples/warmups");
-    results = []; overall = "PASS";
+    results = []; overall = BENCHMARK_KẾT_QUẢ_ĐẠT;
     lặp(i = 0; i < độ dài(plan); i++) {
-        name = plan[i]["case"]; group = groups[name];
-        bench_require(độ dài(group["baseline"]) == count && độ dài(group["candidate"]) == count, "missing measurements");
+        name = plan[i][BENCHMARK_KHÓA_CA]; group = groups[name];
+        bench_require(độ dài(group[BENCHMARK_BẢN_CƠ_SỞ]) == count && độ dài(group[BENCHMARK_BẢN_ỨNG_VIÊN]) == count, "missing measurements");
         fields = ["ns_per_iteration", "peak_rss_bytes"];
         thresholds = [budget["time"], budget["rss"]];
         nếu (bench_gc(name)) {
@@ -222,16 +223,16 @@ hàm công khai so sánh benchmark(report) {
             };
             base = summaries[0]; candidate = summaries[1];
             delta = rỗng; regression = sai;
-            nếu (base["median"] == 0) {
-                nếu (candidate["median"] == 0) { delta = 0; } hoặc { regression = đúng; };
+            nếu (base[BENCHMARK_KHÓA_TRUNG_VỊ] == 0) {
+                nếu (candidate[BENCHMARK_KHÓA_TRUNG_VỊ] == 0) { delta = 0; } hoặc { regression = đúng; };
             } hoặc {
-                delta = candidate["median"] / base["median"] - 1;
+                delta = candidate[BENCHMARK_KHÓA_TRUNG_VỊ] / base[BENCHMARK_KHÓA_TRUNG_VỊ] - 1;
                 regression = delta > thresholds[j];
             };
-            metrics[field] = {"baseline": base, "candidate": candidate,
-                "change_fraction": delta, "budget": thresholds[j], "regression": regression};
+            metrics[field] = {BENCHMARK_BẢN_CƠ_SỞ: base, BENCHMARK_BẢN_ỨNG_VIÊN: candidate,
+                "change_fraction": delta, BENCHMARK_KHÓA_NGÂN_SÁCH: thresholds[j], "regression": regression};
             nếu (regression) { failed = đúng; máy ảo thêm cuối danh sách(reasons, field + " exceeds budget"); };
-            nếu (base["mad_over_median"] > budget["noise"] || candidate["mad_over_median"] > budget["noise"]) {
+            nếu (base[BENCHMARK_KHÓA_MAD_TRÊN_TRUNG_VỊ] > budget[BENCHMARK_KHÓA_NHIỄU] || candidate[BENCHMARK_KHÓA_MAD_TRÊN_TRUNG_VỊ] > budget[BENCHMARK_KHÓA_NHIỄU]) {
                 noisy = đúng; máy ảo thêm cuối danh sách(reasons, field + " exceeds noise budget");
             };
         };
@@ -249,22 +250,22 @@ hàm công khai so sánh benchmark(report) {
                 máy ảo thêm cuối danh sách(tails, benchmark percentile(pooled));
             };
             delta = tails[1] / tails[0] - 1;
-            regression = delta > budget["gc_p95"];
-            metrics["gc_pause_p95_ns"] = {"baseline": summaries[0], "candidate": summaries[1],
+            regression = delta > budget[BENCHMARK_KHÓA_GC_P95];
+            metrics["gc_pause_p95_ns"] = {BENCHMARK_BẢN_CƠ_SỞ: summaries[0], BENCHMARK_BẢN_ỨNG_VIÊN: summaries[1],
                 "baseline_pooled_p95": tails[0], "candidate_pooled_p95": tails[1],
-                "change_fraction": delta, "budget": budget["gc_p95"], "regression": regression};
+                "change_fraction": delta, BENCHMARK_KHÓA_NGÂN_SÁCH: budget[BENCHMARK_KHÓA_GC_P95], "regression": regression};
             insufficient = count < 40;
             nếu (insufficient) { máy ảo thêm cuối danh sách(reasons, "GC p95 requires 40 independent processes"); }
             hoặc nếu (regression) { failed = đúng; máy ảo thêm cuối danh sách(reasons, "GC p95 exceeds budget"); };
-            nếu (summaries[0]["mad_over_median"] > budget["noise"] || summaries[1]["mad_over_median"] > budget["noise"]) {
+            nếu (summaries[0][BENCHMARK_KHÓA_MAD_TRÊN_TRUNG_VỊ] > budget[BENCHMARK_KHÓA_NHIỄU] || summaries[1][BENCHMARK_KHÓA_MAD_TRÊN_TRUNG_VỊ] > budget[BENCHMARK_KHÓA_NHIỄU]) {
                 noisy = đúng; máy ảo thêm cuối danh sách(reasons, "GC p95 exceeds noise budget");
             };
         };
-        status = "PASS";
-        nếu (noisy || insufficient) { status = "INCONCLUSIVE"; } hoặc nếu (failed) { status = "FAIL"; };
-        nếu (status == "FAIL") { overall = "FAIL"; }
-        hoặc nếu (status == "INCONCLUSIVE" && overall == "PASS") { overall = "INCONCLUSIVE"; };
-        máy ảo thêm cuối danh sách(results, {"case": name, "status": status, "reasons": reasons, "metrics": metrics});
+        status = BENCHMARK_KẾT_QUẢ_ĐẠT;
+        nếu (noisy || insufficient) { status = BENCHMARK_KẾT_QUẢ_CHƯA_KẾT_LUẬN; } hoặc nếu (failed) { status = BENCHMARK_KẾT_QUẢ_TRƯỢT; };
+        nếu (status == BENCHMARK_KẾT_QUẢ_TRƯỢT) { overall = BENCHMARK_KẾT_QUẢ_TRƯỢT; }
+        hoặc nếu (status == BENCHMARK_KẾT_QUẢ_CHƯA_KẾT_LUẬN && overall == BENCHMARK_KẾT_QUẢ_ĐẠT) { overall = BENCHMARK_KẾT_QUẢ_CHƯA_KẾT_LUẬN; };
+        máy ảo thêm cuối danh sách(results, {BENCHMARK_KHÓA_CA: name, "status": status, "reasons": reasons, "metrics": metrics});
     };
     trả về {"status": overall, "cases": results};
 };

@@ -1,3 +1,5 @@
+nhập hằng.trường dữ liệu.*;
+nhập hằng.đơn hàng.*;
 nhập lõi;
 nhập ma-don-hang;
 nhập ..domain.don_hang.*;
@@ -40,8 +42,8 @@ lớp công khai DịchVụĐơnHàng {
         tổngTheoMã = {};
         lặp(i = 0; i < độ dài(cácMục); i = i + 1) {
             mục = cácMục[i];
-            mã = lấy từ điển(mục, "maSanPham", "");
-            sốLượng = lấy từ điển(mục, "soLuong", 0);
+            mã = lấy từ điển(mục, KHÓA_MÃ_SẢN_PHẨM, "");
+            sốLượng = lấy từ điển(mục, KHÓA_SỐ_LƯỢNG, 0);
             nếu (mã == "") {
                 ném "Dịch vụ đơn hàng: thiếu maSanPham";
             };
@@ -60,10 +62,10 @@ lớp công khai DịchVụĐơnHàng {
         lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
             sảnPhẩm = cácSảnPhẩm[i];
             thêm(kếtQuả, {
-                "id": sảnPhẩm.id,
-                "tonKho": sảnPhẩm.tồnKho,
-                "daBan": sảnPhẩm.đãBán,
-                "phienBan": sảnPhẩm.phiênBản
+                KHÓA_ID: sảnPhẩm.id,
+                KHÓA_TỒN_KHO: sảnPhẩm.tồnKho,
+                KHÓA_ĐÃ_BÁN: sảnPhẩm.đãBán,
+                KHÓA_PHIÊN_BẢN: sảnPhẩm.phiênBản
             });
         };
         trả về kếtQuả;
@@ -73,12 +75,12 @@ lớp công khai DịchVụĐơnHàng {
         khoSảnPhẩm = mình.khoSảnPhẩm;
         lặp(i = 0; i < độ dài(snapshot); i = i + 1) {
             trạngThái = snapshot[i];
-            id = lấy từ điển(trạngThái, "id", "");
+            id = lấy từ điển(trạngThái, KHÓA_ID, "");
             sảnPhẩm = khoSảnPhẩm.tìmTheoId(id);
             nếu (sảnPhẩm != rỗng) {
-                sảnPhẩm.tồnKho = lấy từ điển(trạngThái, "tonKho", sảnPhẩm.tồnKho);
-                sảnPhẩm.đãBán = lấy từ điển(trạngThái, "daBan", sảnPhẩm.đãBán);
-                sảnPhẩm.phiênBản = lấy từ điển(trạngThái, "phienBan", sảnPhẩm.phiênBản);
+                sảnPhẩm.tồnKho = lấy từ điển(trạngThái, KHÓA_TỒN_KHO, sảnPhẩm.tồnKho);
+                sảnPhẩm.đãBán = lấy từ điển(trạngThái, KHÓA_ĐÃ_BÁN, sảnPhẩm.đãBán);
+                sảnPhẩm.phiênBản = lấy từ điển(trạngThái, KHÓA_PHIÊN_BẢN, sảnPhẩm.phiênBản);
                 khoSảnPhẩm.lưu(sảnPhẩm);
             };
         };
@@ -125,7 +127,7 @@ lớp công khai DịchVụĐơnHàng {
 
             khoĐơnHàng = mình.khoĐơnHàng;
             mãĐơn = tạo mã hóa đơn(khoĐơnHàng.sốLượng() + 1);
-            đơn = ĐơnHàng(mãĐơn, kháchHàng, cácDòng, "MOI");
+            đơn = ĐơnHàng(mãĐơn, kháchHàng, cácDòng, ĐƠN_MỚI);
             đơn.kiểmTraHợpLệ();
             đơn.xácNhận();
             khoĐơnHàng.tạoMới(đơn);

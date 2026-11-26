@@ -15,12 +15,21 @@ hàm công khai biên dịch phân tích chương trình thuần(mã nguồn, c�
     trả về bộ.phân tích();
 };
 
+// Các đường biên dịch và thông dịch chỉ nhận mã nguồn không có đồ thị nhập.
+hàm công khai biên dịch hạ hằng độc lập(cây) {
+    nếu (lấy từ điển(cây, "có bất biến", sai)) {
+        Bộ Phân Tích Cú Pháp("", []).hạ hằng độc lập(cây);
+    };
+    trả về cây;
+};
+
 lớp công khai Bộ Phân Tích Cú Pháp {
     hàm công khai khởi tạo(mã nguồn, các từ tố = rỗng, giữ nguồn = sai) {
         mình.giữ nguồn = giữ nguồn;
         nếu (các từ tố == rỗng) { các từ tố = biên dịch từ tố hóa gọn(mã nguồn)["token"]; };
         mình.các từ tố = các từ tố;
         mình.vị trí = 0;
+        mình.có khai báo bất biến = sai;
     };
     hàm công khai phân tích() {
         p = {"token": mình.các từ tố, "vị trí": 0, "mã cú pháp cố định": đúng};
@@ -35,9 +44,249 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         mình.vị trí = p["vị trí"];
         kết quả = {"loại": "chương trình", "câu lệnh": câu lệnh};
         nếu (mình.giữ nguồn) { kết quả["giữ nguồn"] = đúng; };
+        nếu (mình.có khai báo bất biến) {
+            mình.kiểm tra bất biến(kết quả, rỗng);
+            kết quả["có bất biến"] = đúng;
+        };
         trả về kết quả;
     };
     hàm công khai vị trí() { trả về mình.vị trí; };
+
+    // IR của V++ cấp slot theo hàm/global, còn tên bắt lỗi có phạm vi riêng.
+    // Thu thập khai báo trước khi kiểm tra phép ghi, kể cả khai báo trong nhánh.
+    hàm riêng tư thu thập bất biến(nút, bảng, bảng tĩnh = rỗng) {
+        dạng = loại của(nút);
+        nếu (dạng == "danh sách") {
+            lặp(i = 0; i < máy ảo lấy độ dài(nút); i++) {
+                mình.thu thập bất biến(nút[i], bảng, bảng tĩnh);
+            };
+            trả về;
+        };
+        nếu (dạng != "từ điển") { trả về; };
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "hàm" || loại == "hàm ẩn danh" || loại == "lớp" ||
+            loại == "giao diện" || loại == "hằng" || loại == "tên" || loại == "nhập") { trả về; };
+        nếu (loại == "biến") {
+            tên = nút["tên"];
+            bất biến = lấy từ điển(nút, "bất biến", sai);
+            nếu (máy ảo có khóa từ điển(bảng, tên)) {
+                nếu (bất biến || bảng[tên]) {
+                    ném "biên dịch ngữ nghĩa: trùng khai báo hằng '" + tên + "'";
+                };
+            };
+            bảng[tên] = bất biến;
+            nếu (bảng tĩnh != rỗng && bất biến) {
+                bảng tĩnh[tên] = mình.giá trị hằng tĩnh(nút["giá trị"]);
+            };
+            trả về;
+        };
+        các khóa = máy ảo liệt kê khóa từ điển(nút);
+        lặp(i = 0; i < máy ảo lấy độ dài(các khóa); i++) {
+            mình.thu thập bất biến(nút[các khóa[i]], bảng, bảng tĩnh);
+        };
+    };
+
+    hàm riêng tư kiểm tra bất biến(nút, phạm vi) {
+        dạng = loại của(nút);
+        nếu (dạng == "danh sách") {
+            lặp(i = 0; i < máy ảo lấy độ dài(nút); i++) {
+                mình.kiểm tra bất biến(nút[i], phạm vi);
+            };
+            trả về;
+        };
+        nếu (dạng != "từ điển") { trả về; };
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "hằng" || loại == "tên" || loại == "nhập") { trả về; };
+        nếu (loại == "chương trình") {
+            phạm vi = {"cha": phạm vi, "tên": {}};
+            mình.thu thập bất biến(nút["câu lệnh"], phạm vi["tên"]);
+        };
+        nếu (loại == "hàm" || loại == "hàm ẩn danh") {
+            phạm vi = {"cha": phạm vi, "tên": {}};
+            các tên = nút["tham số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(các tên); i++) {
+                phạm vi["tên"][các tên[i]] = sai;
+            };
+            mình.thu thập bất biến(nút["thân"], phạm vi["tên"]);
+        };
+        nếu (loại == "thử") {
+            mình.kiểm tra bất biến(nút["thân"], phạm vi);
+            phạm vi bắt = {"cha": phạm vi, "tên": {}};
+            phạm vi bắt["tên"][nút["biến lỗi"]] = sai;
+            mình.kiểm tra bất biến(nút["bắt"], phạm vi bắt);
+            trả về;
+        };
+        đích = rỗng;
+        nếu (loại == "hai ngôi") {
+            nếu (biên dịch biểu thức là phép gán(nút["toán tử"])) { đích = nút["trái"]; };
+        } hoặc nếu (loại == "cập nhật") { đích = nút["đối tượng"]; };
+        nếu (loại của(đích) == "từ điển") {
+          nếu (lấy từ điển(đích, "loại", "") == "tên") {
+            tên = đích["giá trị"];
+            hiện tại = phạm vi;
+            khi (hiện tại != rỗng) {
+                nếu (máy ảo có khóa từ điển(hiện tại["tên"], tên)) {
+                    nếu (hiện tại["tên"][tên]) {
+                        ném "biên dịch ngữ nghĩa: không thể gán lại hằng '" + tên + "'";
+                    };
+                    thoát;
+                };
+                hiện tại = hiện tại["cha"];
+            };
+          };
+        };
+        các khóa = máy ảo liệt kê khóa từ điển(nút);
+        lặp(i = 0; i < máy ảo lấy độ dài(các khóa); i++) {
+            mình.kiểm tra bất biến(nút[các khóa[i]], phạm vi);
+        };
+    };
+
+    // Hạ tên hằng nhập thành lời đọc ô nhớ của mô-đun sở hữu.
+    hàm riêng tư tên hằng mô đun(nút) {
+        nếu (loại của(nút) != "từ điển") { trả về ""; };
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "tên") { trả về nút["giá trị"]; };
+        nếu (loại == "thành viên") {
+            gốc = mình.tên hằng mô đun(nút["đối tượng"]);
+            nếu (gốc != "") { trả về gốc + "." + nút["tên"]; };
+        };
+        trả về "";
+    };
+
+    hàm riêng tư tìm hằng mô đun(tên, phạm vi, bảng) {
+        nếu (!máy ảo có khóa từ điển(bảng, tên)) { trả về rỗng; };
+        gốc = tên;
+        lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+            nếu (tên[i] == ".") {
+                gốc = "";
+                lặp(j = 0; j < i; j++) { gốc += tên[j]; };
+                thoát;
+            };
+        };
+        khi (phạm vi != rỗng) {
+            nếu (máy ảo có khóa từ điển(phạm vi["tên"], tên) ||
+                máy ảo có khóa từ điển(phạm vi["tên"], gốc)) { trả về rỗng; };
+            phạm vi = phạm vi["cha"];
+        };
+        trả về bảng[tên];
+    };
+
+    // Chỉ các literal vô hướng được dùng tại vị trí cần giá trị lúc biên dịch.
+    // Không chạy hàm khởi tạo của hằng trong compiler.
+    hàm công khai giá trị hằng tĩnh(nút) {
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "hằng") { trả về nút; };
+        nếu (loại == "một ngôi" && nút["toán tử"] == "-") {
+            toán hạng = nút["toán hạng"];
+            nếu (lấy từ điển(toán hạng, "loại", "") == "hằng" &&
+                lấy từ điển(toán hạng, "kiểu", "") == "số nguyên") { trả về nút; };
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư tìm hằng tĩnh(tên, phạm vi, bảng) {
+        hiện tại = phạm vi;
+        khi (hiện tại != rỗng) {
+            nếu (máy ảo có khóa từ điển(hiện tại["tên"], tên)) {
+                nếu (hiện tại["tên"][tên]) {
+                    trả về {"giá trị tĩnh": lấy từ điển(hiện tại["tĩnh"], tên, rỗng)};
+                };
+                trả về rỗng;
+            };
+            hiện tại = hiện tại["cha"];
+        };
+        trả về mình.tìm hằng mô đun(tên, phạm vi, bảng);
+    };
+
+    hàm riêng tư hạ vị trí hằng tĩnh(nút, bảng, phạm vi, khóa từ điển) {
+        tên = mình.tên hằng mô đun(nút);
+        nếu (tên == "") { trả về nút; };
+        mục = mình.tìm hằng tĩnh(tên, phạm vi, bảng);
+        nếu (mục == rỗng) { trả về nút; };
+        giá trị = lấy từ điển(mục, "giá trị tĩnh", rỗng);
+        nếu (giá trị == rỗng) {
+            ném "biên dịch ngữ nghĩa: hằng '" + tên + "' cần giá trị tĩnh tại vị trí này";
+        };
+        nếu (khóa từ điển && (giá trị["loại"] != "hằng" || giá trị["kiểu"] != "chuỗi")) {
+            ném "biên dịch ngữ nghĩa: hằng khóa từ điển phải là chuỗi";
+        };
+        trả về giá trị;
+    };
+
+    hàm công khai hạ hằng độc lập(cây) {
+        phạm vi = {"cha": rỗng, "tên": {}, "tĩnh": {}};
+        mình.thu thập bất biến(cây["câu lệnh"], phạm vi["tên"], phạm vi["tĩnh"]);
+        trả về mình.hạ hằng mô đun(cây, {}, phạm vi);
+    };
+
+    hàm công khai hạ hằng mô đun(nút, bảng, phạm vi = rỗng) {
+        dạng = loại của(nút);
+        nếu (dạng == "danh sách") {
+            lặp(i = 0; i < máy ảo lấy độ dài(nút); i++) {
+                nút[i] = mình.hạ hằng mô đun(nút[i], bảng, phạm vi);
+            };
+            trả về nút;
+        };
+        nếu (dạng != "từ điển") { trả về nút; };
+        loại = lấy từ điển(nút, "loại", "");
+        nếu (loại == "hằng" || loại == "nhập") { trả về nút; };
+        nếu (loại == "tên" || loại == "thành viên") {
+            tên = mình.tên hằng mô đun(nút);
+            mục = mình.tìm hằng mô đun(tên, phạm vi, bảng);
+            nếu (mục != rỗng) {
+                nếu (lấy từ điển(mục, "giữ tên", sai)) { trả về nút; };
+                nếu (mục["nội bộ"]) {
+                    trả về {"loại": "tên", "giá trị": mục["ô nhớ"], "vị trí": lấy từ điển(nút, "vị trí", 0)};
+                };
+                trả về {"loại": "gọi", "hàm": {"loại": "tên", "giá trị": tên, "vị trí": 0},
+                        "đối số": [], "dòng": 0, "cột": 0};
+            };
+            nếu (loại == "tên") { trả về nút; };
+        };
+        nếu (loại == "từ điển") {
+            các mục = nút["mục"];
+            lặp(i = 0; i < máy ảo lấy độ dài(các mục); i++) {
+                các mục[i]["khóa"] = mình.hạ vị trí hằng tĩnh(các mục[i]["khóa"], bảng, phạm vi, đúng);
+                các mục[i]["giá trị"] = mình.hạ hằng mô đun(các mục[i]["giá trị"], bảng, phạm vi);
+            };
+            trả về nút;
+        };
+        nếu (loại == "hàm" || loại == "hàm ẩn danh") {
+            mặc định = nút["mặc định tham số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(mặc định); i++) {
+                mặc định[i] = mình.hạ vị trí hằng tĩnh(mặc định[i], bảng, phạm vi, sai);
+            };
+            phạm vi = {"cha": phạm vi, "tên": {}, "tĩnh": {}};
+            các tên = nút["tham số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(các tên); i++) { phạm vi["tên"][các tên[i]] = sai; };
+            mình.thu thập bất biến(nút["thân"], phạm vi["tên"], phạm vi["tĩnh"]);
+            nút["thân"] = mình.hạ hằng mô đun(nút["thân"], bảng, phạm vi);
+            trả về nút;
+        };
+        nếu (loại == "thử") {
+            nút["thân"] = mình.hạ hằng mô đun(nút["thân"], bảng, phạm vi);
+            phạm vi bắt = {"cha": phạm vi, "tên": {}, "tĩnh": {}};
+            phạm vi bắt["tên"][nút["biến lỗi"]] = sai;
+            nút["bắt"] = mình.hạ hằng mô đun(nút["bắt"], bảng, phạm vi bắt);
+            trả về nút;
+        };
+        đích = rỗng;
+        nếu (loại == "hai ngôi") {
+            nếu (biên dịch biểu thức là phép gán(nút["toán tử"])) { đích = nút["trái"]; };
+        } hoặc nếu (loại == "cập nhật") { đích = nút["đối tượng"]; };
+        nếu (đích != rỗng) {
+            tên = mình.tên hằng mô đun(đích);
+            nếu (mình.tìm hằng mô đun(tên, phạm vi, bảng) != rỗng) {
+                ném "biên dịch ngữ nghĩa: không thể gán lại hằng '" + tên + "'";
+            };
+        };
+        các khóa = máy ảo liệt kê khóa từ điển(nút);
+        lặp(i = 0; i < máy ảo lấy độ dài(các khóa); i++) {
+            khóa = các khóa[i];
+            nút[khóa] = mình.hạ hằng mô đun(nút[khóa], bảng, phạm vi);
+        };
+        trả về nút;
+    };
 
     hàm riêng tư khoảng nguồn(p, đầu) {
         nếu (!mình.giữ nguồn || p["vị trí"] <= đầu) { trả về []; };
@@ -590,7 +839,12 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             biên dịch biểu thức chờ(p, ";");
             trả về {"loại": "in", "biểu thức": giá trị};
         };
-        nếu (mã cú pháp == 326) {
+        khai báo bất biến = sai;
+        nếu (s == "hằng" && p["vị trí"] + 1 < máy ảo lấy độ dài(p["token"])) {
+            loại tiếp = biên dịch mã loại từ tố(p["token"][p["vị trí"] + 1]);
+            khai báo bất biến = loại tiếp == 1 || loại tiếp == 2;
+        };
+        nếu (mã cú pháp == 326 || khai báo bất biến) {
             biên dịch biểu thức lấy(p);
             // Từ khóa ngữ cảnh vẫn có thể là một phần của định danh nhiều từ,
             // ví dụ "bước cập nhật con trỏ hiện tại". Dấu '=' / ';' kết thúc tên.
@@ -601,9 +855,15 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
                 giá trị = mình.biên dịch chương trình biểu thức(p);
+            } hoặc nếu (khai báo bất biến) {
+                biên dịch biểu thức lỗi(p, "hằng phải có giá trị khởi tạo");
             };
             biên dịch biểu thức chờ(p, ";");
             kết quả = {"loại": "biến", "tên": tên, "giá trị": giá trị};
+            nếu (khai báo bất biến) {
+                kết quả["bất biến"] = đúng;
+                mình.có khai báo bất biến = đúng;
+            };
             nếu (mình.giữ nguồn) { kết quả["nguồn tên"] = nguồn tên; };
             trả về kết quả;
         };

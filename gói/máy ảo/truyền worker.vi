@@ -19,8 +19,10 @@ hàm vm_worker_reserve(b, n) {
             cap = cap * 2; nếu (cap > 7750000) { cap = 7750000; };
         };
         biến data = vm_alloc(cap * 4, 0); nếu (data == 0) { trả về -1; };
-        máy sao chép vùng nhớ(data, vm_get(b, 0), end * 4);
+        biến old = vm_get(b, 0);
+        máy sao chép vùng nhớ(data, old, end * 4);
         vm_set(b, 0, data); vm_set(b, 2, cap);
+        vm_release_owned(old);
     };
     vm_set(b, 1, end + n); trả về end;
 };
@@ -47,7 +49,7 @@ hàm vm_worker_memo_grow(m) {
             vm_set(table, j * 2, p); vm_set(table, j * 2 + 1, vm_get(old, i * 2 + 1));
         };
     };
-    vm_set(m, 0, table); vm_set(m, 1, next); trả về 1;
+    vm_set(m, 0, table); vm_set(m, 1, next); vm_release_owned(old); trả về 1;
 };
 hàm vm_worker_memo() {
     biến m = vm_alloc(16, 1); nếu (m == 0) { trả về 0; };
@@ -60,7 +62,7 @@ hàm vm_worker_ref(m, p, kind) {
     nếu (p < 8388624 || p >= vm_get(4198464, 0) || p % 16 != 0) { trả về vm_error(22); };
     nếu (máy đọc byte(120000000 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16)) != 1 || vm_get(p - 16, 1) < 0) { trả về vm_error(22); };
     nếu (kind == 0) { kind = vm_tag(p); };
-    nếu (kind <= 0 || kind == 12 || kind > 20) { trả về vm_error(22); };
+    nếu (kind <= 0 || kind == 12 || kind > 21) { trả về vm_error(22); };
     biến queue = vm_get(m, 2); biến count = máy chia số nguyên ba mươi hai bit(vm_get(queue, 1), 2);
     nếu (count * 2 >= vm_get(m, 1)) { nếu (vm_worker_memo_grow(m) == 0) { trả về 0; }; };
     biến table = vm_get(m, 0); biến cap = vm_get(m, 1); biến i = vm_worker_hash(p, cap);
@@ -99,7 +101,7 @@ hàm vm_worker_graph_pack(root, kind) {
     khi (cursor < vm_get(queue, 1) && vm_get(4198464, 1) == 0) {
         biến p = vm_get(vm_get(queue, 0), cursor); biến k = vm_get(vm_get(queue, 0), cursor + 1);
         cursor = cursor + 2;
-        nếu (k == 1 || k == 2 || k == 11) {
+        nếu (k == 1 || k == 2 || k == 11 || k == 21) {
             vm_worker_node(b, k, 0, vm_get(p, 1), vm_get(p, 2), vm_get(p, 3));
         } hoặc nếu (k == 3 || k == 18) {
             biến n = vm_get(p, 1); biến data = vm_get(p, 2); biến words = 0;
@@ -143,7 +145,10 @@ hàm vm_worker_graph_pack(root, kind) {
     nếu (vm_get(4198464, 1) != 0) { trả về 0; };
     biến packet = vm_get(b, 0); vm_set(packet, 0, 1464881153);
     vm_set(packet, 1, vm_get(b, 1) * 4); vm_set(packet, 2, máy chia số nguyên ba mươi hai bit(cursor, 2));
-    vm_set(packet, 3, root_id); trả về packet;
+    vm_set(packet, 3, root_id);
+    vm_release_owned(vm_get(queue, 0)); vm_release_owned(queue);
+    vm_release_owned(vm_get(m, 0)); vm_release_owned(m); vm_release_owned(b);
+    trả về packet;
 };
 // Decoder allocates all nodes first, then connects edges. A third pass
 // reconstructs byte views after all owning strings have been installed.
@@ -183,7 +188,7 @@ hàm vm_worker_graph_unpack(packet, bytes) {
             nếu (a < 0 || a > 1900000 || n != a * 4) { trả về vm_error(22); };
             v = vm_alloc(4 + n * 4, 0); nếu (v == 0) { trả về 0; };
             vm_set(v, 0, a); máy sao chép vùng nhớ(v + 4, r + 20, n * 4);
-        } hoặc nếu (k == 1 || k == 2 || k == 11) {
+        } hoặc nếu (k == 1 || k == 2 || k == 11 || k == 21) {
             nếu (n != 0) { trả về vm_error(22); };
             v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; };
             vm_set(v, 0, k); vm_set(v, 1, a); vm_set(v, 2, vm_get(r, 3)); vm_set(v, 3, vm_get(r, 4));
@@ -220,5 +225,7 @@ hàm vm_worker_graph_unpack(packet, bytes) {
         };
     };
     nếu (vm_get(4198464, 1) != 0) { trả về 0; };
-    trả về vm_worker_graph_ref(table, count, vm_get(packet, 3));
+    biến root = vm_worker_graph_ref(table, count, vm_get(packet, 3));
+    vm_release_owned(positions); vm_release_owned(table);
+    trả về root;
 };

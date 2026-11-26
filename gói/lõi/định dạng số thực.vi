@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Chuyển IEEE-754 binary64 thành thập phân chính xác bằng V++.
 // VM chỉ đọc 8 byte biểu diễn số. Số lớn, làm tròn ties-to-even và bố cục
 // fixed/scientific/general đều nằm ở thư viện.
@@ -180,10 +181,10 @@ hàm riêng tư định dạng số khoa học(chữ số, mũ, hoa, bỏ không
 };
 
 hàm công khai định dạng số thực nội bộ(giá trị, chuyển, độ chính xác) {
-    nếu (loại của(độ chính xác) != "số nguyên") { ném "FORMAT_PRECISION"; };
-    nếu (độ chính xác < 0 || độ chính xác > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
+    nếu (loại của(độ chính xác) != "số nguyên") { ném LỖI_FORMAT_PRECISION; };
+    nếu (độ chính xác < 0 || độ chính xác > 1048576) { ném LỖI_FORMAT_RESOURCE_LIMIT; };
     nếu (chuyển != "f" && chuyển != "e" && chuyển != "E" && chuyển != "g" && chuyển != "G") {
-        ném "FORMAT_UNKNOWN_CONVERSION";
+        ném LỖI_FORMAT_UNKNOWN_CONVERSION;
     };
     chính xác = định dạng số thập phân chính xác(giá trị);
     đặc biệt = lấy từ điển(chính xác, "đặc biệt", "");

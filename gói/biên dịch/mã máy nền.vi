@@ -205,7 +205,7 @@ lớp công khai Tiện Ích Mã Máy {
         ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
         sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
         sau = [];
-        mã lệnh = []; hằng lệnh = []; toán hạng lệnh = []; độ sâu lệnh = []; ký hiệu lệnh = [];
+        mã lệnh = []; giá trị tức thời lệnh = []; toán hạng lệnh = []; độ sâu lệnh = []; ký hiệu lệnh = [];
         có lời gọi = sai;
         bảng opcode = {"PushConstant": 0, "LoadSlot": 1, "StoreSlot": 2, "Drop": 3, "Add": 4, "Sub": 5, "Mul": 6, "Div": 7, "Mod": 8, "Equal": 9, "NotEqual": 10, "Less": 11, "LessEqual": 12, "Greater": 13, "GreaterEqual": 14, "BranchZero": 15, "Jump": 16, "Call": 17, "Return": 18, "Trap": 19, "BitAnd": 20, "BitOr": 21, "BitXor": 22, "ShiftLeft": 23, "ShiftRight": 24};
         độ sâu đến = [];
@@ -215,7 +215,7 @@ lớp công khai Tiện Ích Mã Máy {
             nếu ((i & 2047) == 0) {
                 bỏ kết quả = máy ảo thêm cuối danh sách(mã lệnh, []);
                 nếu (giữ dữ liệu phát mã) {
-                    bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh, []);
+                    bỏ kết quả = máy ảo thêm cuối danh sách(giá trị tức thời lệnh, []);
                     bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh, []);
                 };
                 bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh, []);
@@ -237,7 +237,7 @@ lớp công khai Tiện Ích Mã Máy {
             // do not allocate columns used exclusively by the encoder.
             hằng = nguồn["immediate"];
             nếu (giữ dữ liệu phát mã) {
-                bỏ kết quả = máy ảo thêm cuối danh sách(hằng lệnh[trang], hằng);
+                bỏ kết quả = máy ảo thêm cuối danh sách(giá trị tức thời lệnh[trang], hằng);
                 bỏ kết quả = máy ảo thêm cuối danh sách(ký hiệu lệnh[trang], ký hiệu);
             };
             bỏ kết quả = máy ảo thêm cuối danh sách(toán hạng lệnh[trang], toán hạng);
@@ -273,7 +273,7 @@ lớp công khai Tiện Ích Mã Máy {
                 độ sâu đến[i >> 11][i & 2047] = sâu;
             };
         };
-        trả về {"opcodes": mã lệnh, "immediates": hằng lệnh, "operands": toán hạng lệnh,
+        trả về {"opcodes": mã lệnh, "immediates": giá trị tức thời lệnh, "operands": toán hạng lệnh,
                 "depths": độ sâu lệnh, "symbols": ký hiệu lệnh, "calls": có lời gọi};
     };
 };

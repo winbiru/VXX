@@ -1,0 +1,6 @@
+nhập values.VALUE;
+hàm nhận(VALUE) { VALUE += 1; trả về VALUE; };
+hàm chính() {
+    in nhận(1);
+    in VALUE;
+};

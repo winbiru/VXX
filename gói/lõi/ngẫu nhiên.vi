@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Module: lõi.ngẫu nhiên
 // Sinh số nguyên trong đoạn đóng [tối thiểu, tối đa]. VM chỉ cung cấp
 // entropy bảo mật dạng byte; việc ánh xạ vào khoảng số nguyên nằm hoàn toàn ở V++.
@@ -129,7 +130,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
             ném "ngẫu nhiên: không tìm thấy bộ sinh";
         };
         nếu (lấy từ điển(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
-            ném "RANDOM_STATE";
+            ném LỖI_RANDOM_STATE;
         };
         trả về bộ sinh;
     };
@@ -169,7 +170,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         nhỏ = mình.ngẫu nhiên yêu cầu số nguyên(tối thiểu, "tối thiểu");
         lớn = mình.ngẫu nhiên yêu cầu số nguyên(tối đa, "tối đa");
         nếu (nhỏ > lớn) {
-            ném "RANDOM_RANGE";
+            ném LỖI_RANDOM_RANGE;
         };
         nếu (nhỏ == lớn) {
             trả về nhỏ;
@@ -180,7 +181,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         không gian = 2147483646.0;
         độ rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
         nếu (độ rộng <= 0.0 || độ rộng > không gian) {
-            ném "RANDOM_RANGE";
+            ném LỖI_RANDOM_RANGE;
         };
         số khối = làm tròn xuống(không gian / độ rộng);
         mức trần = số khối * độ rộng;
@@ -208,7 +209,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         mình.ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
         n = mình.ngẫu nhiên yêu cầu số nguyên(số lượng, "số lượng byte");
         nếu (n < 0 || n > 1048576) {
-            ném "RANDOM_RANGE";
+            ném LỖI_RANDOM_RANGE;
         };
         kết quả = [];
         lặp(i = 0; i < n; i++) {
@@ -227,18 +228,18 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
 
     hàm công khai khôi phục bộ sinh ngẫu nhiên(snapshot) {
         nếu (loại của(snapshot) != "từ điển") {
-            ném "RANDOM_STATE";
+            ném LỖI_RANDOM_STATE;
         };
         thuật toán = lấy từ điển(snapshot, "thuật toán", "");
         nếu (thuật toán != "park-miller-48271-v1") {
-            ném "RANDOM_STATE";
+            ném LỖI_RANDOM_STATE;
         };
         trạng thái = lấy từ điển(snapshot, "trạng thái", 0);
         nếu (loại của(trạng thái) != "số nguyên") {
-            ném "RANDOM_STATE";
+            ném LỖI_RANDOM_STATE;
         };
         nếu (trạng thái <= 0 || trạng thái >= 2147483647) {
-            ném "RANDOM_STATE";
+            ném LỖI_RANDOM_STATE;
         };
         trả về {
             "__vpp_random": 1,

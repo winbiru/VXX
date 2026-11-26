@@ -1,3 +1,4 @@
+nhập gói.hằng.xml.*;
 // vi.xml.dom — thao tác cây node do vi.xml tạo ra.
 nhập gói.dữ liệu.xml.xml.xml phân tích;
 nhập gói.dữ liệu.xml.xml.xml tạo;
@@ -8,24 +9,24 @@ lớp riêng tư Xử Lý Nội Bộ Cây Tài Liệu {
     hàm công khai khởi tạo() {};
 
     hàm công khai cây tài liệu phần tử(tên) {
-        trả về {"tên": tên, "thuộc tính": {}, "nội dung": "", "con": []};
+        trả về {XML_KHÓA_TÊN: tên, XML_KHÓA_THUỘC_TÍNH: {}, XML_KHÓA_NỘI_DUNG: "", XML_KHÓA_CON: []};
     };
 
     hàm công khai cây tài liệu tên(nút) {
-        trả về lấy từ điển(nút, "tên", "");
+        trả về lấy từ điển(nút, XML_KHÓA_TÊN, "");
     };
 
     hàm công khai cây tài liệu nội dung(nút) {
-        trả về lấy từ điển(nút, "nội dung", "");
+        trả về lấy từ điển(nút, XML_KHÓA_NỘI_DUNG, "");
     };
 
     hàm công khai cây tài liệu đặt nội dung(nút, nội dung) {
-        đặt từ điển(nút, "nội dung", nội dung);
+        đặt từ điển(nút, XML_KHÓA_NỘI_DUNG, nội dung);
         trả về nút;
     };
 
     hàm công khai cây tài liệu thuộc tính(nút, khóa, mặc định = rỗng) {
-        các thuộc tính phần tử = lấy từ điển(nút, "thuộc tính", rỗng);
+        các thuộc tính phần tử = lấy từ điển(nút, XML_KHÓA_THUỘC_TÍNH, rỗng);
         nếu (các thuộc tính phần tử == rỗng) {
             trả về mặc định;
         };
@@ -33,24 +34,24 @@ lớp riêng tư Xử Lý Nội Bộ Cây Tài Liệu {
     };
 
     hàm công khai cây tài liệu đặt thuộc tính(nút, khóa, giá trị) {
-        các thuộc tính phần tử = lấy từ điển(nút, "thuộc tính", rỗng);
+        các thuộc tính phần tử = lấy từ điển(nút, XML_KHÓA_THUỘC_TÍNH, rỗng);
         nếu (các thuộc tính phần tử == rỗng) {
             các thuộc tính phần tử = {};
-            đặt từ điển(nút, "thuộc tính", các thuộc tính phần tử);
+            đặt từ điển(nút, XML_KHÓA_THUỘC_TÍNH, các thuộc tính phần tử);
         };
         đặt từ điển(các thuộc tính phần tử, khóa, giá trị);
         trả về nút;
     };
 
     hàm công khai cây tài liệu con(nút) {
-        trả về lấy từ điển(nút, "con", []);
+        trả về lấy từ điển(nút, XML_KHÓA_CON, []);
     };
 
     hàm công khai cây tài liệu thêm con(nút, con) {
-        các con = lấy từ điển(nút, "con", rỗng);
+        các con = lấy từ điển(nút, XML_KHÓA_CON, rỗng);
         nếu (các con == rỗng) {
             các con = [];
-            đặt từ điển(nút, "con", các con);
+            đặt từ điển(nút, XML_KHÓA_CON, các con);
         };
         máy ảo thêm cuối danh sách(các con, con);
         trả về nút;
@@ -93,7 +94,7 @@ hàm công khai cây tài liệu thêm con(nút, con) {
 lớp công khai Phần Tử DOM {
     hàm công khai khởi tạo(tên) { mình.nút = cây tài liệu phần tử(tên); };
     hàm công khai nạp(cây) {
-        nếu (loại của(cây) != "từ điển" || !máy ảo có khóa từ điển(cây, "tên")) {
+        nếu (loại của(cây) != "từ điển" || !máy ảo có khóa từ điển(cây, XML_KHÓA_TÊN)) {
             ném "dom: cây không hợp lệ";
         };
         mình.nút = cây;

@@ -213,3 +213,65 @@ bằng thay thế văn bản thiếu phân tích định danh.
 
 Tài liệu này là quy ước rà soát cho dự án, chưa phải bộ kiểm tra ngữ pháp
 tự động và không mở rộng cú pháp compiler.
+
+## Khai báo hằng
+
+`hằng` khai báo một ràng buộc chỉ được khởi tạo một lần, có thể ở cấp mô-đun hoặc trong hàm:
+
+```vpp
+hằng KEY_ROWS = "rows";
+hằng SQL_SELECT = "SELECT";
+hàm chính() {
+    hằng giới hạn = 10;
+    in SQL_SELECT + " " + KEY_ROWS;
+    in giới hạn;
+};
+```
+
+Phải cung cấp biểu thức khởi tạo. Các phép gán lại (`=`, `+=`, `-=`, …)
+và cập nhật (`++`, `--`) vào tên hằng là lỗi biên dịch. Hằng giữ nguyên
+ràng buộc tới giá trị; các phần tử của danh sách hoặc từ điển vẫn có thể
+được thay đổi theo quy tắc của kiểu dữ liệu. Tên biến có thể gồm nhiều từ.
+Ở đầu câu lệnh, `hằng tên` là khai báo hằng; tránh dùng tên biến bắt đầu
+bằng cụm này trong phép gán thông thường. Phạm vi ràng buộc của hằng theo
+quy tắc biến cấp hàm/mô-đun hiện hành.
+
+Hằng cấp mô-đun có thể đặt trong thư mục `hằng/` của dự án hoặc trong
+`gói/hằng/` của thư viện chuẩn, sau đó nhập theo tên, toàn bộ nhóm hoặc bí danh:
+
+```vpp
+nhập gói.hằng.cơ sở dữ liệu.JDBC_MYSQL;
+nhập gói.hằng.lượng tử.* như Q;
+nhập gói.hằng.cơ sở dữ liệu.CỔNG_MYSQL như CỔNG;
+
+hàm chính() {
+    in JDBC_MYSQL;
+    in Q.SỐ_BƯỚC_NEWTON;
+    in CỔNG;
+};
+```
+
+Đọc trực tiếp tên hằng đã nhập, không thêm dấu ngoặc gọi hàm. Không được
+gán lại hằng đã nhập. Hằng được khởi tạo trong mô-đun định nghĩa và được
+dùng chung giữa các mô-đun nhập nó. Tệp `gói/hằng/chính.vi` tái xuất
+các nhóm hằng chuẩn; có thể dùng `nhập hằng.CỔNG_POSTGRESQL;` để nhập từ gói này.
+
+Nhóm hằng chuẩn gồm cơ sở dữ liệu, lượng tử, HTTP và các mã lỗi theo
+thư viện. Dùng hằng trong biểu thức, đối số và truy cập khóa từ điển.
+Hằng có giá trị literal cũng có thể dùng làm khóa khi khởi tạo từ điển
+hoặc làm giá trị tham số mặc định:
+
+```vpp
+nhập gói.hằng.http.MIME_JSON;
+hằng KEY_ROWS = "rows";
+hằng GIỚI_HẠN = 100;
+
+hàm phản hồi(kiểu = MIME_JSON, giới hạn = GIỚI_HẠN) {
+    trả về {KEY_ROWS: giới hạn, "kiểu": kiểu};
+};
+```
+
+Khóa hằng phải là chuỗi. Tham số mặc định hỗ trợ các literal vô hướng
+và số nguyên âm theo định dạng hiện hành. Hằng khởi tạo bằng lời gọi hàm
+hoặc biểu thức tính toán vẫn dùng được trong biểu thức thông thường;
+ở hai vị trí cần giá trị tĩnh này, compiler báo lỗi nếu không có literal.

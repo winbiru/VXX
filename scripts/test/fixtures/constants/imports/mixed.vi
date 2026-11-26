@@ -1,0 +1,16 @@
+nhập values.VALUE;
+nhập other.VALUE như KHÁC;
+nhập gói.hằng.cơ sở dữ liệu.CỔNG_MYSQL;
+
+lớp công khai Bộ Đọc Hằng {
+    hàm công khai đọc() { trả về VALUE + KHÁC; };
+};
+
+hàm chính() {
+    hằng tổng = VALUE + KHÁC;
+    biến đọc = hàm() { trả về tổng + CỔNG_MYSQL; };
+    in Bộ Đọc Hằng().đọc();
+    in đọc();
+    in VALUE;
+    in KHÁC;
+};

@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 
 nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
@@ -12,33 +13,33 @@ lớp công khai Hạ Tầng Sự Kiện {
     // module manifest và capability isolation vẫn là boundary runtime sau này.
     hàm riêng tư sự kiện yêu cầu bộ phát(emitter) {
         nếu (loại của(emitter) != "từ điển") {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         nếu (lấy từ điển(emitter, "__vpp_event_emitter__", 0) != 1) {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         trả về đúng;
     };
 
     hàm riêng tư sự kiện yêu cầu đăng ký(đăng ký) {
         nếu (loại của(đăng ký) != "từ điển") {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         nếu (lấy từ điển(đăng ký, "__vpp_event_registration__", 0) != 1) {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         trả về đúng;
     };
 
     hàm công khai bộ phát sự kiện(mức trần bộ lắng nghe = 1024, chính sách lỗi = "ném đầu") {
         nếu (loại của(mức trần bộ lắng nghe) != "số nguyên") {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         nếu (mức trần bộ lắng nghe <= 0) {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
         nếu (chính sách lỗi != "ném đầu" && chính sách lỗi != "thu thập") {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
 
         trả về {
@@ -56,7 +57,7 @@ lớp công khai Hạ Tầng Sự Kiện {
             siêu dữ liệu = {};
         } hoặc {
             nếu (loại của(siêu dữ liệu) != "từ điển") {
-                ném "LISTENER_STATE";
+                ném LỖI_LISTENER_STATE;
             };
         };
         trả về {
@@ -95,7 +96,7 @@ lớp công khai Hạ Tầng Sự Kiện {
     hàm công khai đăng ký sự kiện(emitter, bộ lắng nghe, một lần = sai) {
         mình.sự kiện yêu cầu bộ phát(emitter);
         nếu (bộ lắng nghe == rỗng) {
-            ném "LISTENER_STATE";
+            ném LỖI_LISTENER_STATE;
         };
 
         hiện tại = mình.sự kiện gom đăng ký(emitter);
@@ -180,30 +181,30 @@ lớp công khai Hạ Tầng Sự Kiện {
     // --- Service/provider registry thuần V++ ---
     hàm riêng tư dịch vụ yêu cầu bộ nạp(bộ nạp) {
         nếu (loại của(bộ nạp) != "từ điển") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (lấy từ điển(bộ nạp, "__vpp_service_loader__", 0) != 1) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         trả về bộ nạp;
     };
 
     hàm riêng tư dịch vụ yêu cầu nhà cung cấp(nhà cung cấp) {
         nếu (loại của(nhà cung cấp) != "từ điển") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (lấy từ điển(nhà cung cấp, "__vpp_service_provider__", 0) != 1) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         trả về nhà cung cấp;
     };
 
     hàm công khai bộ nạp dịch vụ(mức trần nhà cung cấp = 1024) {
         nếu (loại của(mức trần nhà cung cấp) != "số nguyên") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (mức trần nhà cung cấp <= 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         trả về {
             "__vpp_service_loader__": 1,
@@ -223,35 +224,35 @@ lớp công khai Hạ Tầng Sự Kiện {
         validator = rỗng
     ) {
         nếu (loại của(mã định danh giao diện) != "chuỗi") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (máy ảo lấy độ dài(mã định danh giao diện) == 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (loại của(triển khai mã định danh) != "chuỗi") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (máy ảo lấy độ dài(triển khai mã định danh) == 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (loại của(phiên bản) != "chuỗi" || loại của(mô đun mã định danh) != "chuỗi") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (bộ tạo == rỗng) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (vòng đời != "mỗi lần" && vòng đời != "đơn thể") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
 
         quyền = [];
         nếu (capabilities != rỗng) {
             nếu (loại của(capabilities) != "danh sách") {
-                ném "SERVICE_CONFIGURATION";
+                ném LỖI_SERVICE_CONFIGURATION;
             };
             lặp(i = 0; i < máy ảo lấy độ dài(capabilities); i++) {
                 nếu (loại của(capabilities[i]) != "chuỗi") {
-                    ném "SERVICE_CONFIGURATION";
+                    ném LỖI_SERVICE_CONFIGURATION;
                 };
                 máy ảo thêm cuối danh sách(quyền, capabilities[i]);
             };
@@ -278,7 +279,7 @@ lớp công khai Hạ Tầng Sự Kiện {
         danh sách = lấy từ điển(bộ nạp, "providers", []);
         mức trần = lấy từ điển(bộ nạp, "giới hạn", 1024);
         nếu (máy ảo lấy độ dài(danh sách) >= mức trần) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
 
         mã định danh giao diện = lấy từ điển(nhà cung cấp, "interface_id", "");
@@ -289,7 +290,7 @@ lớp công khai Hạ Tầng Sự Kiện {
             nếu (lấy từ điển(hiện tại, "interface_id", "") == mã định danh giao diện &&
                 lấy từ điển(hiện tại, "implementation_id", "") == triển khai mã định danh &&
                 lấy từ điển(hiện tại, "module_id", "") == mô đun mã định danh) {
-                ném "SERVICE_CONFIGURATION";
+                ném LỖI_SERVICE_CONFIGURATION;
             };
         };
         máy ảo thêm cuối danh sách(danh sách, nhà cung cấp);
@@ -299,10 +300,10 @@ lớp công khai Hạ Tầng Sự Kiện {
     hàm công khai dịch vụ(mã định danh giao diện, bộ nạp) {
         mình.dịch vụ yêu cầu bộ nạp(bộ nạp);
         nếu (loại của(mã định danh giao diện) != "chuỗi") {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
         nếu (máy ảo lấy độ dài(mã định danh giao diện) == 0) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
 
         kết quả = [];
@@ -314,7 +315,7 @@ lớp công khai Hạ Tầng Sự Kiện {
             };
         };
         nếu (máy ảo lấy độ dài(kết quả) == 0) {
-            ném "SERVICE_NOT_FOUND";
+            ném LỖI_SERVICE_NOT_FOUND;
         };
         trả về kết quả;
     };
@@ -330,7 +331,7 @@ lớp công khai Hạ Tầng Sự Kiện {
         thử {
             thể hiện = bộ tạo();
         } bắt lỗi (e) {
-            ném "SERVICE_CONFIGURATION";
+            ném LỖI_SERVICE_CONFIGURATION;
         };
 
         validator = lấy từ điển(nhà cung cấp, "validator", rỗng);
@@ -338,10 +339,10 @@ lớp công khai Hạ Tầng Sự Kiện {
             thử {
                 hợp lệ = validator(thể hiện);
             } bắt lỗi (e) {
-                ném "SERVICE_CONFIGURATION";
+                ném LỖI_SERVICE_CONFIGURATION;
             };
             nếu (!hợp lệ) {
-                ném "SERVICE_CONFIGURATION";
+                ném LỖI_SERVICE_CONFIGURATION;
             };
         };
 

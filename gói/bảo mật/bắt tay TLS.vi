@@ -10,6 +10,9 @@ nhập gói.bảo mật.chứng chỉ TLS.Chứng Chỉ TLS VPP;
 nhập gói.bảo mật.mật mã.Bộ Mật Mã;
 nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
 nhập gói.lõi.nguồn ngẫu nhiên.nguồn ngẫu nhiên bảo mật các byte;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 
 lớp công khai Bắt Tay TLS VPP {
     hàm công khai khởi tạo() {
@@ -107,6 +110,123 @@ lớp công khai Bắt Tay TLS VPP {
         private = nguồn ngẫu nhiên bảo mật các byte(32);
         random = nguồn ngẫu nhiên bảo mật các byte(32);
         trả về [mình.khách chào(host, private, random), private];
+    };
+
+    // ClientHello for a certificate-authenticated TLS 1.3 server.
+    // Ignore unselected extensions, but reject duplicate extensions and
+    // malformed vectors. No PSK, early data or HelloRetryRequest is negotiated.
+    hàm công khai đọc khách chào(message) {
+        keys = mình.hkdf; keys.bytes(message, 65535);
+        n = độ dài(message);
+        nếu (n < 43 || message[0] != 1 || message[4] != 3 || message[5] != 3 ||
+            message[1] * 65536 + message[2] * 256 + message[3] != n - 4) {
+            ném "TLS: invalid ClientHello";
+        };
+        sid size = message[38];
+        nếu (sid size > 32 || 39 + sid size + 2 > n) { ném "TLS: invalid client session id"; };
+        sid = mình.phần(message, 39, sid size);
+        at = 39 + sid size;
+        size = mình.u16(message, at); at = at + 2;
+        nếu (size < 2 || size % 2 != 0 || at + size + 2 > n) { ném "TLS: invalid cipher suites"; };
+        suite = sai;
+        lặp(i = at; i < at + size; i = i + 2) {
+            nếu (mình.u16(message, i) == 4867) { suite = đúng; };
+        };
+        at = at + size;
+        nếu (!suite || message[at] != 1 || message[at + 1] != 0) {
+            ném "TLS: unsupported client cipher/compression";
+        };
+        at = at + 2;
+        size = mình.u16(message, at); at = at + 2;
+        nếu (at + size != n) { ném "TLS: invalid client extensions"; };
+        seen = {}; version = sai; signature = sai; group = sai; peer = [];
+        khi (at < n) {
+            type = mình.u16(message, at);
+            size = mình.u16(message, at + 2); at = at + 4;
+            end = at + size;
+            nếu (end > n || lấy từ điển(seen, thành chuỗi(type), sai)) {
+                ném "TLS: invalid or duplicate client extension";
+            };
+            đặt từ điển(seen, thành chuỗi(type), đúng);
+            nếu (type == 43) {
+                nếu (size < 3 || message[at] != size - 1 || (size - 1) % 2 != 0) {
+                    ném "TLS: invalid supported versions";
+                };
+                lặp(i = at + 1; i < end; i = i + 2) {
+                    nếu (mình.u16(message, i) == 772) { version = đúng; };
+                };
+            } hoặc nếu (type == 13 || type == 10) {
+                nếu (size < 4 || size % 2 != 0 || mình.u16(message, at) != size - 2) {
+                    ném "TLS: invalid client signature/group vector";
+                };
+                lặp(i = at + 2; i < end; i = i + 2) {
+                    value = mình.u16(message, i);
+                    nếu (type == 13 && value == 2055) { signature = đúng; };
+                    nếu (type == 10 && value == 29) { group = đúng; };
+                };
+            } hoặc nếu (type == 51) {
+                nếu (size < 2 || mình.u16(message, at) != size - 2) {
+                    ném "TLS: invalid client key share vector";
+                };
+                i = at + 2;
+                khi (i < end) {
+                    nếu (i + 4 > end) { ném "TLS: truncated client key share"; };
+                    named group = mình.u16(message, i);
+                    count = mình.u16(message, i + 2); i = i + 4;
+                    nếu (count == 0 || i + count > end) { ném "TLS: invalid client key share"; };
+                    nếu (named group == 29) {
+                        nếu (count != 32 || độ dài(peer) != 0) { ném "TLS: invalid X25519 share"; };
+                        peer = mình.phần(message, i, count);
+                    };
+                    i = i + count;
+                };
+            } hoặc nếu (type == 42) {
+                ném "TLS: early data unsupported";
+            };
+            at = end;
+        };
+        nếu (!version || !signature || !group || độ dài(peer) != 32) {
+            ném "TLS: client must offer TLS 1.3, X25519 and Ed25519";
+        };
+        trả về [peer, sid];
+    };
+
+    hàm công khai đóng gói thông điệp(type, body) {
+        trả về mình.ghép([type], mình.ghép(mình.số ba(độ dài(body)), body));
+    };
+
+    hàm công khai máy chủ chào(private, random, sid) {
+        keys = mình.hkdf; curve = mình.curve;
+        keys.bytes(random, 32); keys.bytes(sid, 32);
+        nếu (độ dài(random) != 32) { ném "TLS: server random length"; };
+        ext = mình.phần mở rộng(43, [3,4]);
+        ext = mình.ghép(ext, mình.phần mở rộng(51, mình.ghép([0,29,0,32], curve.công khai(private))));
+        body = mình.ghép([3,3], random);
+        body = mình.ghép(body, mình.ghép([độ dài(sid)], sid));
+        body = mình.ghép(body, [19,3,0]);
+        body = mình.ghép(body, mình.ghép(mình.số hai(độ dài(ext)), ext));
+        trả về mình.đóng gói thông điệp(2, body);
+    };
+
+    hàm công khai bản ghi chào(message) {
+        trả về mình.ghép([22,3,3], mình.ghép(mình.số hai(độ dài(message)), message));
+    };
+
+    hàm công khai thông điệp chứng chỉ(chain) {
+        keys = mình.hkdf;
+        nếu (loại của(chain) != "danh sách" || độ dài(chain) < 1 || độ dài(chain) > 16) {
+            ném "TLS: invalid server certificate chain";
+        };
+        entries = [];
+        lặp(i = 0; i < độ dài(chain); i++) {
+            der = chain[i];
+            keys.bytes(der, 131072);
+            nếu (độ dài(der) == 0) { ném "TLS: empty server certificate"; };
+            entries = mình.ghép(entries, mình.ghép(mình.số ba(độ dài(der)), der));
+            entries = mình.ghép(entries, [0,0]);
+            nếu (độ dài(entries) > 1000000) { ném "TLS: server certificate chain too large"; };
+        };
+        trả về mình.đóng gói thông điệp(11, mình.ghép([0], mình.ghép(mình.số ba(độ dài(entries)), entries)));
     };
 
     // Accept only TLS 1.3 ServerHello for the selected cipher and X25519.
@@ -243,10 +363,14 @@ lớp công khai Bắt Tay TLS VPP {
         difference = 0;
         lặp(i = 0; i < 32; i++) { difference = difference | (peer_public[i] ^ parsed[0][i]); };
         nếu (difference != 0) { ném "TLS: ServerHello key share changed"; };
+        trả về mình.khóa bắt tay từ chung(curve.tính(private, peer_public), client_hello, server_hello);
+    };
+
+    hàm công khai khóa bắt tay từ chung(shared, client_hello, server_hello) {
+        keys = mình.hkdf;
         zero = []; lặp(i = 0; i < 32; i++) { thêm(zero, 0); };
         early = keys.trích(zero, zero);
         derived = keys.dẫn xuất(early, "derived", []);
-        shared = curve.tính(private, peer_public);
         handshake = keys.trích(derived, shared);
         transcript = mình.ghép(client_hello, server_hello);
         trả về [keys.dẫn xuất(handshake, "c hs traffic", transcript),
@@ -289,9 +413,14 @@ lớp công khai Bắt Tay TLS VPP {
         mismatch = 0;
         lặp(i = 0; i < 32; i++) { mismatch = mismatch | (peer_public[i] ^ parsed[0][i]); };
         nếu (mismatch != 0) { ném "TLS: ServerHello key share changed"; };
+        trả về mình.khóa ứng dụng từ chung(curve.tính(private, peer_public), server_finished_transcript);
+    };
+
+    hàm công khai khóa ứng dụng từ chung(shared, server_finished_transcript) {
+        keys = mình.hkdf;
         zero = []; lặp(i = 0; i < 32; i++) { thêm(zero, 0); };
         early = keys.trích(zero, zero);
-        handshake = keys.trích(keys.dẫn xuất(early, "derived", []), curve.tính(private, peer_public));
+        handshake = keys.trích(keys.dẫn xuất(early, "derived", []), shared);
         master = keys.trích(keys.dẫn xuất(handshake, "derived", []), zero);
         keys.bytes(server_finished_transcript, 1048576);
         trả về [keys.dẫn xuất(master, "c ap traffic", server_finished_transcript),

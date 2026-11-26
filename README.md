@@ -200,7 +200,7 @@ build-pure-vpp/bin/vpp-vm xin-chao.vmb
 ./VPP --help
 ```
 
-JIT mặc định có đường i32; `--dynamic` cung cấp runtime cho số, chuỗi, danh sách, bản đồ, đối tượng, closure, ngoại lệ, GC và import. JIT phát mã máy trực tiếp vào bộ nhớ, không cần tạo executable hoặc gọi linker ngoài trong đường này. Tier tối ưu i32 vẫn mang tính thử nghiệm. Các giới hạn hiện tại gồm thực thi JIT một luồng, chưa có FFI descriptor và không phải môi trường sandbox.
+JIT mặc định thử đường i32 cho chương trình không đối số và chuyển sang backend động khi không biên dịch được. `--dynamic` chọn trực tiếp runtime cho số thực, chuỗi, danh sách, bản đồ, đối tượng, closure, ngoại lệ, GC và import. JIT phát mã máy trực tiếp vào bộ nhớ, không cần tạo executable hoặc gọi linker ngoài trong đường này. Tier tối ưu i32 vẫn mang tính thử nghiệm. Các giới hạn hiện tại gồm thực thi JIT một luồng, chưa có FFI descriptor và không phải môi trường sandbox.
 
 CLI hiện còn có `disassemble`, `format`, `lint`, `embed`, `emit-program-asm` và các chế độ native `--emit-obj`, `--emit-obj-selfhost`, `--emit-raw`, `--emit-asm`. Dùng `vpp --help` để xem cú pháp và các tùy chọn của binary đang chạy.
 

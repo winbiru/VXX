@@ -145,13 +145,411 @@ không coi bootstrap Stage 2/3 là đã được xác nhận trên lượt kiể
 
 Heap giữ các offset i32 thay cho con trỏ OS. Mark/sweep duyệt từng
 đối tượng reachable qua mark stack liên kết trong header, sau đó quét
-heap và gộp khối trống liên tiếp. Allocator sử dụng **10 bucket free-list**
+heap và gộp khối trống liên tiếp. Allocator sử dụng **18 bucket free-list**
 theo tổng kích thước block (gồm header): <=32, <=48, <=64, <=96,
-<=128, <=192, <=256, <=512, <=1024 byte và lớn hơn 1024 byte.
-Các đầu danh sách nằm ở VM header slot 19..28. Bộ đếm
+<=128, <=192, <=256, <=512, <=1024, <=2048, <=4096, <=8192,
+<=16384, <=32768, <=65536, <=262144, <=1048576 byte và lớn hơn 1048576 byte.
+Các đầu danh sách nhỏ nằm ở VM header slot 19..28; tám bucket lớn bổ sung
+nằm ở vùng 4198728..4198759, sau cờ worker. Bộ đếm
 `free-list-probes` đo số block đã xét, không đếm số bucket trống.
 
-Giá trị số nguyên bất biến -16..255 được intern trong một bảng tại
+VM và AOT thu hồi ngay bộ nhớ nội bộ có chủ sở hữu duy nhất khi
+kết thúc vòng đời: vùng dữ liệu cũ của vector khi tăng dung lượng, vùng
+stack tràn, bảng phạm vi riêng và bản ghi switch/handler của khung đã
+kết thúc. Kho giữ tối đa 64 khung rỗng trên mỗi state; khung vượt giới hạn
+trở về free-list. Đối số lời gọi trực tiếp từ 1 đến 4 phần tử dùng vùng
+nội tuyến trong khung gọi. Tối đa 16 ô biến cục bộ dùng vùng khung;
+closure bắt giữ ô sẽ chuyển ô đó lên heap. Cell và giá trị được chia sẻ,
+bao gồm đồ thị có chu trình, vẫn do mark/sweep GC quản lý.
+
+Allocator đánh dấu block cấp phát sau lần GC gần nhất bằng epoch -1.
+Khi thu hồi sớm một block nội bộ, xóa dấu allocation-start, đưa block
+vào free-list và chỉ giảm ngân sách cấp phát nếu block thuộc epoch -1.
+Không chạy GC trong helper khi giá trị tạm chưa có root. Thu hồi sớm
+chỉ áp dụng khi runtime chứng minh quyền sở hữu vùng dữ liệu; cơ chế này
+không thay đổi ngữ nghĩa tham chiếu của mã khách.
+
+Đường worker cũng thu hồi các vùng tạm có chủ duy nhất: bộ đệm serializer
+và bảng memo đã thay thế, queue/table dùng để đóng gói hoặc giải mã đồ thị,
+snapshot đầu vào sau khi ASM sao chép xong, packet kết quả và bộ đệm đồng hồ.
+Chờ vô hạn, poll và chờ worker đã kết thúc không cần cấp phát đồng hồ.
+Đồ thị guest được giải mã giữ ngữ nghĩa alias và chu trình như trước.
+
+Đo trên macOS ARM64 ngày 25/11/2026 (`VPP_VM_PROFILE=1`), cùng ảnh
+bytecode và đầu ra:
+
+| Workload | Cấp phát trước → sau | GC trước → sau | Free-list probes trước → sau |
+| --- | ---: | ---: | ---: |
+| Vòng lặp/call, baseline trước thu hồi sớm | 475084 → 385022 | 4 → 2 | 1487329 → 208953 |
+| Worker stress, baseline đã có frame pool | 47344 → 46900 | 8 → 1 | 52806 → 67848 |
+
+Tách bucket lớn giảm probes của worker stress từ 269253 (10 bucket,
+đã thu hồi buffer worker) xuống 67848. Các số này đo số lần cấp phát,
+GC và xét free-list trong heap chính; không phải benchmark thời gian
+chạy toàn bộ hệ thống, cũng không bao gồm cấp phát trong heap con.
+
+### Loại bỏ cấp phát qua hạ IR
+
+Linker bật tối ưu mặc định (`VPP_OPTIMIZE_IR=0` để đối chiếu). Bộ hạ IR
+chỉ gấp phép `+`, `-`, `*` trong cây hằng nguyên có giới hạn an toàn;
+phép đọc `[1, 2, 3][1]` được thay bằng hằng `2` khi mọi phần tử là hằng
+nguyên hợp lệ và chỉ số nằm trong biên. Danh sách tạm không cần cấp phát.
+Chỉ số động/sai biên, hằng ngoài miền hỗ trợ và phép chia giữ đường xử lý
+thông thường. IR thô, metadata editor và lượt xác thực JIT đầy đủ giữ nguyên.
+
+Đo cùng VM macOS ARM64, cùng nguồn `scripts/test/fixtures/ir_optimizer_runtime.vi`
+(100.000 lần đọc danh sách tạm), với cùng compiler và bật/tắt tối ưu:
+
+| Chỉ số | Tắt | Bật |
+| --- | ---: | ---: |
+| Cấp phát heap | 1.398.280 | 298.252 |
+| GC | 8 | 2 |
+| Free-list probes | 1.160.741 | 69.553 |
+| Bytecode VMB (byte) | 1.308 | 1.165 |
+
+Đầu ra VM, AOT và JIT khi bật/tắt giống nhau; đường worker 2 cũng đạt.
+Đây là số liệu của fixture chuyên biệt, chưa phải benchmark tổng quát.
+
+### Escape analysis cục bộ và arena đối số (25/11/2026)
+
+`[1, biểu_thức, 3][1]` được hạ trực tiếp thành biểu thức được chọn nếu
+chỉ số là hằng hợp lệ và mọi phần tử bị bỏ qua đều là hằng nguyên nhỏ.
+Biểu thức được chọn vẫn chạy một lần, giữ alias, tác dụng phụ và lỗi.
+Nếu danh sách được mã hóa tĩnh thì chỉ thay thế hằng nguyên nhỏ như trước.
+Danh sách có phần tử không được chọn nhưng có lời gọi hoặc phép tính
+vẫn đi qua đường dựng danh sách đầy đủ.
+
+VM và AOT dựng danh sách/từ điển động trực tiếp từ vùng toán hạng đang
+nằm trong khung. Các tham chiếu gốc được giữ tới khi hoàn tất sao chép,
+sau đó xóa các ô đã dùng. Danh sách dài hơn hai phần tử cấp phát vùng
+tham chiếu đúng kích thước một lần; map dùng quy tắc chèn và trùng khóa
+hiện có. Không tạo vector tham số trung gian hoặc chạy GC giữa helper.
+
+Khung tăng từ 336 lên 352 byte; ô 84 giữ arena đối số cấp phát lười.
+Lời gọi guest trực tiếp trong VM, và lời gọi guest trực tiếp, gián tiếp,
+phương thức trong AOT dùng bốn ô nội tuyến như trước hoặc arena riêng
+64 ô cho 5–64 đối số. Arena nằm trong một block GC được khung cha giữ,
+chỉ được khung con mượn khi chạy. Khi khung con kết thúc hoặc bị tháo
+vì ngoại lệ, xóa các ô tham chiếu; khi khung sở hữu kết thúc, thu hồi
+block ngay. Lời gọi trên 64 đối số vẫn dùng vector heap thông thường.
+Host ABI giữ đường cấp phát cũ. Giá trị guest và closure thoát khỏi
+khung tiếp tục được GC quản lý.
+
+So sánh phase 5 và phase 6 trên cùng bytecode (tắt tối ưu IR để cô lập
+thay đổi runtime), VM macOS ARM64, `VPP_VM_PROFILE=1`:
+
+| Fixture (100.000 vòng) | Cấp phát trước → sau | GC trước → sau | Free-list probes trước → sau |
+| --- | ---: | ---: | ---: |
+| `scoped_collection_runtime` | 2.084.048 → 1.484.036 | 11 → 8 | 1.829.561 → 1.203.451 |
+| `scoped_args_runtime` | 2.000.824 → 1.800.808 | 8 → 6 | 1.770.277 → 1.568.117 |
+
+Bật thêm tối ưu IR phase 6 cho `scoped_collection_runtime` trên cùng VM:
+1.484.036 → 1.283.976 lần cấp phát, GC 8 → 7, free-list probes
+1.203.451 → 1.004.092; kích thước VMB 4.332 → 4.012 byte.
+So với phase 5 tắt IR, tổng mức giảm cấp phát là 38,4% và GC 36,4%.
+Compiler native và JIT `--vm-image` mới cho cùng số liệu và đầu ra chuẩn.
+VM core, hai fixture phase 6 và `ir_optimizer_runtime` qua VM, AOT,
+JIT động đều PASS trên macOS ARM64; `ownership_valid` qua VM/AOT PASS.
+Chưa xác minh toàn bộ regression suite và Linux/Windows.
+
+Đây là tối ưu dựa trên chứng minh cục bộ và vùng tạm nội bộ có vòng đời
+rõ ràng. Chưa có phân tích escape liên thủ tục hay stack/arena allocation
+tổng quát cho đối tượng guest. Không thay opcode hoặc định dạng VMB.
+
+### Arena đối số cho closure, phương thức và constructor (phase 7)
+
+VM phân giải đích lời gọi gián tiếp trước khi lấy đối số. Closure guest,
+phương thức và constructor guest dùng chung cơ chế đối số có vòng đời
+theo khung: 1–4 đối số nội tuyến, 5–64 đối số mượn arena của khung cha,
+trên 64 đối số dùng vector heap. AOT áp dụng cơ chế này cho constructor.
+Host ABI, thứ tự đánh giá đối số, tham chiếu capture và định dạng VMB
+giữ nguyên. Khi trả về hoặc tháo khung do ngoại lệ, các ô đã mượn được xóa.
+
+Đo phase 6 và phase 7 trên macOS ARM64 với cùng compiler và fixture
+`scripts/test/fixtures/scoped_dispatch_runtime.vi` (100.000 vòng),
+VM chạy cùng VMB và AOT liên kết với runtime tương ứng:
+
+| Backend | Cấp phát trước → sau | GC trước → sau | Free-list probes trước → sau |
+| --- | ---: | ---: | ---: |
+| VM | 5.201.512 → 4.601.500 | 20 → 17 | 4.898.239 → 4.290.963 |
+| AOT | 1.500.089 → 1.300.085 | 7 → 5 | 1.239.588 → 1.053.407 |
+
+Fixture kiểm tra constructor, closure lồng nhau, capture thay đổi,
+phương thức, tham số mặc định, ngoại lệ và tái sử dụng arena sau ngoại lệ.
+Đầu ra VM/AOT trước và sau giống nhau. VM core và các fixture arena/IR
+phase 6 đã đạt trên macOS ARM64. Compiler native và JIT được biên dịch lại
+với runtime phase 7; JIT động, JIT tạo VMB, compiler tạo VMB và AOT đều
+cho đầu ra chuẩn. Bản CLI cục bộ đã được cập nhật và kiểm tra cả ba đường
+thực thi. Số liệu chỉ đại diện cho fixture này.
+Chưa có phân tích escape liên thủ tục hoặc cấp phát đối tượng guest
+tổng quát trên stack. Chưa xác minh toàn bộ regression suite, Linux/Windows.
+
+### Phân tích escape liên thủ tục cho danh sách tạm (phase 8)
+
+Compiler nhận diện lời gọi trực tiếp đến hàm cục bộ có đúng một tham số
+và thân IR chỉ đọc phần tử thứ nhất của chính tham số đó rồi trả về.
+Khi đối số là danh sách tạm động có đúng một phần tử, compiler giữ kết
+quả đánh giá phần tử trên stack và loại bỏ cả `OP_LIST_LITERAL` lẫn
+`OP_GOI`. Danh sách trung gian không cần cấp phát trên heap.
+Thứ tự đánh giá, ngoại lệ từ biểu thức đối số và định danh tham chiếu
+của phần tử được bảo toàn.
+
+Chỉ áp dụng khi chứng minh được đích gọi và dạng thân hàm nói trên.
+Danh sách tĩnh, biến danh sách, nhiều phần tử, lời gọi gián tiếp,
+phương thức, hàm bị che khuất bởi biến cục bộ và thân hàm có thao tác
+bổ sung vẫn theo đường thực thi thông thường. `VPP_OPTIMIZE_IR=0`
+tắt tối ưu này. Không thay đổi runtime, opcode hay định dạng VMB.
+
+Đo trên macOS ARM64 với fixture
+`scripts/test/fixtures/interprocedural_escape_runtime.vi` (100.000 vòng),
+so sánh compiler phase 7 và phase 8 với cùng runtime:
+
+| Backend | Cấp phát trước → sau | GC trước → sau | Free-list probes trước → sau |
+| --- | ---: | ---: | ---: |
+| VM | 599.557 → 299.464 | 3 → 2 | 377.832 → 71.198 |
+| AOT | 299.251 → 199.248 | 2 → 1 | 274.137 → 25.333 |
+
+Đầu ra VM, AOT và JIT động khớp fixture chuẩn. Compiler native và JIT
+tạo VMB tối ưu giống nhau từng byte. Khi tắt tối ưu, VMB từ compiler
+mới giống từng byte với baseline phase 7. Kiểm thử cấu trúc IR và
+disassemble xác nhận hai opcode được loại bỏ tại lời gọi đủ điều kiện.
+VM core gate đạt; CLI cục bộ đã cập nhật compiler và JIT, kiểm tra thành
+công `vm-build`, `artifact`, `jit --dynamic` và `build`.
+Đây là phân tích escape cho một dạng lời gọi cụ thể; chưa hỗ trợ
+phân tích escape tổng quát, cấp phát đối tượng guest trên stack hay
+giải phóng sớm mọi đối tượng không escape. Số liệu chỉ đại diện cho
+fixture trên; chưa xác minh toàn bộ regression suite, Linux/Windows.
+
+### Chiếu danh sách tạm nhiều phần tử (phase 9)
+
+Mở rộng chứng minh phase 8 cho chỉ số nguyên hằng không âm (tối đa
+32767). Đối số là danh sách động có đúng một biểu thức cần giữ;
+các phần tử còn lại phải là literal nguyên thập phân nhỏ đã xác minh.
+Chỉ thay thế khi hàm đích đọc đúng chỉ số của biểu thức cần giữ.
+
+Bước hạ IR lưu vị trí biểu thức cần giữ và phạm vi IR của đối số.
+Emitter xác minh lại đích gọi, binding tham số, số phần tử và các
+lệnh literal trước khi phát mã. Các literal không cần thiết, lệnh
+tạo danh sách và lời gọi được bỏ qua ngay trong IR, nên không phải
+chỉnh sửa địa chỉ nhảy hoặc vị trí nguồn đã phát. Lời gọi lồng nhau
+cũng được phân tích trên cùng dãy IR gốc.
+
+Biểu thức được chọn vẫn thực thi đúng một lần và giữ nguyên tham chiếu.
+Danh sách có nhiều biểu thức động, chỉ số ngoài miền, literal tĩnh,
+hàm sửa hoặc trả về danh sách, lời gọi gián tiếp và binding bị che
+khuất giữ nguyên đường thực thi. `VPP_OPTIMIZE_IR=0` tắt tối ưu.
+
+Fixture `scripts/test/fixtures/interprocedural_projection_runtime.vi`
+chạy 100.000 vòng, mỗi vòng chiếu phần tử đầu, giữa và cuối. Trên
+macOS ARM64, cả VM và AOT cho cùng đầu ra chuẩn trước và sau tối ưu:
+
+| Chỉ số | VM phase 8 | VM phase 9 | AOT phase 8 | AOT phase 9 |
+| --- | ---: | ---: | ---: | ---: |
+| Lượt cấp phát | 1.700.025 | 499.613 | 999.261 | 399.251 |
+| Lượt GC | 7 | 2 | 5 | 2 |
+| Free-list probes | 1.427.901 | 237.872 | 726.285 | 162.593 |
+
+Kiểm thử cấu trúc IR xác nhận các trường hợp dương và âm, kể cả
+chiếu lồng nhau. Khi tắt tối ưu, VMB của compiler phase 8 và phase 9
+giống nhau từng byte. Runtime và định dạng VMB không thay đổi.
+
+Compiler native và JIT phase 9 đã được build lại; VMB của hai compiler
+khớp với ảnh do harness IR tạo ra. Gate VM/ASM core PASS (giá trị,
+điều khiển, closure, OOP, ngoại lệ, GC và kiểm tra symbol C++).
+Fixture phase 8 tiếp tục PASS trên AOT và JIT. CLI cục bộ đã được
+cập nhật và kiểm tra lại VM, JIT động, AOT với fixture phase 9.
+Kết quả này chỉ đo workload trên, chưa đo toàn bộ chi phí biên dịch
+hoặc xác nhận toàn bộ regression trên Linux/Windows. Bản CLI trước
+được giữ tại `build-pure-vpp/rust-phase9/previous-active`.
+
+### Chiếu danh sách tạm có nhiều biểu thức động (phase 10)
+
+Mở rộng phase 9 để loại bỏ danh sách tạm ngay cả khi nhiều phần tử
+là biểu thức động. Compiler vẫn yêu cầu chứng minh được lời gọi trực
+tiếp đến hàm cục bộ chỉ đọc một chỉ số nguyên hằng của tham số duy nhất.
+IR ghi độ dài của từng biểu thức phần tử; emitter kiểm tra phạm vi,
+chỉ số, binding của đích gọi và loại trừ IR phép gán không có kết quả
+stack được bảo đảm. Danh sách tĩnh và lời gọi chưa chứng minh được
+tiếp tục dùng đường thực thi thông thường.
+
+Các biểu thức động được đánh giá theo thứ tự nguồn. Kết quả không được
+chọn được bỏ khỏi stack bằng `OP_BAT_LOI` với slot -1; kết quả được
+chọn vẫn là root trên stack. Literal nguyên nhỏ đã xác minh có thể
+được bỏ hoàn toàn. Không thêm opcode, thay runtime hoặc định dạng VMB.
+Tắt tối ưu bằng `VPP_OPTIMIZE_IR=0` cho VMB giống từng byte với phase 9.
+
+Fixture `scripts/test/fixtures/interprocedural_effect_projection_runtime.vi`
+chạy 100.000 vòng, mỗi vòng chiếu ba danh sách có nhiều biểu thức động.
+Kết quả trên macOS ARM64, cùng runtime:
+
+| Chỉ số | VM phase 9 | VM phase 10 | AOT phase 9 | AOT phase 10 |
+| --- | ---: | ---: | ---: | ---: |
+| Lượt cấp phát | 1.700.194 | 499.934 | 999.284 | 399.266 |
+| Lượt GC | 7 | 2 | 5 | 2 |
+| Free-list probes | 1.428.623 | 237.807 | 721.135 | 162.495 |
+
+Fixture kiểm tra thứ tự hiệu ứng, ngoại lệ trước và sau phần tử được
+chọn, định danh tham chiếu và đột biến qua alias, chiếu lồng nhau,
+giá trị rỗng, số lớn và số thực. Kiểm thử cấu trúc IR, VM core gate,
+fixture phase 9 trên AOT/JIT và đầu ra VM/JIT/AOT phase 10 đều PASS.
+Compiler native và JIT đã build lại, tạo VMB khớp harness IR và được
+cài vào CLI cục bộ; `vm-build`, `artifact`, `jit --dynamic` và `build`
+đều được kiểm tra. Bản CLI phase 9 được giữ tại
+`build-pure-vpp/rust-phase10/previous-active`.
+Số liệu chỉ đại diện cho fixture này. Chưa đo chi phí biên dịch tổng
+thể, chưa chạy toàn bộ regression suite hoặc xác minh Linux/Windows.
+
+### Đối chiếu cùng workload giữa phase 8, 9 và 10 (25/11/2026)
+
+Hai benchmark ở trên có cùng số vòng lặp nhưng khác biểu thức phần tử.
+Không ghép số liệu của chúng thành một chuỗi giảm dần. Đã chạy lại
+cả ba compiler trên cả hai fixture, cùng VM, runtime AOT, macOS ARM64,
+`VPP_OPTIMIZE_IR=1` và `VPP_VM_PROFILE=1`.
+
+**Fixture một biểu thức động, hai literal nguyên nhỏ** (`interprocedural_projection_runtime.vi`):
+
+| Chỉ số | Phase 8 | Phase 9 | Phase 10 |
+| --- | ---: | ---: | ---: |
+| VM cấp phát | 1.700.025 | 499.613 | 499.605 |
+| VM GC | 7 | 2 | 2 |
+| VM free-list probes | 1.427.901 | 237.872 | 237.871 |
+| AOT cấp phát | 999.261 | 399.251 | 399.247 |
+| AOT GC | 5 | 2 | 2 |
+| AOT free-list probes | 726.285 | 162.593 | 162.600 |
+
+**Fixture ba biểu thức động** (`interprocedural_effect_projection_runtime.vi`):
+
+| Chỉ số | Phase 8 | Phase 9 | Phase 10 |
+| --- | ---: | ---: | ---: |
+| VM cấp phát | 1.700.194 | 1.700.194 | 499.934 |
+| VM GC | 7 | 7 | 2 |
+| VM free-list probes | 1.428.623 | 1.428.623 | 237.807 |
+| AOT cấp phát | 999.284 | 999.284 | 399.266 |
+| AOT GC | 5 | 5 | 2 |
+| AOT free-list probes | 721.135 | 721.135 | 162.495 |
+
+Đầu ra của cả 12 phép chạy khớp fixture chuẩn. Phase 9 tối ưu workload
+thứ nhất; phase 10 giữ gần như nguyên số lượt cấp phát của workload đó
+và mở rộng tối ưu sang workload thứ hai. AOT free-list probes tăng
+7 lượt ở workload thứ nhất. Không cộng dồn tỷ lệ giảm của hai workload.
+Các số liệu này đo số lần cấp phát và GC, chưa đo peak RAM hoặc tốc độ.
+Log thô nằm tại `build-pure-vpp/phase8-10-comparison/`.
+Các phase tiếp theo cần chạy lại cả hai fixture trên cùng runtime khi
+đánh giá riêng thay đổi compiler, và ghi rõ runtime nếu có thay đổi.
+
+### Chiếu trực tiếp danh sách tạm có biểu thức động (phase 11)
+
+Mở rộng scalar replacement sang `[a(), b(), c()][1]`. IR ghi lại
+ranh giới từng biểu thức và chỉ số nguyên nhỏ đã xác minh nằm trong
+danh sách. Emitter dùng chung phép kiểm tra ranh giới với chiếu liên
+thủ tục, giữ thứ tự đánh giá và ngoại lệ, giữ kết quả được chọn trên
+stack làm GC root và bỏ từng kết quả không được chọn. Không tạo danh
+sách tạm hoặc thực thi lệnh đọc chỉ số trong trường hợp đủ điều kiện.
+Chỉ số động, ngoài phạm vi, literal tĩnh chưa được tối ưu và IR gán
+tiếp tục đi qua đường phát mã thông thường. VM, AOT runtime và opcode
+không đổi.
+
+**Đối chiếu phase 10/11 trên macOS ARM64, cùng VM và runtime AOT,
+`VPP_OPTIMIZE_IR=1`, `VPP_VM_PROFILE=1` (25/11/2026).**
+
+| Workload | Backend | Cấp phát P10 → P11 | GC P10 → P11 | Free-list probes P10 → P11 |
+| --- | --- | ---: | ---: | ---: |
+| interprocedural_projection_runtime | VM | 499.605 → 499.605 | 2 → 2 | 237.871 → 237.871 |
+| interprocedural_projection_runtime | AOT | 399.247 → 399.247 | 2 → 2 | 162.600 → 162.600 |
+| interprocedural_effect_projection_runtime | VM | 499.934 → 499.934 | 2 → 2 | 237.807 → 237.807 |
+| interprocedural_effect_projection_runtime | AOT | 399.266 → 399.266 | 2 → 2 | 162.495 → 162.495 |
+| direct_effect_projection_runtime | VM | 1.100.038 → 499.990 | 5 → 2 | 824.782 → 237.814 |
+| direct_effect_projection_runtime | AOT | 999.324 → 399.304 | 5 → 2 | 726.237 → 162.505 |
+| scoped_dispatch_runtime | VM | 4.601.500 → 4.601.500 | 17 → 17 | 4.290.963 → 4.290.963 |
+| scoped_dispatch_runtime | AOT | 1.300.085 → 1.300.085 | 5 → 5 | 1.053.407 → 1.053.407 |
+
+Fixture mới đo 300.000 phép chiếu trực tiếp, cùng số vòng lặp và biểu
+thức ở hai phase. VM giảm cấp phát 54,55%, GC 60%, dò free-list 71,17%.
+AOT giảm tương ứng 60,04%, 60% và 77,62%. Ba workload đối chứng giữ
+nguyên tất cả bộ đếm. Đây là bộ đếm cấp phát, chưa phải peak RAM
+hoặc thời gian thực thi.
+
+Runner `scripts/quality/benchmark_vm_allocations.py` cố định bốn
+fixture, xác minh stdout theo expected, ghi SHA-256 của compiler, VM,
+runtime object, fixture và artifact; lưu profile thô và JSON.
+Có thể tái hiện từ thư mục dự án trên macOS ARM64:
+
+```sh
+p="$PWD/build-pure-vpp/rust-phase11"
+b="$PWD/build-pure-vpp/bin"
+export VPP_AOT_VPP_OBJECT="$PWD/build-pure-vpp/native-vpp-runtime/runtime.o"
+export VPP_AOT_PLATFORM_OBJECT="$PWD/build-pure-vpp/native-vpp-runtime/platform.o"
+export VPP_AOT_DYNAMIC_BRIDGE_OBJECT="$PWD/build-pure-vpp/native-vpp-runtime/dynamic-bridge.o"
+export VPP_AOT_NATIVE_MACHO_LINK=1 VPP_AOT_NATIVE_ARM64_OBJECT=1
+export VPP_AOT_ASSEMBLER="$b/assembler-must-not-run"
+python3 scripts/quality/benchmark_vm_allocations.py --vm "$b/vpp-vm" \
+    --output-dir "$p/recheck" phase10="$p/previous-active/vpp-native" \
+    phase11="$p/vpp-native"
+```
+
+Kết quả đã đo ở `build-pure-vpp/rust-phase11/comparison-summary.json`.
+Cả 16 phép chạy khớp expected; fixture, VM và runtime có SHA-256
+trùng nhau giữa hai lần đo. Kiểm thử cấu trúc IR, bytecode tắt tối ưu
+trùng từng byte, JIT dynamic/VM image, VM core gate và launcher VM/AOT/JIT
+đều PASS. Probe bổ sung giữ danh sách tạm sống qua 25 GC trong VM và 20
+GC trong AOT, cho đúng kết quả 42, 43, 44. Compiler và JIT phase 11
+đã được đặt vào `build-pure-vpp/bin`, bản phase 10 lưu tại
+`rust-phase11/previous-active`. Chưa chạy toàn bộ regression suite
+hoặc xác minh Linux/Windows.
+
+### Số nguyên nội tuyến và hợp nhất lệnh VM (phase 12)
+
+VM giữ lại ô nội tuyến khi khai báo hoặc bind tham số lặp lại và ô chưa
+thoát ra closure. Closure vẫn chuyển ô sang heap trước khi bắt giữ.
+Dispatcher nhận chuỗi `load slot; i32 immediate; compare` và chuỗi
+`load slot; i32 immediate; add/sub/mul; slot id; store` cùng slot.
+Phép toán trên i32 giữ nguyên quy tắc tràn 32 bit. Ô nội tuyến lưu
+kết quả thô (tag 12); ô heap lưu kết quả đóng hộp. Kiểu động, slot
+không tồn tại và các chuỗi lệnh khác tiếp tục qua dispatcher cũ.
+Không đổi opcode hoặc định dạng VMB, compiler, JIT hay runtime AOT đã cài.
+
+**So sánh phase 11/12 trên macOS ARM64 (25/11/2026).** Hai VM chạy
+cùng từng artifact VMB đã băm SHA-256, đối chiếu stdout với expected.
+Bộ đếm lấy với `VPP_VM_PROFILE=1`; thời gian là trung vị 5 lượt chạy
+xen kẽ không bật profile sau warmup, tính cả khởi động tiến trình.
+
+| Workload | Cấp phát P11 → P12 | GC P11 → P12 | Free-list probes P11 → P12 | Thời gian (s) P11 → P12 |
+| --- | ---: | ---: | ---: | ---: |
+| interprocedural_projection_runtime | 499.605 → 399.578 | 2 → 2 | 237.871 → 163.083 | 0.842 → 0.702 |
+| interprocedural_effect_projection_runtime | 499.934 → 399.852 | 2 → 2 | 237.807 → 163.182 | 1.307 → 1.124 |
+| direct_effect_projection_runtime | 499.990 → 399.890 | 2 → 2 | 237.814 → 163.215 | 1.403 → 1.141 |
+| scoped_dispatch_runtime | 4.601.500 → 3.201.417 | 17 → 12 | 4.290.963 → 2.899.978 | 5.736 → 4.889 |
+| i32_slot_runtime | 600.389 → 100.262 | 3 → 1 | 335.008 → 11.323 | 0.555 → 0.226 |
+
+Fixture `i32_slot_runtime` kiểm tra 200.000 phép cập nhật số nguyên,
+tràn i32, so sánh, closure và chuyển kiểu sang số thực/chuỗi. Giảm
+83,30% lượt cấp phát, 66,67% GC, 96,62% dò free-list và 59,32% thời gian.
+Bốn fixture cũ giảm cấp phát 20,02–30,43%. Các bộ đếm không đo peak RAM;
+profiling theo dispatch có thể ghi ít bước hơn vì hợp nhất lệnh.
+
+Runner `scripts/quality/benchmark_vm_runtime.py` giữ nguyên bytecode,
+expected và executable trong suốt phép đo; ghi profile và SHA-256 vào
+`build-pure-vpp/rust-phase12/comparison/results.json`. Tái hiện:
+
+```sh
+p=build-pure-vpp/rust-phase12
+old=build-pure-vpp/rust-phase11/comparison-candidate
+python3 scripts/quality/benchmark_vm_runtime.py --baseline "$p/previous-active" \
+  --candidate "$p/vpp-vm-final" --output-dir "$p/recheck" --repeats 5 \
+  interprocedural_projection_runtime="$old/phase11-interprocedural_projection_runtime.vmb" \
+  interprocedural_effect_projection_runtime="$old/phase11-interprocedural_effect_projection_runtime.vmb" \
+  direct_effect_projection_runtime="$old/phase11-direct_effect_projection_runtime.vmb" \
+  scoped_dispatch_runtime="$old/phase11-scoped_dispatch_runtime.vmb" \
+  i32_slot_runtime="$p/i32_slot_runtime.vmb"
+```
+
+VM core gate, optimizer tự biên dịch, launcher VM artifact, AOT và JIT
+`--dynamic` cho fixture mới đều PASS. JIT mặc định báo chưa hỗ trợ literal
+1.5; kiểm thử dùng chế độ dynamic. Đã cài VM mới vào `build-pure-vpp/bin/vpp-vm`
+và lưu VM cũ tại `rust-phase12/previous-active`. Chưa chạy toàn bộ regression,
+self-host stage 2/3 hoặc xác minh Linux/Windows.
+
+Giá trị số nguyên bất biến -16..4095 được intern trong một bảng tại
 header slot 17; kết quả `source[i]` ASCII được intern theo byte trong
 bảng tại slot 18. `vm_collect()` đánh dấu hai bảng này làm root để
 không tạo tham chiếu treo. Do chuỗi có ngữ nghĩa so sánh theo nội dung,

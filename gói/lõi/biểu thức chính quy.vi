@@ -1,3 +1,4 @@
+nhập gói.hằng.biểu thức chính quy.*;
 // vi.regex — engine regex và API biểu thức chính quy viết bằng V++.
 // Runtime chỉ cung cấp primitive chuỗi/list/map; parser, backtracking, capture,
 // search, replace và split đều nằm ở tầng ngôn ngữ.
@@ -17,7 +18,7 @@ lớp công khai Biểu Thức Chính Quy {
         trả về các khớp[0][1][0];
     };
     hàm công khai thay(văn bản, thay thế) {
-        nếu (loại của(thay thế) != "chuỗi") { ném "regex thay: giá trị thay thế phải là chuỗi"; };
+        nếu (loại của(thay thế) != "chuỗi") { ném REGEX_LỖI_THAY_THẾ; };
         trả về mình.biểu thức chính quy thay kết quả(mình.quét(văn bản), thay thế);
     };
     hàm công khai tách(văn bản) { trả về mình.biểu thức chính quy tách kết quả(mình.quét(văn bản)); };
@@ -43,21 +44,21 @@ lớp công khai Biểu Thức Chính Quy {
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp tạo(mẫu) {
-        trả về {"mẫu": mẫu, "vị trí": 0, "nhóm": 0};
+        trả về {REGEX_KHÓA_MẪU: mẫu, REGEX_KHÓA_VỊ_TRÍ: 0, REGEX_KHÓA_NHÓM: 0};
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp biểu thức(p) {
         nhánh = [];
         máy ảo thêm cuối danh sách(nhánh, mình.biểu thức chính quy phân tích cú pháp chuỗi(p));
-        mẫu = p["mẫu"];
+        mẫu = p[REGEX_KHÓA_MẪU];
         tiếp = đúng;
         khi (tiếp) {
-            i = p["vị trí"];
+            i = p[REGEX_KHÓA_VỊ_TRÍ];
             nếu (i >= máy ảo lấy độ dài(mẫu)) {
                 tiếp = sai;
             } hoặc {
                 nếu (mẫu[i] == "|") {
-                    p["vị trí"] = i + 1;
+                    p[REGEX_KHÓA_VỊ_TRÍ] = i + 1;
                     máy ảo thêm cuối danh sách(nhánh, mình.biểu thức chính quy phân tích cú pháp chuỗi(p));
                 } hoặc {
                     tiếp = sai;
@@ -67,15 +68,15 @@ lớp công khai Biểu Thức Chính Quy {
         nếu (máy ảo lấy độ dài(nhánh) == 1) {
             trả về nhánh[0];
         };
-        trả về {"loại": "hoặc", "con": nhánh};
+        trả về {REGEX_KHÓA_LOẠI: "hoặc", REGEX_KHÓA_CON: nhánh};
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp chuỗi(p) {
         con = [];
-        mẫu = p["mẫu"];
+        mẫu = p[REGEX_KHÓA_MẪU];
         tiếp = đúng;
         khi (tiếp) {
-            i = p["vị trí"];
+            i = p[REGEX_KHÓA_VỊ_TRÍ];
             nếu (i >= máy ảo lấy độ dài(mẫu)) {
                 tiếp = sai;
             } hoặc {
@@ -87,12 +88,12 @@ lớp công khai Biểu Thức Chính Quy {
                 };
             };
         };
-        trả về {"loại": "chuỗi", "con": con};
+        trả về {REGEX_KHÓA_LOẠI: "chuỗi", REGEX_KHÓA_CON: con};
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp lớp(p) {
-        mẫu = p["mẫu"];
-        i = p["vị trí"] + 1;
+        mẫu = p[REGEX_KHÓA_MẪU];
+        i = p[REGEX_KHÓA_VỊ_TRÍ] + 1;
         phủ định = sai;
         nếu (i < máy ảo lấy độ dài(mẫu)) {
             nếu (mẫu[i] == "^") {
@@ -121,21 +122,21 @@ lớp công khai Biểu Thức Chính Quy {
             };
         };
         nếu (!đóng) { mình.biểu thức chính quy lỗi mẫu(); };
-        p["vị trí"] = i;
-        trả về {"loại": "lớp", "mẫu": nội dung, "phủ định": phủ định};
+        p[REGEX_KHÓA_VỊ_TRÍ] = i;
+        trả về {REGEX_KHÓA_LOẠI: "lớp", REGEX_KHÓA_MẪU: nội dung, "phủ định": phủ định};
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp đơn vị khớp(p) {
-        mẫu = p["mẫu"];
-        i = p["vị trí"];
+        mẫu = p[REGEX_KHÓA_MẪU];
+        i = p[REGEX_KHÓA_VỊ_TRÍ];
         nếu (i >= máy ảo lấy độ dài(mẫu)) { mình.biểu thức chính quy lỗi mẫu(); };
         c = mẫu[i];
 
         nếu (c == "(" ) {
-            p["vị trí"] = i + 1;
-            kiểu = "nhóm";
+            p[REGEX_KHÓA_VỊ_TRÍ] = i + 1;
+            kiểu = REGEX_KHÓA_NHÓM;
             số nhóm = 0;
-            j = p["vị trí"];
+            j = p[REGEX_KHÓA_VỊ_TRÍ];
             nếu (j < máy ảo lấy độ dài(mẫu)) {
                 nếu (mẫu[j] == "?") {
                     j++;
@@ -154,26 +155,26 @@ lớp công khai Biểu Thức Chính Quy {
                             };
                         };
                     };
-                    p["vị trí"] = j + 1;
+                    p[REGEX_KHÓA_VỊ_TRÍ] = j + 1;
                 };
             };
-            nếu (kiểu == "nhóm") {
-                p["nhóm"] = p["nhóm"] + 1;
-                số nhóm = p["nhóm"];
+            nếu (kiểu == REGEX_KHÓA_NHÓM) {
+                p[REGEX_KHÓA_NHÓM] = p[REGEX_KHÓA_NHÓM] + 1;
+                số nhóm = p[REGEX_KHÓA_NHÓM];
             };
             thân = mình.biểu thức chính quy phân tích cú pháp biểu thức(p);
-            i = p["vị trí"];
+            i = p[REGEX_KHÓA_VỊ_TRÍ];
             nếu (i >= máy ảo lấy độ dài(mẫu)) { mình.biểu thức chính quy lỗi mẫu(); };
             nếu (mẫu[i] != ")") { mình.biểu thức chính quy lỗi mẫu(); };
-            p["vị trí"] = i + 1;
+            p[REGEX_KHÓA_VỊ_TRÍ] = i + 1;
             nếu (kiểu == "không bắt") { trả về thân; };
             nếu (kiểu == "nhìn trước") {
-                trả về {"loại": "nhìn trước", "con": thân};
+                trả về {REGEX_KHÓA_LOẠI: "nhìn trước", REGEX_KHÓA_CON: thân};
             };
             nếu (kiểu == "không nhìn trước") {
-                trả về {"loại": "không nhìn trước", "con": thân};
+                trả về {REGEX_KHÓA_LOẠI: "không nhìn trước", REGEX_KHÓA_CON: thân};
             };
-            trả về {"loại": "nhóm", "con": thân, "số": số nhóm};
+            trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_NHÓM, REGEX_KHÓA_CON: thân, "số": số nhóm};
         };
 
         nếu (c == "[") {
@@ -183,29 +184,29 @@ lớp công khai Biểu Thức Chính Quy {
         nếu (c == "\\") {
             i++;
             nếu (i >= máy ảo lấy độ dài(mẫu)) { mình.biểu thức chính quy lỗi mẫu(); };
-            p["vị trí"] = i + 1;
+            p[REGEX_KHÓA_VỊ_TRÍ] = i + 1;
             e = mẫu[i];
             nếu (e == "s" || e == "d" || e == "w") {
-                trả về {"loại": "lớp tắt", "mẫu": e};
+                trả về {REGEX_KHÓA_LOẠI: "lớp tắt", REGEX_KHÓA_MẪU: e};
             };
-            nếu (e == "n") { trả về {"loại": "chữ", "giá trị": "\n"}; };
-            nếu (e == "r") { trả về {"loại": "chữ", "giá trị": "\r"}; };
-            nếu (e == "t") { trả về {"loại": "chữ", "giá trị": "\t"}; };
-            trả về {"loại": "chữ", "giá trị": e};
+            nếu (e == "n") { trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_CHỮ, REGEX_KHÓA_GIÁ_TRỊ: "\n"}; };
+            nếu (e == "r") { trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_CHỮ, REGEX_KHÓA_GIÁ_TRỊ: "\r"}; };
+            nếu (e == "t") { trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_CHỮ, REGEX_KHÓA_GIÁ_TRỊ: "\t"}; };
+            trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_CHỮ, REGEX_KHÓA_GIÁ_TRỊ: e};
         };
 
         nếu (c == "*" || c == "+" || c == "?") { mình.biểu thức chính quy lỗi mẫu(); };
-        p["vị trí"] = i + 1;
-        nếu (c == ".") { trả về {"loại": "bất kỳ"}; };
-        nếu (c == "^") { trả về {"loại": "đầu"}; };
-        nếu (c == "$") { trả về {"loại": "cuối"}; };
-        trả về {"loại": "chữ", "giá trị": c};
+        p[REGEX_KHÓA_VỊ_TRÍ] = i + 1;
+        nếu (c == ".") { trả về {REGEX_KHÓA_LOẠI: "bất kỳ"}; };
+        nếu (c == "^") { trả về {REGEX_KHÓA_LOẠI: "đầu"}; };
+        nếu (c == "$") { trả về {REGEX_KHÓA_LOẠI: "cuối"}; };
+        trả về {REGEX_KHÓA_LOẠI: REGEX_KHÓA_CHỮ, REGEX_KHÓA_GIÁ_TRỊ: c};
     };
 
     hàm riêng tư biểu thức chính quy phân tích cú pháp phần tử(p) {
         đơn vị khớp = mình.biểu thức chính quy phân tích cú pháp đơn vị khớp(p);
-        mẫu = p["mẫu"];
-        i = p["vị trí"];
+        mẫu = p[REGEX_KHÓA_MẪU];
+        i = p[REGEX_KHÓA_VỊ_TRÍ];
         nếu (i >= máy ảo lấy độ dài(mẫu)) { trả về đơn vị khớp; };
         q = mẫu[i];
         nếu (q != "*" && q != "+" && q != "?") { trả về đơn vị khớp; };
@@ -221,10 +222,10 @@ lớp công khai Biểu Thức Chính Quy {
                 i++;
             };
         };
-        p["vị trí"] = i;
+        p[REGEX_KHÓA_VỊ_TRÍ] = i;
         trả về {
-            "loại": "lặp",
-            "con": đơn vị khớp,
+            REGEX_KHÓA_LOẠI: "lặp",
+            REGEX_KHÓA_CON: đơn vị khớp,
             "tối thiểu": tối thiểu,
             "tối đa": tối đa,
             "tham": tham
@@ -237,8 +238,8 @@ lớp công khai Biểu Thức Chính Quy {
         };
         p = mình.biểu thức chính quy phân tích cú pháp tạo(mẫu);
         cây = mình.biểu thức chính quy phân tích cú pháp biểu thức(p);
-        nếu (p["vị trí"] != máy ảo lấy độ dài(mẫu)) { mình.biểu thức chính quy lỗi mẫu(); };
-        trả về {"cây": cây, "nhóm": p["nhóm"]};
+        nếu (p[REGEX_KHÓA_VỊ_TRÍ] != máy ảo lấy độ dài(mẫu)) { mình.biểu thức chính quy lỗi mẫu(); };
+        trả về {REGEX_KHÓA_CÂY: cây, REGEX_KHÓA_NHÓM: p[REGEX_KHÓA_NHÓM]};
     };
 
     hàm riêng tư biểu thức chính quy là chữ số(c) {
@@ -262,7 +263,7 @@ lớp công khai Biểu Thức Chính Quy {
     };
 
     hàm riêng tư biểu thức chính quy lớp khớp(nút, c) {
-        mẫu = nút["mẫu"];
+        mẫu = nút[REGEX_KHÓA_MẪU];
         mục khớp = sai;
         i = 0;
         khi (i < máy ảo lấy độ dài(mẫu)) {
@@ -297,7 +298,7 @@ lớp công khai Biểu Thức Chính Quy {
     };
 
     hàm riêng tư biểu thức chính quy trạng thái(vị trí, nhóm) {
-        trả về {"vị trí": vị trí, "nhóm": nhóm};
+        trả về {REGEX_KHÓA_VỊ_TRÍ: vị trí, REGEX_KHÓA_NHÓM: nhóm};
     };
 
     hàm riêng tư biểu thức chính quy ghép trạng thái(đích, nguồn) {
@@ -315,9 +316,9 @@ lớp công khai Biểu Thức Chính Quy {
 
         được lặp = tối đa < 0 || số lần < tối đa;
         nếu (được lặp) {
-            tiếp = mình.biểu thức chính quy khớp nút(nút["con"], văn bản, trạng thái);
+            tiếp = mình.biểu thức chính quy khớp nút(nút[REGEX_KHÓA_CON], văn bản, trạng thái);
             lặp(i = 0; i < máy ảo lấy độ dài(tiếp); i++) {
-                nếu (tiếp[i]["vị trí"] > trạng thái["vị trí"]) {
+                nếu (tiếp[i][REGEX_KHÓA_VỊ_TRÍ] > trạng thái[REGEX_KHÓA_VỊ_TRÍ]) {
                     mình.biểu thức chính quy khớp lặp(nút, văn bản, tiếp[i], số lần + 1, kết quả);
                 };
             };
@@ -330,14 +331,14 @@ lớp công khai Biểu Thức Chính Quy {
     };
 
     hàm riêng tư biểu thức chính quy khớp nút(nút, văn bản, trạng thái) {
-        loại = nút["loại"];
-        vị trí = trạng thái["vị trí"];
+        loại = nút[REGEX_KHÓA_LOẠI];
+        vị trí = trạng thái[REGEX_KHÓA_VỊ_TRÍ];
         n = máy ảo lấy độ dài(văn bản);
 
-        nếu (loại == "chữ") {
+        nếu (loại == REGEX_KHÓA_CHỮ) {
             nếu (vị trí < n) {
-                nếu (văn bản[vị trí] == nút["giá trị"]) {
-                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái["nhóm"])];
+                nếu (văn bản[vị trí] == nút[REGEX_KHÓA_GIÁ_TRỊ]) {
+                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái[REGEX_KHÓA_NHÓM])];
                 };
             };
             trả về [];
@@ -346,7 +347,7 @@ lớp công khai Biểu Thức Chính Quy {
             nếu (vị trí < n) {
                 c = văn bản[vị trí];
                 nếu (c != "\n" && c != "\r") {
-                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái["nhóm"])];
+                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái[REGEX_KHÓA_NHÓM])];
                 };
             };
             trả về [];
@@ -354,15 +355,15 @@ lớp công khai Biểu Thức Chính Quy {
         nếu (loại == "lớp") {
             nếu (vị trí < n) {
                 nếu (mình.biểu thức chính quy lớp khớp(nút, văn bản[vị trí])) {
-                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái["nhóm"])];
+                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái[REGEX_KHÓA_NHÓM])];
                 };
             };
             trả về [];
         };
         nếu (loại == "lớp tắt") {
             nếu (vị trí < n) {
-                nếu (mình.biểu thức chính quy lớp tắt khớp(nút["mẫu"], văn bản[vị trí])) {
-                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái["nhóm"])];
+                nếu (mình.biểu thức chính quy lớp tắt khớp(nút[REGEX_KHÓA_MẪU], văn bản[vị trí])) {
+                    trả về [mình.biểu thức chính quy trạng thái(vị trí + 1, trạng thái[REGEX_KHÓA_NHÓM])];
                 };
             };
             trả về [];
@@ -377,7 +378,7 @@ lớp công khai Biểu Thức Chính Quy {
         };
         nếu (loại == "chuỗi") {
             hiện = [trạng thái];
-            con = nút["con"];
+            con = nút[REGEX_KHÓA_CON];
             lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
                 kế = [];
                 lặp(j = 0; j < máy ảo lấy độ dài(hiện); j++) {
@@ -390,30 +391,30 @@ lớp công khai Biểu Thức Chính Quy {
         };
         nếu (loại == "hoặc") {
             kết quả = [];
-            con = nút["con"];
+            con = nút[REGEX_KHÓA_CON];
             lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
                 mình.biểu thức chính quy ghép trạng thái(kết quả, mình.biểu thức chính quy khớp nút(con[i], văn bản, trạng thái));
             };
             trả về kết quả;
         };
-        nếu (loại == "nhóm") {
+        nếu (loại == REGEX_KHÓA_NHÓM) {
             bắt đầu = vị trí;
-            kết quả con = mình.biểu thức chính quy khớp nút(nút["con"], văn bản, trạng thái);
+            kết quả con = mình.biểu thức chính quy khớp nút(nút[REGEX_KHÓA_CON], văn bản, trạng thái);
             kết quả = [];
             lặp(i = 0; i < máy ảo lấy độ dài(kết quả con); i++) {
-                nhóm = mình.biểu thức chính quy sao chép danh sách(kết quả con[i]["nhóm"]);
-                nhóm[nút["số"]] = mình.biểu thức chính quy đoạn(văn bản, bắt đầu, kết quả con[i]["vị trí"]);
-                máy ảo thêm cuối danh sách(kết quả, mình.biểu thức chính quy trạng thái(kết quả con[i]["vị trí"], nhóm));
+                nhóm = mình.biểu thức chính quy sao chép danh sách(kết quả con[i][REGEX_KHÓA_NHÓM]);
+                nhóm[nút["số"]] = mình.biểu thức chính quy đoạn(văn bản, bắt đầu, kết quả con[i][REGEX_KHÓA_VỊ_TRÍ]);
+                máy ảo thêm cuối danh sách(kết quả, mình.biểu thức chính quy trạng thái(kết quả con[i][REGEX_KHÓA_VỊ_TRÍ], nhóm));
             };
             trả về kết quả;
         };
         nếu (loại == "nhìn trước") {
-            lượt thử khớp = mình.biểu thức chính quy khớp nút(nút["con"], văn bản, trạng thái);
+            lượt thử khớp = mình.biểu thức chính quy khớp nút(nút[REGEX_KHÓA_CON], văn bản, trạng thái);
             nếu (máy ảo lấy độ dài(lượt thử khớp) == 0) { trả về []; };
-            trả về [mình.biểu thức chính quy trạng thái(vị trí, lượt thử khớp[0]["nhóm"])];
+            trả về [mình.biểu thức chính quy trạng thái(vị trí, lượt thử khớp[0][REGEX_KHÓA_NHÓM])];
         };
         nếu (loại == "không nhìn trước") {
-            lượt thử khớp = mình.biểu thức chính quy khớp nút(nút["con"], văn bản, trạng thái);
+            lượt thử khớp = mình.biểu thức chính quy khớp nút(nút[REGEX_KHÓA_CON], văn bản, trạng thái);
             nếu (máy ảo lấy độ dài(lượt thử khớp) == 0) { trả về [trạng thái]; };
             trả về [];
         };
@@ -436,7 +437,7 @@ lớp công khai Biểu Thức Chính Quy {
 
     hàm riêng tư biểu thức chính quy chọn(kết quả, bắt đầu, cần dương) {
         lặp(i = 0; i < máy ảo lấy độ dài(kết quả); i++) {
-            nếu (!cần dương || kết quả[i]["vị trí"] > bắt đầu) {
+            nếu (!cần dương || kết quả[i][REGEX_KHÓA_VỊ_TRÍ] > bắt đầu) {
                 trả về kết quả[i];
             };
         };
@@ -444,18 +445,18 @@ lớp công khai Biểu Thức Chính Quy {
     };
 
     hàm riêng tư biểu thức chính quy thêm khớp(các khớp, văn bản, bắt đầu trước, bắt đầu, trạng thái) {
-        nhóm = mình.biểu thức chính quy sao chép danh sách(trạng thái["nhóm"]);
-        nhóm[0] = mình.biểu thức chính quy đoạn(văn bản, bắt đầu, trạng thái["vị trí"]);
+        nhóm = mình.biểu thức chính quy sao chép danh sách(trạng thái[REGEX_KHÓA_NHÓM]);
+        nhóm[0] = mình.biểu thức chính quy đoạn(văn bản, bắt đầu, trạng thái[REGEX_KHÓA_VỊ_TRÍ]);
         máy ảo thêm cuối danh sách(các khớp, [mình.biểu thức chính quy đoạn(văn bản, bắt đầu trước, bắt đầu), nhóm]);
-        trả về trạng thái["vị trí"];
+        trả về trạng thái[REGEX_KHÓA_VỊ_TRÍ];
     };
 
     hàm riêng tư biểu thức chính quy quét đã phân tích(văn bản, phân tích) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "regex: văn bản phải là chuỗi";
+            ném REGEX_LỖI_VĂN_BẢN;
         };
-        cây = phân tích["cây"];
-        số nhóm = phân tích["nhóm"];
+        cây = phân tích[REGEX_KHÓA_CÂY];
+        số nhóm = phân tích[REGEX_KHÓA_NHÓM];
         n = máy ảo lấy độ dài(văn bản);
         các khớp = [];
         tìm từ = 0;
@@ -503,12 +504,12 @@ lớp công khai Biểu Thức Chính Quy {
 
     hàm riêng tư biểu thức chính quy khớp đã phân tích(văn bản, phân tích) {
         nếu (loại của(văn bản) != "chuỗi") {
-            ném "regex: văn bản phải là chuỗi";
+            ném REGEX_LỖI_VĂN_BẢN;
         };
-        kết quả = mình.biểu thức chính quy thử tại(phân tích["cây"], phân tích["nhóm"], văn bản, 0);
+        kết quả = mình.biểu thức chính quy thử tại(phân tích[REGEX_KHÓA_CÂY], phân tích[REGEX_KHÓA_NHÓM], văn bản, 0);
         n = máy ảo lấy độ dài(văn bản);
         lặp(i = 0; i < máy ảo lấy độ dài(kết quả); i++) {
-            nếu (kết quả[i]["vị trí"] == n) { trả về đúng; };
+            nếu (kết quả[i][REGEX_KHÓA_VỊ_TRÍ] == n) { trả về đúng; };
         };
         trả về sai;
     };
@@ -620,26 +621,26 @@ lớp công khai Biểu Thức Chính Quy {
 
 // Hàm tiện ích dựng Biểu Thức Chính Quy; lớp giữ AST đã phân tích theo instance.
 hàm công khai biểu thức chính quy khớp(văn bản, mẫu) {
-    nếu (loại của(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    nếu (loại của(văn bản) != "chuỗi") { ném REGEX_LỖI_VĂN_BẢN; };
     bộ = Biểu Thức Chính Quy(mẫu);
     trả về bộ.khớp(văn bản);
 };
 
 hàm công khai biểu thức chính quy tìm(văn bản, mẫu) {
-    nếu (loại của(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    nếu (loại của(văn bản) != "chuỗi") { ném REGEX_LỖI_VĂN_BẢN; };
     bộ = Biểu Thức Chính Quy(mẫu);
     trả về bộ.tìm(văn bản);
 };
 
 hàm công khai biểu thức chính quy thay(văn bản, mẫu, giá trị thay thế) {
-    nếu (loại của(giá trị thay thế) != "chuỗi") { ném "regex thay: giá trị thay thế phải là chuỗi"; };
-    nếu (loại của(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    nếu (loại của(giá trị thay thế) != "chuỗi") { ném REGEX_LỖI_THAY_THẾ; };
+    nếu (loại của(văn bản) != "chuỗi") { ném REGEX_LỖI_VĂN_BẢN; };
     bộ = Biểu Thức Chính Quy(mẫu);
     trả về bộ.thay(văn bản, giá trị thay thế);
 };
 
 hàm công khai biểu thức chính quy tách(văn bản, mẫu) {
-    nếu (loại của(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    nếu (loại của(văn bản) != "chuỗi") { ném REGEX_LỖI_VĂN_BẢN; };
     bộ = Biểu Thức Chính Quy(mẫu);
     trả về bộ.tách(văn bản);
 };

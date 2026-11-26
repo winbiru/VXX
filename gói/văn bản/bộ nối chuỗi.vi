@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi văn bản.*;
 
 nhập gói.lõi.chuyển kiểu.thành chuỗi;
 nhập gói.lõi.chuyển kiểu.loại của;
@@ -14,16 +15,16 @@ lớp công khai Bộ Nối Chuỗi {
     // phụ thuộc class-lowering. Public semantics giữ encounter order.
     hàm công khai bộ nối chuỗi(phân cách, tiền tố = "", hậu tố = "", giá trị rỗng = rỗng) {
         nếu (loại của(phân cách) != "chuỗi") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         nếu (loại của(tiền tố) != "chuỗi") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         nếu (loại của(hậu tố) != "chuỗi") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         nếu (giá trị rỗng != rỗng && loại của(giá trị rỗng) != "chuỗi") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         trả về {
             "__vpp_string_joiner__": 1,
@@ -37,14 +38,14 @@ lớp công khai Bộ Nối Chuỗi {
 
     hàm công khai bộ nối yêu cầu(bộ) {
         nếu (loại của(bộ) != "từ điển") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         nếu (lấy từ điển(bộ, "__vpp_string_joiner__", 0) != 1) {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         các phần = lấy từ điển(bộ, "các phần", rỗng);
         nếu (loại của(các phần) != "danh sách") {
-            ném "JOIN_ARGUMENT";
+            ném LỖI_JOIN_ARGUMENT;
         };
         trả về các phần;
     };

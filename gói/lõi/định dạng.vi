@@ -1,3 +1,4 @@
+nhập gói.hằng.lỗi lõi.*;
 // Module: lõi.định dạng
 // ABI V1 dùng một list đối số vì ngôn ngữ chưa có vararg public ổn định.
 // Parser, validation, grouping, padding và dispatch kiểu nằm ở V++.
@@ -73,60 +74,60 @@ hàm riêng tư định dạng xác thực spec(spec) {
     có chính xác = lấy từ điển(spec, "có chính xác", sai);
 
     nếu (định dạng có ký tự(cờ, "-") && định dạng có ký tự(cờ, "0")) {
-        ném "FORMAT_FLAG_MISMATCH";
+        ném LỖI_FORMAT_FLAG_MISMATCH;
     };
     nếu (định dạng có ký tự(cờ, "+") && định dạng có ký tự(cờ, " ")) {
-        ném "FORMAT_FLAG_MISMATCH";
+        ném LỖI_FORMAT_FLAG_MISMATCH;
     };
     nếu (định dạng có ký tự(cờ, "(") &&
         (định dạng có ký tự(cờ, "+") || định dạng có ký tự(cờ, " "))) {
-        ném "FORMAT_FLAG_MISMATCH";
+        ném LỖI_FORMAT_FLAG_MISMATCH;
     };
     nếu ((định dạng có ký tự(cờ, "-") || định dạng có ký tự(cờ, "0")) && !có rộng) {
         ném "FORMAT_MISSING_WIDTH";
     };
 
     nếu (chuyển == "s" || chuyển == "b") {
-        nếu (định dạng cờ ngoài(cờ, "-")) { ném "FORMAT_FLAG_MISMATCH"; };
+        nếu (định dạng cờ ngoài(cờ, "-")) { ném LỖI_FORMAT_FLAG_MISMATCH; };
     } hoặc {
         nếu (chuyển == "c") {
             nếu (định dạng cờ ngoài(cờ, "-") || có chính xác) {
-                ném "FORMAT_FLAG_MISMATCH";
+                ném LỖI_FORMAT_FLAG_MISMATCH;
             };
         } hoặc {
             nếu (chuyển == "d") {
                 nếu (định dạng cờ ngoài(cờ, "-+0 ,(") || có chính xác) {
-                    ném "FORMAT_FLAG_MISMATCH";
+                    ném LỖI_FORMAT_FLAG_MISMATCH;
                 };
             } hoặc {
                 nếu (chuyển == "o" || chuyển == "x" || chuyển == "X") {
                     nếu (định dạng cờ ngoài(cờ, "-0") || có chính xác) {
-                        ném "FORMAT_FLAG_MISMATCH";
+                        ném LỖI_FORMAT_FLAG_MISMATCH;
                     };
                 } hoặc {
                     nếu (chuyển == "f") {
                         nếu (định dạng cờ ngoài(cờ, "-+0 ,(")) {
-                            ném "FORMAT_FLAG_MISMATCH";
+                            ném LỖI_FORMAT_FLAG_MISMATCH;
                         };
                     } hoặc {
                         nếu (chuyển == "e" || chuyển == "E") {
                             nếu (định dạng cờ ngoài(cờ, "-+0 (")) {
-                                ném "FORMAT_FLAG_MISMATCH";
+                                ném LỖI_FORMAT_FLAG_MISMATCH;
                             };
                         } hoặc {
                             nếu (chuyển == "g" || chuyển == "G") {
                                 nếu (định dạng cờ ngoài(cờ, "-+0 ,(")) {
-                                    ném "FORMAT_FLAG_MISMATCH";
+                                    ném LỖI_FORMAT_FLAG_MISMATCH;
                                 };
                             } hoặc {
                                 nếu (chuyển == "%") {
                                     nếu (định dạng cờ ngoài(cờ, "-") || có chính xác) {
-                                        ném "FORMAT_FLAG_MISMATCH";
+                                        ném LỖI_FORMAT_FLAG_MISMATCH;
                                     };
                                 } hoặc {
                                     nếu (chuyển == "n") {
                                         nếu (cờ != "" || có rộng || có chính xác) {
-                                            ném "FORMAT_FLAG_MISMATCH";
+                                            ném LỖI_FORMAT_FLAG_MISMATCH;
                                         };
                                     };
                                 };
@@ -379,14 +380,14 @@ hàm riêng tư định dạng giá trị(giá trị, spec, ký hiệu) {
             nếu (kiểu == "chuỗi" && máy ảo lấy độ dài(giá trị) == 1) {
                 văn bản = giá trị;
             } hoặc {
-                ném "FORMAT_CONVERSION";
+                ném LỖI_FORMAT_CONVERSION;
             };
         };
         trả về định dạng đệm(văn bản, spec);
     };
     nếu (chuyển == "d" || chuyển == "o" || chuyển == "x" || chuyển == "X") {
         nếu (loại của(giá trị) != "số nguyên") {
-            ném "FORMAT_CONVERSION";
+            ném LỖI_FORMAT_CONVERSION;
         };
         thân = định dạng thân số nguyên(giá trị, chuyển);
         nếu (chuyển == "d" && định dạng có ký tự(lấy từ điển(spec, "cờ", ""), ",")) {
@@ -398,7 +399,7 @@ hàm riêng tư định dạng giá trị(giá trị, spec, ký hiệu) {
         chuyển == "g" || chuyển == "G") {
         kiểu = loại của(giá trị);
         nếu (kiểu != "số nguyên" && kiểu != "số thực") {
-            ném "FORMAT_CONVERSION";
+            ném LỖI_FORMAT_CONVERSION;
         };
         nếu (!có chính xác) { chính xác = 6; };
         số đã định dạng = định dạng số thực nội bộ(giá trị, chuyển, chính xác);
@@ -415,12 +416,12 @@ hàm riêng tư định dạng giá trị(giá trị, spec, ký hiệu) {
         };
         trả về định dạng áp dấu(thân, âm, spec);
     };
-    ném "FORMAT_UNKNOWN_CONVERSION";
+    ném LỖI_FORMAT_UNKNOWN_CONVERSION;
 };
 
 hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn ngữ) {
     nếu (loại của(mẫu) != "chuỗi" || loại của(các đối số) != "danh sách") {
-        ném "FORMAT_INVALID";
+        ném LỖI_FORMAT_INVALID;
     };
     thử {
         ký hiệu = ký hiệu vùng lấy(vùng ngôn ngữ);
@@ -428,7 +429,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
         ném "FORMAT_LOCALE";
     };
     nếu (máy ảo lấy độ dài(mã hóa bảng mã(mẫu, "UTF-8")) > 1048576) {
-        ném "FORMAT_RESOURCE_LIMIT";
+        ném LỖI_FORMAT_RESOURCE_LIMIT;
     };
 
     kết quả = "";
@@ -444,7 +445,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             con trỏ = con trỏ + 1;
         } hoặc {
             vị trí hiện tại = con trỏ + 1;
-            nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
+            nếu (vị trí hiện tại >= n) { ném LỖI_FORMAT_INVALID; };
 
             bắt đầu số = vị trí hiện tại;
             khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
@@ -453,8 +454,8 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             có chỉ số = sai;
             chỉ số = 0;
             nếu (vị trí hiện tại > bắt đầu số && vị trí hiện tại < n && mẫu[vị trí hiện tại] == "$") {
-                một gốc = định dạng đọc số(mẫu, bắt đầu số, vị trí hiện tại, "FORMAT_INVALID");
-                nếu (một gốc == 0) { ném "FORMAT_INVALID"; };
+                một gốc = định dạng đọc số(mẫu, bắt đầu số, vị trí hiện tại, LỖI_FORMAT_INVALID);
+                nếu (một gốc == 0) { ném LỖI_FORMAT_INVALID; };
                 chỉ số = một gốc - 1;
                 có chỉ số = đúng;
                 vị trí hiện tại = vị trí hiện tại + 1;
@@ -495,18 +496,18 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
                 khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                     vị trí hiện tại = vị trí hiện tại + 1;
                 };
-                nếu (bắt đầu chính xác == vị trí hiện tại) { ném "FORMAT_PRECISION"; };
-                chính xác = định dạng đọc số(mẫu, bắt đầu chính xác, vị trí hiện tại, "FORMAT_PRECISION");
+                nếu (bắt đầu chính xác == vị trí hiện tại) { ném LỖI_FORMAT_PRECISION; };
+                chính xác = định dạng đọc số(mẫu, bắt đầu chính xác, vị trí hiện tại, LỖI_FORMAT_PRECISION);
             };
 
-            nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
+            nếu (vị trí hiện tại >= n) { ném LỖI_FORMAT_INVALID; };
             chuyển = mẫu[vị trí hiện tại];
             vị trí hiện tại = vị trí hiện tại + 1;
             nếu (!định dạng chuyển đổi hợp lệ(chuyển)) {
-                ném "FORMAT_UNKNOWN_CONVERSION";
+                ném LỖI_FORMAT_UNKNOWN_CONVERSION;
             };
             nếu ((chuyển == "%" || chuyển == "n") && có chỉ số) {
-                ném "FORMAT_INVALID";
+                ném LỖI_FORMAT_INVALID;
             };
 
             spec = {
@@ -530,7 +531,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
                     } hoặc {
                         đã ngầm = đúng;
                     };
-                    nếu (đã tường mình && đã ngầm) { ném "FORMAT_INVALID"; };
+                    nếu (đã tường mình && đã ngầm) { ném LỖI_FORMAT_INVALID; };
 
                     dùng = chỉ số ngầm;
                     nếu (có chỉ số) {
@@ -545,14 +546,14 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
                 };
             };
             nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
-                ném "FORMAT_RESOURCE_LIMIT";
+                ném LỖI_FORMAT_RESOURCE_LIMIT;
             };
             con trỏ = vị trí hiện tại;
         };
     };
 
     nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
-        ném "FORMAT_RESOURCE_LIMIT";
+        ném LỖI_FORMAT_RESOURCE_LIMIT;
     };
     trả về kết quả;
 };
@@ -567,7 +568,7 @@ hàm riêng tư định dạng nội bộ(mẫu, các đối số, vùng ngôn n
 
 hàm công khai định dạng(mẫu, các đối số, vùng ngôn ngữ = rỗng) {
     kết quả = định dạng nội bộ(mẫu, các đối số, vùng ngôn ngữ);
-    lỗi = lấy từ điển(kết quả, "lỗi", "FORMAT_INVALID");
+    lỗi = lấy từ điển(kết quả, "lỗi", LỖI_FORMAT_INVALID);
     nếu (lỗi != "") {
         ném lỗi;
     };
@@ -580,16 +581,16 @@ hàm công khai định dạng vào(đích, mẫu, các đối số, vùng ngôn
     thử {
         bộ dựng yêu cầu(đích);
     } bắt lỗi (e) {
-        ném "FORMAT_APPENDABLE";
+        ném LỖI_FORMAT_APPENDABLE;
     };
     văn bản = định dạng(mẫu, các đối số, vùng ngôn ngữ);
     thử {
         bộ dựng thêm(đích, văn bản);
     } bắt lỗi (e) {
         nếu (e == "STRING_RESOURCE_LIMIT") {
-            ném "FORMAT_RESOURCE_LIMIT";
+            ném LỖI_FORMAT_RESOURCE_LIMIT;
         };
-        ném "FORMAT_APPENDABLE";
+        ném LỖI_FORMAT_APPENDABLE;
     };
     trả về đích;
 };
@@ -603,10 +604,10 @@ hàm công khai bộ xử lý mẫu định dạng(specs = rỗng, vùng ngôn n
         giá trị = lấy từ điển(template, "giá trị", []);
         nếu (specs != rỗng) {
             nếu (loại của(specs) != "danh sách") {
-                ném "FORMAT_PROCESSOR_INVALID";
+                ném LỖI_FORMAT_PROCESSOR_INVALID;
             };
             nếu (máy ảo lấy độ dài(specs) != máy ảo lấy độ dài(giá trị)) {
-                ném "FORMAT_PROCESSOR_INVALID";
+                ném LỖI_FORMAT_PROCESSOR_INVALID;
             };
         };
 
@@ -616,17 +617,17 @@ hàm công khai bộ xử lý mẫu định dạng(specs = rỗng, vùng ngôn n
             nếu (specs != rỗng) {
                 spec = specs[i];
                 nếu (loại của(spec) != "chuỗi") {
-                    ném "FORMAT_PROCESSOR_INVALID";
+                    ném LỖI_FORMAT_PROCESSOR_INVALID;
                 };
             };
             kết quả = kết quả + mảnh[i] + định dạng(spec, [giá trị[i]], vùng ngôn ngữ);
             nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
-                ném "FORMAT_RESOURCE_LIMIT";
+                ném LỖI_FORMAT_RESOURCE_LIMIT;
             };
         };
         kết quả = kết quả + mảnh[máy ảo lấy độ dài(mảnh) - 1];
         nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
-            ném "FORMAT_RESOURCE_LIMIT";
+            ném LỖI_FORMAT_RESOURCE_LIMIT;
         };
         trả về kết quả;
     };
@@ -639,7 +640,7 @@ lớp công khai Bộ Định Dạng {
     hàm công khai thêm(mẫu, đối số) {
         phần = định dạng(mẫu, đối số, mình.vùng);
         mới = mình.văn bản + phần;
-        nếu (máy ảo lấy độ dài(mã hóa bảng mã(mới, "UTF-8")) > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
+        nếu (máy ảo lấy độ dài(mã hóa bảng mã(mới, "UTF-8")) > 1048576) { ném LỖI_FORMAT_RESOURCE_LIMIT; };
         mình.văn bản = mới;
         trả về mình;
     };

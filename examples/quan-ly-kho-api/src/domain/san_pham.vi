@@ -1,3 +1,4 @@
+nhập hằng.trường dữ liệu.*;
 nhập lõi;
 
 // Entity sản phẩm của miền nghiệp vụ.
@@ -76,24 +77,24 @@ lớp công khai SảnPhẩm {
 
     hàm thànhMap() {
         trả về {
-            "id": mình.id,
-            "ten": mình.tên,
-            "gia": mình.giá,
-            "tonKho": mình.tồnKho,
-            "daBan": mình.đãBán,
-            "phienBan": mình.phiênBản
+            KHÓA_ID: mình.id,
+            KHÓA_TÊN: mình.tên,
+            KHÓA_GIÁ: mình.giá,
+            KHÓA_TỒN_KHO: mình.tồnKho,
+            KHÓA_ĐÃ_BÁN: mình.đãBán,
+            KHÓA_PHIÊN_BẢN: mình.phiênBản
         };
     }
 };
 
 hàm công khai sản phẩm từ map(dữLiệu) {
     sảnPhẩm = SảnPhẩm(
-        lấy từ điển(dữLiệu, "id", ""),
-        lấy từ điển(dữLiệu, "ten", ""),
-        lấy từ điển(dữLiệu, "gia", 0),
-        lấy từ điển(dữLiệu, "tonKho", 0),
-        lấy từ điển(dữLiệu, "daBan", 0),
-        lấy từ điển(dữLiệu, "phienBan", 1)
+        lấy từ điển(dữLiệu, KHÓA_ID, ""),
+        lấy từ điển(dữLiệu, KHÓA_TÊN, ""),
+        lấy từ điển(dữLiệu, KHÓA_GIÁ, 0),
+        lấy từ điển(dữLiệu, KHÓA_TỒN_KHO, 0),
+        lấy từ điển(dữLiệu, KHÓA_ĐÃ_BÁN, 0),
+        lấy từ điển(dữLiệu, KHÓA_PHIÊN_BẢN, 1)
     );
     sảnPhẩm.kiểmTraHợpLệ();
     trả về sảnPhẩm;

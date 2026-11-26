@@ -148,9 +148,9 @@ hàm sinh mã từ máy(đầu ra, từ máy) {
 };
 
 // MOVZ/MOVK W9, signed i32 (16-bit chunks are unsigned).
-hàm sinh mã hằng số(đầu ra, biểu diễn trung gian, hằng tức thời độ lệch) {
-    biến lo = byte lấy(biểu diễn trung gian, hằng tức thời độ lệch) + byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 1) * 256;
-    biến hi = byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 2) + byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 3) * 256;
+hàm sinh mã hằng số(đầu ra, biểu diễn trung gian, độ lệch hằng tức thời) {
+    biến lo = byte lấy(biểu diễn trung gian, độ lệch hằng tức thời) + byte lấy(biểu diễn trung gian, độ lệch hằng tức thời + 1) * 256;
+    biến hi = byte lấy(biểu diễn trung gian, độ lệch hằng tức thời + 2) + byte lấy(biểu diễn trung gian, độ lệch hằng tức thời + 3) * 256;
     nếu (sinh mã từ máy(đầu ra, 1384120329 + lo * 32) != 0) { trả về -1; };
     // MOVK W9, #hi, LSL #16: 0x72a00009 | (hi << 5).
     // The immediate field starts at zero; carrying out of a pre-filled

@@ -1,0 +1,5 @@
+hằng SỐ_QUBIT_BELL = 2;
+hằng SỐ_QUBIT_GHZ = 3;
+hằng SỐ_LẦN_ĐO = 1024;
+hằng HẠT_NGẪU_NHIÊN_BELL = 20261022;
+hằng HẠT_NGẪU_NHIÊN = 42;

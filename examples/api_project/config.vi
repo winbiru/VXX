@@ -1,3 +1,4 @@
+nhập hằng.chung.*;
 nhập vào ra;
 
 // Bao đóng việc đọc cấu hình để phần còn lại của ứng dụng không phụ thuộc trực tiếp
@@ -11,7 +12,7 @@ lớp CấuHìnhApi {
     // Đọc cổng HTTP từ cấu hình, dùng 8080 khi khóa port không tồn tại.
     hàm cổng() {
         đườngDẫn = mình.đườngDẫn;
-        trả về đọc cấu hình khóa(đườngDẫn, "port", "8080");
+        trả về đọc cấu hình khóa(đườngDẫn, "port", CỔNG_MẶC_ĐỊNH);
     }
 };
 

@@ -114,7 +114,7 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
         };
         chuẩn = biên dịch mã máy chuẩn hóa CFG(danh sách hàm biểu diễn trung gian);
         mã lệnh = chuẩn["opcodes"];
-        hằng lệnh = chuẩn["immediates"];
+        giá trị lệnh = chuẩn["immediates"];
         toán hạng lệnh = chuẩn["operands"];
         độ sâu lệnh = chuẩn["depths"];
         ký hiệu lệnh = chuẩn["symbols"];
@@ -157,7 +157,7 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
                 ca 0: {
                     nếu (d >= sâu nhất) { ném "x86 eval stack overflow"; };
                     // Chỉ cần kiểm tra i32; kết quả {lo, hi} trước đây bị bỏ đi.
-                    hằng = hằng lệnh[trang][vị trí];
+                    hằng = giá trị lệnh[trang][vị trí];
                     nếu (hằng < -2147483647 - 1 || hằng > 2147483647) {
                         ném "mã máy V++: hằng nằm ngoài i32";
                     };

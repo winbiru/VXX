@@ -403,7 +403,7 @@ hàm vm_char_offset(s, i) {
 hàm vm_type(v) {
     biến t = vm_tag(v);
     nếu (t == 0) { trả về vm_literal("rỗng"); }; nếu (t == 1 || t == 11) { trả về vm_literal("số nguyên"); };
-    nếu (t == 2) { trả về vm_literal("số thực"); }; nếu (t == 3) { trả về vm_literal("chuỗi"); };
+    nếu (vm_is_real_tag(t)) { trả về vm_literal("số thực"); }; nếu (t == 3) { trả về vm_literal("chuỗi"); };
     nếu (t == 4) { trả về vm_literal("danh sách"); }; nếu (t == 5) { trả về vm_literal("từ điển"); };
     nếu (t == 6 || t == 13) { trả về vm_literal("tuple"); }; nếu (t == 7) { trả về vm_literal("hàm"); };
     nếu (t == 8) { trả về vm_literal("lớp"); }; trả về vm_literal("đối tượng");
@@ -875,7 +875,9 @@ hàm vm_host(state, op, args) {
     };
     nếu (op == 154 || op == 155) {
         nếu (vm_tag(a) != 4) { trả về vm_error(2); }; biến size = vm_get(a, 1);
-        nếu (op == 155 && size != 8) { trả về vm_error(2); };
+        // Eight bytes retain the existing f64 wire format. A ninth byte
+        // equal to 32 requests a binary32-rounded scalar.
+        nếu (op == 155 && size != 8 && size != 9) { trả về vm_error(2); };
         biến chuỗi_byte = vm_string(size);
         lặp(i = 0; i < size; i++) {
             biến phần_tử_byte = vm_at(a, i); nếu (vm_tag(phần_tử_byte) != 1) { trả về vm_error(2); };
@@ -884,7 +886,12 @@ hàm vm_host(state, op, args) {
         };
         nếu (op == 154) { trả về chuỗi_byte; };
         biến số_thực_từ_bit = vm_alloc(16, 0); nếu (số_thực_từ_bit == 0) { trả về 0; }; vm_set(số_thực_từ_bit, 0, 2);
-        vm_set(số_thực_từ_bit, 2, vm_get(vm_get(chuỗi_byte, 2), 0)); vm_set(số_thực_từ_bit, 3, vm_get(vm_get(chuỗi_byte, 2), 1)); trả về số_thực_từ_bit;
+        vm_set(số_thực_từ_bit, 2, vm_get(vm_get(chuỗi_byte, 2), 0)); vm_set(số_thực_từ_bit, 3, vm_get(vm_get(chuỗi_byte, 2), 1));
+        nếu (size == 9) {
+            nếu (máy đọc byte(vm_get(chuỗi_byte, 2) + 8) != 32) { trả về vm_error(2); };
+            trả về vm_round_f32(số_thực_từ_bit);
+        };
+        trả về số_thực_từ_bit;
     };
     nếu (op == 118) {
         biến số_thực_nguồn = vm_real(a); biến danh_sách_bit = vm_vector(4);

@@ -123,6 +123,9 @@ lớp công khai Bộ Phát Bytecode {
     // IR đã phân giải binding; một SymbolId dùng đúng một VM slot dù cùng tên
     // với function ID, local của hàm khác hoặc biến của catch lồng nhau.
     hàm riêng tư biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, tên, mục ký hiệu) {
+        // Các hằng cấp mô-đun dùng slot thống nhất trong toàn phiên.
+        ô hằng = lấy từ điển(trạng thái, "ô nhớ hằng", rỗng);
+        nếu (ô hằng != rỗng && máy ảo có khóa từ điển(ô hằng, tên)) { trả về ô hằng[tên]; };
         nếu (mục ký hiệu < 0) { trả về mình.biên dịch phát mã ô nhớ(trạng thái, tên); };
         // Các SymbolId trong một phiên là duy nhất. Tra trực tiếp ID đã
         // phân giải để tránh quét lại toàn bộ slots ở mỗi LOAD/STORE của IR.
@@ -406,6 +409,54 @@ lớp công khai Bộ Phát Bytecode {
                 mã định danh, máy ảo lấy độ dài(bắt giữ), 0);
         };
         trả về đúng;
+    };
+
+    // Prove that the sole argument is only read at a constant index.
+    hàm riêng tư IR chỉ số chiếu(hàm IR) {
+        tham số = lấy từ điển(hàm IR, "tham số", []);
+        symbols = lấy từ điển(hàm IR, "tham số symbol", []);
+        thân = lấy từ điển(hàm IR, "lệnh", []);
+        nếu (máy ảo lấy độ dài(tham số) != 1 ||
+            máy ảo lấy độ dài(symbols) != 1 || máy ảo lấy độ dài(thân) != 4) { trả về -1; };
+        mã định danh = symbols[0];
+        nếu (!(mã định danh >= 0 && thân[0]["mã"] == "đọc tên" &&
+            thân[0]["giá trị"] == tham số[0] &&
+            lấy từ điển(thân[0], "symbol", -1) == mã định danh &&
+            thân[1]["mã"] == "số nguyên" &&
+            thân[2]["mã"] == "đọc chỉ số" && thân[3]["mã"] == "trả về")) { trả về -1; };
+        chỉ số = thành số nguyên(thân[1]["giá trị"]);
+        nếu (chỉ số < 0 || chỉ số > 32767 || thành chuỗi(chỉ số) != thân[1]["giá trị"]) { trả về -1; };
+        trả về chỉ số;
+    };
+
+    // Only the same local global function selected by normal dispatch may be
+    // projected. Constructors, intrinsics and lexical/method bindings win.
+    hàm riêng tư IR đích chiếu(mục, trạng thái) {
+        mã = mục["mã"];
+        nếu (mã != "gọi tên" && mã != "gọi tường minh") { trả về -1; };
+        tên = mục["giá trị"]["tên"];
+        nếu (mục["giá trị"]["số đối số"] != 1) { trả về -1; };
+        bảng = trạng thái["hàm chiếu"];
+        nếu (!máy ảo có khóa từ điển(bảng, tên)) { trả về -1; };
+        các lớp = lấy từ điển(trạng thái, "lớp nhập", []);
+        lặp(i = 0; i < máy ảo lấy độ dài(các lớp); i++) {
+            nếu (các lớp[i]["tên"] == tên) { trả về -1; };
+        };
+        các lớp = lấy từ điển(trạng thái, "lớp đã khai", []);
+        lặp(i = 0; i < máy ảo lấy độ dài(các lớp); i++) {
+            nếu (các lớp[i] == tên) { trả về -1; };
+        };
+        nội tại = biên dịch nội tại(tên);
+        nếu (nội tại != rỗng) {
+            nếu (nội tại[2]) { trả về -1; };
+        };
+        nếu (mã == "gọi tên") {
+            nếu (lấy từ điển(mục, "symbol", -1) >= 0) { trả về -1; };
+            nếu (lấy từ điển(trạng thái, "lớp hiện tại", "") != "") {
+                nếu (máy ảo có khóa từ điển(lấy từ điển(trạng thái, "phương thức lớp", {}), tên)) { trả về -1; };
+            };
+        };
+        trả về bảng[tên];
     };
 
     hàm riêng tư biên dịch phát mã IR một(mục, trạng thái, thô) {
@@ -1041,9 +1092,90 @@ lớp công khai Bộ Phát Bytecode {
         };
     };
 
-    hàm riêng tư biên dịch phát mã danh sách(các lệnh, trạng thái, thô) {
-        lặp(i = 0; i < máy ảo lấy độ dài(các lệnh); i++) {
-            mình.biên dịch phát mã IR có vị trí(các lệnh[i], trạng thái, thô);
+    hàm riêng tư biên dịch phát mã danh sách(các lệnh, trạng thái, thô, bắt đầu = 0, kết thúc = -1) {
+        nếu (kết thúc < 0) { kết thúc = máy ảo lấy độ dài(các lệnh); };
+        bỏ lệnh = {};
+        bỏ giá trị = {};
+        // Mark IR before emission, so no emitted jump target or source position
+        // needs adjustment. Nested projections refer to the original IR indices.
+        lặp(i = bắt đầu; i < kết thúc; i++) {
+            mục = các lệnh[i];
+            chiếu = lấy từ điển(mục, "chiếu danh sách tạm", rỗng);
+            nếu (chiếu == rỗng) { bỏ qua; };
+            đầu = i - chiếu[0];
+            cuối = i - 1;
+            trực tiếp = mục["mã"] == "đọc chỉ số";
+            nếu (trực tiếp) {
+                nếu (máy ảo lấy độ dài(chiếu) != 3 || cuối < bắt đầu) { bỏ qua; };
+                chỉ số = chiếu[2];
+                nếu (các lệnh[cuối]["mã"] != "số nguyên" ||
+                    thành số nguyên(các lệnh[cuối]["giá trị"]) != chỉ số) { bỏ qua; };
+                cuối -= 1;
+            } hoặc {
+                chỉ số = mình.IR đích chiếu(mục, trạng thái);
+            };
+            độ dài phần tử = chiếu[1];
+            số phần tử = máy ảo lấy độ dài(độ dài phần tử);
+            nếu (chỉ số < 0 || chỉ số >= số phần tử) { bỏ qua; };
+            nếu (đầu < bắt đầu || đầu >= cuối) { bỏ qua; };
+            nếu (các lệnh[cuối]["mã"] != "danh sách động" ||
+                các lệnh[cuối]["giá trị"] != số phần tử) { bỏ qua; };
+            hợp lệ = đúng;
+            vị trí = đầu;
+            lặp(j = 0; j < số phần tử; j++) {
+                n = độ dài phần tử[j];
+                nếu (n == -1) {
+                    nếu (vị trí >= cuối || các lệnh[vị trí]["mã"] != "số nguyên") { hợp lệ = sai; thoát; };
+                    n = 1;
+                };
+                nếu (n <= 0 || n > cuối - vị trí) { hợp lệ = sai; thoát; };
+                // Assignment IR does not necessarily leave a stack value.
+                // Do not project such expressions, even when selected.
+                lặp(k = vị trí; k < vị trí + n; k++) {
+                    mã = các lệnh[k]["mã"];
+                    nếu (mã == "chuẩn bị gán" || mã == "chuẩn bị gán thành viên" ||
+                        mã == "gán tên" || mã == "gán thành viên" || mã == "gán chỉ số" ||
+                        mã == "chuẩn bị gán kết hợp chỉ số" || mã == "toán tử gán") {
+                        hợp lệ = sai; thoát;
+                    };
+                };
+                nếu (!hợp lệ) { thoát; };
+                vị trí += n;
+            };
+            nếu (!hợp lệ || vị trí != cuối) { bỏ qua; };
+            vị trí = đầu;
+            lặp(j = 0; j < số phần tử; j++) {
+                n = độ dài phần tử[j];
+                nếu (n == -1) {
+                    nếu (j != chỉ số) { bỏ lệnh[thành chuỗi(vị trí)] = đúng; };
+                    n = 1;
+                } hoặc nếu (j != chỉ số) {
+                    // Evaluate effects and exceptions in source order, then
+                    // drop just this result while retaining the selected root.
+                    bỏ giá trị[thành chuỗi(vị trí + n - 1)] = đúng;
+                };
+                vị trí += n;
+            };
+            bỏ lệnh[thành chuỗi(cuối)] = đúng;
+            nếu (trực tiếp) { bỏ lệnh[thành chuỗi(i - 1)] = đúng; };
+            bỏ lệnh[thành chuỗi(i)] = đúng;
+        };
+        nếu (máy ảo lấy độ dài(bỏ lệnh) == 0) {
+            lặp(i = bắt đầu; i < kết thúc; i++) {
+                mình.biên dịch phát mã IR có vị trí(các lệnh[i], trạng thái, thô);
+            };
+            trả về đúng;
+        };
+        lặp(i = bắt đầu; i < kết thúc; i++) {
+            khóa = thành chuỗi(i);
+            nếu (!máy ảo có khóa từ điển(bỏ lệnh, khóa)) {
+                mình.biên dịch phát mã IR có vị trí(các lệnh[i], trạng thái, thô);
+            };
+            // OP_BAT_LOI with slot -1 is the existing stack discard operation
+            // in VM and AOT. No exception handler is installed or removed.
+            nếu (máy ảo có khóa từ điển(bỏ giá trị, khóa)) {
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BAT_LOI"), 0, -1, 0);
+            };
         };
     };
 
@@ -1135,7 +1267,8 @@ lớp công khai Bộ Phát Bytecode {
         } hoặc {
             đã kiểm tra = lấy từ điển(phiên, "ngữ nghĩa đã kiểm tra", sai);
             cây = biên dịch kiểu cây hạ IR(sổ, đồ thị, đích, đã kiểm tra);
-            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng, đã kiểm tra);
+            biểu diễn trung gian = biên dịch hạ IR từ cây thuần(cây, đúng, đã kiểm tra,
+                lấy từ điển(phiên, "tối ưu IR", sai));
         };
         phần = mình.biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian, sổ, phụ thuộc, đồ thị, phiên);
         máy ảo thêm cuối danh sách(phiên["đã phát"], {"định danh": đích, "phần": phần});
@@ -1391,6 +1524,26 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo thêm cuối danh sách(các hàm, {"tên": tên hàm, "id": mã định danh, "tên index": tên chỉ mục,
                             "bytecode": []});
         };
+        // Mọi mô-đun dành cùng vùng slot cho hằng, kể cả khi không nhập hằng.
+        // Slot biến thông thường nằm sau vùng này, tránh ghi đè khi khởi tạo.
+        ô hằng = {};
+        nếu (đồ thị != rỗng) {
+            danh sách hằng = lấy từ điển(đồ thị, "ô nhớ hằng", []);
+            nếu (máy ảo lấy độ dài(danh sách hằng) > 0) {
+                nếu (!máy ảo có khóa từ điển(phiên, "bắt đầu ô hằng")) {
+                    phiên["bắt đầu ô hằng"] = máy ảo lấy độ dài(sổ["hàm"]);
+                };
+                bắt đầu hằng = phiên["bắt đầu ô hằng"];
+                lặp(i = máy ảo lấy độ dài(các ô nhớ); i < bắt đầu hằng; i++) {
+                    máy ảo thêm cuối danh sách(các ô nhớ, "");
+                };
+                lặp(i = 0; i < máy ảo lấy độ dài(danh sách hằng); i++) {
+                    tên hằng = danh sách hằng[i];
+                    ô hằng[tên hằng] = bắt đầu hằng + i;
+                    máy ảo thêm cuối danh sách(các ô nhớ, tên hằng);
+                };
+            };
+        };
         kiểu lớp đã khai = [];
         lặp(i = 0; i < máy ảo lấy độ dài(lấy từ điển(biểu diễn trung gian, "lớp", [])); i++) {
             máy ảo thêm cuối danh sách(kiểu lớp đã khai, biểu diễn trung gian["lớp"][i]["tên"]);
@@ -1398,10 +1551,15 @@ lớp công khai Bộ Phát Bytecode {
         // Index the stable local/visible function declarations once. Preserve
         // the first matching declaration and the original lookup precedence.
         chỉ mục hàm đã khai = {};
+        bảng chiếu = {};
         lặp(i = 0; i < máy ảo lấy độ dài(danh sách hàm đã khai); i++) {
             tên hàm = danh sách hàm đã khai[i];
             nếu (!máy ảo có khóa từ điển(chỉ mục hàm đã khai, tên hàm)) {
                 chỉ mục hàm đã khai[tên hàm] = danh sách hàm các mã định danh[i];
+                chỉ số chiếu = mình.IR chỉ số chiếu(các hàm biểu diễn trung gian[i]);
+                nếu (chỉ số chiếu >= 0) {
+                    bảng chiếu[tên hàm] = chỉ số chiếu;
+                };
             };
         };
         danh sách nhìn thấy = lấy từ điển(mô đun, "nhìn thấy", []);
@@ -1412,7 +1570,7 @@ lớp công khai Bộ Phát Bytecode {
                 chỉ mục hàm nhìn thấy[tên hàm] = danh sách nhìn thấy[i]["id"];
             };
         };
-        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chỉ mục symbol slots": {},
+        trạng thái = {"slots": các ô nhớ, "ô nhớ hằng": ô hằng, "khóa slots": [], "chỉ mục symbol slots": {},
                       "chỉ mục khóa slots": {}, "số khóa đã tra": 0, "chuỗi": sổ["chuỗi"],
                       "chỉ mục receiver": {}, "số receiver đã tra": 0,
                       "sổ hàm": sổ, "hàm ẩn danh": [],
@@ -1425,6 +1583,7 @@ lớp công khai Bộ Phát Bytecode {
                       "lớp nhập": biên dịch kiểu lớp chạy(sổ, mô đun),
                       "hàm đã khai": danh sách hàm đã khai, "hàm các mã định danh": danh sách hàm các mã định danh,
                       "chỉ mục hàm đã khai": chỉ mục hàm đã khai,
+                      "hàm chiếu": bảng chiếu,
                       "hàm nhìn thấy": danh sách nhìn thấy,
                       "chỉ mục hàm nhìn thấy": chỉ mục hàm nhìn thấy,
                       "liên mô đun": tên mô đun != "",
@@ -1487,9 +1646,7 @@ lớp công khai Bộ Phát Bytecode {
                 tên mã định danh = mình.biên dịch phát mã lưu chuỗi(trạng thái, tên hàm);
                 mình.biên dịch phát mã lệnh(đỉnh, biên dịch mã thao tác("OP_HAM"), tên mã định danh, mã định danh, 0);
             } hoặc {
-                lặp(j = mục["bắt đầu"]; j < mục["kết thúc"]; j++) {
-                    mình.biên dịch phát mã IR có vị trí(tất cả lệnh[j], trạng thái, đỉnh);
-                };
+                mình.biên dịch phát mã danh sách(tất cả lệnh, trạng thái, đỉnh, mục["bắt đầu"], mục["kết thúc"]);
             };
             };
             };

@@ -1,0 +1,9 @@
+nhập values.KEY_ROWS;
+nhập values.SQL_SELECT;
+nhập values.COMPUTED;
+nhập values.đọc giá trị;
+hàm chính() {
+    in SQL_SELECT + " " + KEY_ROWS;
+    in COMPUTED;
+    in đọc giá trị();
+};

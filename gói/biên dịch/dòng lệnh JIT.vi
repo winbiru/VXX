@@ -81,7 +81,19 @@ hàm chính() {
             máy ảo thêm cuối danh sách(các đối số, thành số nguyên(jit đối số(i)));
             i += 1;
         };
-        bộ = Bộ Biên Dịch JIT(đọc tệp(tệp));
+        văn bản = đọc tệp(tệp);
+        bộ = rỗng;
+        thử { bộ = Bộ Biên Dịch JIT(văn bản); }
+        bắt lỗi(e) {
+            // Only the implicit, argument-free entry may select the dynamic ABI.
+            // Compilation happens before guest execution, so no side effect is repeated.
+            nếu (đầu + 1 != đối số đếm()) { ném e; };
+            gốc = đọc biến môi trường("VPP_HOME", "");
+            nếu (gốc != "") { gốc = đường dẫn tuyệt đối(gốc); };
+            ảnh = jit động tệp(đường dẫn tuyệt đối(tệp), gốc);
+            thử { kết quả = ảnh.chạy(đầu); ảnh.đóng(); trả về kết quả; }
+            bắt lỗi(lỗi chạy) { ảnh.đóng(); ném lỗi chạy; };
+        };
         thử { kết quả = bộ.chạy(tên, các đối số); bộ.đóng(); trả về kết quả; }
         bắt lỗi(e) { bộ.đóng(); ném e; };
     } bắt lỗi(e) { in e; trả về 1; };

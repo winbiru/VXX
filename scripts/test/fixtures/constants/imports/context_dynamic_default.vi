@@ -1,0 +1,3 @@
+nhập values.COMPUTED;
+hàm lấy(số = COMPUTED) { trả về số; };
+hàm chính() { in lấy(); };

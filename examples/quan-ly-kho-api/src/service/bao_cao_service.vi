@@ -1,3 +1,4 @@
+nhập hằng.đơn hàng.*;
 nhập lõi;
 
 lớp công khai DịchVụBáoCáo {
@@ -29,7 +30,7 @@ lớp công khai DịchVụBáoCáo {
         đơnHoạtĐộng = 0;
         lặp(i = 0; i < độ dài(đơnHàng); i = i + 1) {
             đơn = đơnHàng[i];
-            nếu (đơn.trạngThái == "DA_HUY") {
+            nếu (đơn.trạngThái == ĐƠN_ĐÃ_HỦY) {
                 đơnĐãHủy = đơnĐãHủy + 1;
             } hoặc {
                 đơnHoạtĐộng = đơnHoạtĐộng + 1;

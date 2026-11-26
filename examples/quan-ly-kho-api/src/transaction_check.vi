@@ -1,3 +1,5 @@
+nhập hằng.trường dữ liệu.*;
+nhập hằng.giao dịch.*;
 nhập lõi;
 nhập nhập xuất;
 nhập repository.hop_dong.*;
@@ -34,20 +36,19 @@ hàm yêuCầuTransaction(điềuKiện, nhãn) {
 }
 
 hàm chính() {
-    đườngDẫn = ".tmp-transaction-products.json";
     dữLiệu = [
-        {"id": "SP-TX", "ten": "San pham transaction", "gia": 100, "tonKho": 5, "daBan": 0, "phienBan": 1}
+        {KHÓA_ID: "SP-TX", KHÓA_TÊN: "San pham transaction", KHÓA_GIÁ: 100, KHÓA_TỒN_KHO: 5, KHÓA_ĐÃ_BÁN: 0, KHÓA_PHIÊN_BẢN: 1}
     ];
-    ghi tệp(đườngDẫn, json tạo(dữLiệu));
+    ghi tệp(TỆP_GIAO_DỊCH, json tạo(dữLiệu));
 
-    khoSảnPhẩm = tạo kho sản phẩm tệp(đườngDẫn);
+    khoSảnPhẩm = tạo kho sản phẩm tệp(TỆP_GIAO_DỊCH);
     khoĐơnHàng = KhoĐơnHàngLỗi();
     dịchVụ = tạo dịch vụ đơn hàng(khoSảnPhẩm, khoĐơnHàng);
 
     bắtĐược = sai;
     thử {
         dịchVụ.đặtHàng("Khach transaction", [
-            {"maSanPham": "SP-TX", "soLuong": 2}
+            {KHÓA_MÃ_SẢN_PHẨM: "SP-TX", KHÓA_SỐ_LƯỢNG: 2}
         ]);
     } bắt lỗi (e) {
         bắtĐược = đúng;
@@ -59,6 +60,6 @@ hàm chính() {
     yêuCầuTransaction(sauLỗi.đãBán == 0, "đã bán phải rollback");
     yêuCầuTransaction(sauLỗi.phiênBản == 1, "phiên bản phải rollback");
 
-    xóa đường dẫn(đườngDẫn);
+    xóa đường dẫn(TỆP_GIAO_DỊCH);
     in "transaction rollback: PASS";
 };

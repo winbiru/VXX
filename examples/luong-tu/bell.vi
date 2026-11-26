@@ -1,12 +1,13 @@
+nhập hằng.chung.*;
 nhập lượng tử;
 hàm chính() {
-    mạch = Mạch Lượng Tử(2);
+    mạch = Mạch Lượng Tử(SỐ_QUBIT_BELL);
     mạch.h(0) .cx(0, 1);
     máy = Bộ Mô Phỏng Lượng Tử();
     trạng thái = máy.trạng thái(mạch);
     in trạng thái["xác suất"];
     mạch.đo tất cả();
-    kết quả = máy.chạy(mạch, 1024, 20261022);
+    kết quả = máy.chạy(mạch, SỐ_LẦN_ĐO, HẠT_NGẪU_NHIÊN_BELL);
     in kết quả["đếm"];
     in xuất openqasm(mạch);
 }
