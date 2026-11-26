@@ -40,7 +40,7 @@ hàm vm_dir_path(path) {
     trả về vm_path_handle(path);
 };
 hàm vm_dir_long_path_error() {
-    nếu (vm_get(4198464, 8) == 1) { trả về 36; }; // Linux ENAMETOOLONG
+    nếu (vm_get(4198464, 8) != 0) { trả về 36; }; // Linux and Windows ENAMETOOLONG
     trả về 63; // Darwin ENAMETOOLONG
 };
 hàm vm_dir_pair(a, b) {

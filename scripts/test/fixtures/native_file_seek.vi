@@ -1,4 +1,7 @@
 nhập gói.nhập xuất.tệp thô.*;
+nhập gói.nhập xuất.tệp.thử khóa tệp;
+nhập gói.nhập xuất.tệp.mở khóa tệp;
+nhập gói.nhập xuất.tệp.thử liên kết cứng;
 nhập gói.nhập xuất.bộ đệm tệp.Bộ Đệm Tệp;
 
 hàm đối số văn bản(i) {
@@ -85,5 +88,29 @@ hàm chính() {
     nếu (ten nền tảng máy ảo() != "windows") {
         nếu (tệp thô đồng bộ thư mục(".") != 0) { trả về 36; };
     };
+    đường khóa = đường + ".lock";
+    khóa = thử khóa tệp(đường khóa);
+    nếu (khóa == 0) { trả về 37; };
+    nếu (thử khóa tệp(đường khóa) != 0) { trả về 38; };
+    bỏ kết quả = mở khóa tệp(khóa);
+    nếu (máy tệp khóa(khóa) != -1 || tệp thô mã lỗi() != 9) { trả về 39; };
+    khóa = thử khóa tệp(đường khóa);
+    nếu (khóa == 0) { trả về 40; };
+    bỏ kết quả = mở khóa tệp(khóa);
+    nếu (tệp thô xóa(đường khóa) != 0) { trả về 41; };
+
+    đường liên kết = đường + ".link";
+    t = tệp thô mở(đường, 1);
+    nếu (tệp thô ghi(t, [65, 66], 2) != 2 || tệp thô đóng(t) != 0) { trả về 42; };
+    nếu (!thử liên kết cứng(đường, đường liên kết) || tệp thô mã lỗi() != 0) { trả về 43; };
+    nếu (thử liên kết cứng(đường, đường liên kết) || tệp thô mã lỗi() != 17) { trả về 44; };
+    t = tệp thô mở(đường, 3);
+    nếu (tệp thô ghi tại(t, [67], 1, 0) != 1 || tệp thô đồng bộ(t) != 0 || tệp thô đóng(t) != 0) { trả về 45; };
+    nếu (tệp thô xóa(đường) != 0) { trả về 46; };
+    t = tệp thô mở(đường liên kết, 0);
+    dữ liệu = [0, 0];
+    nếu (tệp thô đọc(t, dữ liệu, 2) != 2 || dữ liệu[0] != 67 || dữ liệu[1] != 66 || tệp thô đóng(t) != 0) { trả về 47; };
+    nếu (thử liên kết cứng(đường, đường + ".missing") || tệp thô mã lỗi() != 2) { trả về 48; };
+    nếu (tệp thô xóa(đường liên kết) != 0) { trả về 49; };
     in "Native file seek: PASS";
 };

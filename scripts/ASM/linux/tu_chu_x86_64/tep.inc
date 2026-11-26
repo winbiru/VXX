@@ -87,7 +87,7 @@ vpp_native_os_open:
 2:
     cmpl $514, %esi
     jne 3f
-    movl $66, %esi              // O_RDWR | O_CREAT
+    movl $66, %esi
 3:
     movl $438, %edx
     call Llinux_mo

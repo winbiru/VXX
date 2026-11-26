@@ -36,7 +36,7 @@ hàm pe rt tìm(kho, sym, ns, str, tên) {
 hàm pe rt thư viện(tên) {
     biến khóa = "|"; byte nối(khóa, tên); byte thêm(khóa, 124);
     biến kết quả = -1;
-    biến danh sách = "|VirtualAlloc|VirtualFree|TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|VirtualProtect|FlushInstructionCache|MultiByteToWideChar|WideCharToMultiByte|MoveFileExW|GetFileInformationByHandle|CreateFileW|CloseHandle|ReOpenFile|SetFilePointerEx|WriteFile|FlushFileBuffers|WaitForSingleObject|GetLastError|SetLastError|GetEnvironmentVariableW|GetModuleFileNameW|GetCommandLineW|LocalFree|";
+    biến danh sách = "|VirtualAlloc|VirtualFree|TlsAlloc|TlsFree|TlsGetValue|TlsSetValue|VirtualProtect|FlushInstructionCache|MultiByteToWideChar|WideCharToMultiByte|MoveFileExW|GetFileInformationByHandle|CreateFileW|CloseHandle|LockFileEx|CreateHardLinkW|ReOpenFile|SetFilePointerEx|WriteFile|FlushFileBuffers|WaitForSingleObject|GetLastError|SetLastError|GetEnvironmentVariableW|GetModuleFileNameW|GetCommandLineW|LocalFree|";
     nếu (byte tìm(danh sách, khóa) >= 0) { kết quả = 1; };
     byte hủy(danh sách);
     danh sách = "|_read|_write|_wopen|_close|_errno|_wunlink|_wmkdir|_waccess|_wmktemp_s|_get_osfhandle|_lseeki64|_wgetcwd|realloc|calloc|malloc|free|_beginthreadex|_wspawnvp|_cwait|atexit|";

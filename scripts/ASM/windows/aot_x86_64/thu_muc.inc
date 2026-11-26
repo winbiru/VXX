@@ -10,6 +10,10 @@ vpp_native_os_directory:
     je .Lwin_fsync
     cmpl $11, %r12d
     je .Lwin_dirsync
+    cmpl $12, %r12d
+    je .Lwin_lock
+    cmpl $13, %r12d
+    je .Lwin_hardlink
     cmpl $8, %r12d
     ja .Lwin_khong_hop_le
     cmpl $6, %r12d
@@ -280,3 +284,75 @@ vpp_native_os_directory:
 .Lwin_durable_api_error:
     call .Lwin_loi
     WIN_RA
+
+// LockFileEx holds an exclusive, nonblocking range lock until close.
+.Lwin_lock:
+    movl %r13d, %ecx
+    testl %ecx, %ecx
+    js .Lwin_durable_bad_fd
+    call _get_osfhandle
+    cmpq $-2, %rax
+    je .Lwin_durable_bad_fd
+    cmpq $-1, %rax
+    je .Lwin_durable_bad_fd
+    movq %rax, %rcx
+    movl $3, %edx
+    xorl %r8d, %r8d
+    movl $-1, %r9d
+    movl $-1, 32(%rsp)
+    movq $0, -88(%rbp)
+    movq $0, -80(%rbp)
+    movq $0, -72(%rbp)
+    movq $0, -64(%rbp)
+    leaq -88(%rbp), %rax
+    movq %rax, 40(%rsp)
+    call LockFileEx
+    testl %eax, %eax
+    jz .Lwin_durable_api_error
+    xorl %eax, %eax
+    WIN_RA
+
+.Lwin_hardlink:
+    cmpl $(VPP_ARENA_SIZE-4096), %r13d
+    ja .Lwin_khong_hop_le
+    cmpl $(VPP_ARENA_SIZE-4096), %r14d
+    ja .Lwin_khong_hop_le
+    leaq (%rbx,%r13), %rsi
+    leaq (%rbx,%r14), %rdi
+    movq %rsi, %rax
+    movl $4096, %ecx
+1:  cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp .Lwin_khong_hop_le
+2:  movq %rdi, %rax
+    movl $4096, %ecx
+3:  cmpb $0, (%rax)
+    je 4f
+    incq %rax
+    decl %ecx
+    jnz 3b
+    jmp .Lwin_khong_hop_le
+4:  movl $1, %ecx
+    movl $16384, %edx
+    call calloc
+    testq %rax, %rax
+    jz .Lwin_khong_hop_le
+    movq %rax, %r15
+    movq %rsi, %rcx
+    movq %r15, %rdx
+    call Lduong_utf8_sang_utf16
+    testl %eax, %eax
+    jz .Lwin_thu_muc_duong_loi
+    movq %rdi, %rcx
+    leaq 8192(%r15), %rdx
+    call Lduong_utf8_sang_utf16
+    testl %eax, %eax
+    jz .Lwin_thu_muc_duong_loi
+    leaq 8192(%r15), %rcx
+    movq %r15, %rdx
+    xorl %r8d, %r8d
+    call CreateHardLinkW
+    jmp .Lwin_thu_muc_doi_ket_qua

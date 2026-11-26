@@ -1013,9 +1013,32 @@ hàm vm_host(state, op, args) {
     };
     nếu (op == 218) { trả về vm_file_rename(a, b); };
     nếu (op == 219) { trả về vm_file_copy(state, a, b); };
-    // Hard-link creation is an optional optimization. Copy-and-rename uses
-    // the same immutable cache key when the OS boundary cannot link.
-    nếu (op == 220) { trả về vm_int(-1); };
+    nếu (op == 229) {
+        nếu (vm_tag(a) != 1) { trả về vm_error(2); };
+        biến token_lock = vm_number(a);
+        biến fd_lock = vm_file_fd(token_lock);
+        nếu (fd_lock < 0 || !vm_embedded_file_allowed(state, token_lock)) {
+            vm_set(state, 9, 9); trả về vm_int(-1);
+        };
+        biến status_lock = máy thư mục thô(12, fd_lock, 0);
+        nếu (status_lock < 0) { vm_set(state, 9, -status_lock); trả về vm_int(-1); };
+        vm_set(state, 9, 0); trả về vm_int(0);
+    };
+    nếu (op == 220) {
+        biến src_link = vm_dir_path(a);
+        nếu (src_link == -2) { vm_set(state, 9, vm_dir_long_path_error()); trả về vm_int(-1); };
+        nếu (src_link < 0) { trả về 0; };
+        biến dst_link = vm_dir_path(b);
+        nếu (dst_link < 0) {
+            byte hủy(src_link);
+            nếu (dst_link == -2) { vm_set(state, 9, vm_dir_long_path_error()); trả về vm_int(-1); };
+            trả về 0;
+        };
+        biến status_link = máy thư mục thô(13, thực thi nội dung đệm(thực thi các byte ô nhớ(src_link)), thực thi nội dung đệm(thực thi các byte ô nhớ(dst_link)));
+        byte hủy(src_link); byte hủy(dst_link);
+        nếu (status_link < 0) { vm_set(state, 9, -status_link); trả về vm_int(-1); };
+        vm_set(state, 9, 0); trả về vm_int(0);
+    };
     nếu (op >= 167 && op <= 172) {
         biến identity = máy tiến trình định danh thô(op - 167);
         // PID/PPID are signed i32; POSIX credentials are unsigned u32.

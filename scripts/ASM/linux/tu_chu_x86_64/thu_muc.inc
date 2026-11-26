@@ -53,6 +53,10 @@ vpp_native_os_directory:
     je Lvm_fsync_x86
     cmpl $11, %r15d
     je Lvm_dirsync_x86
+    cmpl $12, %r15d
+    je Lvm_lock_x86
+    cmpl $13, %r15d
+    je Lvm_link_x86
     cmpl $6, %r15d
     ja Lvm_thu_muc_sai_x86
     jne 1f
@@ -138,7 +142,8 @@ Lvm_dirsync_x86:
     leaq (%r12,%r13), %r13
     movq %r13, %rax
     movl $4096, %ecx
-1:  cmpb $0, (%rax)
+1:
+    cmpb $0, (%rax)
     je 2f
     incq %rax
     decl %ecx
@@ -165,6 +170,45 @@ Lvm_dirsync_x86:
     jz 6f
     movl %r15d, %eax
 6:
+    jmp Lvm_thu_muc_tra_ve_x86
+
+Lvm_lock_x86:
+    movl %r13d, %edi
+    movl $6, %esi
+    movl $73, %eax
+    syscall
+    jmp Lvm_thu_muc_tra_ve_x86
+Lvm_link_x86:
+    cmpl $(135271424 - 4096), %r13d
+    ja Lvm_thu_muc_sai_x86
+    cmpl $(135271424 - 4096), %r14d
+    ja Lvm_thu_muc_sai_x86
+    addq %r12, %r13
+    addq %r12, %r14
+    movq %r13, %rax
+    movl $4096, %ecx
+1:
+    cmpb $0, (%rax)
+    je 2f
+    incq %rax
+    decl %ecx
+    jnz 1b
+    jmp Lvm_thu_muc_sai_x86
+2:
+    movq %r14, %rax
+    movl $4096, %ecx
+3:
+    cmpb $0, (%rax)
+    je 4f
+    incq %rax
+    decl %ecx
+    jnz 3b
+    jmp Lvm_thu_muc_sai_x86
+4:
+    movq %r13, %rdi
+    movq %r14, %rsi
+    movl $86, %eax
+    syscall
     jmp Lvm_thu_muc_tra_ve_x86
 
 Lvm_thu_muc_duong_x86:

@@ -2369,7 +2369,10 @@
         "seek-ệ.bin"
       ],
       "absent": [
-        "seek-ệ.bin"
+        "seek-ệ.bin",
+        "seek-ệ.bin.lock",
+        "seek-ệ.bin.link",
+        "seek-ệ.bin.missing"
       ]
     },
     {
