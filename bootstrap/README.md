@@ -1,5 +1,19 @@
 # V++ platform bootstrap
 
+## Current full assembly seeds (2026-11-26)
+
+All three `vpp-full.S.gz` seeds were refreshed from source commit `b046ae3` using the macOS ARM64 full compiler (executable SHA-256 `cb4bd88e9f9da3581cc1f873f7fd387c8d8046849da198a101660bc47b982271`), with compiler workers disabled. The preceding assembly seeds predated random-write, file sync and directory sync and could not resolve their intrinsic calls in the current library at Stage 1. The i32 executable pins and macOS full executable pin are unchanged. The older assembly refreshes described below are historical provenance.
+
+Each target was emitted using `emit-program-asm`, preprocessed with `-DVPP_AOT_VPP_RUNTIME=1 -I scripts/ASM -I scripts/ASM/common`, and assembled both before and after preprocessing with Apple clang. The resulting objects matched byte-for-byte. The standalone assembly was compressed using `gzip -n -9`; all checksum manifests and the source-derived intrinsic coverage test pass.
+
+| Target | Raw assembly SHA-256 | Standalone assembly SHA-256 | Object SHA-256 |
+| --- | --- | --- | --- |
+| `x86_64-unknown-linux-gnu` | `7a2258d7a5c75cc730428ae2a30da0699093e93d3d372a74c02b926e8bd748f1` | `cc543e75e03c165c6da134c086a12a47a6031adda350c17c3937d2a524070fcd` | `ec4f26a674b69da771df66b65fad052b4642ab44ba6d1a7395a52e090800a478` |
+| `aarch64-apple-darwin` | `4f52a7db35f9029780d474899f426c6985471b70acf71c267830c7dbbe626a48` | `1b23f1cc4bcfc33fb46806aae335af4c5b154837bdb2824f5019f122d6025113` | `7cca69ded0e085cbadd5e149e1200744ecc54394355d360761bba3dfd69c3634` |
+| `x86_64-pc-windows-msvc` | `f5e5f470ee62ac4b78fdbdc9c4315bf496d9b98c5618626871d5a5685ec195f8` | `174ad4cd417930651a39011bed296c1f67272eb76704f8b7c5a911209bd9fd4a` | `557814641d529c59d4927610b4817de199fa46e05f7bf05f3776def88aaba43e` |
+
+The relinked macOS Stage 1 passed its code signature and dependency checks, compiled `native_path_kind.vi` with the external assembler disabled, and ran the fixture successfully. On Wine, the relinked Windows Stage 1 passed the PE audit and `--version`, and emitted assembly for a probe calling all three new intrinsics. The previous seed failed the same probe with an unresolved `máy tệp ghi tại` call. The initial Wine run used the POSIX locale and failed on Unicode paths. With `LANG=C.UTF-8` and `LC_ALL=C.UTF-8`, the refreshed Windows Stage 1 resolved the Unicode imports and emitted `native_path_kind.vi` successfully; the linked executable ran under Wine and printed `NATIVE PATH KIND OK`. On Linux, directly compiling the current runtime with the older pinned i32 still failed in `vm_slice` (exit 14), even with a current ASM host object. The normal source bootstrap rebuilt the ASM host from text, produced byte-identical i32 Stage 1 and Stage 2 compilers, and completed the current runtime object build. The refreshed full seed then linked, passed the static ELF audit, and compiled and ran all eleven Linux Stage 1 dynamic fixtures successfully under emulated Linux amd64. The full Windows fixture suite and native CI, including full Stage 2/3 convergence, remain to be verified.
+
 ## macOS ARM64
 
 The two seed executables are generated V++/ASM Mach-O binaries, not the old C++ host. They are pinned by `macos-arm64/SHA256SUMS`. The full seed is the locally verified 2026-11-14 stage3 from `vpp-macos-ci-split`, SHA-256 `832554cf16894f06a2a85e0aa21796e811334c1984ac98be424fe391e1cf8cd0`. Its stage2 and stage3 were byte-identical, both passed the four dynamic AOT golden fixtures, and it compiled and ran a direct Mach-O probe with the assembler unavailable as well as a legacy assembler/linker probe. It predates the current batch-build revision; the exact source commit of this local seed was not recorded. The i32 seed remains the 2026-11-13 refreshed benchmark runtime compiler. Both link only `/usr/lib/libSystem.B.dylib` and have an ad-hoc signature. No C or C++ source is compiled.

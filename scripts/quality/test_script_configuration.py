@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Regression checks for build-cache invalidation and test-runner configuration."""
+import gzip
 import importlib.util
 import json
 import os
@@ -191,6 +192,21 @@ class DiagnosticCatalogTests(unittest.TestCase):
 
     def source(self, name):
         return (ROOT / 'gói/chẩn đoán' / name).read_text(encoding='utf-8')
+
+    def test_full_bootstrap_seeds_include_intrinsics(self):
+        source = (ROOT / 'gói/biên dịch/nội tại.vi').read_text(encoding='utf-8')
+        names = re.findall(r'ca\s+"([^"\n]+)":\s*\{\s*trả về\s*\[biên dịch mã thao tác\(', source)
+        self.assertTrue(names, 'No compiler intrinsic registrations found')
+        for platform in ('linux-x86_64', 'macos-arm64', 'windows-x86_64'):
+            with self.subTest(platform=platform):
+                seed = gzip.decompress((ROOT / 'bootstrap' / platform / 'vpp-full.S.gz').read_bytes())
+                missing = []
+                for name in names:
+                    escaped = ''.join(chr(byte) if 32 <= byte < 127 else f'\\{byte:03o}'
+                                      for byte in name.encode('utf-8'))
+                    if f'.asciz "{escaped}"'.encode('ascii') not in seed:
+                        missing.append(name)
+                self.assertEqual(missing, [], 'Refresh the full compiler assembly seed')
 
     def test_generated_catalogs_and_abi(self):
         self.catalog.verify_abi(ROOT)
