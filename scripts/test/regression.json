@@ -3069,6 +3069,7 @@
     }
   ],
   "unregistered_sources": {
+    "scripts/test/fixtures/constants/imports/context_owner.vi": "Imported constant context support module",
     "scripts/test/fixtures/constants/imports/gói/package/chính.vi": "Imported constant support module",
     "scripts/test/fixtures/constants/imports/other.vi": "Imported constant support module",
     "scripts/test/fixtures/constants/imports/values.vi": "Imported constant support module",

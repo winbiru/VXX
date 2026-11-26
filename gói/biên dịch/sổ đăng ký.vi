@@ -54,6 +54,9 @@ hàm công khai biên dịch sổ thêm tên(bảng, tên, mã định danh, ph�
 };
 
 hàm công khai biên dịch sổ cấp hàm(sổ, mô đun, tên) {
+    nếu (máy ảo lấy độ dài(tên) >= 11 && máy ảo cắt chuỗi(tên, 0, 11) == "vpp_native_") {
+        ném "biên dịch sổ: tên hàm dành riêng cho hệ thống: " + tên;
+    };
     mã định danh = máy ảo lấy độ dài(sổ["hàm"]);
     // Function ID đã xác định khi dựng đồ thị. Với emitter đa mô-đun,
     // StringPool được cấp khi gặp predeclare thực tế của từng module.

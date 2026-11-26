@@ -964,7 +964,7 @@ def jit_i32_print(jit, source, cwd, env, logs, timeout):
     for label, code, status, stdout, diagnostic in (
         ("print-variable", "hàm chính() { biến số = 42; in số; trả về 0; };", 0, b"42\n", None),
         ("string-print", "hàm chính() { in ; trả về 0; };", 1, None, "thiếu toán hạng"),
-        ("legacy-print", "hàm chính() { in số(7); trả về 0; };", 1, None, "hàm chưa định nghĩa"),
+        ("legacy-print", "hàm chính() { in số(7); trả về 0; };", 1, None, "lời gọi chưa phân giải 'số'"),
         ("reserved-symbol", "hàm vpp_native_print_i32(x) { trả về x; }; hàm main() { trả về 0; };", 1, None, "dành riêng"),
     ):
         probe = cwd / (label + ".vi")
