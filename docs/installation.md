@@ -1,6 +1,6 @@
 # Cài đặt V++ (bản V++/ASM tự chủ)
 
-Để sử dụng V++ ngay, tải gói VDK đã biên dịch sẵn và thực hiện [hướng dẫn cài đặt từ VDK](../README.md#cài-đặt-từ-vdk). Phần dưới đây dành cho việc tự build từ mã nguồn.
+Bạn có thể [cài VDK từ gói phát hành](#cài-đặt-vdk-và-chọn-phiên-bản-sdk) hoặc tự build bộ công cụ từ mã nguồn.
 
 ## Build từ mã nguồn
 
@@ -49,10 +49,115 @@ Hai seed được kiểm tra SHA-256, chữ ký và thư viện động trước
 
 ## Cài đặt VDK và chọn phiên bản SDK
 
-Tải gói `VDK-<version>-<platform>.tar.gz` (macOS/Linux) hoặc
-`VDK-<version>-windows-x64.zip` (Windows) từ [GitHub Releases](https://github.com/winbiru/VXX/releases)
-cùng tệp `.sha256`. Xem [các bước kiểm tra checksum, giải nén và thiết lập PATH](../README.md#cài-đặt-từ-vdk).
-Không trộn các tệp từ hai SDK. Kiểm tra:
+Chọn gói cho hệ điều hành và kiến trúc của bạn, rồi tải cả gói và tệp `.sha256`
+tương ứng. [GitHub Releases](https://github.com/winbiru/VXX/releases)
+
+Dùng số phiên bản trong tên gói thay cho `1.0.0`. Đặt biến `archive` theo đúng
+tên tệp đã tải, kể cả chữ hoa hoặc chữ thường.
+
+| Nền tảng | Tên gói |
+| --- | --- |
+| macOS ARM64 (Apple Silicon) | `vdk-<version>-macos-arm64.tar.gz` |
+| Linux x86-64 | `vdk-<version>-linux-x64.tar.gz` |
+| Windows x86-64 | `vdk-<version>-windows-x64.zip` |
+
+Chạy các lệnh bên dưới trong thư mục tải xuống. Mỗi phiên bản VDK dùng một thư mục riêng.
+
+### macOS ARM64 và Linux x86-64
+
+Kiểm tra SHA-256 bằng lệnh tương ứng với hệ điều hành.
+
+```sh
+version=1.0.0
+# macOS ARM64
+archive="vdk-$version-macos-arm64.tar.gz"
+shasum -a 256 -c "$archive.sha256"
+
+# Linux x86-64: dùng hai dòng sau thay hai dòng macOS ở trên.
+# archive="vdk-$version-linux-x64.tar.gz"
+# sha256sum -c "$archive.sha256"
+```
+
+Khi checksum báo `OK`, giải nén gói và lưu `PATH` cùng cấu hình UTF-8 vào profile của shell.
+
+```sh
+sdk="$HOME/.vpp/vdk/$version"
+mkdir -p "$HOME/.vpp/vdk" && mkdir "$sdk" &&
+  tar -xzf "$archive" -C "$sdk" &&
+  export PATH="$sdk/bin:$PATH" &&
+  vdk cai-hien-thi &&
+  (
+    sdk_bin='$HOME/.vpp/vdk/'"$version"'/bin'
+    path_line=$(printf 'case ":$PATH:" in *":%s:"*) ;; *) export PATH="%s:$PATH" ;; esac' \
+      "$sdk_bin" "$sdk_bin")
+    case "${SHELL##*/}" in
+      zsh) set -- "${ZDOTDIR:-$HOME}/.zshrc" ;;
+      bash)
+        login_profile="$HOME/.profile"
+        if [ -f "$HOME/.bash_profile" ]; then
+          login_profile="$HOME/.bash_profile"
+        elif [ -f "$HOME/.bash_login" ]; then
+          login_profile="$HOME/.bash_login"
+        fi
+        set -- "$HOME/.bashrc" "$login_profile" ;;
+      *) set -- "$HOME/.profile" ;;
+    esac
+    for profile in "$@"; do
+      if ! grep -Fxq "$path_line" "$profile" 2>/dev/null; then
+        printf '\n%s\n' "$path_line" >> "$profile" || exit 1
+      fi
+    done
+  ) &&
+  vdk_locale=$(bash "$sdk/bin/vdk-display.sh" locale) &&
+  export LANG="$vdk_locale" LC_CTYPE="$vdk_locale" &&
+  if [ -n "${LC_ALL:-}" ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; then
+    unset LC_ALL
+  fi &&
+  vdk check-display &&
+  vdk phiên bản && vdk chẩn đoán
+```
+
+### Windows x86-64 (PowerShell)
+
+```powershell
+$version = "1.0.0"
+$archive = "vdk-$version-windows-x64.zip"
+$expected = ((Get-Content "$archive.sha256" -ErrorAction Stop) -split '\s+')[0]
+if ((Get-FileHash $archive -Algorithm SHA256 -ErrorAction Stop).Hash -ne $expected) {
+    throw "SHA-256 không khớp"
+}
+$sdk = Join-Path $env:LOCALAPPDATA "VPP\vdk\$version"
+if (Test-Path $sdk) { throw "Phiên bản VDK này đã được cài đặt" }
+Expand-Archive -Path $archive -DestinationPath $sdk -ErrorAction Stop
+$bin = Join-Path $sdk "bin"
+$env:Path = "$bin;$env:Path"
+
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$global:OutputEncoding = $utf8
+vdk cai-hien-thi
+if ($LASTEXITCODE -ne 0) { throw "VDK chưa lưu được cấu hình UTF-8" }
+
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $bin) {
+    $newPath = if ($userPath) { "$bin;$userPath" } else { $bin }
+    [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+}
+vdk check-display
+vdk phiên bản
+vdk chẩn đoán
+```
+
+Sau khi cài, mở terminal mới và chạy `vpp phiên bản` rồi `vdk phiên bản`.
+Nếu đã cài VDK theo hướng dẫn cũ, thêm đường dẫn `bin` của SDK đang dùng vào
+`PATH` trong profile shell, hoặc vào biến `Path` của tài khoản Windows.
+
+### Lệnh VDK và khóa phiên bản
+
+Trên Linux, launcher `vpp` cần `clang` trong `PATH`. Trên Linux và Windows,
+chế độ AOT cần Clang/LLD tương thích. Có thể dùng
+MSYS2 CLANG64 trên Windows. Một số lệnh VDK thường dùng gồm các lệnh sau.
 
 ```sh
 vdk trợ giúp
@@ -106,8 +211,8 @@ toolchain bên ngoài của VDK cũ không được đưa lại vào SDK mới.
 
 ### Cấu hình hiển thị tiếng Việt UTF-8
 
-Chạy `vdk cài hiển thị` để tự nguyện lưu cấu hình UTF-8 cho tài khoản hiện tại.
-Nếu terminal chưa nhập được dấu, dùng `vdk cai-hien-thi` hoặc `vdk install-display`.
+Các lệnh cài đặt chạy `vdk cai-hien-thi` để lưu cấu hình UTF-8 cho tài khoản hiện tại.
+Có thể chạy lại lệnh này bằng tên `vdk cài hiển thị` hoặc `vdk install-display`.
 Trên Windows, VDK dùng code page 65001 và cấu hình profile PowerShell 5.1/7
 với UTF-8 BOM; trên Linux/macOS chọn locale UTF-8 đã cài, ưu tiên tiếng Việt,
 sau đó C.UTF-8 hoặc locale UTF-8 khác. Không cần sudo hay thay đổi toàn hệ thống.
@@ -117,7 +222,6 @@ và trạng thái profile; font terminal vẫn phải hỗ trợ các ký tự t
 
 Các lệnh tiếng Anh cũ (`version`, `doctor`, `library list`, `build`, `run`,
 `jit`, `lint`, `vm-build`, `--vdk-home`) vẫn tương thích.
-Trên Linux/Windows cần clang/LLD phù hợp để biên dịch AOT.
 
 
 ### Gỡ cài đặt V++/VDK

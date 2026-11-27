@@ -16,7 +16,7 @@ Bộ đo so sánh đa ngôn ngữ vẫn mặc định 6 bài cũ;
 `--extended` chọn đủ 21 bài; V++ AOT, Python và Node.js đã có mã cho
 toàn bộ 21 bài. i32 có 3 bài, C++ và Java có 5 bài, Ruby có 6 bài.
 Mỗi runtime chỉ chạy những bài có trong manifest của nó.
-Kết quả đo ngày 16/11/2026 xem ở [README chính](../../README.md#-benchmark).
+Xem [kết quả đo ngày 16/11/2026](results-2026-11-16.md).
 
 | Nhóm | Workload | Đơn vị của một lượt |
 | --- | --- | --- |
