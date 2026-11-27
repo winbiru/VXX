@@ -8,31 +8,17 @@ model, interface, JSON, HTTP server, file I/O và exception nghiệp vụ.
 
 ## Yêu cầu — V++ 1.0
 
-Project này chạy trực tiếp bằng **V++ 1.0.0**. Runtime bundle của GitHub Release giữ tên asset
-ổn định để có thể tải bản phát hành mới nhất mà không hardcode tag.
+Project này sử dụng **V++ 1.0.0**. Tải gói VDK tương ứng từ
+[GitHub Releases](https://github.com/winbiru/VXX/releases) và làm theo
+[hướng dẫn cài đặt VDK](../../README.md#cài-đặt-từ-vdk) để kiểm tra checksum,
+giải nén và thêm thư mục `bin` vào PATH.
 
-### macOS
+Kiểm tra phiên bản trước khi chạy project:
 
-```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
-tar -xzf vpp-macos.tar.gz
-./install-vpp.sh
-source ~/.zshrc
-vpp giúp đỡ
+```sh
+vdk phiên bản
+vdk chẩn đoán
 ```
-
-### Linux x64
-
-```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
-tar -xzf vpp-linux-x64.tar.gz
-./install-vpp.sh
-vpp giúp đỡ
-```
-
-Installer mặc định cài `vpp`, thư viện chuẩn `gói/`, `templates/` và toàn bộ `examples/` vào
-`~/.local/bin`, đồng thời thiết lập `VPP_HOME`. Release workflow 1.0 dựng runtime bundle cho
-Linux, macOS và Windows, đồng thời phát hành thêm VDK đầy đủ theo nền tảng.
 
 ## Kiến trúc
 

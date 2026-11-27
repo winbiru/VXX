@@ -224,7 +224,7 @@ jobs:
         run: |
           package="$RUNNER_TEMP/vpp-install"
           python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity
-      - name: Build VPP and VDK release candidates
+      - name: Build VDK release candidate
         run: python3 scripts/quality/package_release.py --platform macos-arm64 --prefix "$RUNNER_TEMP/vpp-install" --output "$RUNNER_TEMP/release-candidates"
       - name: Upload release candidates
         uses: actions/upload-artifact@v4
@@ -389,7 +389,7 @@ jobs:
           package="$RUNNER_TEMP/linux-full/extracted"
           export VPP_AOT_LINUX_OBJECT_DIR="$package/share/vpp/native-vpp-runtime/linux-objects"
           python3 scripts/quality/check_full_batch.py --compiler "$package/bin/vpp" --logs regression-build-logs/batch-parity
-      - name: Build VPP and VDK release candidates
+      - name: Build VDK release candidate
         run: python3 scripts/quality/package_release.py --platform linux-x64 --prefix "$RUNNER_TEMP/linux-full/package" --output "$RUNNER_TEMP/release-candidates"
       - name: Upload release candidates
         uses: actions/upload-artifact@v4
@@ -589,7 +589,7 @@ jobs:
           $package = "$env:RUNNER_TEMP/windows-full/extracted"
           python scripts/quality/check_full_batch.py --compiler "$package/bin/vpp-native.exe" --clang "$env:VPP_CI_CLANG" --logs regression-build-logs/batch-parity
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build VPP and VDK release candidates
+      - name: Build VDK release candidate
         shell: pwsh
         run: |
           python scripts/quality/package_release.py --platform windows-x64 --prefix "$env:RUNNER_TEMP/windows-full/package" --output "$env:RUNNER_TEMP/release-candidates"
@@ -710,13 +710,14 @@ jobs:
           path: regression-logs/
 
   release-assets:
-    name: Attach verified VPP and VDK packages
+    name: Attach verified VDK packages
     if: github.event_name == 'release' && github.event.action == 'published'
     needs: [macos-regression, linux-regression, windows-regression, posix-worker-machine]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*
@@ -727,8 +728,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          version=$(python3 -c 'import json; print(json.load(open("vpp-libraries.json"))["sdkVersion"])')
           cd release-candidates
-          test "$(find . -maxdepth 1 -name '*.sha256' | wc -l)" -eq 6
-          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 12
-          sha256sum -c -- *.sha256
-          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" -- *
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 6
+          assets=()
+          for suffix in macos-arm64.tar.gz linux-x64.tar.gz windows-x64.zip; do
+            archive="VDK-${version}-${suffix}"
+            test -f "$archive"
+            test -f "$archive.sha256"
+            sha256sum -c -- "$archive.sha256"
+            assets+=("$archive" "$archive.sha256")
+          done
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" -- "${assets[@]}"

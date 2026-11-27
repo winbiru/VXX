@@ -1,5 +1,9 @@
 # Cài đặt V++ (bản V++/ASM tự chủ)
 
+Để sử dụng V++ ngay, tải gói VDK đã biên dịch sẵn và thực hiện [hướng dẫn cài đặt từ VDK](../README.md#cài-đặt-từ-vdk). Phần dưới đây dành cho việc tự build từ mã nguồn.
+
+## Build từ mã nguồn
+
 Bản hiện tại hỗ trợ bootstrap compiler đầy đủ trên **macOS ARM64 (Apple Silicon)**. CMake 3.20+, công cụ Xcode Command Line Tools (`xcode-select --install`) và shell Bash là các điều kiện build. Clang dùng để dịch Assembly của nền tảng và ở bước bootstrap seed cũ; không biên dịch C/C++. Compiler sinh ra dùng đường ARM64/Mach-O trực tiếp.
 
 ```sh
@@ -40,13 +44,15 @@ trên nền tảng đích.
 
 Hoặc dùng `bash scripts/unix/install-vpp.sh "$HOME/.local"`. Lệnh này không sửa shell profile. Thêm `$HOME/.local/bin` vào `PATH` nếu cần.
 
-Hai seed được kiểm tra SHA-256, chữ ký và thư viện động trước khi build. Đọc [bootstrap/README.md](../bootstrap/README.md) để thay seed. Linux/Windows và các dịch vụ của host cũ (VM CLI, LSP, package tooling) cần được chuyển sang native trước khi được phát hành ở nhánh này. Các bản phát hành cũ và tài liệu lịch sử không mô tả cách build của nhánh hiện tại.
+Hai seed được kiểm tra SHA-256, chữ ký và thư viện động trước khi build. Đọc [bootstrap/README.md](../bootstrap/README.md) để thay seed. Linux/Windows sử dụng quy trình bootstrap riêng tại tài liệu đó; các gói VDK được phát hành sau khi qua kiểm thử native trên nền tảng đích. Các bản phát hành cũ và tài liệu lịch sử không mô tả cách build của nhánh hiện tại.
 
 
 ## Cài đặt VDK và chọn phiên bản SDK
 
-Giải nén gói `vdk-<version>-<platform>` vào một thư mục riêng và thêm
-`bin` vào PATH. Không trộn các tệp từ hai SDK. Kiểm tra:
+Tải gói `VDK-<version>-<platform>.tar.gz` (macOS/Linux) hoặc
+`VDK-<version>-windows-x64.zip` (Windows) từ [GitHub Releases](https://github.com/winbiru/VXX/releases)
+cùng tệp `.sha256`. Xem [các bước kiểm tra checksum, giải nén và thiết lập PATH](../README.md#cài-đặt-từ-vdk).
+Không trộn các tệp từ hai SDK. Kiểm tra:
 
 ```sh
 vdk trợ giúp

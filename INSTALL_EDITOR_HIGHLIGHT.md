@@ -57,28 +57,21 @@ trong `PATH`. Có thể đặt đường dẫn thủ công bằng setting
 Khi binary compiler được build lại, extension tự khởi động lại LSP;
 có thể dùng lệnh `V++: Khởi động lại máy chủ ngôn ngữ` khi cần.
 
-## Cài V++ VM trực tiếp từ GitHub
+## Cài V++ từ gói VDK
 
-Extension có thể tải và cài V++ VM từ GitHub Releases chính thức:
+Tải VDK phù hợp từ [GitHub Releases](https://github.com/winbiru/VXX/releases)
+và làm theo [hướng dẫn cài đặt VDK](README.md#cài-đặt-từ-vdk) để thêm
+thư mục `bin` vào PATH. Khởi động lại VS Code để nhận PATH mới.
 
-`https://github.com/winbiru/VXX/releases`
+Các gói VDK bao gồm VM, compiler, runtime và công cụ native:
 
-Sau khi cài extension, mở Command Palette (`Cmd/Ctrl+Shift+P`) và chạy:
+- macOS Apple Silicon: `VDK-<version>-macos-arm64.tar.gz`
+- Linux x64: `VDK-<version>-linux-x64.tar.gz`
+- Windows x64: `VDK-<version>-windows-x64.zip`
 
-```text
-V++: Cài đặt/Cập nhật VM từ GitHub
-```
-
-Extension tải release mới nhất phù hợp với hệ điều hành, cài vào vùng lưu trữ riêng của extension và tự thêm thư mục VM vào `PATH`/`VPP_HOME` cho các terminal mới mở trong VS Code.
-
-Các asset release hiện được hỗ trợ:
-
-- macOS: `vpp-macos.tar.gz`
-- Linux x64: `vpp-linux-x64.tar.gz`
-- Windows x64: `vpp-windows-x64.zip`
-
-Bạn cũng có thể dùng `V++: Hiển thị thông tin VM` để xem VM đang được cài ở đâu,
-hoặc `V++: Mở GitHub Releases` để mở trang release.
+Nếu cần, cấu hình đường dẫn công cụ LSP qua setting `vpp.lsp.executable`.
+Extension hiện tự cấu hình terminal khi phát hiện workspace compiler native đã build trên macOS ARM64.
+Bạn có thể dùng lệnh `V++: Mở GitHub Releases` để mở trang tải VDK.
 
 ## V++-style installer
 

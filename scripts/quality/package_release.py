@@ -15,9 +15,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PLATFORMS = {
-    'macos-arm64': ('macos', 'arm64', 'vpp-macos.tar.gz'),
-    'linux-x64': ('linux', 'x64', 'vpp-linux-x64.tar.gz'),
-    'windows-x64': ('windows', 'x64', 'vpp-windows-x64.zip'),
+    'macos-arm64': ('macos', 'arm64', '.tar.gz'),
+    'linux-x64': ('linux', 'x64', '.tar.gz'),
+    'windows-x64': ('windows', 'x64', '.zip'),
 }
 
 
@@ -491,10 +491,9 @@ def main():
     if output == prefix or prefix in output.parents:
         parser.error('output must be outside the installation prefix')
     output.mkdir(parents=True, exist_ok=True)
-    _, _, vpp_name = PLATFORMS[args.platform]
+    _, _, extension = PLATFORMS[args.platform]
     install_uninstaller(prefix, args.platform)
     check_uninstaller(prefix, args.platform)
-    archive(prefix, output / vpp_name, args.platform, False)
     with tempfile.TemporaryDirectory(prefix='vdk release ') as work:
         sdk = Path(work) / 'SDK thử nghiệm'
         shutil.copytree(prefix, sdk, ignore=shutil.ignore_patterns('.vpp', '.git', '__pycache__', '.DS_Store', '._*'))
@@ -502,8 +501,7 @@ def main():
         install_uninstaller(sdk, args.platform)
         check_sdk(sdk, args.platform, version)
         check_uninstaller(sdk, args.platform, sdk=True)
-        extension = '.zip' if args.platform == 'windows-x64' else '.tar.gz'
-        archive(sdk, output / f'vdk-{version}-{args.platform}{extension}', args.platform, True)
+        archive(sdk, output / f'VDK-{version}-{args.platform}{extension}', args.platform, True)
 
 
 if __name__ == '__main__':

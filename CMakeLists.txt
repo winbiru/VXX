@@ -213,6 +213,6 @@ if(Python3_Interpreter_FOUND)
     COMMAND "${CMAKE_BINARY_DIR}/release-prefix/bin/vpp" vm-build "${CMAKE_BINARY_DIR}/release-prefix/share/vpp/gói/máy ảo/nhà cung cấp DNS.vi" -o "${CMAKE_BINARY_DIR}/release-prefix/bin/dns-provider.vmb"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/quality/package_release.py" --platform macos-arm64 --prefix "${CMAKE_BINARY_DIR}/release-prefix" --output "${CMAKE_BINARY_DIR}/release-candidates"
     DEPENDS vpp-cli vpp-vm vpp-jit vpp-tools vpp-graphics
-    COMMENT "Đóng gói VPP và VDK từ compiler hiện tại"
+    COMMENT "Đóng gói VDK từ compiler hiện tại"
     VERBATIM USES_TERMINAL)
 endif()

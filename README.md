@@ -10,7 +10,21 @@
 [![V++ native CI](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml/badge.svg)](https://github.com/winbiru/VXX/actions/workflows/native-vpp.yml)
 [![Release](https://img.shields.io/github/v/release/winbiru/VXX?display_name=tag)](https://github.com/winbiru/VXX/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/winbiru/VXX/total)](https://github.com/winbiru/VXX/releases)
+[![VDK checksums](https://img.shields.io/badge/VDK%20checksum-SHA--256-blue.svg)](#cài-đặt-từ-vdk)
+
+[![Self-hosted](https://img.shields.io/badge/Self--hosted-V%2B%2B%2FASM-blue.svg)](docs/compiler-self-hosting-status.md)
 [![V++/ASM](https://img.shields.io/badge/toolchain-V%2B%2B%2FASM-blue.svg)](CMakeLists.txt)
+[![Execution](https://img.shields.io/badge/Execution-AOT%20%7C%20JIT%20%7C%20VM-blue.svg)](#các-chế-độ-thực-thi)
+[![Standard library catalog: 53 libraries](https://img.shields.io/badge/stdlib%20catalog-53%20libraries-blue.svg)](vpp-libraries.json)
+[![Bootstrap and regression tests](https://img.shields.io/badge/tests-bootstrap%20%26%20regression-blue.svg)](#kiểm-thử-và-chất-lượng)
+
+[![VDK](https://img.shields.io/badge/VDK-1.0.0%20dev-blue.svg)](#cài-đặt-từ-vdk)
+[![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux%20%7C%20Windows-blue.svg)](#trạng-thái-nền-tảng)
+[![Architecture](https://img.shields.io/badge/Architecture-ARM64%20%7C%20x86__64-blue.svg)](#trạng-thái-nền-tảng)
+[![VS Code support](https://img.shields.io/badge/editor-VS%20Code-007ACC.svg)](INSTALL_EDITOR_HIGHLIGHT.md)
+[![Documentation](https://img.shields.io/badge/docs-reference-blue.svg)](docs/language-reference.md)
+[![Vietnamese language](https://img.shields.io/badge/language-Ti%E1%BA%BFng%20Vi%E1%BB%87t-blue.svg)](docs/chuan-ngu-phap-tieng-viet.md)
 
 [Chạy thử](#chạy-thử) · [Cài đặt](#cài-đặt-và-build) · [Kiến trúc](#kiến-trúc) · [Worker](#thực-thi-đồng-thời) · [Benchmark](#benchmark) · [Tài liệu](#tài-liệu)
 </div>
@@ -35,18 +49,20 @@ hàm chính() {
 };
 ```
 
-Sau khi build trên macOS ARM64, chạy từ thư mục repository:
+Sau khi [cài VDK](#cài-đặt-từ-vdk), mở terminal và chạy:
 
 ```sh
-./VPP run xin-chao.vi
+vdk chạy xin-chao.vi
 ```
 
 Biên dịch thành chương trình thực thi độc lập và chạy:
 
 ```sh
-./VPP build xin-chao.vi -o xin-chao
+vdk biên dịch xin-chao.vi --đầu-ra xin-chao
 ./xin-chao
 ```
+
+Trên Windows, dùng `vdk biên dịch xin-chao.vi --đầu-ra xin-chao.exe` và chạy `.\xin-chao.exe`.
 
 Ví dụ về hàm và điều kiện:
 
@@ -67,19 +83,68 @@ Xem thêm [các chương trình ví dụ](examples/) và [tham chiếu ngôn ng�
 
 ## Cài đặt và build
 
-Có thể xem các bản phát hành tại [GitHub Releases](https://github.com/winbiru/VXX/releases). Khi xây dựng từ source, chọn đúng quy trình theo hệ điều hành và kiến trúc CPU.
+### Cài đặt từ VDK
 
-### Gói phát hành VPP và VDK
+VDK (V++ Development Kit) chứa bộ biên dịch V++, runtime, VM, JIT, thư viện chuẩn, công cụ dòng lệnh, tài liệu, ví dụ và template dự án. Bạn có thể cài đặt từ gói đã biên dịch sẵn mà không cần clone repository hay tự bootstrap compiler.
 
-CI tạo các gói từ bộ biên dịch native hiện tại đã qua kiểm tra bootstrap, không sử dụng binary phát hành cũ. Mỗi gói có tệp `.sha256` tương ứng.
+Mở [GitHub Releases](https://github.com/winbiru/VXX/releases), chọn phiên bản đã có gói VDK trong **Assets**, rồi tải gói phù hợp với hệ điều hành cùng tệp `.sha256` tương ứng.
 
-| Nền tảng | VPP | VDK 1.0.0 |
-| --- | --- | --- |
-| Linux x86_64 | `vpp-linux-x64.tar.gz` | `vdk-1.0.0-linux-x64.tar.gz` |
-| macOS ARM64 | `vpp-macos.tar.gz` | `vdk-1.0.0-macos-arm64.tar.gz` |
-| Windows x86_64 | `vpp-windows-x64.zip` | `vdk-1.0.0-windows-x64.zip` |
+| Nền tảng | Tên gói phát hành |
+| --- | --- |
+| macOS ARM64 (Apple Silicon) | `VDK-<version>-macos-arm64.tar.gz` |
+| Linux x86_64 | `VDK-<version>-linux-x64.tar.gz` |
+| Windows x86_64 | `VDK-<version>-windows-x64.zip` |
 
-Cả hai gói có compiler, runtime, VM, JIT và thư viện chuẩn. VDK bổ sung manifest, tài liệu, template dự án, ví dụ, metadata editor và CLI quản lý viết bằng V++ (`vdk-info`), với launcher theo nền tảng. Sau khi giải nén, thêm thư mục `bin` vào `PATH`:
+`<version>` là phiên bản SDK ghi trong tên gói, ví dụ `1.0.0`. Thực hiện các lệnh sau trong thư mục chứa hai tệp vừa tải và thay phiên bản cho phù hợp.
+
+#### macOS ARM64 và Linux x86_64
+
+```sh
+version=1.0.0
+# macOS Apple Silicon
+archive="VDK-$version-macos-arm64.tar.gz"
+shasum -a 256 -c "$archive.sha256"
+
+# Nếu dùng Linux x86_64, thay hai dòng trên bằng:
+# archive="VDK-$version-linux-x64.tar.gz"
+# sha256sum -c "$archive.sha256"
+```
+
+Chỉ tiếp tục khi checksum báo OK. Giải nén vào thư mục riêng theo phiên bản:
+
+```sh
+sdk="$HOME/.vpp/vdk/$version"
+mkdir -p "$HOME/.vpp/vdk" && mkdir "$sdk" &&
+  tar -xzf "$archive" -C "$sdk" &&
+  export PATH="$sdk/bin:$PATH" &&
+  vdk phiên bản && vdk chẩn đoán
+```
+
+Để dùng V++ trong các terminal sau, thêm dòng `export PATH="$HOME/.vpp/vdk/1.0.0/bin:$PATH"` vào `~/.zshrc` (Zsh) hoặc `~/.bashrc` (Bash), thay `1.0.0` bằng phiên bản đã cài.
+
+#### Windows x86_64 (PowerShell)
+
+```powershell
+$version = "1.0.0"
+$archive = "VDK-$version-windows-x64.zip"
+$expected = ((Get-Content "$archive.sha256" -ErrorAction Stop) -split '\s+')[0]
+if ((Get-FileHash $archive -Algorithm SHA256 -ErrorAction Stop).Hash -ne $expected) {
+    throw "SHA-256 không khớp"
+}
+$sdk = Join-Path $env:LOCALAPPDATA "VPP\vdk\$version"
+if (Test-Path $sdk) { throw "Phiên bản VDK này đã được cài đặt" }
+Expand-Archive -Path $archive -DestinationPath $sdk -ErrorAction Stop
+$bin = Join-Path $sdk "bin"
+$env:Path = "$bin;$env:Path"
+vdk phiên bản
+vdk chẩn đoán
+```
+
+Để lưu PATH cho các terminal sau, mở **Environment Variables** của tài khoản Windows, thêm thư mục `%LOCALAPPDATA%\VPP\vdk\1.0.0\bin` vào biến `Path` người dùng (thay phiên bản tương ứng), sau đó mở terminal mới.
+
+Mỗi phiên bản cần một thư mục riêng. Linux và Windows cần Clang/LLD tương thích để biên dịch AOT (Windows dùng toolchain Clang/LLD như MSYS2 CLANG64). Toolchain bên ngoài không nằm trong VDK.
+
+#### Sử dụng V++
 
 ```sh
 vdk trợ giúp
@@ -87,17 +152,16 @@ vdk phiên bản
 vdk chẩn đoán
 vdk thư viện danh sách
 vdk thư viện danh sách --json
-vdk cài hiển thị
-vdk kiểm tra hiển thị
-vdk biên dịch hello.vi --đầu-ra hello
-vdk chạy hello.vi
-vdk chạy tức thời hello.vi
-vdk kiểm tra hello.vi
-vdk biên-dịch-máy-ảo hello.vi --đầu-ra hello.vmb
-vdk gỡ hiển thị
+vdk chạy xin-chao.vi
+vdk biên dịch xin-chao.vi --đầu-ra xin-chao
+vdk chạy tức thời xin-chao.vi
+vdk kiểm tra xin-chao.vi
+vdk biên-dịch-máy-ảo xin-chao.vi --đầu-ra xin-chao.vmb
 ```
 
-Lệnh tiếng Việt là giao diện chính; alias tiếng Anh vẫn tương thích. Cài hiển thị là tùy chọn, chỉ sửa profile người dùng. Mở terminal mới sau khi cài/gỡ. Nếu chưa gõ được dấu, dùng `vdk cai-hien-thi`. Tùy chọn `--vdk-home` tương đương `--thư-mục-vdk`.
+VDK cũng cung cấp lệnh `vpp` trong thư mục `bin`. Các alias tiếng Anh như `vdk version`, `vdk doctor` và `vdk run` vẫn tương thích.
+
+Nếu cần cấu hình hiển thị tiếng Việt UTF-8, dùng `vdk cài hiển thị` (hoặc `vdk cai-hien-thi`), mở terminal mới và chạy `vdk kiểm tra hiển thị`. Có thể hoàn tác bằng `vdk gỡ hiển thị`. Để gỡ SDK, dùng `vdk gỡ cài đặt` rồi bỏ đường dẫn phiên bản tương ứng khỏi PATH.
 
 Khóa phiên bản SDK theo dự án bằng tệp `vdk.json`:
 
@@ -112,11 +176,16 @@ SDK chứa launcher. `vdk --thư-mục-vdk <đường-dẫn> phiên bản` chỉ
 và vẫn phải khớp pin. Pin sai hoặc thiếu phiên bản yêu cầu sẽ trả lỗi.
 Xem [hướng dẫn VDK](docs/installation.md#cài-đặt-vdk-và-chọn-phiên-bản-sdk).
 
-Linux/Windows vẫn cần toolchain clang/LLD phù hợp cho AOT; không đóng kèm toolchain bên ngoài. Kiểm tra SHA-256 bằng `sha256sum -c <tên-gói>.sha256` (Linux), `shasum -a 256 -c <tên-gói>.sha256` (macOS), hoặc so sánh `Get-FileHash <tên-gói> -Algorithm SHA256` trên Windows.
+### Build từ mã nguồn
 
-Build gói trên macOS: `cmake --build build-pure-vpp --target vpp-release-packages`. Kết quả nằm tại `build-pure-vpp/release-candidates/`. CI tải các gói ứng viên lên Actions; sự kiện publish GitHub Release chỉ đính kèm gói sau khi regression thành công và checksum hợp lệ, không ghi đè asset có sẵn.
+Các bước dưới đây dành cho người muốn tự build compiler hoặc phát triển V++.
 
-### macOS ARM64 (Apple Silicon)
+Build gói VDK trên macOS bằng `cmake --build build-pure-vpp --target vpp-release-packages`.
+Kết quả nằm tại `build-pure-vpp/release-candidates/`. CI tạo VDK từ compiler native
+đã qua kiểm tra bootstrap và đính kèm ba gói cùng checksum vào GitHub Release sau khi regression thành công,
+không ghi đè asset có sẵn.
+
+#### macOS ARM64 (Apple Silicon)
 
 Yêu cầu CMake 3.20 trở lên, Bash và Xcode Command Line Tools. CMake ở root hiện được cấu hình dành cho nền tảng này.
 
@@ -140,7 +209,7 @@ vpp --help
 
 Kết quả build gồm `vpp` (launcher), `vpp-native` (compiler đầy đủ), `vpp-i32` (compiler native i32), `vpp-vm` (VM độc lập), `vpp-jit` (JIT) trong `build-pure-vpp/bin/`, cùng các object runtime trong `build-pure-vpp/native-vpp-runtime/`.
 
-### Linux x86_64
+#### Linux x86_64
 
 Quy trình bootstrap riêng dùng Bash, Clang, linker ELF, binutils, Python 3 và GNU coreutils. Chạy từ root repository với thư mục đầu ra mới:
 
@@ -150,7 +219,7 @@ bash scripts/quality/check_linux_full_bootstrap.sh /tmp/vpp-linux-full-bootstrap
 
 Quy trình tạo và kiểm tra compiler đầy đủ, ELF tĩnh, các thế hệ tự biên dịch và gói phân phối. Không yêu cầu máy macOS để chạy trên Linux.
 
-### Windows x86_64
+#### Windows x86_64
 
 Dùng PowerShell, Python 3, CMake và toolchain Clang/LLD (MSYS2 CLANG64) có trong PATH. Chạy từ root repository với đường dẫn đầu ra mới:
 

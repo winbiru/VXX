@@ -148,9 +148,9 @@ variable-map rehash telemetry và bằng chứng CI trên SHA ứng viên.
   **Đạt khi:** tất cả job bắt buộc xanh trên đúng SHA, không dựa vào status
   commit/branch khác.
 - [ ] **REL-15 / P0 — Preflight packaging.** Chạy
-  `.github/workflows/release-binaries.yml` qua `workflow_dispatch` tại SHA
-  ứng viên để dựng `vpp-linux-x64.tar.gz`, `vpp-macos.tar.gz`,
-  `vpp-windows-x64.zip` cùng VDK; lưu SHA256 artifact và logs.
+  `.github/workflows/native-vpp.yml` qua `workflow_dispatch` tại SHA
+  ứng viên để dựng `VDK-<version>-linux-x64.tar.gz`, `VDK-<version>-macos-arm64.tar.gz`,
+  `VDK-<version>-windows-x64.zip` cùng checksum; lưu SHA256 artifact và logs.
   Kiểm tra Windows UTF-8, phụ thuộc DLL/so/dylib, quyền thực thi và không
   mang `.vpp` cache.
   **Đạt khi:** cả 3 job hoàn tất và artifact có thể tải/cài thử.
